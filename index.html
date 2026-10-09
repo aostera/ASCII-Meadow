@@ -236,16 +236,20 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     e.moving = len > 0.01;
     if (e.moving) {
       const nx = e.x + mx / len * speed * dt, ny = e.y + my / len * speed * dt * (CW / CH);
-      if (!blocked(nx, ny)) { e.x = nx; e.y = ny; }
-      else if (!blocked(nx, e.y)) e.x = nx;   // slide along the wall
-      else if (!blocked(e.x, ny)) e.y = ny;
+      if (!blocked(nx, ny, e)) { e.x = nx; e.y = ny; }
+      else if (!blocked(nx, e.y, e)) e.x = nx;   // slide along the wall
+      else if (!blocked(e.x, ny, e)) e.y = ny;
       e.step += dt * speed * 0.55;
       if (Math.abs(mx) >= Math.abs(my) * 0.75) { e.dir = 'side'; e.face = Math.sign(mx); }
       else e.dir = my > 0 ? 'down' : 'up';
     }
     e.x = Math.max(4, Math.min(COLS - 5, e.x));
     e.y = Math.max(8, Math.min(ROWS - 3, e.y));
+    const hs = surfAt(e.x, e.y);
+    if (isFinite(hs)) e.hT = hs;
+    e.h = (e.h || 0) + (e.hT - (e.h || 0)) * Math.min(1, dt * 14);   // climb each tread smoothly
   }
+  const liftPx = e => (e.h || 0) * COSP * MS;
 
   let t = 0;
   function simulate(dt) {
@@ -319,6 +323,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     }
 
     updateWorld(dt);
+    for (const b of braziers) updateFire(b, dt);
 
     // butterflies: drift toward a wandering home, scatter from anyone walking close
     for (const f of flies) {
@@ -407,7 +412,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   function updateCamera(dt, snap) {
     const tx = Math.max(0, Math.min(COLS - VC, player.x - VC / 2));
     const near = Math.max(0, Math.min(1, 1 - (player.y - (cathedral.gateRow || 0)) / (VR * 2)));  // by the castle, look up at it
-    const ty = Math.max(0, Math.min(ROWS - VR, player.y - VR * (0.72 + 0.18 * near)));
+    const ty = Math.max(0, Math.min(ROWS - VR, player.y - liftPx(player) / CH - VR * (0.72 + 0.18 * near)));
     const k = snap ? 1 : 1 - Math.exp(-dt * 3.5);
     camX += (tx - camX) * k; camY += (ty - camY) * k;
     VX0 = Math.max(0, Math.floor(camX) - 1); VX1 = Math.min(COLS - 1, Math.ceil(camX + VC) + 1);
@@ -525,7 +530,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     // apse
     addPrism(0, 870, 150, 8, Y0, Y0 + 580, 'wall', { win: [{ y0: Y0 + 230, h: 230, w: 30 }] });
     addCone(0, 870, 158, 8, Y0 + 580, Y0 + 760, 'roof');
-    for (const s of solids) { const b = s.bb; s.cx = (b[0] + b[1]) / 2; s.cy = (b[2] + b[3]) / 2; s.cz = (b[4] + b[5]) / 2; }
+    solids.forEach((s, i) => { const b = s.bb; s.id = i; s.cx = (b[0] + b[1]) / 2; s.cy = (b[2] + b[3]) / 2; s.cz = (b[4] + b[5]) / 2; });
   }
 
   function boxT(b, ox, oy, oz, ix, iy, iz) {
@@ -563,7 +568,9 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   function pointedArch(u, v, cx, w, y0, h) { const du = Math.abs(u - cx) / (w / 2); return du < 1 && v > y0 && v < y0 + h * (1 - 0.55 * (1 - Math.sqrt(Math.max(0, 1 - du * du)))); }
   // carving on the stone as a function of the hit point: courses, ashlar, windows, portals, the rose
+  let ORN_WIN = -1;  // set by ornament when the hit falls in a window opening
   function ornament(x, y, z, n, so, base) {
+    ORN_WIN = -1;
     const kind = so.kind, M = so.meta;
     let v = base;
     if (kind === 'roof') { if (((y / 16) % 1) < 0.2) v *= 0.55; if ((((x + z) / 34) % 1 + 1) % 1 < 0.08) v *= 0.8; return v; }
@@ -585,12 +592,17 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     if (M.rose && front) {
       const R = M.rose, d = Math.hypot(u - R.u, y - R.y);
       if (d < R.r * 1.12 && d >= R.r) return Math.min(1, v * 1.5);
-      if (d < R.r) { const a = Math.atan2(y - R.y, u - R.u); if (d < R.r * 0.15 || Math.abs(d - R.r * 0.58) < R.r * 0.06 || d > R.r * 0.9 || (Math.abs(Math.sin(a * 6)) < 0.15 && d > R.r * 0.15)) return 0.9; return 0.03; }
+      if (d < R.r) { const a = Math.atan2(y - R.y, u - R.u); if (d < R.r * 0.15 || Math.abs(d - R.r * 0.58) < R.r * 0.06 || d > R.r * 0.9 || (Math.abs(Math.sin(a * 6)) < 0.15 && d > R.r * 0.15)) return 0.9; ORN_WIN = 1e6; return 0.03; }
     }
-    if (M.win) for (const b of M.win) {
+    if (M.win) for (let bi = 0; bi < M.win.length; bi++) {
+      const b = M.win[bi];
       if (y < b.y0 - 8 || y > b.y0 + b.h + 8 || (b.front && !front)) continue;
       const sp = b.sp || 1e9, local = sp >= 1e8 ? u : (((u % sp) + sp) % sp) - sp / 2;
-      if (pointedArch(local, y, 0, b.w, b.y0, b.h)) return Math.abs(local) < 1.4 && b.w > 24 ? 0.5 : 0.03;
+      if (pointedArch(local, y, 0, b.w, b.y0, b.h)) {
+        if (Math.abs(local) < 1.4 && b.w > 24) return 0.5;
+        ORN_WIN = so.id * 997 + bi * 61 + (sp >= 1e8 ? 0 : Math.floor(u / sp + 0.5) & 31) + Math.round(n[0] * 3 + n[2] * 7) * 13;
+        return 0.03;
+      }
       if (pointedArch(local, y, 0, b.w + 10, b.y0 - 5, b.h + 12)) return Math.min(1, v * 1.5);
     }
     return v;
@@ -605,7 +617,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const cx0 = Math.max(0, Math.floor((ox - 820 * MS) / CW)), cx1 = Math.min(COLS - 1, Math.ceil((ox + 820 * MS) / CW));
     const cy0 = Math.max(0, Math.floor((oy - 2150 * MS) / CH)), cy1 = Math.min(ROWS - 1, Math.ceil((oy + 110 * MS) / CH));
     const BW = cx1 - cx0 + 1, BH2 = cy1 - cy0 + 1;
-    const lum = new Float32Array(BW * BH2).fill(-1), dep = new Float32Array(BW * BH2), face = new Uint8Array(BW * BH2);
+    const lum = new Float32Array(BW * BH2).fill(-1), dep = new Float32Array(BW * BH2), face = new Uint8Array(BW * BH2), lit = [];
     for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
       const sx = (cx + 0.5) * CW, sy = (cy + 0.5) * CH;
       const px = (sx - ox) / MS, py = -(sy - oy) / MS * COSP, pz = -(sy - oy) / MS * SINP;
@@ -624,6 +636,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       v *= 0.82 + 0.3 * vnoise(hx * 0.03 + hz * 0.02, hy * 0.04) + (hash(cx, cy) - 0.5) * 0.12;
       const k = (cy - cy0) * BW + (cx - cx0);
       lum[k] = Math.max(0.02, v); dep[k] = oy - hz * SINP * MS; face[k] = ft;
+      if (ORN_WIN >= 0 && ft === 4 && (ORN_WIN === 1e6 || hash(ORN_WIN, 7) < 0.32)) lit.push(cx, cy, ORN_WIN === 1e6 ? -1 : ORN_WIN);
     }
     for (let y = 1; y < BH2; y++) for (let x = 0; x < BW; x++) { const k = y * BW + x; if (lum[k] >= 0 && lum[k - BW] < 0) lum[k] = Math.min(1, lum[k] + 0.25); }
     const bd = Math.min(DPR, Math.sqrt(14e6 / (BW * CW * BH2 * CH)), 4096 / (BW * CW), 4096 / (BH2 * CH));             // keep the baked layer under mobile canvas limits
@@ -643,7 +656,14 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       lev[k] = BL0 + Math.min(BLN - 1, (Math.pow(Math.min(1, v * 1.15), 0.7) * BLN) | 0);
       ctxBlit(g, glyph[k], lev[k], x * CW, y * CH);
     }
-    Object.assign(cathedral, { cv, cx0, cy0, BW, BH: BH2, lum, dep, glyph, lev, ox, oy, face, gateRow: (oy + 110 * SINP * MS) / CH });
+    Object.assign(cathedral, { cv, cx0, cy0, BW, BH: BH2, lum, dep, glyph, lev, ox, oy, face, gateRow: (oy + 110 * SINP * MS) / CH, lit });
+    // one glow per lit window, at its centre
+    const wins = new Map();
+    for (let j = 0; j < lit.length; j += 3) { const w = wins.get(lit[j + 2]) || [0, 0, 0]; w[0] += lit[j]; w[1] += lit[j + 1]; w[2]++; wins.set(lit[j + 2], w); }
+    cathedral.glows = [...wins].map(([id, w]) => ({ id, x: (w[0] / w[2] + 0.5) * CW, y: (w[1] / w[2] + 0.5) * CH, r: Math.sqrt(w[2]) * CW * (id < 0 ? 2.2 : 3.2) }));
+    // two small fires on the terrace, either side of the gate
+    braziers.length = 0;
+    for (const sx of [-1, 1]) braziers.push({ isFire: true, x: (ox + sx * 92 * MS) / CW, y: (oy - 62 * SINP * MS) / CH - 0.7, lift: 120 * COSP * MS, parts: [], seed: sx });
     GB.spr[CAST] = [0, 0, cv.width, cv.height, BW * CW, BH2 * CH, 0, 0, 0, 0, 1, 1];
     if (GL.ok) GL.uploadCastle(cv);
     // footprint (collision), ground shadows and a little contact darkness
@@ -660,15 +680,28 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       if (cast(gx, 0.5, gz, LGT[0], LGT[1], LGT[2], 0.01)) bshade[i] = 0.38;
     }
     props.length = 0;
-    props.push({ spots: [{ x: ox / CW, y: (oy + 118 * SINP * MS) / CH, r: 16, label: 'climb to the great gate', use: () => say(player, 'the gate is sealed. something stirs within.') }] });
+    props.push({ spots: [{ x: ox / CW, y: (oy - 72 * SINP * MS) / CH - 0.7, r: 14, need: () => (player.hT || 0) > 100, label: 'push the great gate', use: () => say(player, 'the gate is sealed. something stirs within.') }] });
   }
 
   function say(e, text) { e.say = text; e.sayT = 3; }
 
-  function blocked(x, y) {
-    const cx = Math.round(x), cy = Math.round(y + 0.2);
-    if (cx < 0 || cy < 0 || cx >= COLS || cy >= ROWS) return true;
-    return bmask[cy * COLS + cx] === 1;
+  // Grid position → castle model ground point under the feet.
+  const toModelXZ = (x, y) => [(x * CW - cathedral.ox) / MS, -((y + 0.7) * CH - cathedral.oy) / (SINP * MS)];
+  // Height of the walkable surface under a point: 0 on the field, the top of rock or stair on the mound,
+  // Infinity inside walls and towers.
+  function surfAt(x, y) {
+    if (!cathedral.cv) return 0;
+    const [gx, gz] = toModelXZ(x, y);
+    if (gz < -140 || gz > 1060 || Math.abs(gx) > 800) return 0;
+    const h = cast(gx, 5000, gz, 0, -1, 0, 0);
+    if (!h) return 0;
+    return h.kind === 'rock' || h.kind === 'step' ? 5000 - h.t : Infinity;
+  }
+  const STEP_UP = 30;  // a stair tread is 24: anything higher is a wall to climb
+  function blocked(x, y, e) {
+    if (x < 1 || y < 1 || x >= COLS - 1 || y >= ROWS - 1) return true;
+    const h = surfAt(x, y);
+    return !isFinite(h) || Math.abs(h - (e ? e.hT || 0 : 0)) > STEP_UP;
   }
 
   function updateWorld(dt) {
@@ -678,7 +711,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     activeSpot = null; let best = 1e9;
     for (const p of props) for (const sp of p.spots || []) {
       const d = Math.hypot(sp.x - player.x, (sp.y - player.y) * CH / CW);
-      if (d < sp.r && d < best) { best = d; activeSpot = sp; }
+      if (d < sp.r && d < best && (!sp.need || sp.need())) { best = d; activeSpot = sp; }
     }
     player.sayT -= dt;
   }
@@ -701,10 +734,11 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     if (!C.cv) return;
     const feet = (e.y + 0.7) * CH;
     const hw = knightPx() * 0.7 / CW, x0 = Math.max(C.cx0, Math.floor(e.x - hw)), x1 = Math.min(C.cx0 + C.BW - 1, Math.ceil(e.x + hw));
-    const y0 = Math.max(C.cy0, Math.floor(e.y - knightPx() / CH - 2)), y1 = Math.min(C.cy0 + C.BH - 1, Math.ceil(e.y + 1));
+    const top = e.y - (liftPx(e) + knightPx()) / CH - 2;
+    const y0 = Math.max(C.cy0, Math.floor(top)), y1 = Math.min(C.cy0 + C.BH - 1, Math.ceil(e.y + 1 - liftPx(e) / CH));
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
       const k = (cy - C.cy0) * C.BW + (cx - C.cx0);
-      if (C.lum[k] < 0 || C.dep[k] <= feet) continue;
+      if (C.lum[k] < 0 || C.dep[k] <= feet + 1.5) continue;
       gput(SOLID_CELL, cx * CW, cy * CH, 1);
       if (C.glyph[k] >= 0) blit(C.glyph[k], C.lev[k], cx * CW, cy * CH);
     }
@@ -733,9 +767,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     if ((FG.tick++ & 1) && FG.tick > 2) return;
     const x0 = camX * CW, y0 = camY * CH, sx = W / fw, sy = H / fh, px = FG.img.data;
     for (let j = 0; j < fh; j++) for (let i = 0; i < fw; i++) {
-      const k = j * fw + i, d = fogDensity(x0 + (i + 0.5) * sx, y0 + (j + 0.5) * sy);
+      const wx = x0 + (i + 0.5) * sx, wy = y0 + (j + 0.5) * sy;
+      let d = fogDensity(wx, wy);
+      for (const b of braziers) { const dx = wx - b.x * CW, dy = (wy - ((b.y + 0.7) * CH - b.lift)) * 1.6, r = 120 * MS; d *= 1 - 0.55 * Math.exp(-(dx * dx + dy * dy) / (r * r)); }  // the heat thins the fog
+      const k = j * fw + i;
       FG.d[k] = d;
-      const c = 92 + d * 34, o = k * 4;          // dark, wet grey: it smothers the light rather than glowing
+      const c = 64 + d * 26, o = k * 4;          // dark, wet grey: it smothers the light rather than glowing
       px[o] = c; px[o + 1] = c; px[o + 2] = c; px[o + 3] = Math.min(175, d * 120 + d * d * 60);
     }
     FG.cv.getContext('2d').putImageData(FG.img, 0, 0);
@@ -792,7 +829,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     ctx.font = `500 ${fs}px "Rubik", system-ui, sans-serif`;
     const tw = ctx.measureText(txt).width, pad = 7;
     const x = Math.max(8, Math.min(W - tw - pad * 2 - 8, (player.x - camX) * CW - tw / 2 - pad));
-    const y = Math.min(H - fs - pad * 2 - 8, (player.y + 0.7 - camY) * CH + 12);
+    const y = Math.min(H - fs - pad * 2 - 8, (player.y + 0.7 - camY) * CH - liftPx(player) + 12);
     const pulse = 0.6 + 0.4 * Math.sin(t * 4);
     ctx.fillStyle = 'rgba(12,12,12,.9)'; ctx.strokeStyle = `rgba(250,250,250,${0.2 + 0.25 * pulse})`; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.rect(x, y, tw + pad * 2, fs + pad * 2); ctx.fill(); ctx.stroke();
@@ -800,6 +837,63 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     activeSpot.box = [x, y, tw + pad * 2, fs + pad * 2];
   }
   function useSpot() { if (activeSpot) activeSpot.use(); }
+
+  // ---------- light in the dark: a few lit windows and two small fires at the gate ----------
+  // Pale, almost colourless light: it thins the fog round it rather than warming the scene.
+  const braziers = [];
+  const LIGHTCH = ['#', '=', ':', '+', '%'].map(c => CI[c]);
+  const FLAMECH = ['^', '*', "'", '"', ',', '.'].map(c => CI[c]);
+  const flick = (k, sp) => 0.62 + 0.22 * Math.sin(t * sp + k * 1.7) + 0.16 * Math.sin(t * sp * 2.7 + k * 4.1);
+  function drawWindows() {
+    const L = cathedral.lit; if (!L) return;
+    for (let j = 0; j < L.length; j += 3) {
+      const id = L[j + 2], f = id < 0 ? 0.55 : flick(id, 2.2), cx = L[j], cy = L[j + 1];
+      const lv = BL0 + Math.min(BLN - 1, Math.round((0.7 + 0.3 * f) * (BLN - 1)));
+      blit(LIGHTCH[(hash(cx, cy) * LIGHTCH.length) | 0], lv, cx * CW, cy * CH, 0.75 + 0.25 * f);
+    }
+  }
+  function updateFire(b, dt) {
+    for (let k = 0; k < 6; k++) if (b.parts.length < 110 && Math.random() < dt * 60) { const sp = Math.random() - 0.5; b.parts.push({ x: sp * 26 * MS, y: 0, vy: -(30 + Math.random() * 46) * MS * (1 - Math.abs(sp)), vx: -sp * 14 * MS, life: 1, k: Math.random() }); }
+    for (let i = b.parts.length - 1; i >= 0; i--) {
+      const q = b.parts[i];
+      q.life -= dt * (0.9 + q.k * 0.8); q.y += q.vy * dt; q.x += (q.vx + Math.sin(t * 9 + q.k * 20) * 6 * MS) * dt;
+      if (q.life <= 0) b.parts.splice(i, 1);
+    }
+  }
+  function drawBrazier(b) {
+    const bx = b.x * CW, by = (b.y + 0.7) * CH - b.lift;
+    // the iron bowl: two rows of dark glyphs
+    // an iron bowl on a short stand
+    const bowl = ['\\', '=', '#', '=', '#', '=', '/'];
+    for (let k = 0; k < bowl.length; k++) blit(CI[bowl[k]], BL0 + 4 + (k === 2 || k === 4 ? 1 : 0), bx + (k - 3.5) * CW, by - CH * 1.6);
+    blit(CI['|'], BL0 + 3, bx - CW * 0.5, by - CH * 0.7); blit(CI['/'], BL0 + 3, bx - CW * 1.6, by - CH * 0.1); blit(CI['\\'], BL0 + 3, bx + CW * 0.6, by - CH * 0.1);
+    // embers in the bowl
+    for (let k = -2; k <= 2; k++) blit(CI[hash(k + 9, (t * 8) | 0) > 0.5 ? '*' : 'o'], BL0 + 9 + ((hash(k, (t * 6) | 0) * 4) | 0), bx + (k - 0.5) * CW, by - CH * 2.3);
+    for (const q of b.parts) {
+      const ci = FLAMECH[Math.min(FLAMECH.length - 1, ((1 - q.life) * FLAMECH.length) | 0)];
+      blit(ci, BL0 + Math.min(BLN - 1, Math.round(6 + q.life * 8)), bx + q.x - CW * 0.5, by - CH * 2.8 + q.y, Math.min(1, q.life * 1.6));
+    }
+  }
+  let glowCv = null;
+  function glowSprite() {
+    if (glowCv) return glowCv;
+    glowCv = document.createElement('canvas'); glowCv.width = glowCv.height = 128;
+    const g = glowCv.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, 'rgba(236,232,222,1)'); gr.addColorStop(0.25, 'rgba(236,232,222,.45)'); gr.addColorStop(1, 'rgba(236,232,222,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    return glowCv;
+  }
+  function drawLights() {  // on the overlay, above the fog, so the light pushes through it
+    const G = glowSprite(), ox = camX * CW, oy = camY * CH;
+    const spot = (x, y, r, a) => { x -= ox; y -= oy; if (x + r < 0 || y + r < 0 || x - r > W || y - r > H) return; ctx.globalAlpha = Math.max(0, Math.min(1, a)); ctx.drawImage(G, x - r, y - r, r * 2, r * 2); };
+    for (const w of cathedral.glows || []) spot(w.x, w.y, w.r * 1.5, (w.id < 0 ? 0.2 : 0.42) * (w.id < 0 ? 1 : flick(w.id, 2.2)));
+    for (const b of braziers) {
+      const bx = b.x * CW, by = (b.y + 0.7) * CH - b.lift - CH * 3.5, f = flick(b.seed * 3, 11);
+      spot(bx, by + CH, 200 * MS * (0.9 + 0.1 * f), 0.24 * f);   // a pool on the stone and in the fog
+      spot(bx, by, 60 * MS, 0.42 * f);                          // the heart of the flame
+    }
+    ctx.globalAlpha = 1;
+  }
 
   function render() {
     ctx.clearRect(0, 0, W, H);
@@ -811,7 +905,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
     drawCathedral();
     const C = cathedral;
-    const order = ents.slice().sort((a, b) => a.y - b.y);
+    drawWindows();
+    const order = [...ents, ...braziers].sort((a, b) => a.y - b.y);
     let oi = 0;
     let cloudRow = 0;
     const boxes = [];  // people already drawn: grass in front of them gets a dark backing so it hides their legs
@@ -830,6 +925,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     for (let y = VY0; y <= VY1 + 4 && y < ROWS; y++) {
       while (oi < order.length && (order[oi].y + 0.7) * CH < (y + 1) * CH) {
         const e = order[oi++];
+        if (e.isFire) { drawBrazier(e); continue; }
         drawEntity(e); occlude(e);
         const G = geomOf(e); boxes.push([G.left + G.w * 0.18, G.top + G.h * 0.05, G.left + G.w * 0.82, G.gy + 2]);
       }
@@ -866,7 +962,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         }
       }
     }
-    while (oi < order.length) { const e = order[oi++]; drawEntity(e); occlude(e); }
+    while (oi < order.length) { const e = order[oi++]; if (e.isFire) drawBrazier(e); else { drawEntity(e); occlude(e); } }
 
     for (const d of dew) {
       const i = d.i, x = i % COLS, y = (i / COLS) | 0;
@@ -894,6 +990,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     drawFog();
     ctx.restore();
     drawFogField();
+    drawLights();
 
     // ash
     for (const m of motes) {
@@ -1110,7 +1207,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   function geomOf(e) {
     const { u } = charDims(e);
     if (e.cls === 'knight') {
-      const k = knightPx() / KS.fh, gx = e.x * CW, gy = (e.y + 0.7) * CH;
+      const k = knightPx() / KS.fh, gx = e.x * CW, gy = (e.y + 0.7) * CH - liftPx(e);
       return { u, k, gx, gy, top: gy - KS.fy * k, left: gx - KS.fx * k, w: KS.tw * k, h: KS.th * k };
     }
     const gx = e.x * CW, gy = (e.y + 0.7) * CH;
