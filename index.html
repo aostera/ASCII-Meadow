@@ -1264,7 +1264,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   }
 
   // ---------- light in the dark: a few lit windows and two small fires at the gate ----------
-  // Pale, almost colourless light: it thins the fog round it rather than warming the scene.
+  // The windows give a pale, almost colourless light; the two fires burn warm and colour whoever comes close.
   const braziers = [];
   const LIGHTCH = ['#', '=', ':', '+', '%'].map(c => CI[c]);
   const FLAMECH = ['^', '*', "'", '"', ',', '.'].map(c => CI[c]);
@@ -1308,14 +1308,23 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
     return glowCv;
   }
+  let fireCv = null;
+  function fireSprite() {   // the fires burn warm: ember red at the rim, orange at the heart
+    if (fireCv) return fireCv;
+    fireCv = document.createElement('canvas'); fireCv.width = fireCv.height = 128;
+    const g = fireCv.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, 'rgba(255,150,80,1)'); gr.addColorStop(0.3, 'rgba(205,48,28,.5)'); gr.addColorStop(1, 'rgba(120,18,12,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    return fireCv;
+  }
   function drawLights() {  // on the overlay, above the fog, so the light pushes through it
-    const G = glowSprite(), ox = camX * CW, oy = camY * CH;
-    const spot = (x, y, r, a) => { x -= ox; y -= oy; if (x + r < 0 || y + r < 0 || x - r > W || y - r > H) return; ctx.globalAlpha = Math.max(0, Math.min(1, a)); ctx.drawImage(G, x - r, y - r, r * 2, r * 2); };
+    const G = glowSprite(), FG = fireSprite(), ox = camX * CW, oy = camY * CH;
+    const spot = (x, y, r, a, S = G) => { x -= ox; y -= oy; if (x + r < 0 || y + r < 0 || x - r > W || y - r > H) return; ctx.globalAlpha = Math.max(0, Math.min(1, a)); ctx.drawImage(S, x - r, y - r, r * 2, r * 2); };
     for (const w of cathedral.glows || []) spot(w.x, w.y, w.r * 1.5, (w.id < 0 ? 0.2 : 0.42) * (w.id < 0 ? 1 : flick(w.id, 2.2)));
     for (const b of braziers) {
       const bx = b.x * CW, by = (b.y + 0.7) * CH - b.lift - CH * 3.5, f = flick(b.seed * 3, 11);
-      spot(bx, by + CH, 280 * Math.min(MS, 1.4) * (0.9 + 0.1 * f), 0.24 * f);   // a pool on the stone and in the fog
-      spot(bx, by, 60 * Math.min(MS, 1.4), 0.42 * f);                          // the heart of the flame
+      spot(bx, by + CH, 280 * Math.min(MS, 1.4) * (0.9 + 0.1 * f), 0.22 * f, FG);   // a pool on the stone and in the fog
+      spot(bx, by, 60 * Math.min(MS, 1.4), 0.5 * f, FG);                          // the heart of the flame
     }
     ctx.globalAlpha = 1;
   }
@@ -8600,6 +8609,30 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     [[22, 42, 50, 20, 46, 30, 46, 40, 40, 44, 28, 44, 36, 36, 44, 24]],                                 // E
     [[31, 43, 60, 32, 64, 32, 72, 44, 66, 45, 60, 42]],                                                 // SE
   ];
+  // The cloak's outline while walking, one per direction (traced on the clearest stride pose; the atlas
+  // frames of a direction line up, so it covers all eight). Used to colour the cloth in firelight.
+  const KCLOAKW = [
+    [[31, 42, 61, 32, 65, 32, 69, 42, 64, 43, 61, 40]],                                                 // S
+    [[29, 41, 59, 30, 63, 30, 70, 40, 64, 42, 59, 40]],                                                 // SW
+    [[20, 40, 52, 18, 60, 18, 66, 28, 79, 37, 76, 41, 64, 43, 56, 42, 54, 32]],                         // W
+    [[24, 43, 48, 18, 58, 18, 64, 26, 70, 34, 78, 42, 66, 44, 56, 44, 50, 40, 48, 30]],                 // NW
+    [[27, 44, 44, 20, 62, 20, 66, 30, 70, 40, 64, 44, 44, 45, 30, 44, 38, 34, 40, 26]],                 // N
+    [[24, 42, 48, 18, 62, 18, 66, 26, 64, 40, 56, 43, 40, 42, 26, 40, 36, 34, 44, 26]],                 // NE
+    [[20, 40, 52, 18, 50, 26, 48, 36, 44, 42, 30, 43, 22, 40, 32, 32, 44, 24]],                         // E
+    [[32, 41, 36, 33, 42, 33, 44, 41, 36, 42], [31, 41, 60, 32, 64, 32, 68, 41, 62, 41]],               // SE
+  ];
+  // The cloth draped round the shoulders (cowl and mantle) where the cloak itself hides behind the body:
+  // coloured with the cloak in firelight, never moved. [x, y, ...] per direction; side views need none.
+  const KCOWL = [
+    [42, 17, 60, 17, 64, 22, 58, 25, 50, 29, 43, 25, 37, 22],   // S
+    [45, 17, 60, 16, 64, 21, 58, 26, 50, 28, 44, 24, 41, 21],   // SW
+    null, // W
+    [46, 16, 58, 16, 62, 22, 58, 26, 50, 27, 45, 24],           // NW
+    [44, 15, 60, 15, 66, 21, 60, 26, 52, 28, 44, 26, 38, 21],   // N
+    [48, 16, 60, 16, 62, 22, 58, 26, 50, 27, 46, 22],           // NE
+    null, // E
+    [43, 17, 58, 17, 62, 21, 56, 25, 49, 28, 42, 25, 39, 21],   // SE
+  ];
   const KTX = [0, -0.71, -1, -0.71, 0, 0.71, 1, 0.71], KTY = [1, 0.71, 0, -0.71, -1, -0.71, 0, 0.71];   // d8 → screen heading
   const JROWI = [0, 7, 6, 5, 4, 2, 1];   // jump row → d8
   // Parse once. Every cell keeps its glyph code (ramp index × level, -1 = plate only) and what it
@@ -8665,10 +8698,18 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     // cloth: only the cloak, outlined by hand on the atlas art of every idle pose (KCLOAK).
     // Inside an outline the weight grows from where the cloth hangs (y0) to where it swings free (y1);
     // everything else (body, arms, cowl, blade, legs) is rigid. Walk and jump poses move it frame by frame.
-    const R0 = i < 8 ? KCLOAK[i] : [];
+    const R0 = i < 8 ? KCLOAK[i] : KCLOAKW[d], CW0 = KCOWL[d];   // outlines: the idle ones also drive the wind sway
     for (const c of C) {
       if (c.seg) continue;
       const px = c.cx + 0.5, py = c.cy + 0.5;
+      if (CW0) {
+        let inside = false;
+        for (let k = 0, l = CW0.length - 2; k < CW0.length; l = k, k += 2) {
+          const xk = CW0[k], yk = CW0[k + 1], xl = CW0[l], yl = CW0[l + 1];
+          if ((yk > py) !== (yl > py) && px < (xl - xk) * (py - yk) / (yl - yk) + xk) inside = !inside;
+        }
+        if (inside) c.cl = 1;
+      }
       for (const r of R0) {
         // the tatters just under an outline belong to the hem too
         for (const qy of [py, py - 1.5, py - 3]) {
@@ -8677,7 +8718,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
             const xk = r[k], yk = r[k + 1], xl = r[l], yl = r[l + 1];
             if ((yk > qy) !== (yl > qy) && px < (xl - xk) * (qy - yk) / (yl - yk) + xk) inside = !inside;
           }
-          if (inside) { c.w = Math.max(c.w, Math.min(1, Math.max(0, (py - r[0]) / (r[1] - r[0])))); break; }
+          if (inside) { c.cl = 1; if (i < 8) c.w = Math.max(c.w, Math.min(1, Math.max(0, (py - r[0]) / (r[1] - r[0])))); break; }
         }
       }
     }
@@ -8696,10 +8737,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       for (let q = 0; q < GW * GH; q++) { const j = at[q]; if (j < 0 || !(C[j].w > 0)) continue; const u = Math.min(1, dist[q] / 4); C[j].w *= u * u * (3 - 2 * u); }
     }
     const n = C.length, side = Math.abs(tx);
-    const F = { n, code: new Int16Array(n), cx: new Int16Array(n), cy: new Int16Array(n), seg: new Uint8Array(n), w: new Float32Array(n), dep: new Float32Array(n),
+    const F = { n, code: new Int16Array(n), cx: new Int16Array(n), cy: new Int16Array(n), seg: new Uint8Array(n), cl: new Uint8Array(n), w: new Float32Array(n), dep: new Float32Array(n),
       // stride half-length in cells: what the pose shows in side views, a set one when walking at the camera
       R: side > 0.5 ? Math.min(12, Math.max(5, D / (2 * side))) : 7, beta: (1 - side) * Math.PI / 2, d };
-    C.forEach((c, j) => { F.code[j] = c.code; F.cx[j] = c.cx; F.cy[j] = c.cy; F.seg[j] = c.seg; F.w[j] = c.w; F.dep[j] = c.dep; });
+    C.forEach((c, j) => { F.cl[j] = c.cl || 0; F.code[j] = c.code; F.cx[j] = c.cx; F.cy[j] = c.cy; F.seg[j] = c.seg; F.w[j] = c.w; F.dep[j] = c.dep; });
     return F;
   }
   const KFR = KNIGHT_ART.map(kseg);
@@ -8831,7 +8872,20 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           } else if (ry >= 0) grect(left + rs * fcw + rdx - 0.4, top + ry * fch + rdy - 0.4, (re - rs) * fcw + 0.8, fch + 0.8, 0.94);
         }
       };
-      const glyphs = (sel) => { for (let j = 0; j < n; j++) { const c = K.code[j]; if (c >= 0 && (K.seg[j] === far) === sel) gput(KN0 + c, left + K.cx[j] * fcw + KDX[j], top + K.cy[j] * fch + KDY[j], 1); } };
+      // Firelight: near a brazier the side facing it and the lower body catch the light, as in a painting lit
+      // by embers: the cloak turns red, the armour dark metal with warm edges. Steps are dithered per glyph.
+      let fI = 0, fdx = 0;
+      for (const b of braziers) {
+        const ddx = b.x * CW - e.x * CW, ddy = (((b.y + 0.7) * CH - b.lift) - ((e.y + 0.7) * CH - liftPx(e))) * 1.6, d = Math.hypot(ddx, ddy), r = 300 * Math.min(MS, 1.4);
+        if (d < r) { const v = (1 - d / r) ** 1.6 * (0.82 + 0.18 * flick(b.seed * 3, 5)); if (v > fI) { fI = v; fdx = ddx / (d + 1); } }
+      }
+      const warm = j => {
+        if (fI < 0.01) return 0;
+        const cx = K.cx[j], cy = K.cy[j], face = Math.min(1.1, Math.max(0.15, 0.55 + 0.6 * fdx * (cx - KFX) / 16)), L = fI * face * (0.45 + 0.55 * cy / 54) * 1.7;
+        return Math.max(0, Math.min(KWH - 1, Math.floor(L * (KWH - 1) + 0.5 + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.9)));
+      };
+      const fireBlock = j => { const h = warm(j); return h && K.cl[j] ? KWH - 1 + h : h; };   // the cloak goes red, the armour metallic
+      const glyphs = (sel) => { for (let j = 0; j < n; j++) { const c = K.code[j]; if (c >= 0 && (K.seg[j] === far) === sel) gput(KN0 + fireBlock(j) * KNS + c, left + K.cx[j] * fcw + KDX[j], top + K.cy[j] * fch + KDY[j], 1); } };
       plate(false); glyphs(true);
       plate(true); glyphs(false);
       drawTag(e, gx, gy);
@@ -8953,26 +9007,35 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   // one atlas: grass glyphs × colours, the knight's small glyphs × tones, and a solid dark block
   const KCH = RAMP + "/\\|'";   // fine glyphs: the dither ramp plus strokes for branches
   const FCI = {}; [...KCH].forEach((c, i) => FCI[c] = i);
+  const KWH = 5, KBLK = 2 * KWH - 1, KNS = KCH.length * 8;   // firelight steps (0 = none); colour blocks: grey, 4 armour, 4 cloak; sprites per block
+  const KMMIX = [0, 0.3, 0.5, 0.68, 0.82], KCMIX = [0, 0.5, 0.74, 0.9, 1];
+  const lerp3 = (a, b, u) => [0, 1, 2].map(i => a[i] + (b[i] - a[i]) * u);
   function buildMegaAtlas() {
     const k = charDims(player), kfs = k.ffs * DPR;
     const KAW = Math.ceil(k.fcw * DPR) + 2, KAH = Math.ceil(k.fch * DPR) + 2;
     const KX = 0, KY = atlas.height + 2, kw = KAW * KCH.length;
-    const mw = Math.max(atlas.width, kw + 16), mh = KY + KAH * KLV + 2;
+    const mw = Math.max(atlas.width, kw + 16), mh = KY + KAH * KLV * KBLK + 2;
     const m = document.createElement('canvas'); m.width = mw; m.height = mh;
     const g = m.getContext('2d');
     g.drawImage(atlas, 0, 0);
     g.font = `600 ${kfs}px ${FONT}`; g.textBaseline = 'top';
     const [tr, tg, tb] = player.tint;
-    for (let l = 0; l < KLV; l++) {
-      const f = 0.3 + 0.85 * (l / (KLV - 1));
-      g.fillStyle = `rgb(${Math.min(255, tr * f) | 0},${Math.min(255, tg * f) | 0},${Math.min(255, tb * f) | 0})`;
-      for (let c = 1; c < KCH.length; c++) g.fillText(KCH[c], KX + c * KAW + 1, KY + l * KAH + 1);
+    // The knight's glyphs in firelight: block 0 is the cold grey; blocks 1-4 are the armour warming to dark
+    // steel with bronze-gold edges, 5-8 the cloak turning ember red. Brightness stays the grey's own.
+    for (let bk = 0; bk < KBLK; bk++) for (let l = 0; l < KLV; l++) {
+      const f = 0.3 + 0.85 * (l / (KLV - 1)), u = l / (KLV - 1), v = Math.min(1, f / 1.15), cloth = bk > KWH - 1, h = cloth ? bk - KWH + 1 : bk;
+      const mix = (cloth ? KCMIX : KMMIX)[h];
+      const tone = cloth ? (u < 0.85 ? [235 * v, 40 * v * v, 26 * v * v] : lerp3([235, 44, 28], [255, 96, 52], (u - 0.85) / 0.15))
+                         : (u < 0.85 ? [205 * v, 172 * v, 132 * v] : lerp3([205, 172, 132], [255, 228, 182], (u - 0.85) / 0.15));
+      const r = Math.min(255, tr * f) * (1 - mix) + tone[0] * mix, gg = Math.min(255, tg * f) * (1 - mix) + tone[1] * mix, bb = Math.min(255, tb * f) * (1 - mix) + tone[2] * mix;
+      g.fillStyle = `rgb(${r | 0},${gg | 0},${bb | 0})`;
+      for (let c = 1; c < KCH.length; c++) g.fillText(KCH[c], KX + c * KAW + 1, KY + (bk * KLV + l) * KAH + 1);
     }
     g.fillStyle = '#0c0c0c'; g.fillRect(kw + 4, KY, 8, 8);
     GB.spr.length = 0;
     for (let c = 0; c < CHARS.length; c++) for (let b = 0; b < NB; b++) sprite(c * AW, b * AH, AW, AH, AW / DPR, AH / DPR, -1 / DPR, -1 / DPR);
     KN0 = GB.spr.length;
-    for (let c = 0; c < KCH.length; c++) for (let l = 0; l < KLV; l++) sprite(KX + c * KAW, KY + l * KAH, KAW, KAH, KAW / DPR, KAH / DPR, -1 / DPR, -1 / DPR);
+    for (let bk = 0; bk < KBLK; bk++) for (let c = 0; c < KCH.length; c++) for (let l = 0; l < KLV; l++) sprite(KX + c * KAW, KY + (bk * KLV + l) * KAH, KAW, KAH, KAW / DPR, KAH / DPR, -1 / DPR, -1 / DPR);
     const sb = (w, h, ox, oy) => sprite(kw + 6, KY + 2, 2, 2, w, h, ox, oy);
     SOLID_CELL = sb(CW + 0.8, CH + 0.8, -0.4, -0.4);
     SOLID_FRONT = sb(CW + 0.6, CH - 1, -0.3, 1);
