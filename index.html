@@ -1622,11 +1622,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       i = 72 + JROW[d] * 11 + c;
     } else if (e.walk > 0.5) i = 8 + d * 8 + (Math.floor(e.step * 0.8) & 7);   // one frame per ~1/8 stride: the feet don't skate
     else {
-      i = d; const b = Math.floor(t * 1.4) & 3; breath = b === 3 ? 1 : b;   // slow breath: 0,1,2,1 over ~3 s
-      // the cloak stirs in the same wind as the grass: 8 phases of a slow ripple, three strengths
-      const w = windAt(e.x, e.y);
-      e.cph = (e.cph || 0) + 0.016 * (0.9 + w.lean * 1.6);
-      sway = (Math.floor(e.cph * 8) & 7) + 1; amp = w.gust > 0.15 ? 2 : w.lean > 0.22 ? 1 : 0;
+      i = d;
     }
     return { col: i % KS.cols, row: Math.floor(i / KS.cols), flip: false, breath, sway, amp };
   }
@@ -1677,30 +1673,11 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     rg.imageSmoothingQuality = 'high';
     // mirrored frames flip round the feet, so he turns on the spot
     if (f.flip) { const ax = rig.width * KS.fx / KS.tw; rg.setTransform(-1, 0, 0, 1, ax * 2, 0); }
-    const st = 1 + (f.breath || 0) * 0.007, fyp = rig.height * KS.fy / KS.th;
+    const st = 1, fyp = rig.height * KS.fy / KS.th;
     rg.drawImage(KS.img, f.col * KS.tw, f.row * KS.th, KS.tw, KS.th, 0, fyp - fyp * st, rig.width, rig.height * st);
     rg.setTransform(1, 0, 0, 1, 0, 0);
     let img = rg.getImageData(0, 0, rig.width, rig.height).data;
     const W2 = rig.width;
-    if (f.sway) {
-      // ripple the cloak: pixels away from the torso line and low on the body drift sideways in a
-      // travelling wave; the torso, the head and the planted feet stay where they are
-      const H2 = rig.height, cxp = W2 * KS.fx / KS.tw, src = img, out = new Uint8ClampedArray(src.length);
-      const ph = (f.sway - 1) / 8 * Math.PI * 2, A = (1.5 + f.amp * 1.1) * W2 / 90;
-      for (let y = 0; y < H2; y++) {
-        const fy = Math.min(1, Math.max(0, (y / H2 - 0.28) / 0.62)), feet = y / H2 > 0.9 ? 0.25 : 1;
-        if (fy <= 0) { out.set(src.subarray(y * W2 * 4, (y + 1) * W2 * 4), y * W2 * 4); continue; }
-        const wave = Math.sin(ph - y / H2 * 7.5), wy = A * fy * Math.sqrt(fy) * feet;
-        for (let x = 0; x < W2; x++) {
-          const dd = Math.abs(x - cxp) / (W2 * 0.5), g = Math.min(1, Math.max(0, (dd - 0.1) / 0.28));
-          const sx = Math.round(x - wy * (0.3 + g * 0.9) * wave);
-          const o = (y * W2 + x) * 4;
-          if (sx < 0 || sx >= W2) continue;
-          const q = (y * W2 + sx) * 4; out[o] = src[q]; out[o + 1] = src[q + 1]; out[o + 2] = src[q + 2]; out[o + 3] = src[q + 3];
-        }
-      }
-      img = out;
-    }
     const list = [], runs = [];
     let runY = -1, runS = 0, runE = 0;
     for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) {
@@ -1740,8 +1717,32 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       let baked = KCACHE.get(key);
       if (!baked) { baked = bakeKnight(f, cols, rows, fcw, fch); KCACHE.set(key, baked); }
       const left = G.left, R = baked.runs, Lg = baked.list;
-      for (let j = 0; j < R.length; j += 3) grect(left + R[j + 1] * fcw - 0.4, top + R[j] * fch - 0.4, (R[j + 2] - R[j + 1]) * fcw + 0.8, fch + 0.8, 0.94);
-      for (let j = 0; j < Lg.length; j += 3) gput(Lg[j], left + Lg[j + 1] * fcw, top + Lg[j + 2] * fch, 1);
+      // Standing still, the baked glyphs are moved, never re-dithered, so the motion is continuous:
+      // the cloak's edges and hem ripple in the grass wind, the chest rises and falls with a slow breath.
+      const idle = !(e.jump > 0) && e.walk < 0.5, ft = Math.min(0.05, Math.max(0, t - (e.lt ?? t))); e.lt = t;   // time-based, so speed doesn't follow the frame rate
+      const k = e.idleK = Math.min(1, Math.max(0, (e.idleK || 0) + (idle ? ft * 1.8 : -ft * 5)));
+      let A = 0, ph = 0, br = 0;
+      if (k > 0) {
+        const w = windAt(e.x, e.y);
+        e.amp = (e.amp || 0) + ((1.6 + w.lean * 4 + w.gust * 3) - (e.amp || 0)) * Math.min(1, ft * 1.8);   // eased, so gusts swell in and out
+        e.cph = (e.cph || 0) + ft * (1.2 + w.lean * 1.5 + w.gust * 1.8);
+        A = e.amp * fcw * 0.55 * k; ph = e.cph; br = (0.5 - 0.5 * Math.cos(t * 2.1)) * fch * 0.35 * k;
+      }
+      const cx0 = cols * KS.fx / KS.tw, pad = A > 0 ? Math.ceil(A / fcw) + 1 : 0;
+      for (let j = 0; j < R.length; j += 3) grect(left + (R[j + 1] - pad) * fcw - 0.4, top + R[j] * fch - 0.4 - (R[j] < rows * 0.55 ? br : 0), (R[j + 2] - R[j + 1] + pad * 2) * fcw + 0.8, fch + 0.8, 0.94);
+      for (let j = 0; j < Lg.length; j += 3) {
+        const gx = Lg[j + 1], gy = Lg[j + 2];
+        let dx = 0, dy = 0;
+        if (A > 0) {
+          const fy = (gy / rows - 0.28) / 0.62;
+          if (fy > 0) {
+            const g = Math.min(1, Math.max(0, (Math.abs(gx - cx0) / (cols * 0.5) - 0.1) / 0.28)), feet = gy / rows > 0.9 ? 0.25 : 1;
+            dx = A * Math.min(1, fy) ** 1.5 * feet * (0.25 + g * 0.95) * Math.sin(ph - gy / rows * 7.5);
+          }
+          if (gy < rows * 0.55) dy = -br * (1 - gy / (rows * 0.55)) * 0.6 - br * 0.4 * (gy > rows * 0.2 ? 1 : 0.5);
+        }
+        gput(Lg[j], left + gx * fcw + dx, top + gy * fch + dy, 1);
+      }
       drawTag(e, gx, gy);
       return;
     }
