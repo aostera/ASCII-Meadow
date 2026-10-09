@@ -36,8 +36,12 @@ for i in range(n):
     frames.append((top, lines[top:]))
 # rows were trimmed from the top: remember how many, so the feet stay put
 # JS source: one template literal per frame, first line is the number of empty rows above the art
+# The page keeps idle 0-7, one stride pose per walk direction (the atlas strides barely differ; the step
+# is animated in code) and the 77 jump frames: 93 frames.
+KWB = [0, 7, 0, 0, 0, 0, 2, 5]
+keep = list(range(8)) + [8 + d * 8 + KWB[d] for d in range(8)] + list(range(72, 149))
 js = ['  const KNIGHT_ART = [']
-for i, (top, lines) in enumerate(frames):
+for i, (top, lines) in enumerate(frames[i] for i in keep):
     body = '\n'.join(lines).replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${')
     js.append('`' + str(top) + '\n' + body + '`,')
 js.append('  ];')
