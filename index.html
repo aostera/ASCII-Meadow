@@ -8672,11 +8672,23 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       }
     }
     const tx = KTX[d], ty = KTY[d];
+    // Cloak membership first (hand-traced outlines, KCLOAK standing / KCLOAKW walking), so the hem that hangs
+    // down over the legs stays cloth to its last tatter instead of being taken for a leg.
+    const R0 = i < 8 ? KCLOAK[i] : KCLOAKW[d], CW0 = KCOWL[d], sim = i < 72;
+    const inPoly = (r, k0, px, py) => { let inside = false; for (let k = k0, l = r.length - 2; k < r.length; l = k, k += 2) { const xk = r[k], yk = r[k + 1], xl = r[l], yl = r[l + 1]; if ((yk > py) !== (yl > py) && px < (xl - xk) * (py - yk) / (yl - yk) + xk) inside = !inside; } return inside; };
+    for (const c of C) {
+      if (c.seg === 3) continue;
+      const px = c.cx + 0.5, py = c.cy + 0.5;
+      for (const r of R0) for (const qy of [py, py - 1.5, py - 3]) {   // the tatters just under an outline belong to the hem too
+        if (inPoly(r, 2, px, qy)) { c.inC = 1; if (qy === py) c.inS = 1; c.inT = Math.max(c.inT || 0, Math.min(1, Math.max(0, (py - r[0]) / (r[1] - r[0])))); break; }
+      }
+      if (CW0 && inPoly(CW0, 0, px, py)) c.cowl = 1;
+    }
     let D = 0;
     if (legs) {
       // legs: below the hip, the connected pieces that reach the ground near the body's axis
       const at = new Map(), comp = new Int32Array(C.length).fill(-1), comps = [];
-      C.forEach((c, j) => { if (c.cy >= KHIP && c.seg !== 3) at.set(c.cx * 64 + c.cy, j); });
+      C.forEach((c, j) => { if (c.cy >= KHIP && c.seg !== 3 && !c.inS) at.set(c.cx * 64 + c.cy, j); });   // under the hem's outline it is cloth; below it, legs
       for (const j0 of at.values()) {
         if (comp[j0] >= 0) continue;
         const id = comps.length, st = [j0], m = []; comp[j0] = id;
@@ -8690,7 +8702,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         let mx = 0, maxY = 0; for (const j of m) { mx += C[j].cx; maxY = Math.max(maxY, C[j].cy); }
         comps.push({ m, mx: mx / m.length, maxY });
       }
-      const L = comps.filter(o => o.maxY >= KFOOT - 4 && Math.abs(o.mx - KFX) < 18 && o.m.length > 12).sort((p, q) => q.m.length - p.m.length).slice(0, 2);
+      const L = comps.filter(o => o.maxY >= KFOOT - 5 && Math.abs(o.mx - KFX) < 18 && o.m.length > 6).sort((p, q) => q.m.length - p.m.length).slice(0, 2);
       let parts = [];
       if (L.length === 2) parts = (L[0].mx < L[1].mx ? L : [L[1], L[0]]).map(o => o.m);
       else if (L.length === 1) {
@@ -8709,32 +8721,13 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       });
       if (fxs.length === 2) D = fxs[1] - fxs[0];
     }
-    // The cloak is its own layer: cells inside the hand-traced outline (KCLOAK standing, KCLOAKW walking)
-    // are cloth, simulated apart from the body. t runs from where it hangs (y0) to where it swings free
-    // (y1). The cowl only takes the cloak's colour. Jump poses keep their drawn cloak and colour only.
-    const R0 = i < 8 ? KCLOAK[i] : KCLOAKW[d], CW0 = KCOWL[d], sim = i < 72;
+    // The cloak is its own layer: cells inside the outline are cloth, simulated apart from the body; t runs
+    // from where it hangs (y0) to where it swings free (y1). The cowl only takes the cloak's colour.
+    // Jump poses keep their drawn cloak and are coloured only.
     for (const c of C) {
       if (c.seg) continue;
-      const px = c.cx + 0.5, py = c.cy + 0.5;
-      if (CW0) {
-        let inside = false;
-        for (let k = 0, l = CW0.length - 2; k < CW0.length; l = k, k += 2) {
-          const xk = CW0[k], yk = CW0[k + 1], xl = CW0[l], yl = CW0[l + 1];
-          if ((yk > py) !== (yl > py) && px < (xl - xk) * (py - yk) / (yl - yk) + xk) inside = !inside;
-        }
-        if (inside) c.cl = 1;
-      }
-      for (const r of R0) {
-        // the tatters just under an outline belong to the hem too
-        for (const qy of [py, py - 1.5, py - 3]) {
-          let inside = false;
-          for (let k = 2, l = r.length - 2; k < r.length; l = k, k += 2) {
-            const xk = r[k], yk = r[k + 1], xl = r[l], yl = r[l + 1];
-            if ((yk > qy) !== (yl > qy) && px < (xl - xk) * (qy - yk) / (yl - yk) + xk) inside = !inside;
-          }
-          if (inside) { c.cl = 1; if (sim) { c.cm = 1; c.w = Math.max(c.w, Math.min(1, Math.max(0, (py - r[0]) / (r[1] - r[0])))); c.t = c.w; } break; }
-        }
-      }
+      if (c.cowl) c.cl = 1;
+      if (c.inC) { c.cl = 1; if (sim) { c.cm = 1; c.w = c.t = c.inT; } }
     }
     // Soften the seams: cloth beside the body barely moves and gains its freedom
     // over a few glyphs, so it bends away from the body instead of tearing off along a line.
@@ -8926,7 +8919,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         const cx = K.cx[j], cy = K.cy[j], face = Math.min(1.1, Math.max(0.15, 0.55 + 0.6 * fdx * (cx - KFX) / 16)), L = fI * face * (0.45 + 0.55 * cy / 54) * 1.7;
         return Math.max(0, Math.min(KWH - 1, Math.floor(L * (KWH - 1) + 0.5 + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.9)));
       };
-      const fireBlock = j => { const h = warm(j); return h && K.cl[j] ? KWH - 1 + h : h; };   // the cloak goes red, the armour metallic
+      // the cloak goes red as a whole once the light is real (only its shade varies), the armour metallic
+      const fireBlock = j => { let h = warm(j); if (K.cl[j]) { if (fI > 0.12) h = Math.max(1, h); return h ? KWH - 1 + h : 0; } return h; };
       const glyphs = (pick) => { for (let j = 0; j < n; j++) { const c = K.code[j]; if (c >= 0 && pick(j)) gput(KN0 + fireBlock(j) * KNS + c, left + K.cx[j] * fcw + KDX[j], top + K.cy[j] * fch + KDY[j], 1); } };
       // The cloak is its own layer: behind the body, or over it when he is seen from behind.
       const cloak = j => K.cm[j] === 1, over = K.d >= 3 && K.d <= 5;
