@@ -11,6 +11,8 @@
 
 Открой `index.html` в браузере, сервер не нужен.
 
+Онлайн: https://aostera.github.io/ASCII-Meadow/ (GitHub Pages, публикуется из `main` при каждом пуше).
+
 ## Управление
 
 | Действие | Клавиши |
