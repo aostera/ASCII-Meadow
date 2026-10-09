@@ -22,14 +22,25 @@ def to_ascii(tile, detail=1.0):
     A = al.reshape(ROWS, 2, COLS, 2).mean((1, 3))
     S = (sharp * al).reshape(ROWS, 2, COLS, 2).sum((1, 3)) / np.maximum(al.reshape(ROWS, 2, COLS, 2).sum((1, 3)), 1e-6)
     inside = A >= 0.3; lo, hi = np.percentile(S[inside], 3), np.percentile(S[inside], 98)
-    V = np.clip((S - lo) / max(1e-3, hi - lo), 0, 1) ** 0.9
+    V = np.clip((S - lo) / max(1e-3, hi - lo), 0, 1)
+    # Lit like the trees: a dark mass under a low moon. The coat's own pattern is kept only faintly;
+    # the light catches the back, the poll and the rump (the top edge of every column) and dies away
+    # down the flank, so belly and legs sink into the grass.
+    rim = np.zeros_like(V)
+    for cx in range(COLS):
+        col = np.nonzero(inside[:, cx])[0]
+        if len(col) == 0: continue
+        d = np.arange(ROWS) - col.min()
+        rim[:, cx] = np.clip(1 - d / 7.0, 0, 1) ** 1.4
+    down = np.clip((np.arange(ROWS)[:, None] - 30) / 22, 0, 1)        # lower rows: belly and legs darker
+    L = (0.32 * V ** 1.2 + 0.62 * rim) * (1 - 0.55 * down)
     lines = []
     for cy in range(ROWS):
         row = []
         for cx in range(COLS):
             if A[cy, cx] < 0.3: row.append(' '); continue
-            v = (0.3 + 0.7 * V[cy, cx]) * min(1, A[cy, cx] * 1.25) + B[cy & 3, cx & 3] * 0.14 + GRAIN[cy, cx]
-            if v < 0.14: row.append("'"); continue
+            v = L[cy, cx] * min(1, A[cy, cx] * 1.25) + B[cy & 3, cx & 3] * 0.22 + GRAIN[cy, cx] * 2
+            if v < 0.2: row.append("'"); continue
             row.append(RAMP[min(9, 1 + int(min(0.999, v) * 9))])
         lines.append(''.join(row).rstrip())
     top = 0
