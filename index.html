@@ -156,6 +156,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     buildMegaAtlas();
     buildWorld();
     carvePath();
+    buildFlora();
   }
 
   // ---------- entities ----------
@@ -324,6 +325,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
     updateWorld(dt);
     for (const b of braziers) updateFire(b, dt);
+    updateFlora(dt);
 
     // butterflies: drift toward a wandering home, scatter from anyone walking close
     for (const f of flies) {
@@ -701,6 +703,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   function blocked(x, y, e) {
     if (x < 1 || y < 1 || x >= COLS - 1 || y >= ROWS - 1) return true;
     const h = surfAt(x, y);
+    if (tmask && tmask[Math.round(y + 0.2) * COLS + Math.round(x)]) return true;  // tree trunks
     return !isFinite(h) || Math.abs(h - (e ? e.hT || 0 : 0)) > STEP_UP;
   }
 
@@ -838,6 +841,200 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   }
   function useSpot() { if (activeSpot) activeSpot.use(); }
 
+  // ---------- flora: trees, dead trees and bushes ----------
+  // A handful of variants are modelled once in 3D (spheres for leaves, a cylinder for the trunk, line
+  // segments for bare branches), seen through the same 50° camera and lit by the same sun, and baked to
+  // lists of glyphs. The world then only places instances: drawing one is a loop of gput calls.
+  const LEAF = ['.', ':', ';', '*', '%', '&', '8', '#', '@'].map(c => CI[c]);
+  const BARK = ['|', 'l', '!', '|'].map(c => CI[c]);
+  const VARS = [], flora = [];
+  let tmask = null, FLMAXR = 0;
+  const TV = [0, SINP, -COSP], UV = [0, COSP, SINP];       // towards the camera, screen up
+  function bakeVariant(type, sd) {
+    const rnd = (k) => hash(sd * 31 + k, 977);
+    const K = knightPx(), cells = new Map();                 // key → [depth, ci, lev, solid]
+    const put = (px, py, depth, ci, lev, solid) => {
+      const cx = Math.floor(px / CW + 0.5), cy = Math.floor(py / CH + 0.5), key = (cy + 400) * 1000 + cx + 500;
+      const o = cells.get(key);
+      if (!o || depth > o[0]) cells.set(key, [depth, ci, lev, solid, cx, cy]);
+    };
+    // the crown is a dark core covered in leaf clumps; each clump catches the light on its own,
+    // blended with the crown's overall roundness, so the mass reads as bumpy foliage
+    const spheres = [];
+    let trunkH = 0, trunkR = 0, CC = null;
+    const crown = (cx, cy, cz, R, n, rmin, rmax) => {
+      CC = [cx, cy, cz, R];
+      spheres.push([cx, cy, cz, R * 0.8, 1]);
+      for (let k = 0; k < n; k++) {
+        const u = rnd(100 + k) * 2 - 1, a = rnd(200 + k) * 6.283, up = 0.15 + 0.85 * rnd(300 + k);
+        const dir = [Math.cos(a) * Math.sqrt(1 - u * u), Math.abs(u) * 0.9 * up + 0.1, Math.sin(a) * Math.sqrt(1 - u * u)];
+        const m = Math.hypot(...dir), d = R * (0.62 + rnd(400 + k) * 0.22);
+        spheres.push([cx + dir[0] / m * d, cy + dir[1] / m * d * 0.85, cz + dir[2] / m * d * 0.8, R * (rmin + rnd(500 + k) * (rmax - rmin)), 0]);
+      }
+    };
+    if (type === 'tree') {
+      const R = K * (0.5 + rnd(1) * 0.25), Hc = K * (1.05 + rnd(2) * 0.45);
+      trunkH = Hc; trunkR = R * 0.13;
+      crown(0, Hc, 0, R, 26 + (rnd(3) * 14 | 0), 0.24, 0.38);
+    } else if (type === 'bush') {
+      const R = K * (0.2 + rnd(1) * 0.12);
+      crown(0, R * 0.7, 0, R, 9 + (rnd(3) * 6 | 0), 0.3, 0.45);
+    }
+    for (const [x, y, z, r, core] of spheres) {
+      const cw = y * COSP + z * SINP, cd = y * SINP - z * COSP;
+      for (let cy = Math.floor((-cw - r) / CH); cy <= Math.ceil((-cw + r) / CH); cy++) for (let cx = Math.floor((x - r) / CW); cx <= Math.ceil((x + r) / CW); cx++) {
+        const px = cx * CW, py = cy * CH;  // whole grid cells, so the crown has no holes
+        const u = px - x, w = -py - cw, q = r * r - u * u - w * w;
+        if (q <= 0) continue;
+        const d = Math.sqrt(q), P = [x + u, y + w * COSP + d * SINP, z + w * SINP - d * COSP];
+        const nl = [(P[0] - x) / r, (P[1] - y) / r, (P[2] - z) / r];
+        const g = [P[0] - CC[0], P[1] - CC[1], P[2] - CC[2]], gm = Math.hypot(...g) || 1;
+        const n = [nl[0] * 0.55 + g[0] / gm * 0.45, nl[1] * 0.55 + g[1] / gm * 0.45, nl[2] * 0.55 + g[2] / gm * 0.45], nm = Math.hypot(...n);
+        const diff = Math.max(0, (n[0] * LGT[0] + n[1] * LGT[1] + n[2] * LGT[2]) / nm);
+        const leaf = vnoise(P[0] * 0.05 + sd * 7, P[1] * 0.05 + P[2] * 0.03) * 0.7 + hash(cx * 3 + sd, cy * 5) * 0.3;
+        const rim = d / r;                                    // edges of a clump fall into its own shade
+        let v = core ? 0.04 + diff * 0.22 : 0.03 + diff * 0.95 * (0.55 + 0.45 * Math.min(1, rim * 1.8)) * (0.7 + leaf * 0.5);
+        v = Math.max(0, Math.min(0.99, v));
+        put(px, py, cd + d, v < 0.07 ? -1 : LEAF[Math.min(LEAF.length - 1, (v * LEAF.length) | 0)], BL0 + Math.min(12, Math.round(v * 13)), 1);
+      }
+    }
+    // trunk: a vertical cylinder from the ground into the crown
+    if (trunkH) for (let py = -trunkH * COSP; py <= 0; py += CH * 0.5) for (let px = -trunkR; px <= trunkR; px += CW * 0.5) {
+      const u = px, s = Math.sqrt(Math.max(0, trunkR * trunkR - u * u)), y = -py / COSP;
+      const v = Math.max(0.08, 0.15 + 0.45 * Math.max(0, -u / trunkR * 0.7 + 0.4));
+      put(px, py, y * SINP + s * COSP, BARK[(hash(Math.round(px / CW), Math.round(py / CH)) * BARK.length) | 0], BL0 + Math.round(v * 13), 1);
+    }
+    // dead tree: a crooked trunk and branches as segments drawn with slope glyphs
+    if (type === 'dead') {
+      const seg = (a, b, wpx) => {
+        const sa = [a[0], -(a[1] * COSP + a[2] * SINP)], sb = [b[0], -(b[1] * COSP + b[2] * SINP)];
+        const L = Math.hypot(sb[0] - sa[0], sb[1] - sa[1]), steps = Math.max(1, Math.ceil(L / (CH * 0.4)));
+        const dx = sb[0] - sa[0], dy = sb[1] - sa[1], ang = Math.atan2(-dy, dx), ad = Math.abs(ang);
+        const ci = CI[ad > 1.2 && ad < 1.95 ? '|' : (ad < 0.35 || ad > 2.8) ? '_' : (ang > 0) === (Math.cos(ang) > 0) ? '/' : '\\'];
+        for (let i = 0; i <= steps; i++) {
+          const f = i / steps, px = sa[0] + dx * f, py = sa[1] + dy * f, dep = (a[1] + (b[1] - a[1]) * f) * SINP - (a[2] + (b[2] - a[2]) * f) * COSP;
+          for (let o = -wpx / 2; o <= wpx / 2 + 0.01; o += CW) put(px + o, py, dep, ci, BL0 + 4 + (o < 0 ? 2 : 0), 1);
+        }
+      };
+      const grow = (p, dir, len, w, depth) => {
+        const q = [p[0] + dir[0] * len, p[1] + dir[1] * len, p[2] + dir[2] * len];
+        seg(p, q, w);
+        if (depth <= 0) return;
+        const nb = 2 + (rnd(depth * 13 + len) > 0.6 ? 1 : 0);
+        for (let k = 0; k < nb; k++) {
+          const a = rnd(depth * 7 + k * 3 + len) * 6.283, sp = 0.5 + rnd(depth * 5 + k) * 0.6;
+          const nd = [dir[0] * 0.5 + Math.cos(a) * sp, dir[1] * 0.7 + 0.25, dir[2] * 0.5 + Math.sin(a) * sp], m = Math.hypot(...nd);
+          grow(q, nd.map(c => c / m), len * (0.55 + rnd(depth + k * 11) * 0.2), Math.max(CW * 0.6, w * 0.55), depth - 1);
+        }
+      };
+      const H0 = K * (0.7 + rnd(2) * 0.4);
+      grow([0, 0, 0], [rnd(4) * 0.3 - 0.15, 1, 0], H0, CW * 2.2, 3);
+    }
+    // flatten: glyph list, and a dark backing per row run so grass behind never shows through the crown
+    const list = [], runs = [];
+    let minY = 0;
+    const rows = new Map();
+    for (const c of cells.values()) {
+      const [, ci, lev, , cx, cy] = c;
+      if (ci >= 0) list.push(cx, cy, ci, lev);
+      if (type !== 'dead') { const r = rows.get(cy) || []; r.push(cx); rows.set(cy, r); }
+      else runs.push(cy, cx, cx + 1);
+      if (cy < minY) minY = cy;
+    }
+    for (const [cy, xs] of rows) {
+      xs.sort((a, b) => a - b);
+      let s0 = xs[0], p = xs[0];
+      for (let k = 1; k <= xs.length; k++) { if (k < xs.length && xs[k] === p + 1) { p = xs[k]; continue; } runs.push(cy, s0, p + 1); if (k < xs.length) { s0 = p = xs[k]; } }
+    }
+    return { type, list: Int16Array.from(list), runs: Int16Array.from(runs), minY, trunkR, R: CC ? CC[3] * 1.15 : K * 0.4, Hc: trunkH || K * 0.3 };
+  }
+
+  function buildFlora() {
+    VARS.length = 0; flora.length = 0;
+    for (let k = 0; k < 7; k++) VARS.push(bakeVariant('tree', k + 1));
+    for (let k = 0; k < 3; k++) VARS.push(bakeVariant('dead', k + 21));
+    for (let k = 0; k < 6; k++) VARS.push(bakeVariant('bush', k + 41));
+    const trees = VARS.filter(v => v.type === 'tree'), dead = VARS.filter(v => v.type === 'dead'), bush = VARS.filter(v => v.type === 'bush');
+    tmask = new Uint8Array(N);
+    const K = knightPx(), C = cathedral;
+    const gx = K * 0.8 / CW, gy = K * 0.55 / CH;           // placement grid, in cells
+    const startY = ROWS - VR * 0.3;
+    const pathNear = (x, y, r) => { for (let dy = -2; dy <= 2; dy++) for (let dx = -r; dx <= r; dx += 2) { const i = (Math.round(y) + dy) * COLS + Math.round(x) + dx; if (i >= 0 && i < N && (kind[i] === 7 || bmask[i])) return true; } return false; };
+    for (let j = 2; j * gy < ROWS - 2; j++) for (let i = 0; i * gx < COLS; i++) {
+      const x = (i + hash(i, j * 3) * 0.8 + 0.1) * gx, y = (j + hash(i * 5, j) * 0.8 + 0.1) * gy;
+      if (x < 3 || x > COLS - 4 || y > ROWS - 2) continue;
+      const forest = vnoise(x * 0.013 + 3, y * 0.021) * 0.75 + vnoise(x * 0.05, y * 0.07) * 0.25, r = hash(i * 17, j * 29);
+      const px = x * CW, py = y * CH;
+      if (C.cv && py < C.oy + 30 * MS && px > C.cx0 * CW - K * 0.6 && px < (C.cx0 + C.BW) * CW + K * 0.6) continue; // never behind the castle
+      if (Math.abs(y - startY) < 18 && Math.abs(x - pathX(y)) < 30) continue;
+      let v = null;
+      if (forest > 0.52 && r < (forest - 0.4) * 1.35) v = r < 0.13 ? dead[(r * 97 | 0) % dead.length] : trees[(r * 131 | 0) % trees.length];
+      else if (r < 0.12 + forest * 0.25) v = bush[(r * 211 | 0) % bush.length];
+      if (!v) continue;
+      if (pathNear(x, y, Math.ceil((v.type === 'bush' ? v.R * 0.7 : v.R * 0.45) / CW))) continue;
+      flora.push({ isFlora: true, v, x, y: Math.floor(y) - 0.7, br: Math.floor(y), ph: hash(i, j) * 6.28, rust: 0 });
+    }
+    flora.sort((a, b) => a.y - b.y);
+    FLMAXR = Math.ceil(Math.max(...VARS.map(v => -v.minY))) + 2;
+    for (const f of flora) {
+      const v = f.v, bx = Math.round(f.x), br = f.br;
+      // grass fully behind the crown is never seen: drop it from simulation and drawing
+      if (v.type !== 'dead') for (let k = 0; k < v.runs.length; k += 3) {
+        const cy = br + v.runs[k]; if (v.runs[k] >= -1 || cy < 0) continue;
+        for (let cx = bx + v.runs[k + 1] + 1; cx < bx + v.runs[k + 2] - 1; cx++) if (cx >= 0 && cx < COLS) kind[cy * COLS + cx] = 0;
+      }
+      // trunks block the way; bushes don't
+      if (v.type !== 'bush') for (let dx = -1; dx <= 1; dx++) { const i = br * COLS + bx + dx; if (i >= 0 && i < N) tmask[i] = 1; }
+      // shade on the ground: under the crown and thrown north-east by the sun
+      const sr = v.R / CW, sx = bx + v.Hc * 0.6 / CW, sy = br - v.Hc * 0.55 / CH;
+      for (let cy = Math.floor(sy - sr * CW / CH); cy <= Math.ceil(br + 2); cy++) for (let cx = Math.floor(Math.min(bx, sx) - sr); cx <= Math.ceil(Math.max(bx, sx) + sr); cx++) {
+        if (cx < 0 || cy < 0 || cx >= COLS || cy >= ROWS) continue;
+        const a = ((cx - sx) / sr) ** 2 + ((cy - sy) * CH / CW / sr / 0.75) ** 2, b = ((cx - bx) / (sr * 0.8)) ** 2 + ((cy - br) * CH / CW / (sr * 0.35)) ** 2;
+        const s = (a < 1 ? (1 - a) * 0.32 : 0) + (b < 1 ? (1 - b) * 0.3 : 0);
+        if (s > 0) { const i = cy * COLS + cx; bshade[i] = Math.min(0.55, bshade[i] + s * (v.type === 'dead' ? 0.4 : 1)); }
+      }
+    }
+    build.flora = flora.length;
+  }
+
+  // instances whose glyphs can reach the view: base row from the top of the view to below its bottom edge
+  function visibleFlora(out) {
+    let lo = 0, hi = flora.length;
+    const y0 = VY0 - 2;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (flora[m].br < y0) lo = m + 1; else hi = m; }
+    const y1 = VY1 + FLMAXR, xa = VX0 - 60, xb = VX1 + 60;
+    for (let k = lo; k < flora.length && flora[k].br <= y1; k++) { const f = flora[k]; if (f.x > xa && f.x < xb) out.push(f); }
+    return out;
+  }
+  function updateFlora(dt) { // bushes shiver when the knight pushes through them
+    for (const f of flora) {
+      if (f.v.type !== 'bush') continue;
+      const d = Math.abs(f.x - player.x) + Math.abs(f.br - player.y - 0.7) * 2;
+      f.rust = Math.max(f.rust * Math.exp(-dt * 3), d < f.v.R / CW + 2 && player.moving ? 1 : 0);
+    }
+  }
+  function drawFlora(f) {
+    const v = f.v, bx = Math.round(f.x) * CW, by = f.br * CH, H = -v.minY;
+    const wind = Math.sin(t * 0.9 + f.ph) * 1.8 + Math.sin(t * 2.3 + f.ph * 2) * 0.6 + f.rust * Math.sin(t * 26 + f.ph) * 2.2;
+    const L = v.list, Rn = v.runs;
+    // a crown standing between the camera and the knight thins out, so he is never lost behind it
+    let fade = 1;
+    if (v.type !== 'bush' && f.br > player.y + 0.7) {
+      const G = geomOf(player), w = v.R * 1.1;
+      if (G.left + G.w * 0.8 > bx - w && G.left + G.w * 0.2 < bx + w && G.top < by && G.gy > by - H * CH) fade = 0.32;
+    }
+    f.fade = (f.fade || 1) + (fade - (f.fade || 1)) * 0.15;
+    const fa = f.fade;
+    for (let k = 0; k < Rn.length; k += 3) {
+      const hf = Math.max(0, -Rn[k] / H); const sw = wind * hf * hf * 2;
+      grect(bx + Rn[k + 1] * CW + sw - 0.3, by + Rn[k] * CH - 0.3, (Rn[k + 2] - Rn[k + 1]) * CW + 0.6, CH + 0.6, 0.96 * fa);
+    }
+    for (let k = 0; k < L.length; k += 4) {
+      const hf = Math.max(0, -L[k + 1] / H);
+      gput(L[k + 2] * NB + L[k + 3], bx + L[k] * CW + wind * hf * hf * 2 - 1 / DPR, by + L[k + 1] * CH - 1 / DPR, fa);
+    }
+  }
+
   // ---------- light in the dark: a few lit windows and two small fires at the gate ----------
   // Pale, almost colourless light: it thins the fog round it rather than warming the scene.
   const braziers = [];
@@ -906,7 +1103,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     drawCathedral();
     const C = cathedral;
     drawWindows();
-    const order = [...ents, ...braziers].sort((a, b) => a.y - b.y);
+    const order = visibleFlora([...ents, ...braziers]).sort((a, b) => a.y - b.y);
     let oi = 0;
     let cloudRow = 0;
     const boxes = [];  // people already drawn: grass in front of them gets a dark backing so it hides their legs
@@ -925,6 +1122,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     for (let y = VY0; y <= VY1 + 4 && y < ROWS; y++) {
       while (oi < order.length && (order[oi].y + 0.7) * CH < (y + 1) * CH) {
         const e = order[oi++];
+        if (e.isFlora) { drawFlora(e); continue; }
         if (e.isFire) { drawBrazier(e); continue; }
         drawEntity(e); occlude(e);
         const G = geomOf(e); boxes.push([G.left + G.w * 0.18, G.top + G.h * 0.05, G.left + G.w * 0.82, G.gy + 2]);
@@ -962,7 +1160,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         }
       }
     }
-    while (oi < order.length) { const e = order[oi++]; if (e.isFire) drawBrazier(e); else { drawEntity(e); occlude(e); } }
+    while (oi < order.length) { const e = order[oi++]; if (e.isFlora) drawFlora(e); else if (e.isFire) drawBrazier(e); else { drawEntity(e); occlude(e); } }
 
     for (const d of dew) {
       const i = d.i, x = i % COLS, y = (i / COLS) | 0;
@@ -1471,7 +1669,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     try { simulate(dt); render(); } catch (err) { console.error(err); }
     frames++; acc += dt;
     if (acc > 0.5) {
-      statsEl.textContent = `${Math.round(frames / acc)} fps\n${build.blades.toLocaleString()} blades · ${COLS}×${ROWS}`;
+      statsEl.textContent = `${Math.round(frames / acc)} fps\n${build.blades.toLocaleString()} blades · ${build.flora} trees & bushes`;
       frames = 0; acc = 0;
     }
   }
