@@ -835,6 +835,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     // two small fires on the terrace, either side of the gate
     braziers.length = 0;
     for (const sx of [-1, 1]) braziers.push({ isFire: true, x: (ox + sx * 108 * MS) / CW, y: (oy - 66 * SINP * MS) / CH - 0.7, lift: 120 * COSP * MS, parts: [], seed: sx });
+    // and a campfire by the trail where he starts, so the firelight is a few steps away
+    { const sy = ROWS - VR * 0.3 - 5; braziers.push({ isFire: true, ground: true, x: pathX(sy) + 16, y: sy - 0.7, lift: 0, parts: [], seed: 3 }); }
     // footprint (collision), ground shadows and a little contact darkness
     bmask.fill(0); bshade.fill(0);
     const fy0 = Math.max(0, Math.floor((oy - 1060 * SINP * MS) / CH)), fy1 = Math.min(ROWS - 1, Math.ceil((oy + 120 * SINP * MS) / CH));
@@ -871,6 +873,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     if (x < 1 || y < 1 || x >= COLS - 1 || y >= ROWS - 1) return true;
     const h = surfAt(x, y);
     if (tmask && tmask[Math.round(y + 0.2) * COLS + Math.round(x)]) return true;  // tree trunks
+    for (const b of braziers) if (b.ground && Math.abs(x - b.x) < 3 && Math.abs(y - b.y - 0.7) < 1.2) return true;   // not through the campfire
     return !isFinite(h) || Math.abs(h - (e ? e.hT || 0 : 0)) > STEP_UP;
   }
 
@@ -1278,6 +1281,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     }
   }
   function updateFire(b, dt) {
+    if (b.ground) for (let y = Math.floor(b.y - 1); y <= Math.ceil(b.y + 2.5); y++) for (let x = Math.floor(b.x - 6); x <= Math.ceil(b.x + 6); x++) {
+      const i = y * COLS + x, dx = (x + 0.5 - b.x) / 6, dy = (y + 0.5 - b.y - 0.7) / 1.8;
+      if (i >= 0 && i < N && dx * dx + dy * dy < 1) flat[i] = Math.max(flat[i], 0.85);
+    }
     const F = Math.min(MS, 1.4); for (let k = 0; k < 6; k++) if (b.parts.length < 110 && Math.random() < dt * 60) { const sp = Math.random() - 0.5; b.parts.push({ x: sp * 26 * F, y: 0, vy: -(30 + Math.random() * 46) * F * (1 - Math.abs(sp)), vx: -sp * 14 * F, life: 1, k: Math.random() }); }
     for (let i = b.parts.length - 1; i >= 0; i--) {
       const q = b.parts[i];
@@ -1289,14 +1296,21 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     const bx = b.x * CW, by = (b.y + 0.7) * CH - b.lift;
     // the iron bowl: two rows of dark glyphs
     // an iron bowl on a short stand
-    const bowl = ['\\', '=', '#', '=', '#', '=', '/'];
-    for (let k = 0; k < bowl.length; k++) blit(CI[bowl[k]], BL0 + 4 + (k === 2 || k === 4 ? 1 : 0), bx + (k - 3.5) * CW, by - CH * 1.6);
-    blit(CI['|'], BL0 + 3, bx - CW * 0.5, by - CH * 0.7); blit(CI['/'], BL0 + 3, bx - CW * 1.6, by - CH * 0.1); blit(CI['\\'], BL0 + 3, bx + CW * 0.6, by - CH * 0.1);
+    if (b.ground) {   // a campfire: crossed logs and a ring of stones in the grass
+      const logs = ['o', '\\', '=', '#', '=', '/', 'o'];
+      for (let k = 0; k < logs.length; k++) blit(CI[logs[k]], BL0 + 3 + (k === 3 ? 2 : 1), bx + (k - 3.5) * CW, by - CH * 1.1);
+      blit(CI['o'], BL0 + 2, bx - CW * 4.4, by - CH * 0.4); blit(CI['o'], BL0 + 2, bx + CW * 3.4, by - CH * 0.4);
+    } else {
+      const bowl = ['\\', '=', '#', '=', '#', '=', '/'];
+      for (let k = 0; k < bowl.length; k++) blit(CI[bowl[k]], BL0 + 4 + (k === 2 || k === 4 ? 1 : 0), bx + (k - 3.5) * CW, by - CH * 1.6);
+      blit(CI['|'], BL0 + 3, bx - CW * 0.5, by - CH * 0.7); blit(CI['/'], BL0 + 3, bx - CW * 1.6, by - CH * 0.1); blit(CI['\\'], BL0 + 3, bx + CW * 0.6, by - CH * 0.1);
+    }
+    const ey = b.ground ? -CH * 1.8 : -CH * 2.3, fy = b.ground ? -CH * 2.2 : -CH * 2.8;
     // embers in the bowl
-    for (let k = -2; k <= 2; k++) blit(CI[hash(k + 9, (t * 8) | 0) > 0.5 ? '*' : 'o'], BL0 + 9 + ((hash(k, (t * 6) | 0) * 4) | 0), bx + (k - 0.5) * CW, by - CH * 2.3);
+    for (let k = -2; k <= 2; k++) blit(CI[hash(k + 9, (t * 8) | 0) > 0.5 ? '*' : 'o'], BL0 + 9 + ((hash(k, (t * 6) | 0) * 4) | 0), bx + (k - 0.5) * CW, by + ey);
     for (const q of b.parts) {
       const ci = FLAMECH[Math.min(FLAMECH.length - 1, ((1 - q.life) * FLAMECH.length) | 0)];
-      blit(ci, BL0 + Math.min(BLN - 1, Math.round(6 + q.life * 8)), bx + q.x - CW * 0.5, by - CH * 2.8 + q.y, Math.min(1, q.life * 1.6));
+      blit(ci, BL0 + Math.min(BLN - 1, Math.round(6 + q.life * 8)), bx + q.x - CW * 0.5, by + fy + q.y, Math.min(1, q.life * 1.6));
     }
   }
   let glowCv = null;
@@ -8628,7 +8642,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     [45, 17, 60, 16, 64, 21, 58, 26, 50, 28, 44, 24, 41, 21],   // SW
     null, // W
     [46, 16, 58, 16, 62, 22, 58, 26, 50, 27, 45, 24],           // NW
-    [44, 15, 60, 15, 66, 21, 60, 26, 52, 28, 44, 26, 38, 21],   // N
+    [42, 18, 62, 18, 66, 21, 60, 26, 52, 28, 44, 26, 38, 21],   // N
     [48, 16, 60, 16, 62, 22, 58, 26, 50, 27, 46, 22],           // NE
     null, // E
     [43, 17, 58, 17, 62, 21, 56, 25, 49, 28, 42, 25, 39, 21],   // SE
@@ -8695,10 +8709,10 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       });
       if (fxs.length === 2) D = fxs[1] - fxs[0];
     }
-    // cloth: only the cloak, outlined by hand on the atlas art of every idle pose (KCLOAK).
-    // Inside an outline the weight grows from where the cloth hangs (y0) to where it swings free (y1);
-    // everything else (body, arms, cowl, blade, legs) is rigid. Walk and jump poses move it frame by frame.
-    const R0 = i < 8 ? KCLOAK[i] : KCLOAKW[d], CW0 = KCOWL[d];   // outlines: the idle ones also drive the wind sway
+    // The cloak is its own layer: cells inside the hand-traced outline (KCLOAK standing, KCLOAKW walking)
+    // are cloth, simulated apart from the body. t runs from where it hangs (y0) to where it swings free
+    // (y1). The cowl only takes the cloak's colour. Jump poses keep their drawn cloak and colour only.
+    const R0 = i < 8 ? KCLOAK[i] : KCLOAKW[d], CW0 = KCOWL[d], sim = i < 72;
     for (const c of C) {
       if (c.seg) continue;
       const px = c.cx + 0.5, py = c.cy + 0.5;
@@ -8718,7 +8732,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
             const xk = r[k], yk = r[k + 1], xl = r[l], yl = r[l + 1];
             if ((yk > qy) !== (yl > qy) && px < (xl - xk) * (qy - yk) / (yl - yk) + xk) inside = !inside;
           }
-          if (inside) { c.cl = 1; if (i < 8) c.w = Math.max(c.w, Math.min(1, Math.max(0, (py - r[0]) / (r[1] - r[0])))); break; }
+          if (inside) { c.cl = 1; if (sim) { c.cm = 1; c.w = Math.max(c.w, Math.min(1, Math.max(0, (py - r[0]) / (r[1] - r[0])))); c.t = c.w; } break; }
         }
       }
     }
@@ -8734,18 +8748,35 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         for (let y = GH - 1; y >= 0; y--) for (let x = GW - 1; x >= 0; x--) { const q = y * GW + x; if (at[q] < 0 || !dist[q]) continue;
           if (x < GW - 1) relax(q, q + 1, 0.67); relax(q, q + GW, 1); if (x < GW - 1) relax(q, q + GW + 1, 1.2); if (x > 0) relax(q, q + GW - 1, 1.2); }
       }
-      for (let q = 0; q < GW * GH; q++) { const j = at[q]; if (j < 0 || !(C[j].w > 0)) continue; const u = Math.min(1, dist[q] / 4); C[j].w *= u * u * (3 - 2 * u); }
+      for (let q = 0; q < GW * GH; q++) { const j = at[q]; if (j < 0 || !(C[j].w > 0)) continue; const u = Math.min(1, dist[q] / 3); C[j].w *= u * u * (3 - 2 * u); }
     }
     const n = C.length, side = Math.abs(tx);
-    const F = { n, code: new Int16Array(n), cx: new Int16Array(n), cy: new Int16Array(n), seg: new Uint8Array(n), cl: new Uint8Array(n), w: new Float32Array(n), dep: new Float32Array(n),
+    const F = { n, code: new Int16Array(n), cx: new Int16Array(n), cy: new Int16Array(n), seg: new Uint8Array(n), cl: new Uint8Array(n), cm: new Uint8Array(n), w: new Float32Array(n), t: new Float32Array(n), dep: new Float32Array(n),
       // stride half-length in cells: what the pose shows in side views, a set one when walking at the camera
       R: side > 0.5 ? Math.min(12, Math.max(5, D / (2 * side))) : 7, beta: (1 - side) * Math.PI / 2, d };
-    C.forEach((c, j) => { F.cl[j] = c.cl || 0; F.code[j] = c.code; F.cx[j] = c.cx; F.cy[j] = c.cy; F.seg[j] = c.seg; F.w[j] = c.w; F.dep[j] = c.dep; });
+    C.forEach((c, j) => { F.cl[j] = c.cl || 0; F.cm[j] = c.cm || 0; F.t[j] = c.t || 0; F.code[j] = c.code; F.cx[j] = c.cx; F.cy[j] = c.cy; F.seg[j] = c.seg; F.w[j] = c.w; F.dep[j] = c.dep; });
     return F;
   }
   const KFR = KNIGHT_ART.map(kseg);
   const KWB = [0, 7, 0, 0, 0, 0, 2, 5];   // per direction, the atlas frame whose stride is clearest: it sets the step length
   const KR = KWB.map((k, d) => KFR[8 + d * 8 + k].R);
+  // Walking, the legs always come from that pose: the atlas frames' own legs barely step and jitter by a
+  // few cells from frame to frame (sometimes merging), which under the coded step read as shuffling.
+  // So each walk frame keeps its own body and cloak and borrows the clean legs.
+  const FKEYS = ['code', 'cx', 'cy', 'seg', 'cl', 'cm', 'w', 't', 'dep'];
+  for (let d = 0; d < 8; d++) {
+    const B = KFR[8 + d * 8 + KWB[d]];
+    for (let k = 0; k < 8; k++) {
+      if (k === KWB[d]) continue;
+      const F = KFR[8 + d * 8 + k], pick = [];
+      for (let j = 0; j < F.n; j++) if (F.seg[j] !== 1 && F.seg[j] !== 2) pick.push([F, j]);
+      for (let j = 0; j < B.n; j++) if (B.seg[j] === 1 || B.seg[j] === 2) pick.push([B, j]);
+      pick.sort((a, b) => (a[0].cy[a[1]] - b[0].cy[b[1]]) || (a[0].cx[a[1]] - b[0].cx[b[1]]));   // rows in order, for the plate runs
+      const N = { n: pick.length, R: F.R, beta: F.beta, d: F.d };
+      for (const key of FKEYS) { N[key] = new F[key].constructor(pick.length); pick.forEach(([S, j], q) => { N[key][q] = S[key][j]; }); }
+      KFR[8 + d * 8 + k] = N;
+    }
+  }
   const KFN = KFR.reduce((a, f) => Math.max(a, f.n), 0), KDX = new Float32Array(KFN), KDY = new Float32Array(KFN);   // per-cell offsets, reused
   KNIGHT_ART.length = 0;   // the text has done its job
   const KS = { ok: true };
@@ -8821,11 +8852,21 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       const ft = Math.min(0.05, Math.max(0, t - (e.lt ?? t))); e.lt = t;   // time-based, so speed doesn't follow the frame rate
       const jumping = e.jump > 0, walking = !jumping && e.walk > 0.5;
       const k = e.idleK = Math.min(1, Math.max(0, (e.idleK || 0) + (!jumping && !walking ? ft * 1.8 : -ft * 5)));
-      // the cloak always lives in the grass wind; gusts swell in and out
-      const w0 = windAt(e.x, e.y);
-      e.amp = (e.amp || 0) + ((1.6 + w0.lean * 4 + w0.gust * 3) - (e.amp || 0)) * Math.min(1, ft * 1.8);
-      e.cph = (e.cph || 0) + ft * (1.2 + w0.lean * 1.5 + w0.gust * 1.8);
-      const Aw = Math.min(1.1, e.amp * 0.22) * fcw * (0.6 + 0.4 * k), phw = e.cph, br = (0.5 - 0.5 * Math.cos(t * 2.1)) * fch * 0.25 * k;
+      const br = (0.5 - 0.5 * Math.cos(t * 2.1)) * fch * 0.25 * k;   // breath
+      // The cloak's hem is a damped spring with inertia: it trails the way he came, swings on when he stops,
+      // sags on the way up a jump and floats on the way down; the wind leans it and sets it fluttering.
+      const w0 = windAt(e.x, e.y), cs = e.cloth || (e.cloth = { x: 0, y: 0, vx: 0, vy: 0, ph: 0, fa: 0, px: e.x, py: e.y, jp: 0, mvx: 0, mvy: 0 });
+      if (ft > 0) {
+        const jp = jumpPx(e), vx = (e.x - cs.px) * CW / ft, vy = ((e.y - cs.py) * CH - (jp - cs.jp)) / ft;   // screen px/s; rising is negative
+        cs.px = e.x; cs.py = e.y; cs.jp = jp;
+        cs.mvx += (vx - cs.mvx) * Math.min(1, ft * 10); cs.mvy += (vy - cs.mvy) * Math.min(1, ft * 10);
+        const hx = Math.max(-5, Math.min(5, -cs.mvx * 0.022 + (w0.lean - 0.1) * 1.4 + w0.gust * 1.2)), hy = Math.max(-3, Math.min(3, -cs.mvy * 0.006));
+        cs.vx += (28 * (hx - cs.x) - 5.5 * cs.vx) * ft; cs.vy += (28 * (hy - cs.y) - 5.5 * cs.vy) * ft;   // under-damped: a little swing past the rest
+        cs.x += cs.vx * ft; cs.y += cs.vy * ft;
+        const spd = Math.min(1, Math.hypot(cs.mvx, cs.mvy) / 90);
+        cs.fa = 0.25 + 0.35 * spd + 0.35 * (e.run || 0) + 0.6 * w0.gust;                   // flutter, in cells at the hem
+        cs.ph += ft * (4 + 4 * spd + 3 * (e.run || 0) + 3 * w0.gust);
+      }
       // Walk: the phase follows the ground covered, so a planted foot keeps still while the body passes it.
       const m = walking ? Math.min(1, (e.walk - 0.5) / 0.35) : 0, rn = walking ? e.run || 0 : 0, R = KR[K.d] * (1 + 0.3 * rn);   // running: a longer stride
       if (!walking) e.wph = 0;
@@ -8849,22 +8890,23 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
           if (cy < 36) dy -= br * Math.min(1, (36 - cy) / 6);   // breath: head and chest rise as one piece, fading out over the waist
           const w = K.w[j];
           if (w > 0) {
-            // The cloth bends as one sheet: offsets grow smoothly from the shoulders and neighbouring rows
-            // stay within a few hundredths of a cell of each other, or the fine dither tears into stripes.
-            const dist = (Math.abs(cx - KFX) * 0.6 + Math.max(0, cy - 19) * 0.9) / 10;
-            dx += w * Aw * Math.sin(phw - cy * 0.05 - dist * 0.4);
+            // cloth: fixed at the shoulders, freest at the hem; it bends as one sheet, and the flutter runs
+            // down it as a slow wave so neighbouring rows stay together
+            const tt = K.t[j], bend = w * tt ** 0.3, f = cs.fa * w * Math.sin(cs.ph - tt * 2.6 - cx * 0.05);
+            dx += bend * cs.x * fcw + (side > 0.5 ? 0.35 : 1) * f * fcw;
+            dy += bend * cs.y * fch + (side > 0.5 ? 0.7 : 0.25) * f * fch;
           }
         }
         KDX[j] = dx; KDY[j] = dy;
       }
-      // dark plate first, in runs of neighbouring cells that move together. The far leg goes down before
+      // Dark plate first, in runs of neighbouring cells that move together. The far leg goes down before
       // the near one's plate, so where the legs cross the near leg hides it instead of tangling with it.
       const near = sgL > 0 ? 1 : 2, far = 3 - near;
-      const plate = (sel) => {
+      const plate = (pick) => {
         let ry = -1, rs = 0, re = 0, rdx = 0, rdy = 0;
         for (let j = 0; j <= n; j++) {
           if (j < n) {
-            if ((K.seg[j] === near) !== sel) continue;
+            if (!pick(j)) continue;
             const cx = K.cx[j], cy = K.cy[j], dx = KDX[j], dy = KDY[j];
             if (cy === ry && cx === re && Math.abs(dx - rdx) < 0.35 && Math.abs(dy - rdy) < 0.35) { re = cx + 1; continue; }
             if (ry >= 0) grect(left + rs * fcw + rdx - 0.4, top + ry * fch + rdy - 0.4, (re - rs) * fcw + 0.8, fch + 0.8, 0.94);
@@ -8885,9 +8927,13 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
         return Math.max(0, Math.min(KWH - 1, Math.floor(L * (KWH - 1) + 0.5 + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.9)));
       };
       const fireBlock = j => { const h = warm(j); return h && K.cl[j] ? KWH - 1 + h : h; };   // the cloak goes red, the armour metallic
-      const glyphs = (sel) => { for (let j = 0; j < n; j++) { const c = K.code[j]; if (c >= 0 && (K.seg[j] === far) === sel) gput(KN0 + fireBlock(j) * KNS + c, left + K.cx[j] * fcw + KDX[j], top + K.cy[j] * fch + KDY[j], 1); } };
-      plate(false); glyphs(true);
-      plate(true); glyphs(false);
+      const glyphs = (pick) => { for (let j = 0; j < n; j++) { const c = K.code[j]; if (c >= 0 && pick(j)) gput(KN0 + fireBlock(j) * KNS + c, left + K.cx[j] * fcw + KDX[j], top + K.cy[j] * fch + KDY[j], 1); } };
+      // The cloak is its own layer: behind the body, or over it when he is seen from behind.
+      const cloak = j => K.cm[j] === 1, over = K.d >= 3 && K.d <= 5;
+      if (!over) { plate(cloak); glyphs(cloak); }
+      plate(j => !cloak(j) && K.seg[j] !== near); glyphs(j => !cloak(j) && K.seg[j] === far);
+      plate(j => K.seg[j] === near); glyphs(j => !cloak(j) && K.seg[j] !== far);
+      if (over) { plate(cloak); glyphs(cloak); }
       drawTag(e, gx, gy);
       return;
     }
@@ -9008,7 +9054,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   const KCH = RAMP + "/\\|'";   // fine glyphs: the dither ramp plus strokes for branches
   const FCI = {}; [...KCH].forEach((c, i) => FCI[c] = i);
   const KWH = 5, KBLK = 2 * KWH - 1, KNS = KCH.length * 8;   // firelight steps (0 = none); colour blocks: grey, 4 armour, 4 cloak; sprites per block
-  const KMMIX = [0, 0.3, 0.5, 0.68, 0.82], KCMIX = [0, 0.5, 0.74, 0.9, 1];
+  const KMMIX = [0, 0.3, 0.45, 0.6, 0.72], KCMIX = [0, 0.8, 0.92, 1, 1];   // the cloth jumps straight to red: half-mixed with the light grey it reads pink
   const lerp3 = (a, b, u) => [0, 1, 2].map(i => a[i] + (b[i] - a[i]) * u);
   function buildMegaAtlas() {
     const k = charDims(player), kfs = k.ffs * DPR;
@@ -9025,8 +9071,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
     for (let bk = 0; bk < KBLK; bk++) for (let l = 0; l < KLV; l++) {
       const f = 0.3 + 0.85 * (l / (KLV - 1)), u = l / (KLV - 1), v = Math.min(1, f / 1.15), cloth = bk > KWH - 1, h = cloth ? bk - KWH + 1 : bk;
       const mix = (cloth ? KCMIX : KMMIX)[h];
-      const tone = cloth ? (u < 0.85 ? [235 * v, 40 * v * v, 26 * v * v] : lerp3([235, 44, 28], [255, 96, 52], (u - 0.85) / 0.15))
-                         : (u < 0.85 ? [205 * v, 172 * v, 132 * v] : lerp3([205, 172, 132], [255, 228, 182], (u - 0.85) / 0.15));
+      const tone = cloth ? (u < 0.85 ? [210 * v, 30 * v * v, 22 * v * v] : lerp3([210, 34, 24], [250, 88, 46], (u - 0.85) / 0.15))
+                         : (u < 0.85 ? [190 * v, 165 * v, 135 * v] : lerp3([190, 165, 135], [250, 222, 178], (u - 0.85) / 0.15));
       const r = Math.min(255, tr * f) * (1 - mix) + tone[0] * mix, gg = Math.min(255, tg * f) * (1 - mix) + tone[1] * mix, bb = Math.min(255, tb * f) * (1 - mix) + tone[2] * mix;
       g.fillStyle = `rgb(${r | 0},${gg | 0},${bb | 0})`;
       for (let c = 1; c < KCH.length; c++) g.fillText(KCH[c], KX + c * KAW + 1, KY + (bk * KLV + l) * KAH + 1);
