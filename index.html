@@ -187,14 +187,19 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   // ---------- input ----------
   const keys = new Set();
+  // Physical keys (e.code), so WASD, E and G work in any keyboard layout (a Russian layout types ц ф ы в)
+  const keyOf = e => ({ KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', KeyE: 'e', KeyG: 'g' })[e.code] || e.key.toLowerCase();
   addEventListener('keydown', e => {
-    keys.add(e.key.toLowerCase());
-    if (e.code === 'Space') { jump(); e.preventDefault(); }
-    if (e.key.toLowerCase() === 'g') gust(player.x, player.y);
+    const k = keyOf(e);
+    keys.add(k);
+    if (e.code === 'Space') { if (!e.repeat) jump(); e.preventDefault(); }
+    if (k === 'g' && !e.repeat) gust(player.x, player.y);
     if (e.key.startsWith('Arrow')) e.preventDefault();
-    if (e.key.toLowerCase() === 'e') useSpot();
+    if (k === 'e' && !e.repeat) useSpot();
   });
-  addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+  addEventListener('keyup', e => { keys.delete(keyOf(e)); keys.delete(e.key.toLowerCase()); });
+  addEventListener('pointerdown', () => window.focus());   // inside an embedded frame, a click hands it the keyboard
+  addEventListener('visibilitychange', () => keys.clear());
   addEventListener('blur', () => keys.clear());
   let ptr = null;
   cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptr = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), held: false }; });
@@ -5961,7 +5966,7 @@ const KSW = [238,504,387,242,214,473,408,240,420,311,249,467,391,338,277,486,799
   // Parse once. Every cell keeps its glyph code (ramp index × level, -1 = plate only) and what it
   // belongs to: 0 body, 1 left leg, 2 right leg, 3 blade; w is how much cloth it is (0..1), dep how far
   // down the leg it sits (0 at the hip, 1 at the foot). The animation only ever moves these cells.
-  const KFX = 52, KHIP = 41, KFOOT = 51, KPIV = 33;   // legs are cut below KHIP but swing from the real hip, under the tabard
+  const KFX = 52, KHIP = 41, KFOOT = 51;   // legs are cut below KHIP, under the tabard's hem
   function kseg(src, i) {
     const d = i < 8 ? i : i < 16 ? i - 8 : JROWI[Math.floor((i - 16) / 11)], legs = i < 16;
     const lines = src.split('\n'), top = +lines[0], C = [];
@@ -6013,7 +6018,7 @@ const KSW = [238,504,387,242,214,473,408,240,420,311,249,467,391,338,277,486,799
       }
       const fxs = parts.map((p, k) => {
         let fx = 0, n = 0;
-        for (const j of p) { const c = C[j]; c.seg = 1 + k; c.dep = Math.min(1, Math.max(0, (c.cy - KPIV) / (KFOOT - KPIV))); if (c.cy >= KFOOT - 3) { fx += c.cx; n++; } }
+        for (const j of p) { const c = C[j]; c.seg = 1 + k; const u = Math.min(1, Math.max(0, (c.cy - KHIP + 0.5) / (KFOOT - KHIP))); c.dep = u * u * (3 - 2 * u); if (c.cy >= KFOOT - 3) { fx += c.cx; n++; } }   // dep: still where the leg meets the body, the foot moving as one
         return n ? fx / n : KFX;
       });
       if (fxs.length === 2) D = fxs[1] - fxs[0];
@@ -6026,13 +6031,30 @@ const KSW = [238,504,387,242,214,473,408,240,420,311,249,467,391,338,277,486,799
       if (c.seg) continue;
       const px = c.cx + 0.5, py = c.cy + 0.5;
       for (const r of R0) {
-        let inside = false;
-        for (let k = 2, l = r.length - 2; k < r.length; l = k, k += 2) {
-          const xk = r[k], yk = r[k + 1], xl = r[l], yl = r[l + 1];
-          if ((yk > py) !== (yl > py) && px < (xl - xk) * (py - yk) / (yl - yk) + xk) inside = !inside;
+        // the tatters just under an outline belong to the hem too
+        for (const qy of [py, py - 1.5, py - 3]) {
+          let inside = false;
+          for (let k = 2, l = r.length - 2; k < r.length; l = k, k += 2) {
+            const xk = r[k], yk = r[k + 1], xl = r[l], yl = r[l + 1];
+            if ((yk > qy) !== (yl > qy) && px < (xl - xk) * (qy - yk) / (yl - yk) + xk) inside = !inside;
+          }
+          if (inside) { c.w = Math.max(c.w, Math.min(1, Math.max(0, (py - r[0]) / (r[1] - r[0])))); break; }
         }
-        if (inside) { c.w = Math.max(c.w, Math.min(1, Math.max(0, (py - r[0]) / (r[1] - r[0])))); }
       }
+    }
+    // Soften the seams: cloth beside the body barely moves and gains its freedom
+    // over a few glyphs, so it bends away from the body instead of tearing off along a line.
+    {
+      const GW = 104, GH = 54, dist = new Float32Array(GW * GH).fill(1e9), at = new Int32Array(GW * GH).fill(-1);
+      for (let j = 0; j < C.length; j++) { const c = C[j]; if (c.cx >= GW || c.cy >= GH) continue; const q = c.cy * GW + c.cx; at[q] = j; if (!c.seg && !(c.w > 0)) dist[q] = 0; }   // only the body holds the cloth: it may lie over legs and blade
+      const relax = (q, r, cost) => { if (r >= 0 && r < GW * GH && at[r] >= 0 && dist[r] + cost < dist[q]) dist[q] = dist[r] + cost; };
+      for (let pass = 0; pass < 2; pass++) {   // chamfer distance through the figure, in cell heights (a cell is 0.6 × 0.9)
+        for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) { const q = y * GW + x; if (at[q] < 0 || !dist[q]) continue;
+          if (x > 0) relax(q, q - 1, 0.67); relax(q, q - GW, 1); if (x > 0) relax(q, q - GW - 1, 1.2); if (x < GW - 1) relax(q, q - GW + 1, 1.2); }
+        for (let y = GH - 1; y >= 0; y--) for (let x = GW - 1; x >= 0; x--) { const q = y * GW + x; if (at[q] < 0 || !dist[q]) continue;
+          if (x < GW - 1) relax(q, q + 1, 0.67); relax(q, q + GW, 1); if (x < GW - 1) relax(q, q + GW + 1, 1.2); if (x > 0) relax(q, q + GW - 1, 1.2); }
+      }
+      for (let q = 0; q < GW * GH; q++) { const j = at[q]; if (j < 0 || !(C[j].w > 0)) continue; const u = Math.min(1, dist[q] / 4); C[j].w *= u * u * (3 - 2 * u); }
     }
     const n = C.length, side = Math.abs(tx);
     const F = { n, code: new Int16Array(n), cx: new Int16Array(n), cy: new Int16Array(n), seg: new Uint8Array(n), w: new Float32Array(n), dep: new Float32Array(n),
