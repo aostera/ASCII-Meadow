@@ -1,9 +1,11 @@
+# Draws every idle/walk pose with its cloak mask (KCLOAK) in red: what the wind and the stride move.
+# usage: python3 tools/cloak/mask_preview.py index.html
 import json,re,base64,io
 from PIL import Image, ImageDraw
 s=open(__import__('sys').argv[1] if len(__import__('sys').argv)>1 else 'index.html').read()
 t=s[s.index('const KCLOAK = ['):s.index('];',s.index('const KCLOAK = ['))+1]
 t=re.sub(r'//.*','',t); t=re.sub(r'\s','',t[t.index('['):]); t=re.sub(r',\]',']',t); KC=json.loads(t)
-KA=json.load(open('kart93.json'))
+a=s.index('const KNIGHT_ART = ['); KA=re.findall(r'`([^`]*)`', s[a:s.index('\n  ];', a)])   # the knight frames, as printed in the page
 def inside(r,px,py):
     ins=False; n=len(r); k=2; l=n-2
     while k<n:
@@ -32,4 +34,4 @@ for i in range(16):
 W,H=tiles[0].size
 m=Image.new('RGB',(W*8,H*2))
 for i,t in enumerate(tiles): m.paste(t,((i%8)*W,(i//8)*H))
-m.save('kseg/mask.png'); print(m.size)
+m.save('tools/cloak/mask.png'); print(m.size)

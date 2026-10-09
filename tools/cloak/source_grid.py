@@ -1,6 +1,8 @@
+# Renders an atlas pose on the page's 104 x 54 cell grid, to trace cloak outlines (KCLOAK) by hand.
+# Needs the knight sheet (sheet3.b64 from tools/build_knight_sheet.py).  usage: python3 source_grid.py 0 1 2 ...
 import sys, base64, io
 from PIL import Image, ImageDraw
-sheet = Image.open(io.BytesIO(base64.b64decode(open('atl3/sheet3.b64').read().split(',')[1]))).convert('RGBA')
+sheet = Image.open(io.BytesIO(base64.b64decode(open('sheet3.b64').read().split(',')[1]))).convert('RGBA')
 KWB=[0,7,0,0,0,0,2,5]
 keep=list(range(8))+[8+d*8+KWB[d] for d in range(8)]+list(range(72,149))
 TW,TH=144,112
@@ -20,4 +22,4 @@ def render(i):
     # crop to figure
     return im.crop((0,0,30+90*cw,20+54*ch)) if True else im
 for i in map(int,sys.argv[1:]):
-    render(i).save('kseg/g%02d.png'%i)
+    render(i).save('g%02d.png'%i)
