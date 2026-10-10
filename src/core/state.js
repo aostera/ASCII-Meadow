@@ -9,5 +9,6 @@ const FONT = '"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace';
 
 let DPR, W, H, FS, CW, CH, COLS, ROWS, N, HZ = 0, VC, VR, bshade, bmask, segs, FR, TA;
 let ang, vel, flat, push, shadow, height, seed, kind, wet;   // wet: water or marsh, no way through
+let worldGen = 0;   // counts build()s: whatever caches cell positions starts afresh when it changes
 
 let t = 0;
