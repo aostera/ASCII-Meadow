@@ -1,0 +1,10 @@
+// Cloudflare Workers Builds: a static site, no Worker code. The build command
+// `sh tools/build_site.sh dist` copies index.html, styles/ and src/ into dist/,
+// and `npx wrangler deploy` uploads that folder as the site's assets.
+{
+  "name": "ascii-meadow",
+  "compatibility_date": "2026-10-09",
+  "assets": {
+    "directory": "./dist"
+  }
+}
