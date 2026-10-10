@@ -13,7 +13,7 @@
 
 Через HTTP: `npx http-server .` (или любой статический сервер) и открыть `http://localhost:8080/`.
 
-Онлайн: https://aostera.github.io/ASCII-Meadow/ (GitHub Pages, публикуется из `main` при каждом пуше).
+Онлайн: https://ascii-meadow.aloster36.workers.dev/ (Cloudflare Workers, бесплатный тариф; публикуется из `main` при каждом пуше, репозиторий остаётся приватным).
 
 ## Управление
 
@@ -95,7 +95,7 @@ notes/                заметки (хранилище Obsidian)
   - на PR — **обязательное** попиксельное сравнение с базовой веткой в шести сценариях: рыцарь, 8 направлений, коровы, замок, 2D, мобильный.
 
   Если PR намеренно меняет картинку, на него ставится метка `visual-change`: сравнение всё равно выполняется и выкладывает diff-изображения, но не блокирует. При падении снимки и логи сохраняются как артефакты.
-- **Pages** (`.github/workflows/pages.yml`) публикует `index.html`, `styles/`, `src/` через `tools/build_site.sh`. GitHub Pages должен быть включён в настройках репозитория: Settings → Pages → Source: GitHub Actions. Для приватного репозитория это возможно только на платном тарифе.
+- **Cloudflare** (Workers Builds, подключён к GitHub): каждый пуш в `main` — деплой на сайт, каждая другая ветка — превью-сборка (проверка «Workers Builds: ascii-meadow» на PR). `npm ci` через скрипт `prepare` кладёт сайт в `dist/` (`tools/build_site.sh`: `index.html`, `styles/`, `src/`), `wrangler.jsonc` отдаёт `dist/` как статические файлы — без кода Worker. Прежний GitHub Pages workflow удалён: в приватном репозитории на бесплатном тарифе Pages недоступен.
 
 ## Заметки
 

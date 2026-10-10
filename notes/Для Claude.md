@@ -35,5 +35,7 @@
 6. Новый код — никогда не в `index.html`: свой файл в `src/`, `<script>` в правильном месте, вызов из `simulate()`/`render()`.
 
 ## Публикация
-- GitHub Pages (`.github/workflows/pages.yml`) на 2026-10-10 **не работает**: репозиторий приватный, Pages в настройках не включён, каждый деплой падает на `configure-pages` («Get Pages site failed — Not Found»), https://aostera.github.io/ASCII-Meadow/ отдаёт 404. Нужно действие владельца: Settings → Pages → Source: GitHub Actions (для приватного репозитория — только на GitHub Pro/Team/Enterprise) или сделать репозиторий публичным. После этого перезапустить «Deploy to GitHub Pages» (workflow_dispatch) и проверить сайт smoke-тестом: `node tools/check/smoke.cjs https://aostera.github.io/ASCII-Meadow/ --quick`.
+- Сайт: https://ascii-meadow.aloster36.workers.dev/ — Cloudflare Workers (бесплатно), Worker `ascii-meadow`, Workers Builds подключён к GitHub (репозиторий приватный). Пуш в `main` → деплой (`npx wrangler deploy`), другие ветки → превью (`npx wrangler preview`, поэтому в `wrangler.jsonc` есть `previews: {}`). Build command в панели не нужен: `npm ci` запускает `prepare` → `sh tools/build_site.sh dist`. Без `wrangler.jsonc` Wrangler сам настраивает проект и заливает весь репозиторий с `node_modules` — сборка падает. Лог сборки виден только в панели Cloudflare (MCP его не отдаёт).
+- После деплоя проверять живой сайт: `node tools/check/smoke.cjs https://ascii-meadow.aloster36.workers.dev/` (26 проверок: WebGL2, 2D, касания, консоль).
+- GitHub Pages не используется: в приватном репозитории на бесплатном тарифе он недоступен, workflow удалён.
 - Артефакт claude.ai публикуется склейкой: `python3 tools/bundle.py <файл> --body`.
