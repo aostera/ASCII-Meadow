@@ -10,11 +10,11 @@ function flush2D(camx, camy, castle) {
     g.globalAlpha = castle.a; g.drawImage(cathedral.cv, castle.x, castle.y, cathedral.BW * CW, cathedral.BH * CH);
     if (castle.flash > 0.02) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = castle.flash; g.drawImage(cathedral.cv, castle.x, castle.y, cathedral.BW * CW, cathedral.BH * CH); g.globalCompositeOperation = 'source-over'; }
   }
-  const A = GB.atlasCv, b = GB.buf, aw = A.width, ah = A.height;
+  const A = GB.atlasCv, b = GB.buf, S = SPF, aw = A.width, ah = A.height;
   for (let i = 0; i < GB.n; i++) {
-    const o = i * 20;
-    g.globalAlpha = b[o + 4];
-    g.drawImage(A, b[o + 2] * aw, b[o + 3] * ah, (b[o + 7] - b[o + 2]) * aw, (b[o + 13] - b[o + 3]) * ah, b[o], b[o + 1], b[o + 5] - b[o], b[o + 11] - b[o + 1]);
+    const o = i * 6, q = b[o + 4] * 8;
+    g.globalAlpha = b[o + 5];
+    g.drawImage(A, S[q + 4] * aw, S[q + 5] * ah, (S[q + 6] - S[q + 4]) * aw, (S[q + 7] - S[q + 5]) * ah, b[o], b[o + 1], b[o + 2] - b[o], b[o + 3] - b[o + 1]);
   }
   g.globalAlpha = 1;
 }
