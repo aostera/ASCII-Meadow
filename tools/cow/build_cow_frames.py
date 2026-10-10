@@ -1,7 +1,8 @@
-# usage: python3 tools/cow/build_cow_frames.py raw.pkl cow_ascii.json preview.png  (cow_ascii.json → COW_ART in index.html)
+# usage: python3 tools/cow/build_cow_frames.py raw.pkl cow_ascii.json preview.png  (cow_ascii.json → COW_ART, cow_ascii_index.json → CI6 in index.html; needs opencv-python-headless)
 # Cow frames as glyph art, on the knight's fine grid. All frames face right (the atlas's left-facing ones
 # are mirrored); the game mirrors them back when a cow heads left.
-#   idle 0-4, walk 5-12, run 13-20, eat 21-26, hurt 27-32, die 33-39
+#   idle 5 poses; walk, run and eat cycles and the hurt and die moves get in-betweens made along optical
+#   flow, so the motion reads smooth (frame ranges are written to <out>_index.json)
 import sys, pickle, json, numpy as np
 from PIL import Image, ImageFilter
 R = pickle.load(open(sys.argv[1], 'rb'))
@@ -72,10 +73,48 @@ def place(im, mode):
     t = Image.new('RGBA', (TW, TH), (0, 0, 0, 0))
     t.paste(s, (round(FX - cx * SCALE), round(FY - ys.max() * SCALE)), s)
     return t
-tiles = [place(f, 'feet') for f in frames]
+# Work at 3x the tile so the in-betweens are made from real detail, then print each frame as glyphs.
+K3 = 3
+def place3(im):
+    a = np.asarray(im)[..., 3] > 40; ys, xs = np.nonzero(a); h = ys.max() - ys.min()
+    cx = np.median(xs[ys < ys.min() + h * 0.6]); sc = SCALE * K3
+    s2 = im.resize((max(1, round(im.width * sc)), max(1, round(im.height * sc))), Image.LANCZOS)
+    t = Image.new('RGBA', (TW * K3, TH * K3), (0, 0, 0, 0))
+    t.paste(s2, (round(FX * K3 - cx * sc), round(FY * K3 - ys.max() * sc)), s2)
+    return np.asarray(t).astype(np.float32)
+import cv2
+def tween(A, B, t):
+    """A frame t of the way from A to B: both warped along dense optical flow and blended."""
+    ga = (A[..., :3].mean(2) * A[..., 3] / 255).astype(np.uint8); gb = (B[..., :3].mean(2) * B[..., 3] / 255).astype(np.uint8)
+    fab = cv2.calcOpticalFlowFarneback(ga, gb, None, 0.5, 4, 21, 5, 7, 1.5, 0)
+    fba = cv2.calcOpticalFlowFarneback(gb, ga, None, 0.5, 4, 21, 5, 7, 1.5, 0)
+    h, w = ga.shape; gx, gy = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
+    # backward warping: a pixel of the in-between at p came from A at p - t*f and from B at p + (1-t)*f
+    wa = cv2.remap(A, gx - t * fab[..., 0], gy - t * fab[..., 1], cv2.INTER_LINEAR, borderValue=0)
+    wb = cv2.remap(B, gx - (1 - t) * fba[..., 0], gy - (1 - t) * fba[..., 1], cv2.INTER_LINEAR, borderValue=0)
+    out = wa * (1 - t) + wb * t
+    # keep the coat crisp: colour from whichever source dominates, coverage blended
+    return out
+def expand(seq, n, cyclic):
+    """n frames between each pair (the originals included)."""
+    T = [place3(f) for f in seq]; res = []
+    pairs = len(T) if cyclic else len(T) - 1
+    for i in range(pairs):
+        A, B = T[i], T[(i + 1) % len(T)]
+        res.append(A)
+        for k in range(1, n): res.append(tween(A, B, k / n))
+    if not cyclic: res.append(T[-1])
+    return [Image.fromarray(np.clip(r, 0, 255).astype(np.uint8)) for r in res]
+SEQ = [('idle', IDLE, 1, False), ('walk', WALK, 3, True), ('run', RUN, 3, True), ('eat', EAT, 3, True), ('hurt', HURT, 2, False), ('die', DIE, 2, False)]
+tiles, index = [], {}
+for name, seq, n, cyc in SEQ:
+    fr = [Image.fromarray(place3(f).astype(np.uint8)) for f in seq] if n == 1 else expand(seq, n, cyc)
+    index[name] = [len(tiles), len(fr)]; tiles += fr
+print('index', index)
+json.dump(index, open(sys.argv[2].replace('.json', '_index.json'), 'w'))
 out = [to_ascii(t) for t in tiles]
 json.dump(out, open(sys.argv[2], 'w'))
 prev = Image.new('RGB', (TW * 8, TH * ((len(tiles) + 7) // 8)), (40, 40, 40))
-for i, t in enumerate(tiles): prev.paste(t, ((i % 8) * TW, (i // 8) * TH), t)
+for i, t in enumerate(tiles): t2 = t.resize((TW, TH), Image.LANCZOS); prev.paste(t2, ((i % 8) * TW, (i // 8) * TH), t2)
 prev.save(sys.argv[3])
 print('frames', len(out), 'chars', sum(map(len, out)), 'cut', cut)
