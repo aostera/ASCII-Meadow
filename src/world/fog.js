@@ -18,7 +18,7 @@ function fogDensity(x, y) {
   return Math.max(0, Math.min(1, (n - 0.56 + thick * 0.42) * 2.4)) * thick;
 }
 function updateFog() {
-  const fw = Math.max(32, Math.round(W / 12)), fh = Math.max(24, Math.round(H / 12));
+  const cs = Math.max(12, W / 160), fw = Math.max(32, Math.round(W / cs)), fh = Math.max(24, Math.round(H / cs));   // a cell of 12 px, coarser past 1920 px wide: it is drawn smoothed anyway
   if (FG.w !== fw || FG.h !== fh) { FG.w = fw; FG.h = fh; FG.cv.width = fw; FG.cv.height = fh; FG.d = new Float32Array(fw * fh); FG.img = FG.cv.getContext('2d').createImageData(fw, fh); FG.tick = 0; }
   if ((FG.tick++ & 1) && FG.tick > 2) return;
   const x0 = camX * CW, y0 = camY * CH, sx = W / VZ / fw, sy = H / VZ / fh, px = FG.img.data;
