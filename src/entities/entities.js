@@ -38,11 +38,6 @@ function geomOf(e) {
   const gx = e.x * CW, gy = (e.y + 0.7) * CH;
   return { u, gx, gy, top: gy - (boxH(e) - 6) * u };
 }
-function glowPos(e) {
-  if (!e.glowM) return [-999, -999];
-  const { u, gx, gy } = geomOf(e);
-  return [gx + e.glowM[0] * u * e.face, gy - (100 - e.glowM[1]) * u];
-}
 function drawTag(e, gx, gy) {
   const kn = e.cls === 'knight', u = charDims(e).u;
   // name tag
@@ -63,5 +58,27 @@ function drawTag(e, gx, gy) {
     ctx.beginPath(); ctx.rect(bx, by, tw + pad * 2, fs + pad * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#eaeaea'; ctx.fillText(e.say, bx + pad, by + pad);
     ctx.globalAlpha = 1;
+  }
+}
+
+// Other walkers (none at the moment): wander, stop to talk when the knight comes close.
+function updateNpcs(dt) {
+  for (const n of npcs) {
+    const px = player.x - n.x, py = (player.y - n.y) * (CH / CW), pd = Math.hypot(px, py);
+    n.sayCd -= dt; n.sayT -= dt;
+    if (pd < 14 && n.sayCd <= 0) { n.say = n.lines[(Math.random() * n.lines.length) | 0]; n.sayT = 3; n.sayCd = 10; n.tx = n.x; n.ty = n.y; n.wait = 3; }
+    const dx = n.tx - n.x, dy = (n.ty - n.y) * (CH / CW);
+    if (Math.hypot(dx, dy) < 1) {
+      move(n, 0, 0, dt, 0);
+      if (pd < 18) n.face = Math.sign(px) || n.face;
+      if ((n.wait -= dt) <= 0) { n.tx = 6 + Math.random() * (COLS - 12); n.ty = 12 + Math.random() * (ROWS - 16); n.wait = 1.5 + Math.random() * 4; }
+    } else move(n, dx, dy, dt, 8);
+  }
+}
+
+// Per-entity easing: walk blend, swing, the jump clock and the gust of a landing.
+function updateEntityTimers(dt) {
+  for (const e of ents) { e.walk += ((e.moving ? 1 : 0) - e.walk) * Math.min(1, dt * 8); e.swing = Math.max(0, e.swing - dt * 2.6);
+    if (e.jump > 0) { e.jump = Math.max(0, e.jump - dt / JUMP_T); if (!e.landed && (1 - e.jump) * JUMP_T >= AIR1) { e.landed = true; gust(e.x, e.y + 0.5); } }
   }
 }

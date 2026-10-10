@@ -26,3 +26,19 @@ cv.addEventListener('pointermove', e => { if (ptr) { ptr.x = e.clientX; ptr.y = 
 const up = () => { const bx = activeSpot && activeSpot.box; if (ptr && bx && !ptr.held && ptr.x >= bx[0] && ptr.x <= bx[0] + bx[2] && ptr.y >= bx[1] && ptr.y <= bx[1] + bx[3]) { useSpot(); ptr = null; return; } if (ptr && !ptr.held && performance.now() - ptr.t < 250) { const gx = ptr.x / CW + camX, gy = ptr.y / CH + camY; if (Math.hypot(gx - player.x, (gy - player.y) * CH / CW) < 10) strike(); else gust(gx, gy); } ptr = null; };
 cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
 function strike() { jump(); }
+
+// Where the player wants to go: keys, or a held drag (far from the knight, it runs). [mx, my, run]
+function moveIntent() {
+  let mx = 0, my = 0;
+  if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
+  if (keys.has('d') || keys.has('arrowright')) mx += 1;
+  if (keys.has('w') || keys.has('arrowup')) my -= 1;
+  if (keys.has('s') || keys.has('arrowdown')) my += 1;
+  let run = keys.has('shift');
+  if (ptr && ptr.held) {
+    const dx = ptr.x / CW + camX - player.x, dy = (ptr.y / CH + camY - player.y) * (CH / CW), dd = Math.hypot(dx, dy);
+    if (dd > 1.5) { mx = dx; my = dy; }
+    if (dd > 28) run = true;   // drag far from the knight to run
+  }
+  return [mx, my, run];
+}

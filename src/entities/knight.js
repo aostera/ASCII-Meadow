@@ -56,7 +56,6 @@ const KTABARD = [
   null, null, null, null, null,
   [44, 28, 58, 28, 57, 36, 54, 41, 51, 42, 48, 41, 45, 36],   // SE
 ];
-const KTX = [0, -0.71, -1, -0.71, 0, 0.71, 1, 0.71], KTY = [1, 0.71, 0, -0.71, -1, -0.71, 0, 0.71];   // d8 → screen heading
 const JROWI = [0, 3, 4, 5];   // jump row → d8
 // Parse once. Every cell keeps its glyph code (ramp index × level, -1 = plate only) and what it
 // belongs to: 0 body, 1 left leg, 2 right leg, 3 blade; w is how much cloth it is (0..1), dep how far
@@ -69,8 +68,8 @@ function kseg(src, i) {
     const row = lines[k], cy = top + k - 1;
     for (let cx = 0; cx < row.length; cx++) {
       const ch = row[cx]; if (ch === ' ') continue;
-      const ci = " .:-=+*#%@".indexOf(ch);   // same ramp as RAMP below
-      C.push({ code: ch === "'" ? -1 : ci * 8 + Math.min(7, Math.floor((ci - 0.5) / 9 * 8)), cx, cy, seg: 0, w: 0, dep: 0 });
+      const ci = RAMP.indexOf(ch);
+      C.push({ code: ch === "'" ? -1 : rampCode(ci), cx, cy, seg: 0, w: 0, dep: 0 });
     }
   }
   if (KSW[i * 4] >= 0) {
@@ -80,7 +79,7 @@ function kseg(src, i) {
       if (Math.abs(px * uy - py * ux) / len < 1.15 && tt > -1.2 && tt < len + 1.2) c.seg = 3;
     }
   }
-  const tx = KTX[d], ty = KTY[d];
+  const tx = KTX[d];
   // Cloak membership first (hand-traced outlines, KCLOAK standing / KCLOAKW walking), so the hem that hangs
   // down over the legs stays cloth to its last tatter instead of being taken for a leg.
   const R0 = (i < 8 ? KCLOAK[i] : i < 88 ? KCLOAKW[d] : KCLOAKR[d]) || [], CW0 = KCOWL[d], TB0 = KTABARD[d], sim = i < 152;
@@ -196,3 +195,57 @@ function jump() {
   player.jr = l > 0.01 ? player.run || 0 : 0;   // a running jump carries further
 }
 const knightPx = () => KG.art * charDims(player).fch;   // on-screen height of the standing knight
+
+// The knight's step: input, easing into a run, and a jump that carries him the way he pushed off.
+function updateKnight(dt) {
+  const [mx, my, run] = moveIntent();
+  player.inp = [mx, my];
+  // running eases in and out over a few strides' worth of time, never snapping
+  player.run = (player.run || 0) + (((mx || my) && run && !(player.jump > 0) ? 1 : 0) - (player.run || 0)) * Math.min(1, dt * (player.jump > 0 ? 0 : 4));
+  if (player.jump > 0) {
+    // a jump carries him the way he was heading when he pushed off; with no direction held he jumps on the spot
+    const tt = (1 - player.jump) * JUMP_T, [jx, jy] = player.jv || [0, 0];
+    const air = tt > AIR0 - 0.07 && tt < AIR1 + 0.04;
+    if (air && (jx || jy)) move(player, jx, jy, dt, (26 + 14 * (player.jr || 0)) * Math.sin(Math.PI * Math.min(1, Math.max(0, (tt - AIR0 + 0.07) / (AIR1 - AIR0 + 0.11)))) + 8);
+    else move(player, 0, 0, dt, 0);
+  } else move(player, mx, my, dt, 12.5 + 13 * player.run);
+}
+
+// Draws the knight from his baked frame: animation offsets (systems/animation.js), dark plate in runs,
+// glyphs in their firelight colour (renderer/lighting.js); the cloak is a layer behind him, or over him
+// when he is seen from behind.
+function drawKnight(e, G, fcw, fch) {
+  const { gx, gy, top } = G;
+  // The frame's glyphs are baked; animation only moves them, never re-dithers, so motion is continuous.
+  const fi = knightFrame(e), K = KFR[fi], left = G.left, n = K.n, runF = fi >= 88 && fi < 152;
+  const ft = Math.min(0.05, Math.max(0, t - (e.lt ?? t))); e.lt = t;   // time-based, so speed doesn't follow the frame rate
+  const jumping = e.jump > 0, walking = !jumping && e.walk > 0.5;
+  const k = e.idleK = Math.min(1, Math.max(0, (e.idleK || 0) + (!jumping && !walking ? ft * 1.8 : -ft * 5)));
+  const br = (0.5 - 0.5 * Math.cos(t * 2.1)) * fch * 0.25 * k;   // breath
+  const cs = stepCloak(e, ft);
+  const sgL = knightCellOffsets(e, K, fcw, fch, walking, runF, br, cs);
+  // Dark plate first, in runs of neighbouring cells that move together. The far leg goes down before
+  // the near one's plate, so where the legs cross the near leg hides it instead of tangling with it.
+  const near = sgL > 0 ? 1 : 2, far = 3 - near;
+  const plate = (pick) => {
+    let ry = -1, rs = 0, re = 0, rdx = 0, rdy = 0;
+    for (let j = 0; j <= n; j++) {
+      if (j < n) {
+        if (!pick(j)) continue;
+        const cx = K.cx[j], cy = K.cy[j], dx = KDX[j], dy = KDY[j];
+        if (cy === ry && cx === re && Math.abs(dx - rdx) < 0.35 && Math.abs(dy - rdy) < 0.35) { re = cx + 1; continue; }
+        if (ry >= 0) grect(left + rs * fcw + rdx - 0.4, top + ry * fch + rdy - 0.4, (re - rs) * fcw + 0.8, fch + 0.8, 0.94);
+        ry = cy; rs = cx; re = cx + 1; rdx = dx; rdy = dy;
+      } else if (ry >= 0) grect(left + rs * fcw + rdx - 0.4, top + ry * fch + rdy - 0.4, (re - rs) * fcw + 0.8, fch + 0.8, 0.94);
+    }
+  };
+  const [fI, fdx] = fireLightAt(e), fireBlock = j => knightFireBlock(K, j, fI, fdx);
+  const glyphs = (pick) => { for (let j = 0; j < n; j++) { const c = K.code[j]; if (c >= 0 && pick(j)) gput(KN0 + fireBlock(j) * KNS + c, left + K.cx[j] * fcw + KDX[j], top + K.cy[j] * fch + KDY[j], 1); } };
+  // The cloak is its own layer: behind the body, or over it when he is seen from behind.
+  const cloak = j => K.cm[j] === 1, over = K.d >= 3 && K.d <= 5;
+  if (!over) { plate(cloak); glyphs(cloak); }
+  plate(j => !cloak(j) && K.seg[j] !== near); glyphs(j => !cloak(j) && K.seg[j] === far);
+  plate(j => K.seg[j] === near); glyphs(j => !cloak(j) && K.seg[j] !== far);
+  if (over) { plate(cloak); glyphs(cloak); }
+  drawTag(e, gx, gy);
+}

@@ -64,3 +64,47 @@ function light(i, x, y, cloud) {
         - f * 0.38 - shadow[i] - cloud * 0.75 - bshade[i] + (s - 0.5) * 0.16;
   return l < 0 ? 0 : l > 0.999 ? SH - 1 : (l * SH) | 0;
 }
+
+// Forces on the grass in view: cleared each step, then pushed by bodies and the hovering mouse.
+function applyGrassForces(dt) {
+  // the grass only lives in view: clear just that band, not the whole field
+  const x0 = Math.max(0, VX0 - 12), x1 = Math.min(COLS, VX1 + 13), y0 = Math.max(0, VY0 - 10), y1 = Math.min(ROWS, VY1 + 12);
+  for (let y = y0; y < y1; y++) { const o = y * COLS; push.fill(0, o + x0, o + x1); shadow.fill(0, o + x0, o + x1); }
+  for (const e of ents) influence(e, dt);
+  if (mouse.on) {
+    const mx = mouse.x / CW + camX, my = mouse.y / CH + camY;
+    const v = Math.hypot(mx - mouse.lx, (my - mouse.ly) * CH / CW) / Math.max(dt, 1e-3);
+    mouse.sp += (Math.min(1, v / 120) - mouse.sp) * Math.min(1, dt * 10);
+    mouse.lx = mx; mouse.ly = my;
+    brush(mx, my, 0.75 + mouse.sp * 1.1, dt);
+  }
+}
+
+// The blades in view: wind waves and fronts plus the pushes, through a damped spring.
+function updateGrass(dt) {
+  const amp = reduced ? 0.35 : 1;
+  const k = 42, damp = Math.exp(-5.5 * dt);
+  // the wind waves are sines of (x + y + t): split them with the angle-sum rule so each cell costs a few multiplies
+  for (let x = VX0; x <= VX1; x++) {
+    const a = x * 0.06 - t * 1.5, b = x * 0.17 - t * 2.3, c = x * 0.028 - t * 0.55, o = x * 6;
+    TA[o] = Math.sin(a); TA[o + 1] = Math.cos(a); TA[o + 2] = Math.sin(b); TA[o + 3] = Math.cos(b); TA[o + 4] = Math.sin(c); TA[o + 5] = Math.cos(c);
+  }
+  for (let y = VY0; y <= Math.min(ROWS - 1, VY1 + 4); y++) {
+    const ry = y * 0.035, rf = y * 0.012;
+    const s1 = Math.sin(ry), c1 = Math.cos(ry), s2 = Math.sin(-2 * ry), c2 = Math.cos(-2 * ry), s3 = Math.sin(-rf), c3 = Math.cos(-rf);
+    for (let x = VX0; x <= VX1; x++) {
+      const i = y * COLS + x, kd = kind[i];
+      if (kd === 0 || kd === 2 || kd === 5 || kd === 7) continue;
+      const h = height[i], o = x * 6;
+      const swell = (TA[o] * c1 + TA[o + 1] * s1) * 0.6 + (TA[o + 2] * c2 + TA[o + 3] * s2) * 0.25;
+      const front = TA[o + 4] * c3 + TA[o + 5] * s3;
+      FR[i] = front;
+      const gb = front > 0.55 ? (front - 0.55) * 2.2 : 0;
+      const wind = (0.16 + swell * 0.24 + gb * 0.95 + (seed[i] - 0.5) * 0.28) * amp;
+      const target = wind * (0.45 + h) + push[i] * (0.55 + h * 0.65);
+      vel[i] = (vel[i] + (target - ang[i]) * k * (0.8 + seed[i] * 0.4) * dt) * damp;
+      ang[i] += vel[i] * dt;
+      if (flat[i] > 0) flat[i] = Math.max(0, flat[i] - dt * 0.2);
+    }
+  }
+}

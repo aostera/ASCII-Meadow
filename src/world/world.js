@@ -8,7 +8,6 @@ let flash = 0, nextFlash = 6;
 const fogs = [];
 
 function buildWorld() {
-  buildFineAtlas();
   props.length = 0; cathedral.cv = null;
   buildCathedral();
   fogs.length = 0;

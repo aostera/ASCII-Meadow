@@ -375,12 +375,11 @@ function surfAt(x, y) {
   return h.kind === 'rock' || h.kind === 'step' ? 5000 - h.t : Infinity;
 }
 
-function ctxBlit(c2, ci, b, x, y) { c2.drawImage(atlas, ci * AW, b * AH, AW, AH, x - 1 / DPR, y - 1 / DPR, AW / DPR, AH / DPR); }
 let castleDraw = null;
 function drawCathedral() {
   const C = cathedral;
   if (!C.cv) return;
-  const x = C.cx0 * CW, y = C.cy0 * CH, w = C.BW * CW, h = C.BH * CH;
+  const x = C.cx0 * CW, w = C.BW * CW;
   const far = Math.max(0, Math.min(1, ((player.y + 0.7) * CH - C.oy) / (H * 2.4)));
   // visible rows only: backing runs, then glyphs; far away it fades, lightning lifts it a few shades
   const a = 1 - far * 0.55, up = Math.round(flash * 3);

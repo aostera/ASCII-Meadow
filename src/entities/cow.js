@@ -1,6 +1,11 @@
 // Cows: frame index per animation and direction, grazing, hopping, the herd's behaviour, and drawing
 // (frames swap by dissolving). Frames: data/cow-frames.js.
 
+// ---------- cows: the dark-fantasy cow atlases (assets/cow/), printed as glyphs like the knight ----------
+// Eight directions (d8: S, SW, W, NW, N, NE, E, SE) for idle, walk, run and grazing, and a hop where the jump
+// sheet has a clean drawing (W, SW, N and their mirrors E, SE). Grazing: eatdown lowers the head from the
+// standing drawing to the drawn grazing pose (played backwards it rises), eat is the grazing loop. Every frame was looked at and the faults worked
+// around in tools/cow/build_cow_frames.py (turning rows, tails that snap, a jump sheet that turns mid-air).
 const CG = { cols: 144, rows: 54, fx: 72, fy: 51.6 };
 const CFR = COW_ART.map(src => {   // glyph codes and dark backing runs, as [code, cx, cy...] and [cy, s0, s1...]
   const lines = src.split('\n'), top = +lines[0], list = [], runs = [];
@@ -14,8 +19,7 @@ const CFR = COW_ART.map(src => {   // glyph codes and dark backing runs, as [cod
       if (ch !== ' ' && s0 < 0) s0 = cx;
       if (ch === ' ' && s0 >= 0) { runs.push(cy, s0, cx); s0 = -1; }
       if (ch === ' ' || ch === "'") continue;
-      const ci = " .:-=+*#%@".indexOf(ch);
-      list.push(ci * 8 + Math.min(7, Math.floor((ci - 0.5) / 9 * 8)), cx, cy);
+      list.push(rampCode(RAMP.indexOf(ch)), cx, cy);
     }
   }
   return { list: Int16Array.from(list), runs: Int16Array.from(runs) };
@@ -27,7 +31,7 @@ const HOP_T = COW_HOP.reduce((a, b) => a + b, 0), HOP0 = 0.18, HOP1 = 0.18 + 0.1
 const GRAZE_DOWN = 0.9, GRAZE_UP = 0.75;   // seconds to lower and to raise the head
 const COW_STRIDE = 30;   // fine cells of ground per walk cycle (about half a cow's length: hooves don't slide)
 const cows = [];
-const smooth = u => (u = Math.min(1, Math.max(0, u)), u * u * (3 - 2 * u));
+const smooth = u => sm(Math.min(1, Math.max(0, u)));
 const cowFrame = c => {
   const d = c.d8 | 0, f = (r, k) => r[0] + (((k % r[1]) + r[1]) % r[1]), fcw = charDims(c).fcw;
   switch (c.state) {
@@ -91,7 +95,6 @@ function placeCows() {
     cows.push(c); ents.push(c);
   }
 }
-const dirTo = (dx, dy) => ({ 0: 0, 1: 7, 2: 6, 3: 5, 4: 4, '-4': 4, '-1': 1, '-2': 2, '-3': 3 })[Math.round(Math.atan2(dx, dy) / (Math.PI / 4))];
 function updateCows(dt) {
   for (const c of cows) {
     c.at += dt;

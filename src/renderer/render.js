@@ -129,14 +129,3 @@ function render() {
   drawPrompt();
   if (GL.ok) GL.flush(camX * CW, camY * CH, castleDraw); else flush2D(camX * CW, camY * CH, castleDraw);
 }
-
-function tips(y0, y1, x0, x1) {
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-    const i = y * COLS + x;
-    if (kind[i] !== 1) continue;
-    const h = height[i];
-    if (h < 0.42 || flat[i] > 0.4) continue;
-    const b = ang[i] * 1.5;
-    blit(tipGlyph(b, seed[i]), light(i, x, y, cloudBuf[i]), x * CW + ang[i] * CW * 0.9, y * CH - CH * (0.25 + h * 0.4));
-  }
-}

@@ -41,48 +41,15 @@ function buildAtlas() {
   }
 }
 function blit(ci, b, x, y, a = 1) { gput(ci * NB + b, x, y, a); }
-// ---------- fine glyph layer shared by the sky and the chapel ----------
-// Same grain as the knight: tiny ramp glyphs, ordered-dithered, one cold palette.
-const FRAMP = " .:-=+*#%@";
-const FLV = 10, FDARK = [12, 12, 12], FPALE = [250, 250, 250];
-const B4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16 - 0.5);
-let FFS, FW, FH, fAtlas, FAW, FAH;
-function buildFineAtlas() {
-  FFS = Math.max(3.6, FS * 0.38); FW = FFS * 0.6; FH = FFS * 0.92;
-  FAW = Math.ceil(FW * DPR) + 2; FAH = Math.ceil(FH * DPR) + 2;
-  fAtlas = document.createElement('canvas');
-  fAtlas.width = FAW * FRAMP.length; fAtlas.height = FAH * FLV;
-  const a = fAtlas.getContext('2d');
-  a.font = `600 ${FFS * DPR}px ${FONT}`; a.textBaseline = 'top';
-  for (let l = 0; l < FLV; l++) {
-    const f = (l + 1) / FLV;
-    a.fillStyle = `rgb(${FDARK.map((d, k) => d + (FPALE[k] - d) * f | 0).join(',')})`;
-    for (let c = 1; c < FRAMP.length; c++) a.fillText(FRAMP[c], c * FAW + 1, l * FAH + 1);
-  }
-}
-// value 0..1 at a cell → [glyph index, level], or null for empty
-function fineGlyph(v, cx, cy, jitter) {
-  v += B4[(cy & 3) * 4 + (cx & 3)] * jitter;
-  if (v < 0.07) return null;
-  v = Math.min(0.999, v);
-  return [1 + ((v * (FRAMP.length - 1)) | 0), (v * FLV) | 0];
-}
-function fblit(c2, ci, l, x, y) { c2.drawImage(fAtlas, ci * FAW, l * FAH, FAW, FAH, x - 1 / DPR, y - 1 / DPR, FAW / DPR, FAH / DPR); }
+// ---------- the fine glyphs: knight, cows and flora share one dither ramp ----------
+const RAMP = " .:-=+*#%@";   // brightness, dark to light
+const rampCode = ci => ci * 8 + Math.min(7, Math.floor((ci - 0.5) / 9 * 8));   // ramp index -> fine glyph code (8 tones)
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16 - 0.5);   // 4x4 ordered dither
 
 // ---------- dithered glyph rendering ----------
-const RAMP = " .:-=+*#%@";
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16 - 0.5);
 // one atlas: grass glyphs × colours, the knight's small glyphs × tones, and a solid dark block
 const KCH = RAMP + "/\\|'";   // fine glyphs: the dither ramp plus strokes for branches
 const FCI = {}; [...KCH].forEach((c, i) => FCI[c] = i);
-const KWH = 5, KBLK = 2 * KWH - 1, KNS = KCH.length * 8;   // firelight steps (0 = none); colour blocks: grey, 4 armour, 4 cloak; sprites per block
-const KMMIX = [0, 0.6, 0.76, 0.86, 0.93], KCMIX = [0, 0.85, 0.94, 1, 1];   // the cloth jumps straight to red: half-mixed with the light grey it reads pink
-const lerp3 = (a, b, u) => [0, 1, 2].map(i => a[i] + (b[i] - a[i]) * u);
-// Firelight palettes sampled from the crimson knight reference, by glyph level (0 = darkest, 1 = brightest):
-// the armour is dark warm graphite whose brightest edges catch the fire as copper; the cloth is crimson.
-const ramp3 = (st, u) => { let k = 0; while (k < st.length - 2 && u > st[k + 1][0]) k++; const [u0, a] = st[k], [u1, b] = st[k + 1]; return lerp3(a, b, Math.min(1, Math.max(0, (u - u0) / (u1 - u0)))); };
-const KFIRE_ARMOUR = [[0, [24, 19, 18]], [0.5, [66, 55, 51]], [0.8, [104, 89, 82]], [0.92, [150, 92, 60]], [1, [206, 146, 100]]];
-const KFIRE_CLOTH = [[0, [52, 12, 12]], [0.4, [117, 28, 24]], [0.78, [185, 54, 46]], [1, [226, 99, 82]]];
 function buildMegaAtlas() {
   const k = charDims(player), kfs = k.ffs * DPR;
   const KAW = Math.ceil(k.fcw * DPR) + 2, KAH = Math.ceil(k.fch * DPR) + 2;

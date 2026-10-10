@@ -28,9 +28,7 @@ function syncSPF() {
   if (SPF.length < GB.spr.length * 8) SPF = new Float32Array(GB.spr.length * 8 + 64);
   GB.spr.forEach((s, i) => { const q = i * 8; SPF[q] = s[6]; SPF[q + 1] = s[7]; SPF[q + 2] = s[4]; SPF[q + 3] = s[5]; SPF[q + 4] = s[8]; SPF[q + 5] = s[9]; SPF[q + 6] = s[8] + s[10]; SPF[q + 7] = s[9] + s[11]; });
 }
-const gid = (ci, b) => ci * NB + b;
 function grect(x, y, w, h, a) { // a dark block of any size, from the solid texel
-  const s = GB.spr[SOLID_K];
   gput(SOLID_K, x, y, a);
   const b = GB.buf, o = (GB.n - 1) * 20;
   b[o + 5] = b[o + 15] = x + w; b[o + 11] = b[o + 16] = y + h; b[o] = b[o + 10] = x; b[o + 1] = b[o + 6] = y;
