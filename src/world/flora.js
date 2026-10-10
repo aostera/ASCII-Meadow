@@ -5,7 +5,7 @@
 // Crowns are noise-shaped clouds lit from the upper left with dappled light and gaps you can see
 // branches through; bare trees are nets of thin crooked branches. Each variant is baked once.
 const fid = (c, l) => KN0 + FCI[c] * KLV + Math.max(0, Math.min(KLV - 1, l));
-const VARS = [], flora = [];
+const VARS = [], flora = [], STONES = [];   // STONES: pebble, stone, boulder, three of each (bakeStone)
 let tmask = null, FLMAXR = 0;
 const fbm3 = (x, y) => vnoise(x, y) * 0.55 + vnoise(x * 2.1 + 3.7, y * 2.1) * 0.3 + vnoise(x * 4.3, y * 4.3 + 1.3) * 0.15;
 function bakeVariant(type, sd) {
@@ -63,26 +63,41 @@ function bakeVariant(type, sd) {
       }
     }
   }
-  // crown: a cloud of dots
+  // crown: a heap of leaf clumps. Each clump is a small dome lit on its upper-left shoulder, so the crown
+  // reads as foliage in lobes with dark creases between them; the heap as a whole darkens towards its
+  // underside and its far side, and leaves speckle the lit parts. Still mostly dark: only shoulders catch light.
   if (crown) {
-    const { x: X, y: Y, rx, ry } = crown, s = (type === 'bush' ? 2.2 : 3.2) / R;
+    const { x: X, y: Y, rx, ry } = crown, bush = type === 'bush', s = (bush ? 2.2 : 3.2) / R, sl = (bush ? 9 : 11) / R;
+    const lobes = [[X - rx * 0.05, Y - ry * 0.05, rx * 0.62, ry * 0.6]];
+    const nl = bush ? 4 + (rnd(60) * 2 | 0) : 7 + (rnd(60) * 3 | 0);
+    for (let k = 0; k < nl; k++) {
+      const a = (bush ? Math.PI * (1.05 + k / (nl - 1) * 0.9) : k / nl * 6.283) + (rnd(70 + k) - 0.5) * 0.7;   // a bush heaps up from the ground
+      const d = 0.5 + rnd(80 + k) * 0.22, r = (bush ? 0.48 : 0.4) + rnd(90 + k) * 0.16;
+      lobes.push([X + Math.cos(a) * d * rx, Y + Math.sin(a) * d * ry, r * rx, r * ry]);
+    }
     for (let cy = Math.floor((Y - ry * 1.35) / fh); cy <= Math.ceil((Y + ry * 1.25) / fh); cy++) for (let cx = Math.floor((X - rx * 1.35) / fw); cx <= Math.ceil((X + rx * 1.35) / fw); cx++) {
-      const px = cx * fw, py = cy * fh, u = (px - X) / rx, w = (py - Y) / ry, r = Math.hypot(u, w);
-      const n = fbm3(px * s + sd * 5.1, py * s * 1.15 + sd);
-      const dens = (1 - r) * 1.4 + (n - 0.5) * 1.5;
+      const px = cx * fw, py = cy * fh;
+      let q = -1, lu = 0, lw = 0;                   // the clump this point belongs to: the one it lies deepest in
+      for (const [lx, ly, lr, lry] of lobes) {
+        const a = (px - lx) / lr, b = (py - ly) / lry, d = 1 - Math.hypot(a, b);
+        if (d > q) { q = d; lu = a; lw = b; }
+      }
+      const n = fbm3(px * s + sd * 5.1, py * s * 1.15 + sd), leaf = vnoise(px * sl + sd * 3.3, py * sl * 1.3 - sd);
+      const dens = q * 2.2 + (n - 0.5) * 0.9 + (leaf - 0.5) * 1.1;   // leafy, ragged edges
       if (dens <= 0) continue;
-      // relief: noise seen from the light, plus the round mass of the crown
-      const nl = fbm3((px - R * 0.05) * s + sd * 5.1, (py - R * 0.07) * s * 1.15 + sd);
-      const relief = (n - nl) * 4, mass = 0.5 - u * 0.35 - w * 0.45;
-      const dapple = Math.max(0, vnoise(px * s * 2.2 + 7, py * s * 2.2) - 0.62) * 1.6;
-      // a dark mass: only the top-left shoulder and a few dapples catch any light
-      let v = 0.06 + Math.max(0, mass) * 0.4 + relief * 0.45 + dapple * 1.3 + (n - 0.5) * 0.2;
-      v *= Math.min(1, dens * 1.8);                 // the edge dissolves into the dark
-      v = Math.max(0, v) ** 1.35 * 1.35;            // crush the mids towards black
       if (dens < 0.18 && has(cx, cy)) continue;     // branches show through the gaps
-      v = Math.max(0, Math.min(0.95, v + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.4));
+      const u = (px - X) / rx, w = (py - Y) / ry;
+      const nz = Math.sqrt(Math.max(0, 1 - lu * lu - lw * lw));
+      const lam = Math.max(0, -0.5 * lu - 0.62 * lw + 0.6 * nz);       // light from the upper left, a little in front
+      const occl = Math.max(0.12, 1 - Math.max(0, w) * 0.7 - Math.max(0, u) * 0.25);   // the heap's own shade
+      // leaves: small lit flecks with dark between them, so foliage never reads as a smooth stone
+      const lf = vnoise(px * sl * 2.3 + sd * 7, py * sl * 2.9 - sd * 2), fleck = lf < 0.38 ? 0 : lf > 0.68 ? 1 : (lf - 0.38) / 0.3;
+      let v = (0.03 + lam ** 1.3 * 0.75 * occl) * (0.3 + leaf * 0.5 + fleck * 0.75);
+      if (q < 0.25 && lu < -0.2 && lw < -0.2 && u + w < -0.6) v += 0.12; // a cold rim on the lit edge of the crown
+      v *= Math.min(1, dens * 1.6);                 // the edge dissolves into the dark
+      v = Math.max(0, Math.min(0.95, v + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.3));
       const ci = Math.min(RAMP.length - 1, Math.floor(v * 7));
-      set(cx, cy, ci > 0 ? RAMP[ci] : ' ', Math.min(KLV - 2, Math.floor(v * 7)), dens > (type === 'bush' ? 0.3 : 0.12), 0.4 + v * 0.75);
+      set(cx, cy, ci > 0 ? RAMP[ci] : ' ', Math.min(KLV - 2, Math.floor(v * 7)), dens > (bush ? 0.3 : 0.12), 0.4 + v * 0.75);
     }
   }
   // flatten into glyphs, dark backing runs, and the coarse grass cells the crown hides
@@ -105,6 +120,40 @@ function bakeVariant(type, sd) {
     if (all) hide.push(gx, gy);
   }
   return { type, list: Int32Array.from(list), runs: Int16Array.from(runs), hide: Int16Array.from(hide), fw, fh, minY, R, Hc: crown ? -crown.y : K * 0.8, crownH: -minY * fh };
+}
+
+// A stone in the same fine dither: a low dome, flattened by the view, its outline broken by noise into a
+// rough rock, lit on the upper-left shoulder, black on the underside, with a dark foot holding it down.
+// size: 0 a pebble, 1 a stone, 2 a boulder (knee-high to the knight).
+function bakeStone(size, sd) {
+  const rnd = (k) => hash(sd * 31 + k, 977);
+  const K = knightPx(), fd = charDims(player), fw = fd.fcw, fh = fd.fch;
+  const rx = K * [0.1, 0.17, 0.28][size] * (0.85 + rnd(1) * 0.3), ry = rx * (0.62 + rnd(2) * 0.14), Y = -ry * 0.7;
+  const list = [], runs = [], tilt = (rnd(3) - 0.5) * 0.5;
+  for (let cy = Math.floor((Y - ry * 1.2) / fh); cy <= Math.ceil((Y + ry * 1.3) / fh); cy++) {
+    let r0 = 1e9, r1 = -1e9;
+    for (let cx = Math.floor(-rx * 1.2 / fw); cx <= Math.ceil(rx * 1.2 / fw); cx++) {
+      const px = cx * fw, py = cy * fh, u = px / rx, w = (py - Y - u * tilt * ry) / ry;
+      const n = fbm3(px * 2.4 / rx + sd * 3.1, py * 2.4 / rx + sd), e = 1 - Math.hypot(u, w) + (n - 0.5) * 0.55;
+      if (e <= 0) continue;
+      r0 = Math.min(r0, cx); r1 = Math.max(r1, cx);
+      // facets: the dome's normal bent by coarse noise, and its light stepped, so the rock shows flat faces
+      const fu = u + (fbm3(px * 1.6 / rx + 9, py * 1.6 / rx) - 0.5) * 1.1, fw2 = w + (fbm3(px * 1.6 / rx, py * 1.6 / rx + 5) - 0.5) * 1.1;
+      const nz = Math.sqrt(Math.max(0, 1 - Math.min(1, fu * fu + fw2 * fw2)));
+      const lam = Math.max(0, -0.55 * fu - 0.7 * fw2 + 0.45 * nz), step = Math.floor(lam * 4) / 4;
+      let v = 0.05 + (step * 0.7 + lam * 0.3) ** 1.15 * 0.78;
+      v *= Math.min(1, e * 4) * (w > 0.45 ? 0.3 : 1);   // the underside and the edge sink into shadow
+      v = Math.max(0, Math.min(0.9, v + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.22));
+      const ci = Math.min(RAMP.length - 1, Math.floor(v * 7));
+      if (ci > 0) list.push(cx, cy, fid(RAMP[ci], Math.min(KLV - 2, Math.floor(v * 7))), Math.round(Math.min(1, 0.45 + v * 0.8) * 100));
+    }
+    if (r1 >= r0) runs.push(cy, r0, r1 + 1);
+  }
+  // the foot: a dark smear on the ground below and to the right, away from the light
+  const sy = Math.round(ry * 0.25 / fh);
+  runs.push(sy, Math.round(-rx * 0.6 / fw), Math.round(rx * 1.05 / fw), sy + 1, Math.round(-rx * 0.2 / fw), Math.round(rx * 0.8 / fw));
+  let minY = 0; for (let k = 1; k < list.length; k += 4) minY = Math.min(minY, list[k]);
+  return { type: 'stone', list: Int32Array.from(list), runs: Int16Array.from(runs), hide: new Int16Array(0), fw, fh, minY, R: rx, Hc: ry, crownH: Math.max(1, -minY * fh) };
 }
 
 // Every variant is baked once into the glyph atlas as a picture, cut into horizontal slices.
@@ -134,6 +183,7 @@ function bakeFloraSprites() {
   for (const it of items) {
     mg.drawImage(it.c, it.px, it.py);
     const v = it.v, hp = it.c.height / NSL, hc = it.ch / NSL;
+    v.whole = sprite(it.px, it.py, it.c.width, it.c.height, it.cw, it.ch, it.ox, it.oy);   // stones are drawn in one piece
     v.sl = [];
     for (let j = 0; j < NSL; j++) {
       const top = it.oy + j * hc, mid = -(top + hc / 2);
@@ -155,6 +205,8 @@ function bakeVariants() {
   for (let k = 0; k < 7; k++) VARS.push(bakeVariant('tree', k + 1));
   for (let k = 0; k < 4; k++) VARS.push(bakeVariant('dead', k + 21));
   for (let k = 0; k < 6; k++) VARS.push(bakeVariant('bush', k + 41));
+  STONES.length = 0;
+  for (let k = 0; k < 9; k++) { const v = bakeStone(k % 3, k + 61); STONES.push(v); VARS.push(v); }
   FLMAXR = Math.ceil(Math.max(...VARS.map(v => v.crownH / CH))) + 2;
   bakeFloraSprites();
 }

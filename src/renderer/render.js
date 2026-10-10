@@ -73,7 +73,16 @@ function render() {
         continue;
       }
       if (kd === 2) { if (s > 0.55) PF2(s > 0.8 ? CI[','] : CI['.'], s > 0.75 ? C_DIRT : C_DIRT2, px, py, x, y, baseY); continue; }
-      if (kd === 5) { PF2(s > 0.6 ? CI['@'] : s > 0.3 ? CI['o'] : CI['°'], s > 0.5 ? C_STONE : C_STONE2, px, py, x, y, baseY); continue; }
+      if (kd === 5) {   // stony ground: one stone to a 4×3 block of cells, set at random in it, grit between
+        const bx = x >> 2, by = (y / 3) | 0, h = hash(bx, by * 7 + 1);
+        if (h > 0.12 && x === bx * 4 + ((h * 4) | 0) && y === by * 3 + ((hash(bx * 3 + 5, by) * 3) | 0)) {
+          if (slowRow && covered(x, y, baseY)) continue;
+          const z = hash(by * 5 + 3, bx), st = STONES[(h * 97 | 0) % 3 * 3 + (z < 0.4 ? 0 : z < 0.8 ? 1 : 2)];
+          const lit = (1 - shadow[i]) * (1 - cloud * 0.55) * (1 - bshade[i] * 0.8);
+          gput(st.whole, px + CW * (0.2 + s * 0.6), py + CH * 0.85, lit < 0.25 ? 0.25 : lit);
+        } else if (s > 0.62) PF2(s > 0.9 ? CI['o'] : s > 0.78 ? CI[','] : CI['.'], s > 0.85 ? C_STONE : C_DIRT, px, py, x, y, baseY);
+        continue;
+      }
       if (kd >= 3) { P(flat[i] > 0.5 ? CI['.'] : (kd === 3 ? CI['*'] : kd === 4 ? CI['o'] : CI['"']), kd === 3 ? C_WHITE : kd === 4 ? C_YEL : C_LAV, px + ang[i] * 1.5, py, x, y, baseY); continue; }
       // a blade: stem at its cell, then up to three more glyphs climbing and bending further with the wind
       const h = height[i], f = flat[i], a = ang[i], lt = light(i, x, y, cloud);
