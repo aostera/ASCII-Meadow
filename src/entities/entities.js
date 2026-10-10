@@ -10,7 +10,8 @@ const player = mk('you', 'knight', [236, 236, 236], { me: true, label: '#9a9a9a'
 const npcs = []; // the knight walks the meadow alone
 const ents = [player, ...npcs];
 function placeEntities() {
-  player.y = ROWS - VR * 0.3; player.x = pathX(player.y) - 3;
+  if (MEADOW_MAP.start) [player.x, player.y] = mapToCell(MEADOW_MAP.start[0], MEADOW_MAP.start[1]);
+  else { player.y = ROWS - VR * 0.3; player.x = pathX(player.y) - 3; }
   player.dir = 'up'; player.d8 = 4;
   placeCows();
   updateCamera(0, true);

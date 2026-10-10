@@ -34,6 +34,10 @@
 5. Опубликовать артефакт (страница + файлы `src/`, `styles/` через `files`, или одним файлом через `tools/bundle.py`), закоммитить, обновить [[Хронология]] и [[Бэклог]].
 6. Новый код — никогда не в `index.html`: свой файл в `src/`, `<script>` в правильном месте, вызов из `simulate()`/`render()`.
 
+## Карта
+- Карта игры — `src/data/map.js` (`MEADOW_MAP`), её рисует пользователь в редакторе (`?edit`, M) и присылает файлом или загружает в `src/data/`. Не перезаписывать её генерацией: `null`-поля = генерация, заполненные — его работа.
+- Новый вид объекта на карте: поле в `MEADOW_MAP`, расстановка в `world/map.js` (по образцу `placeGroundFires`), инструмент в `ED_OBJECTS` и ветка в `edPlace`/`edBake` (`editor/editor.js`), проверка в `smoke.cjs`.
+
 ## Публикация
 - Сайт: https://ascii-meadow.aloster36.workers.dev/ — Cloudflare Workers (бесплатно), Worker `ascii-meadow`, Workers Builds подключён к GitHub (репозиторий приватный). Пуш в `main` → деплой (`npx wrangler deploy`), другие ветки → превью (`npx wrangler preview`, поэтому в `wrangler.jsonc` есть `previews: {}`). Build command в панели не нужен: `npm ci` запускает `prepare` → `sh tools/build_site.sh dist`. Без `wrangler.jsonc` Wrangler сам настраивает проект и заливает весь репозиторий с `node_modules` — сборка падает. Лог сборки виден только в панели Cloudflare (MCP его не отдаёт).
 - После деплоя проверять живой сайт: `node tools/check/smoke.cjs https://ascii-meadow.aloster36.workers.dev/` (26 проверок: WebGL2, 2D, касания, консоль).

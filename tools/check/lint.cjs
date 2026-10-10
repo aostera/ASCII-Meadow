@@ -13,9 +13,9 @@ for (const f of code) { map.push([text.split('\n').length, f]); text += fs.readF
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'meadow-lint-'));
 fs.writeFileSync(path.join(tmp, 'game.js'), text);
 // browser globals the game reads, plus the data globals defined by src/data/ (excluded above)
-const globals = ['window', 'document', 'addEventListener', 'matchMedia', 'devicePixelRatio', 'innerWidth', 'innerHeight', 'requestAnimationFrame', 'performance', 'setTimeout', 'console', 'Promise'];
+const globals = ['window', 'document', 'location', 'localStorage', 'Blob', 'URL', 'confirm', 'addEventListener', 'matchMedia', 'devicePixelRatio', 'innerWidth', 'innerHeight', 'requestAnimationFrame', 'performance', 'setTimeout', 'clearTimeout', 'console', 'Promise'];
 fs.writeFileSync(path.join(tmp, 'eslint.config.mjs'), `export default [{ files: ['**/*.js'], languageOptions: { ecmaVersion: 2022, sourceType: 'script',
-  globals: { ${globals.map(g => `${g}: 'readonly'`).join(', ')}, KNIGHT_ART: 'writable', KSW: 'readonly', COW_ART: 'writable' } },
+  globals: { ${globals.map(g => `${g}: 'readonly'`).join(', ')}, KNIGHT_ART: 'writable', KSW: 'readonly', COW_ART: 'writable', MEADOW_MAP: 'readonly' } },
   rules: { 'no-undef': 'error', 'no-redeclare': 'error', 'no-dupe-keys': 'error', 'no-unused-vars': ['warn', { vars: 'all', args: 'none' }] } }];\n`);
 // eslint's package exports hide bin/, so find the file: the repo's node_modules (npm ci), else a global install
 const bin = [path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), '/opt/node-tools/node_modules/eslint/bin/eslint.js'].find(f => fs.existsSync(f));

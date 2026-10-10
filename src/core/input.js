@@ -29,6 +29,7 @@ function strike() { jump(); }
 
 // Where the player wants to go: keys, or a held drag (far from the knight, it runs). [mx, my, run]
 function moveIntent() {
+  if (editing) return [0, 0, false];   // the map editor has the keys and the pointer (editor/editor.js)
   let mx = 0, my = 0;
   if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
   if (keys.has('d') || keys.has('arrowright')) mx += 1;

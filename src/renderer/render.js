@@ -8,6 +8,7 @@ function render() {
   ctx.clearRect(0, 0, W, H);
   GB.n = 0; castleDraw = null;
   ctx.save();
+  if (VZ !== 1) ctx.scale(VZ, VZ);   // the editor's zoom
   ctx.translate(-camX * CW, -camY * CH);
   if (!cloudBuf || cloudBuf.length !== N) { cloudBuf = new Float32Array(N); cloudTick = 0; }
   else cloudTick = (cloudTick + 1) % 3;
@@ -127,5 +128,6 @@ function render() {
   ctx.fillStyle = render.vg; ctx.fillRect(0, 0, W, H);
   if (flash > 0.02) { ctx.fillStyle = `rgba(250,250,250,${flash * 0.05})`; ctx.fillRect(0, 0, W, H); }
   drawPrompt();
+  if (editing) drawEditor();   // editor/editor.js: brush, markers, selection, over the fog and vignette
   if (GL.ok) GL.flush(camX * CW, camY * CH, castleDraw); else flush2D(camX * CW, camY * CH, castleDraw);
 }

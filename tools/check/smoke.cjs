@@ -57,6 +57,8 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       check('G sends a gust ring', sg.rings > 0, `rings ${sg.rings}`);
       await page.mouse.move(300, 300); await step(2); await page.mouse.move(600, 320); await step(4);
       check('mouse brushes the grass', (await state(page)).mouse === true);
+      await page.keyboard.press('KeyM'); await step(2);
+      check('M does nothing without ?edit', await page.evaluate(() => !editing && !document.querySelector('.ed')));
       if (!quick) {
         // cows: the same herd for a while, then a running knight among them
         const seen = new Set(), phases = new Set();
@@ -121,6 +123,84 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       await shot(page, 'mobile');
       const re = realErrors(errs); check('no console errors (mobile)', re.length === 0, re.slice(0, 3).join(' | '));
       await ctx.close();
+    }
+    // ---- map editor (?edit): open, paint, place, undo, save; the saved file builds the same map, at any size
+    {
+      const { ctx, page, errs, step } = await openGame(b, url + (url.includes('?') ? '&' : '?') + 'edit', { mode: 'gl', viewport: { width: 1100, height: 700 } });
+      const count = () => page.evaluate(() => { let n = 0; for (let i = 0; i < N; i++) if (kind[i] === 2) n++; return { earth: n, flora: flora.length, cows: cows.map(c => toModelXZ(c.home[0], c.home[1]).map(Math.round)) }; });
+      await step(20); await page.keyboard.press('KeyM'); await step(2);
+      check('editor: ?edit and M open the panel', await page.evaluate(() => editing && !document.querySelector('.ed').hidden));
+      // selecting a generated tree changes nothing; stones and flowers paint what they say
+      const fp = await page.evaluate(() => { const f = flora.find(f => f.br > VY0 + 12 && f.br < VY1 - 8 && f.x > VX0 + 12 && f.x < VX0 + VC * 0.6); return f ? [(f.x - camX) * CW, (f.br - camY) * CH - 4] : null; });
+      if (fp) { await page.keyboard.press('KeyV'); await page.mouse.click(fp[0], fp[1]); await step(1); }
+      check('editor: selecting changes nothing', fp && await page.evaluate(() => !!ED.sel && MEADOW_MAP.flora === null && !ED.undo.length));
+      await page.keyboard.press('Escape');
+      const inView = () => page.evaluate(() => { let st = 0, fl = 0; for (let y = VY0; y <= VY1; y++) for (let x = VX0; x <= VX1; x++) { const k = kind[y * COLS + x]; if (k === 5) st++; if (k === 3 || k === 4 || k === 6) fl++; } return { st, fl }; });
+      const sf0 = await inView();
+      await page.keyboard.press('Digit5'); await page.mouse.move(250, 200); await page.mouse.down(); await page.mouse.move(450, 200, { steps: 6 }); await page.mouse.up();
+      await page.keyboard.press('Digit6'); await page.mouse.move(250, 260); await page.mouse.down(); await page.mouse.move(450, 260, { steps: 6 }); await page.mouse.up(); await step(2);
+      const sf1 = await inView();
+      check('editor: stones paint stones, flowers paint flowers', sf1.st > sf0.st + 50 && sf1.fl > sf0.fl + 10, JSON.stringify({ before: sf0, after: sf1 }));
+      const c0 = await count();
+      await page.keyboard.press('Digit4'); await page.mouse.move(300, 350); await page.mouse.down();
+      for (let x = 300; x <= 600; x += 25) { await page.mouse.move(x, 350); await step(1); }
+      await page.mouse.up(); await step(2);
+      const c1 = await count();
+      check('editor: an earth stroke paints the ground', c1.earth > c0.earth + 200, `${c0.earth} → ${c1.earth} earth cells`);
+      await page.keyboard.press('KeyT'); await page.mouse.click(700, 300); await step(2);
+      await page.keyboard.press('KeyC'); await page.mouse.click(650, 450); await step(2);
+      const c2 = await count();
+      check('editor: a tree and a cow placed', c2.flora === c0.flora + 1 && c2.cows.length === 4, `flora ${c0.flora} → ${c2.flora}, cows ${c2.cows.length}`);
+      await page.keyboard.press('Control+KeyZ'); await step(1);
+      const undone = await page.evaluate(() => cows.length);
+      await page.keyboard.press('Control+Shift+KeyZ'); await step(1);
+      check('editor: undo and redo', undone === 3 && (await page.evaluate(() => cows.length)) === 4);
+      await page.keyboard.press('Control+KeyZ'); await page.keyboard.press('Control+KeyZ'); await step(1);
+      // (regenerated over the strokes above: where earth covered the trail, trees may now grow)
+      const back = await page.evaluate(() => MEADOW_MAP.flora === null && MEADOW_MAP.cows === null && MEADOW_MAP.fires === null && cows.length === 3);
+      await page.keyboard.press('Control+Shift+KeyZ'); await page.keyboard.press('Control+Shift+KeyZ'); await step(1);
+      check('editor: undoing the first placement brings back the generated world', back && (await page.evaluate(() => flora.length)) === c0.flora + 1);
+      const [dl] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+KeyS')]);
+      const saved = fs.readFileSync(await dl.path(), 'utf8'), c3 = await count();
+      check('editor: «Сохранить» writes a map file', /const MEADOW_MAP = \{/.test(saved) && !/<\/script/i.test(saved), saved.length + ' bytes');
+      await shot(page, 'editor');
+      // fog: dense fog where it is brushed, none where it is cleared
+      const fogMean = (x0, y0, x1, y1) => page.evaluate(([x0, y0, x1, y1]) => { let s = 0, n = 0; for (let j = 0; j < FG.h; j++) for (let i = 0; i < FG.w; i++) { const x = (i + 0.5) / FG.w * W, y = (j + 0.5) / FG.h * H; if (x >= x0 && x <= x1 && y >= y0 && y <= y1) { s += FG.d[j * FG.w + i]; n++; } } return n ? s / n : 0; }, [x0, y0, x1, y1]);
+      const fg0 = await fogMean(150, 120, 330, 220);
+      await page.keyboard.press('KeyJ'); await page.mouse.move(120, 170); await page.mouse.down(); await page.mouse.move(360, 170, { steps: 8 }); await page.mouse.up(); await step(4);
+      const fg1 = await fogMean(150, 120, 330, 220);
+      await page.keyboard.press('KeyN'); await page.mouse.move(120, 170); await page.mouse.down(); await page.mouse.move(360, 170, { steps: 8 }); await page.mouse.up(); await step(4);
+      const fg2 = await fogMean(150, 120, 330, 220);
+      check('editor: fog brushed in and cleared away', fg1 > Math.max(0.6, fg0 + 0.2) && fg2 < 0.08, `fog ${fg0.toFixed(2)} → dense ${fg1.toFixed(2)} → cleared ${fg2.toFixed(2)}`);
+      // zoom: out to see more, a tree lands under the cursor at any scale, and the game is back at 100% when the editor closes
+      await page.keyboard.press('KeyQ'); await page.keyboard.press('KeyQ'); await step(2);
+      await page.keyboard.press('KeyT'); await page.mouse.click(500, 300); await step(2);
+      const zt = await page.evaluate(() => { const e = MEADOW_MAP.flora[MEADOW_MAP.flora.length - 1], [x, y] = mapToCell(e[2], e[3]); return { z: VZ, cols: VX1 - VX0, sx: (x - camX) * CW * VZ, sy: (y + 0.7 - camY) * CH * VZ }; });
+      await page.evaluate(() => { closeEditor(); }); const z1 = await page.evaluate(() => VZ); await page.evaluate(() => { openEditor(); });
+      check('editor: zoom out, place under the cursor, back to 100% on close', zt.z < 1 && Math.hypot(zt.sx - 500, zt.sy - 300) < 8 && z1 === 1, JSON.stringify({ zoom: zt.z, cellsAcross: zt.cols, foot: [Math.round(zt.sx), Math.round(zt.sy)] }));
+      // nothing on the map is fixed: the «Стереть» brush clears the ground, the trail switches off, every object deletes
+      await page.keyboard.press('Digit8'); await page.mouse.move(300, 500); await page.mouse.down(); await page.mouse.move(420, 500, { steps: 6 }); await page.mouse.up(); await step(2);
+      const empty = await page.evaluate(() => { let n = 0; for (let y = VY0; y <= VY1; y++) for (let x = VX0; x <= VX1; x++) if (!kind[y * COLS + x]) n++; return n; });
+      await page.click('.ed-check input'); await step(2);
+      const left = await page.evaluate(() => {
+        for (const kind of ['flora', 'cows', 'fires']) while (MEADOW_MAP[kind].length) { ED.sel = { kind, mi: 0 }; edDeleteSelected(); }
+        let trail = 0; for (let i = 0; i < N; i++) if (kind[i] === 7) trail++;
+        return { flora: flora.length, cows: cows.length, fires: braziers.length, trail };
+      });
+      check('editor: erase the ground, the trail and every object', empty > 100 && !left.flora && !left.cows && !left.fires && left.trail === 0, `${empty} empty cells in view; left ${JSON.stringify(left)}`);
+      const re = realErrors(errs); check('no console errors (editor)', re.length === 0, re.slice(0, 3).join(' | '));
+      await ctx.close();
+      // the bundle inlines its map: the reload needs the page that loads src/data/map.js
+      if (!/\.html?(\?|$)/.test(url) || /index\.html/.test(url)) for (const [w, h] of [[1100, 700], [800, 600]]) {
+        const g = await openGame(b, url, { mode: 'gl', viewport: { width: w, height: h }, files: { 'src/data/map\\.js$': saved } });
+        await g.step(5);
+        const r = await g.page.evaluate(() => { let n = 0; for (let i = 0; i < N; i++) if (kind[i] === 2) n++; return { earth: n, flora: flora.length, cows: cows.map(c => toModelXZ(c.home[0], c.home[1]).map(Math.round)), editor: !!document.querySelector('.ed') }; });
+        const sameCows = r.cows.length === 4 && r.cows.every((p, k) => Math.abs(p[0] - c3.cows[k][0]) <= 1 && Math.abs(p[1] - c3.cows[k][1]) <= 1);
+        if (w === 1100) check('saved map loads back the same', r.earth === c3.earth && r.flora === c3.flora && sameCows && !r.editor, JSON.stringify({ earth: r.earth, flora: r.flora }));
+        else check('saved map stays put on another screen size', sameCows && r.flora > c3.flora * 0.8, `cows ${JSON.stringify(r.cows)}, flora ${r.flora}`);
+        const re2 = realErrors(g.errs); if (re2.length) check('no console errors (saved map)', false, re2.slice(0, 3).join(' | '));
+        await g.ctx.close();
+      }
     }
     // ---- zero-size start (panels open at 0x0 and grow): real timing, no deterministic clock
     {

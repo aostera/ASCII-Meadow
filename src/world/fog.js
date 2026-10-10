@@ -21,10 +21,11 @@ function updateFog() {
   const fw = Math.max(32, Math.round(W / 12)), fh = Math.max(24, Math.round(H / 12));
   if (FG.w !== fw || FG.h !== fh) { FG.w = fw; FG.h = fh; FG.cv.width = fw; FG.cv.height = fh; FG.d = new Float32Array(fw * fh); FG.img = FG.cv.getContext('2d').createImageData(fw, fh); FG.tick = 0; }
   if ((FG.tick++ & 1) && FG.tick > 2) return;
-  const x0 = camX * CW, y0 = camY * CH, sx = W / fw, sy = H / fh, px = FG.img.data;
+  const x0 = camX * CW, y0 = camY * CH, sx = W / VZ / fw, sy = H / VZ / fh, px = FG.img.data;
   for (let j = 0; j < fh; j++) for (let i = 0; i < fw; i++) {
     const wx = x0 + (i + 0.5) * sx, wy = y0 + (j + 0.5) * sy;
     let d = fogDensity(wx, wy);
+    if (fogChunks.size) d = mapFog(d, wx, wy);   // world/map.js: fog brushed in the editor
     { const C2 = cathedral; if (C2.cv) { const dx = (wx - C2.ox) / (230 * MS), dy = (wy - (C2.oy - 20 * MS)) / (200 * MS); d *= 1 - 0.65 * Math.exp(-(dx * dx + dy * dy)); } }  // the stair stays readable
     for (const b of braziers) { const dx = wx - b.x * CW, dy = (wy - ((b.y + 0.7) * CH - b.lift)) * 1.6, r = 150 * Math.min(MS, 1.4); d *= 1 - 0.55 * Math.exp(-(dx * dx + dy * dy) / (r * r)); }  // the heat thins the fog
     const k = j * fw + i;
@@ -40,7 +41,7 @@ function castleFogGlyphs() {  // grain of the fog, in the glyph batch on top of 
   if (!FG.d) return;
   const ox = camX * CW, oy = camY * CH;
   for (let y = VY0; y <= VY1; y += 2) for (let x = VX0 + ((y >> 1) & 1); x <= VX1; x += 2) {
-    const px = x * CW, py = y * CH, d = fogAt(px - ox, py - oy);
+    const px = x * CW, py = y * CH, d = fogAt((px - ox) * VZ, (py - oy) * VZ);
     if (d < 0.12) continue;
     const h = hash(x + ((t * 3) | 0), y);   // reshuffles a few times a second, so the grain seethes
     if (h > d * 1.3) continue;
@@ -62,7 +63,7 @@ function castleFogBanks(dt) {  // on the overlay, in world space
   for (const b of fogBanks) {
     b.x += b.sp * dt;
     if (b.x - b.rx > C.ox + 1200 * MS) b.x = C.ox - 1200 * MS - b.rx;
-    if (b.x + b.rx < vx0 || b.x - b.rx > vx0 + W || b.y + b.ry < vy0 || b.y - b.ry > vy0 + H) continue;
+    if (b.x + b.rx < vx0 || b.x - b.rx > vx0 + W / VZ || b.y + b.ry < vy0 || b.y - b.ry > vy0 + H / VZ) continue;
     const a = b.a * (0.8 + 0.2 * Math.sin(t * 0.4 + b.ph)) + flash * 0.05;
     ctx.save(); ctx.translate(b.x, b.y); ctx.scale(1, b.ry / b.rx);
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, b.rx);
@@ -74,7 +75,7 @@ function castleFogBanks(dt) {  // on the overlay, in world space
 function drawFog() {
   for (const f of fogs) {
     const x = f.x * CW, y = f.y * CH, r = f.r * CW;
-    if (x + r < camX * CW || x - r > camX * CW + W || y + r < camY * CH || y - r > camY * CH + H) continue;
+    if (x + r < camX * CW || x - r > camX * CW + W / VZ || y + r < camY * CH || y - r > camY * CH + H / VZ) continue;
     const gr = ctx.createRadialGradient(x, y, 0, x, y, r);
     gr.addColorStop(0, `rgba(190,190,190,${0.06 * f.a})`); gr.addColorStop(1, 'rgba(190,190,190,0)');
     ctx.fillStyle = gr; ctx.fillRect(x - r, y - r * 0.6, r * 2, r * 1.2);
