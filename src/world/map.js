@@ -14,7 +14,7 @@ const mapToCell = (gx, gz) => [(gx * MS + cathedral.ox) / CW, (cathedral.oy - gz
 // ---------- paint: brush strokes over the generated ground ----------
 // A sparse grid of PAINT_RES-unit cells, kept in PCH×PCH chunks; a chunk is stored run-length coded.
 const PAINT_RES = 4, PCH = 32;
-const PCODES = '.gtsefrp';   // none, grass, tall grass, short grass, earth, stones, flowers, trail
+const PCODES = '.gtsefrpx';   // none, grass, tall grass, short grass, earth, stones, flowers, trail, empty ground
 const paintChunks = new Map();   // "cx,cz" → Uint8Array(PCH * PCH) of PCODES indices
 function rleEncode(a) {
   let s = '';
@@ -47,7 +47,9 @@ function paintCell(i, x, y, c) {
   else if (c === 4) kind[i] = 2;                                                       // bare earth
   else if (c === 5) kind[i] = s > 0.45 ? 5 : 2;                                        // stones on earth
   else if (c === 7) { kind[i] = 7; height[i] = Math.max(0, Math.min(1, 0.55 + 0.5 * vnoise(x * 0.11, y * 0.17))); segs[i] = 0; }   // trail
+  else if (c === 8) { kind[i] = 0; segs[i] = 0; }                                       // nothing: bare dark ground
 }
+const trailOn = () => MEADOW_MAP.trail !== false;   // the generated trail, unless the map turned it off
 // Ground point of a cell's centre, and its paint code there.
 const cellXZ = (x, y) => [((x + 0.5) * CW - cathedral.ox) / MS, -((y + 0.5) * CH - cathedral.oy) / (SINP * MS)];
 function paintAt(gx, gz) {
@@ -77,7 +79,7 @@ function paintRect(gx0, gz0, gx1, gz1, fresh) {
       if (fresh) {
         groundCell(x, y, i);
         if (bmask[i]) kind[i] = 0;
-        else if (y >= g && x >= Math.floor(cx - hw - 4) && x <= Math.ceil(cx + hw + 4)) carveCell(x, y, cx, hw);
+        else if (trailOn() && y >= g && x >= Math.floor(cx - hw - 4) && x <= Math.ceil(cx + hw + 4)) carveCell(x, y, cx, hw);
       }
       if (bmask[i]) continue;
       const c = paintAt(gx, gz);
@@ -88,11 +90,20 @@ function paintRect(gx0, gz0, gx1, gz1, fresh) {
 }
 
 // ---------- objects: fires, cows and the knight's start ----------
-// Ground fires: from the map, or the one campfire by the trail where he starts.
-function placeGroundFires() {
-  for (let k = braziers.length - 1; k >= 0; k--) if (braziers[k].ground) braziers.splice(k, 1);
-  if (!MEADOW_MAP.fires) { const sy = ROWS - VR * 0.3 - 5; braziers.push({ isFire: true, ground: true, x: pathX(sy) + 16, y: sy - 0.7, lift: 0, parts: [], seed: 3 }); return; }
-  MEADOW_MAP.fires.forEach(([gx, gz], mi) => { const [x, y] = mapToCell(gx, gz); braziers.push({ isFire: true, ground: true, x, y, lift: 0, parts: [], seed: 3 + mi, mi }); });
+// Fires: from the map ([x, z] on the ground, [x, z, h] raised h units, a brazier on the terrace), or the
+// generated ones: two on the terrace either side of the gate and a campfire by the trail where he starts.
+function placeFires() {
+  braziers.length = 0;
+  if (!MEADOW_MAP.fires) {
+    const C = cathedral;
+    for (const sx of [-1, 1]) braziers.push({ isFire: true, x: (C.ox + sx * 108 * MS) / CW, y: (C.oy - 66 * SINP * MS) / CH - 0.7, lift: 120 * COSP * MS, parts: [], seed: sx });
+    const sy = ROWS - VR * 0.3 - 5; braziers.push({ isFire: true, ground: true, x: pathX(sy) + 16, y: sy - 0.7, lift: 0, parts: [], seed: 3 });
+    return;
+  }
+  MEADOW_MAP.fires.forEach(([gx, gz, h], mi) => {
+    const [x, y] = mapToCell(gx, gz);
+    braziers.push(h > 0 ? { isFire: true, x, y, lift: h * COSP * MS, parts: [], seed: 3 + mi, mi } : { isFire: true, ground: true, x, y, lift: 0, parts: [], seed: 3 + mi, mi });
+  });
 }
 
 // Everything the map changes, rebuilt without the atlases or the castle's rays (the editor, after loading a map).

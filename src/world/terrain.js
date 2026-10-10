@@ -10,6 +10,7 @@ function pathX(row) {
   return COLS * 0.5 + (Math.sin(row * 0.019 + 1.3) * 0.26 + Math.sin(row * 0.047) * 0.09) * VC * sw;
 }
 function carvePath() {
+  if (!trailOn()) return;   // world/map.js: the map can do without the generated trail
   const g = Math.floor(cathedral.gateRow || ROWS * 0.45);
   for (let y = g; y < ROWS; y++) {
     const cx = pathX(y), hw = pathHalfWidth(y, g);

@@ -148,6 +148,16 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       const saved = fs.readFileSync(await dl.path(), 'utf8'), c3 = await count();
       check('editor: «Сохранить» writes a map file', /const MEADOW_MAP = \{/.test(saved) && !/<\/script/i.test(saved), saved.length + ' bytes');
       await shot(page, 'editor');
+      // nothing on the map is fixed: the «Стереть» brush clears the ground, the trail switches off, every object deletes
+      await page.keyboard.press('Digit8'); await page.mouse.move(300, 500); await page.mouse.down(); await page.mouse.move(420, 500, { steps: 6 }); await page.mouse.up(); await step(2);
+      const empty = await page.evaluate(() => { let n = 0; for (let y = VY0; y <= VY1; y++) for (let x = VX0; x <= VX1; x++) if (!kind[y * COLS + x]) n++; return n; });
+      await page.click('.ed-check input'); await step(2);
+      const left = await page.evaluate(() => {
+        for (const kind of ['flora', 'cows', 'fires']) while (MEADOW_MAP[kind].length) { ED.sel = { kind, mi: 0 }; edDeleteSelected(); }
+        let trail = 0; for (let i = 0; i < N; i++) if (kind[i] === 7) trail++;
+        return { flora: flora.length, cows: cows.length, fires: braziers.length, trail };
+      });
+      check('editor: erase the ground, the trail and every object', empty > 100 && !left.flora && !left.cows && !left.fires && left.trail === 0, `${empty} empty cells in view; left ${JSON.stringify(left)}`);
       const re = realErrors(errs); check('no console errors (editor)', re.length === 0, re.slice(0, 3).join(' | '));
       await ctx.close();
       // the bundle inlines its map: the reload needs the page that loads src/data/map.js

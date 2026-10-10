@@ -33,6 +33,8 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .ed-btn:disabled { opacity: .4; cursor: default; }
 .ed kbd, .ed-open kbd { font: 400 10px/1 var(--mono); color: var(--dim); }
 .ed-x { min-height: 0; padding: 2px 8px; font-size: 16px; }
+.ed-check { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: #d6d6d6; cursor: pointer; }
+.ed-check input { accent-color: #c9a45c; margin: 0; }
 .ed-size, .ed-variant { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .ed-size input { flex: 1; accent-color: #c9a45c; }
 .ed output { min-width: 3.5em; color: var(--ink); font: 400 12px/1 var(--mono); text-align: center; }

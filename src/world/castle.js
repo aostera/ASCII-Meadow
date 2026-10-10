@@ -340,11 +340,8 @@ function buildCathedral() {
   const wins = new Map();
   for (let j = 0; j < lit.length; j += 3) { const w = wins.get(lit[j + 2]) || [0, 0, 0]; w[0] += lit[j]; w[1] += lit[j + 1]; w[2]++; wins.set(lit[j + 2], w); }
   cathedral.glows = [...wins].map(([id, w]) => ({ id, x: (w[0] / w[2] + 0.5) * CW, y: (w[1] / w[2] + 0.5) * CH, r: Math.sqrt(w[2]) * CW * (id < 0 ? 2.2 : 3.2) }));
-  // two small fires on the terrace, either side of the gate
-  braziers.length = 0;
-  for (const sx of [-1, 1]) braziers.push({ isFire: true, x: (ox + sx * 108 * MS) / CW, y: (oy - 66 * SINP * MS) / CH - 0.7, lift: 120 * COSP * MS, parts: [], seed: sx });
-  // and ground fires: the map's, or a campfire by the trail where he starts (world/map.js)
-  placeGroundFires();
+  // the fires: the map's, or two on the terrace either side of the gate and a campfire by the trail (world/map.js)
+  placeFires();
   // footprint (collision), ground shadows and a little contact darkness
   bmask.fill(0); bshade.fill(0);
   const fy0 = Math.max(0, Math.floor((oy - 1060 * SINP * MS) / CH)), fy1 = Math.min(ROWS - 1, Math.ceil((oy + 120 * SINP * MS) / CH));
