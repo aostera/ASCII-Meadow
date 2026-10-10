@@ -67,7 +67,7 @@ function paintCell(i, x, y, c) {
   if (c === 1 || c === 2 || c === 3 || c === 6) {
     groundCell(x, y, i); kind[i] = 1;
     if (c === 2) { height[i] = Math.max(height[i], 0.72); segs[i] = s > 0.4 ? 4 : 3; }   // tall: up to the knight's knees
-    else if (c === 3) { height[i] = Math.min(height[i], 0.42); segs[i] = 1; }           // short, mown
+    else if (c === 3) { height[i] = Math.max(height[i], 0.62 + s * 0.12); segs[i] = 1; }                     // short, mown: one bent tip over the stem, and it catches the light
     else if (c === 6) kind[i] = s > 0.88 ? 3 : s > 0.8 ? 4 : s > 0.72 ? 6 : 1;          // flowers among the grass
   }
   else if (c === 4) kind[i] = 2;                                                       // bare earth
@@ -85,7 +85,8 @@ function paintCell(i, x, y, c) {
     }
   }
 }
-const trailOn = () => MEADOW_MAP.trail !== false;   // the generated trail, unless the map turned it off
+const trailOn = () => MEADOW_MAP.trail !== false;
+const castleOff = () => MEADOW_MAP.castle || [0, 0];   // the castle moved from its place, in ground units ([x, z])   // the generated trail, unless the map turned it off
 // Ground point of a cell's centre, and its paint code there.
 const cellXZ = (x, y) => [((x + 0.5) * CW - cathedral.ox) / MS, -((y + 0.5) * CH - cathedral.oy) / (SINP * MS)];
 function paintAt(gx, gz) {
@@ -105,7 +106,7 @@ function applyPaint() {
 function paintRect(gx0, gz0, gx1, gz1, fresh) {
   const C = cathedral, x0 = Math.max(0, Math.floor((gx0 * MS + C.ox) / CW - 1)), x1 = Math.min(COLS - 1, Math.ceil((gx1 * MS + C.ox) / CW));
   const y0 = Math.max(0, Math.floor((C.oy - gz1 * SINP * MS) / CH - 1)), y1 = Math.min(ROWS - 1, Math.ceil((C.oy - gz0 * SINP * MS) / CH));
-  const g = Math.floor(C.gateRow || ROWS * 0.45);
+  const g = Math.floor(C.trailRow || ROWS * 0.45);
   for (let y = y0; y <= y1; y++) {
     const cx = y >= g ? pathX(y) : 0, hw = y >= g ? pathHalfWidth(y, g) : 0;
     for (let x = x0; x <= x1; x++) {
@@ -132,7 +133,7 @@ function placeFires() {
   braziers.length = 0;
   if (!MEADOW_MAP.fires) {
     const C = cathedral;
-    for (const sx of [-1, 1]) braziers.push({ isFire: true, x: (C.ox + sx * 108 * MS) / CW, y: (C.oy - 66 * SINP * MS) / CH - 0.7, lift: 120 * COSP * MS, parts: [], seed: sx });
+    for (const sx of [-1, 1]) braziers.push({ isFire: true, x: (C.kx + sx * 108 * MS) / CW, y: (C.ky - 66 * SINP * MS) / CH - 0.7, lift: 120 * COSP * MS, parts: [], seed: sx });
     const sy = ROWS - VR * 0.3 - 5; braziers.push({ isFire: true, ground: true, x: pathX(sy) + 16, y: sy - 0.7, lift: 0, parts: [], seed: 3 });
     return;
   }

@@ -6,7 +6,7 @@
 // branches through; bare trees are nets of thin crooked branches. Each variant is baked once.
 const fid = (c, l) => KN0 + FCI[c] * KLV + Math.max(0, Math.min(KLV - 1, l));
 const VARS = [], flora = [], LILIES = [];   // LILIES: three pads, then two in flower (bakeLily)
-let tmask = null, FLMAXR = 0;
+let tmask = null, fmask = null, FLMAXR = 0;   // tmask: trunks and tents; fmask: fences, which a jump clears
 const fbm3 = (x, y) => vnoise(x, y) * 0.55 + vnoise(x * 2.1 + 3.7, y * 2.1) * 0.3 + vnoise(x * 4.3, y * 4.3 + 1.3) * 0.15;
 function bakeVariant(type, sd) {
   const rnd = (k) => hash(sd * 31 + k, 977);
@@ -122,7 +122,7 @@ function bakeLily(flower, sd) {
       if (da < 0.32 && r > 0.12) continue;                                  // the notch
       r0 = Math.min(r0, cx); r1 = Math.max(r1, cx);
       const rim = r > 0.72 && u + w < -0.2, vein = Math.abs(Math.sin(Math.atan2(w, u) * 4)) < 0.12 && r < 0.8;
-      let v = 0.42 + (rim ? 0.3 : 0) - (vein ? 0.14 : 0) - Math.max(0, u + w) * 0.1;   // veins: darker lines
+      let v = 0.2 + (rim ? 0.16 : 0) - (vein ? 0.08 : 0) - Math.max(0, u + w) * 0.06;   // dark leaves (the toads on them must read); veins darker still
       v = Math.max(0, Math.min(0.9, v + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.12));
       // a leaf is solid, not dithered air: dense glyphs, the tone carries the light
       list.push(cx, cy, fid(rim ? '@' : vein ? ':' : '%', Math.floor(v * 7)), Math.round(Math.min(1, 0.55 + v * 0.6) * 100));
@@ -147,10 +147,11 @@ function bakeFloraSprites() {
     let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
     const L = v.list, Rn = v.runs;
     for (let k = 0; k < L.length; k += 4) { x0 = Math.min(x0, L[k]); x1 = Math.max(x1, L[k]); y0 = Math.min(y0, L[k + 1]); y1 = Math.max(y1, L[k + 1]); }
-    for (let k = 0; k < Rn.length; k += 3) { y0 = Math.min(y0, Rn[k]); y1 = Math.max(y1, Rn[k]); x0 = Math.min(x0, Rn[k + 1]); x1 = Math.max(x1, Rn[k + 2]); }
+    for (const Q of [Rn, v.shade || []]) for (let k = 0; k < Q.length; k += 3) { y0 = Math.min(y0, Q[k]); y1 = Math.max(y1, Q[k]); x0 = Math.min(x0, Q[k + 1]); x1 = Math.max(x1, Q[k + 2]); }
     const ox = x0 * v.fw - 2, oy = y0 * v.fh - 2, cw = (x1 - x0 + 2) * v.fw + 4, ch = (y1 - y0 + 2) * v.fh + 4;
     const c = document.createElement('canvas'); c.width = Math.ceil(cw * bd); c.height = Math.ceil(ch * bd);
     const g = c.getContext('2d'); g.setTransform(bd, 0, 0, bd, -ox * bd, -oy * bd);
+    if (v.shade) { g.fillStyle = 'rgba(6,6,6,0.28)'; const Sh = v.shade; for (let k = 0; k < Sh.length; k += 3) g.fillRect(Sh[k + 1] * v.fw - 0.3, Sh[k] * v.fh - 0.3, (Sh[k + 2] - Sh[k + 1]) * v.fw + 0.6, v.fh + 0.6); }   // a cast shadow on the ground
     g.fillStyle = 'rgba(12,12,12,0.97)';
     for (let k = 0; k < Rn.length; k += 3) g.fillRect(Rn[k + 1] * v.fw - 0.3, Rn[k] * v.fh - 0.3, (Rn[k + 2] - Rn[k + 1]) * v.fw + 0.6, v.fh + 0.6);
     for (let k = 0; k < L.length; k += 4) { const sp = GB.spr[L[k + 2]]; g.globalAlpha = L[k + 3] * 0.01; g.drawImage(A, sp[0], sp[1], sp[2], sp[3], L[k] * v.fw + sp[6], L[k + 1] * v.fh + sp[7], sp[4], sp[5]); }
@@ -189,6 +190,7 @@ function bakeVariants() {
   for (let k = 0; k < 6; k++) VARS.push(bakeVariant('bush', k + 41));
   LILIES.length = 0;
   for (let k = 0; k < 5; k++) { const v = bakeLily(k >= 3, k + 81); LILIES.push(v); VARS.push(v); }
+  bakeCampVariants(VARS);   // world/camp.js: tents and fences
   FLMAXR = Math.ceil(Math.max(...VARS.map(v => v.crownH / CH))) + 2;
   bakeFloraSprites();
 }
@@ -198,9 +200,9 @@ const variantsOf = type => VARS.filter(v => v.type === type);
 function placeFlora() {
   flora.length = 0;
   const trees = variantsOf('tree'), dead = variantsOf('dead'), bush = variantsOf('bush');
-  tmask = new Uint8Array(N);
+  tmask = new Uint8Array(N); fmask = new Uint8Array(N);
   if (MEADOW_MAP.flora) MEADOW_MAP.flora.forEach(([type, k, gx, gz], mi) => {
-    const set = type === 'dead' ? dead : type === 'bush' ? bush : trees, v = set[Math.max(0, Math.min(set.length - 1, k | 0))];
+    const own = variantsOf(type), set = own.length ? own : trees, v = set[Math.max(0, Math.min(set.length - 1, k | 0))];
     const [x, y] = mapToCell(gx, gz), br = Math.round(y + 0.7);
     if (x < 3 || x > COLS - 4 || br < 2 || br > ROWS - 2) return;
     flora.push({ isFlora: true, v, x, y: br - 0.7, br, ph: hash(Math.round(gx), Math.round(gz)) * 6.28, rust: 0, mi });
@@ -215,8 +217,8 @@ function placeFlora() {
       if (x < 3 || x > COLS - 4 || y > ROWS - 2) continue;
       const forest = vnoise(x * 0.013 + 3, y * 0.021) * 0.75 + vnoise(x * 0.05, y * 0.07) * 0.25, r = hash(i * 17, j * 29);
       const px = x * CW, py = y * CH, v0R = K * 0.9;
-      if (C.cv && py < C.oy + 30 * MS && px > C.cx0 * CW - K * 0.6 && px < (C.cx0 + C.BW) * CW + K * 0.6) continue; // never behind the castle
-      if (C.cv && Math.abs(px - C.ox) < 420 * MS + v0R && py < C.oy + 520 * SINP * MS + v0R && py > C.oy - 200 * MS) continue;  // a clear forecourt before the stair
+      if (C.cv && py < C.ky + 30 * MS && px > C.cx0 * CW - K * 0.6 && px < (C.cx0 + C.BW) * CW + K * 0.6) continue; // never behind the castle
+      if (C.cv && Math.abs(px - C.kx) < 420 * MS + v0R && py < C.ky + 520 * SINP * MS + v0R && py > C.ky - 200 * MS) continue;  // a clear forecourt before the stair
       if (Math.abs(y - startY) < 18 && Math.abs(x - pathX(y)) < 30) continue;
       let v = null;
       if (forest > 0.52 && r < (forest - 0.4) * 1.35) v = r < 0.16 ? dead[(r * 97 | 0) % dead.length] : trees[(r * 131 | 0) % trees.length];
@@ -230,6 +232,7 @@ function placeFlora() {
   for (const f of flora) {
     const v = f.v, bx = Math.round(f.x), br = f.br;
     for (let k = 0; k < v.hide.length; k += 2) { const cx = bx + v.hide[k], cy = br + v.hide[k + 1]; if (cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS) kind[cy * COLS + cx] = 0; }
+    if (v.block) { const M = v.type === 'fence' ? fmask : tmask; for (let k = 0; k < v.block.length; k += 2) { const cx = bx + v.block[k], cy = br + v.block[k + 1]; if (cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS) M[cy * COLS + cx] = 1; } continue; }   // tents and fences: their footprint; their shadow is in the picture
     if (v.type !== 'bush') for (let dx = -1; dx <= 1; dx++) { const i = br * COLS + bx + dx; if (i >= 0 && i < N) tmask[i] = 1; }
     const sr = v.R / CW, sx = bx + v.Hc * 0.6 / CW, sy = br - v.Hc * 0.55 / CH;
     for (let cy = Math.floor(sy - sr * CW / CH); cy <= Math.ceil(br + 2); cy++) for (let cx = Math.floor(Math.min(bx, sx) - sr); cx <= Math.ceil(Math.max(bx, sx) + sr); cx++) {
@@ -285,6 +288,7 @@ function drawFlora(f) {
   }
   f.fade = (f.fade || 1) + (fade - (f.fade || 1)) * 0.15;
   const fa = f.fade, L = v.list, Rn = v.runs;
+  if (v.solid) { gput(v.whole, bx, by, fa); return; }   // tents and fences stand still
   if (v.sl && !(bush && (f.rust || 0) > 0.05)) {   // a bush being pushed through is drawn leaf by leaf
     for (const [sid, hf] of v.sl) gput(sid, bx + lean * hf * Math.sqrt(hf), by, fa);
     return;

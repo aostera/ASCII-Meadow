@@ -292,7 +292,13 @@ const cathedral = { cv: null };
 function buildCathedral() {
   buildModel();
   buildBins();
-  const ox = COLS * 0.5 * CW, oy = 2150 * MS + 40;  // screen spot of the mound's front foot
+  // ax, ay: the map's origin, where the mound's front foot stands by default (map coordinates are measured from
+  // it); ox, oy: where it stands now, moved by the map's castle offset (ground units)
+  const ax = COLS * 0.5 * CW, ay = 2150 * MS + 40, [ox0, oz0] = castleOff();
+  // the map's offset, kept inside this world (a smaller window makes a smaller one): the castle is never cut
+  const dx = Math.max((820 * MS - ax) / MS, Math.min((COLS * CW - 820 * MS - ax) / MS, ox0));
+  const dz = Math.max((ay + 160 * MS - ROWS * CH) / (SINP * MS), Math.min((ay - 2150 * MS) / (SINP * MS), oz0));
+  const ox = ax + dx * MS, oy = ay - dz * SINP * MS;
   const Dv = [0, -SINP, COSP];
   const cx0 = Math.max(0, Math.floor((ox - 820 * MS) / CW)), cx1 = Math.min(COLS - 1, Math.ceil((ox + 820 * MS) / CW));
   const cy0 = Math.max(0, Math.floor((oy - 2150 * MS) / CH)), cy1 = Math.min(ROWS - 1, Math.ceil((oy + 110 * MS) / CH));
@@ -335,7 +341,7 @@ function buildCathedral() {
     runs.push(r);
   }
   const cv = true;
-  Object.assign(cathedral, { cv, cx0, cy0, BW, BH: BH2, lum, dep, glyph, lev, runs, ox, oy, face, gateRow: (oy + 110 * SINP * MS) / CH, lit });
+  Object.assign(cathedral, { cv, cx0, cy0, BW, BH: BH2, lum, dep, glyph, lev, runs, ox: ax, oy: ay, kx: ox, ky: oy, off: [dx, dz], face, gateRow: (oy + 110 * SINP * MS) / CH, trailRow: (ay + 110 * SINP * MS) / CH, lit });   // the trail is its own thing: it starts where the gate stands by default
   // one glow per lit window, at its centre
   const wins = new Map();
   for (let j = 0; j < lit.length; j += 3) { const w = wins.get(lit[j + 2]) || [0, 0, 0]; w[0] += lit[j]; w[1] += lit[j + 1]; w[2]++; wins.set(lit[j + 2], w); }
@@ -365,7 +371,7 @@ const toModelXZ = (x, y) => [(x * CW - cathedral.ox) / MS, -((y + 0.7) * CH - ca
 // Infinity inside walls and towers.
 function surfAt(x, y) {
   if (!cathedral.cv) return 0;
-  const [gx, gz] = toModelXZ(x, y);
+  const [mx, mz] = toModelXZ(x, y), [dx, dz] = cathedral.off || [0, 0], gx = mx - dx, gz = mz - dz;   // into the castle's own frame (as built)
   if (gz < -140 || gz > 1060 || Math.abs(gx) > 800) return 0;
   const h = cast(gx, 5000, gz, 0, -1, 0, 0, BINS.down(gx, 0, gz));
   if (!h) return 0;
@@ -377,7 +383,7 @@ function drawCathedral() {
   const C = cathedral;
   if (!C.cv) return;
   const x = C.cx0 * CW, w = C.BW * CW;
-  const far = Math.max(0, Math.min(1, ((player.y + 0.7) * CH - C.oy) / (H * 2.4)));
+  const far = Math.max(0, Math.min(1, ((player.y + 0.7) * CH - C.ky) / (H * 2.4)));
   // visible rows only: backing runs, then glyphs; far away it fades, lightning lifts it a few shades
   const a = 1 - far * 0.55, up = Math.round(flash * 3);
   const y0 = Math.max(0, VY0 - C.cy0), y1 = Math.min(C.BH - 1, VY1 - C.cy0), xa = Math.max(0, VX0 - C.cx0), xb = Math.min(C.BW, VX1 - C.cx0 + 1);
@@ -386,9 +392,9 @@ function drawCathedral() {
     for (let j = 0; j < r.length; j += 2) { const s0 = Math.max(xa, r[j]), s1 = Math.min(xb, r[j + 1]); if (s1 > s0) grect((C.cx0 + s0) * CW - 0.4, py - 0.4, (s1 - s0) * CW + 0.8, CH + 0.8, a); }
     for (let xx = xa, k = yy * C.BW + xa; xx < xb; xx++, k++) { const gl = C.glyph[k]; if (gl >= 0 && C.lum[k] >= 0) gput(gl * NB + Math.min(BL0 + BLN - 1, C.lev[k] + up), (C.cx0 + xx) * CW - 1 / DPR, py - 1 / DPR, a); }
   }
-  const mist = ctx.createLinearGradient(0, C.oy - 260 * MS, 0, C.oy + 60 * MS);  // ground mist round the mound
+  const mist = ctx.createLinearGradient(0, C.ky - 260 * MS, 0, C.ky + 60 * MS);  // ground mist round the mound
   mist.addColorStop(0, 'rgba(170,170,170,0)'); mist.addColorStop(0.6, `rgba(170,170,170,${0.05 + far * 0.08})`); mist.addColorStop(1, 'rgba(170,170,170,0)');
-  ctx.fillStyle = mist; ctx.fillRect(x, C.oy - 260 * MS, w, 320 * MS);
+  ctx.fillStyle = mist; ctx.fillRect(x, C.ky - 260 * MS, w, 320 * MS);
 }
 // stone that stands between the camera and someone: redraw it over them
 function occlude(e) {

@@ -9,6 +9,7 @@ function simulate(dt) {
   if (editing) updateEditor(dt);   // editor/editor.js
   updateCamera(dt);           // core/camera.js
   applyGrassForces(dt);       // world/grass.js
+  updateBirds(dt);            // world/birds.js: a flock bursting out thrashes the grass
   updateGusts(dt);            // world/wind.js
   updateGrass(dt);            // world/grass.js
 
@@ -18,4 +19,5 @@ function simulate(dt) {
   for (const b of braziers) updateFire(b, dt);   // world/lights.js
   updateFlora(dt);            // world/flora.js
   updateLife(dt);             // world/life.js
+  updateToads(dt);            // world/toads.js
 }
