@@ -197,6 +197,15 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       const zt = await page.evaluate(() => { const e = MEADOW_MAP.flora[MEADOW_MAP.flora.length - 1], [x, y] = mapToCell(e[2], e[3]); return { z: VZ, cols: VX1 - VX0, sx: (x - camX) * CW * VZ, sy: (y + 0.7 - camY) * CH * VZ }; });
       await page.evaluate(() => { closeEditor(); }); const z1 = await page.evaluate(() => VZ); await page.evaluate(() => { openEditor(); });
       check('editor: zoom out, place under the cursor, back to 100% on close', zt.z < 1 && Math.hypot(zt.sx - 500, zt.sy - 300) < 8 && z1 === 1, JSON.stringify({ zoom: zt.z, cellsAcross: zt.cols, foot: [Math.round(zt.sx), Math.round(zt.sy)] }));
+      // the castle moves: its gate foot lands under the click, with its walls, stair and gate fires; undo puts it back
+      {
+        await page.keyboard.press('KeyL'); await page.mouse.click(420, 520); await step(2);
+        const cm = await page.evaluate(() => { const C = cathedral, gate = surfAt(C.kx / CW, (C.ky - 74 * SINP * MS) / CH - 0.7); return { moved: C.kx !== C.ox || C.ky !== C.oy, map: MEADOW_MAP.castle, gate, fires: braziers.filter(b => !b.ground).every(b => Math.abs(b.x * CW - C.kx) < 200 * MS) }; });
+        await page.keyboard.press('Control+KeyZ'); await step(2);
+        const back = await page.evaluate(() => cathedral.kx === cathedral.ox && cathedral.ky === cathedral.oy && !MEADOW_MAP.castle);
+        check('editor: the castle moves to the click, and back on undo', cm.moved && Array.isArray(cm.map) && cm.gate > 50 && cm.fires && back, JSON.stringify(cm));
+        await page.keyboard.press('KeyV');
+      }
       // nothing on the map is fixed: the «Стереть» brush clears the ground, the trail switches off, every object deletes
       await page.keyboard.press('Digit8'); await page.mouse.move(300, 500); await page.mouse.down(); await page.mouse.move(420, 500, { steps: 6 }); await page.mouse.up(); await step(2);
       const empty = await page.evaluate(() => { let n = 0; for (let y = VY0; y <= VY1; y++) for (let x = VX0; x <= VX1; x++) if (!kind[y * COLS + x]) n++; return n; });

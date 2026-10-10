@@ -215,8 +215,8 @@ function placeFlora() {
       if (x < 3 || x > COLS - 4 || y > ROWS - 2) continue;
       const forest = vnoise(x * 0.013 + 3, y * 0.021) * 0.75 + vnoise(x * 0.05, y * 0.07) * 0.25, r = hash(i * 17, j * 29);
       const px = x * CW, py = y * CH, v0R = K * 0.9;
-      if (C.cv && py < C.oy + 30 * MS && px > C.cx0 * CW - K * 0.6 && px < (C.cx0 + C.BW) * CW + K * 0.6) continue; // never behind the castle
-      if (C.cv && Math.abs(px - C.ox) < 420 * MS + v0R && py < C.oy + 520 * SINP * MS + v0R && py > C.oy - 200 * MS) continue;  // a clear forecourt before the stair
+      if (C.cv && py < C.ky + 30 * MS && px > C.cx0 * CW - K * 0.6 && px < (C.cx0 + C.BW) * CW + K * 0.6) continue; // never behind the castle
+      if (C.cv && Math.abs(px - C.kx) < 420 * MS + v0R && py < C.ky + 520 * SINP * MS + v0R && py > C.ky - 200 * MS) continue;  // a clear forecourt before the stair
       if (Math.abs(y - startY) < 18 && Math.abs(x - pathX(y)) < 30) continue;
       let v = null;
       if (forest > 0.52 && r < (forest - 0.4) * 1.35) v = r < 0.16 ? dead[(r * 97 | 0) % dead.length] : trees[(r * 131 | 0) % trees.length];

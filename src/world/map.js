@@ -85,7 +85,8 @@ function paintCell(i, x, y, c) {
     }
   }
 }
-const trailOn = () => MEADOW_MAP.trail !== false;   // the generated trail, unless the map turned it off
+const trailOn = () => MEADOW_MAP.trail !== false;
+const castleOff = () => MEADOW_MAP.castle || [0, 0];   // the castle moved from its place, in ground units ([x, z])   // the generated trail, unless the map turned it off
 // Ground point of a cell's centre, and its paint code there.
 const cellXZ = (x, y) => [((x + 0.5) * CW - cathedral.ox) / MS, -((y + 0.5) * CH - cathedral.oy) / (SINP * MS)];
 function paintAt(gx, gz) {
@@ -132,7 +133,7 @@ function placeFires() {
   braziers.length = 0;
   if (!MEADOW_MAP.fires) {
     const C = cathedral;
-    for (const sx of [-1, 1]) braziers.push({ isFire: true, x: (C.ox + sx * 108 * MS) / CW, y: (C.oy - 66 * SINP * MS) / CH - 0.7, lift: 120 * COSP * MS, parts: [], seed: sx });
+    for (const sx of [-1, 1]) braziers.push({ isFire: true, x: (C.kx + sx * 108 * MS) / CW, y: (C.ky - 66 * SINP * MS) / CH - 0.7, lift: 120 * COSP * MS, parts: [], seed: sx });
     const sy = ROWS - VR * 0.3 - 5; braziers.push({ isFire: true, ground: true, x: pathX(sy) + 16, y: sy - 0.7, lift: 0, parts: [], seed: 3 });
     return;
   }

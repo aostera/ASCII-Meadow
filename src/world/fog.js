@@ -10,7 +10,7 @@ const FG = { cv: document.createElement('canvas'), w: 0, h: 0, d: null, img: nul
 function fogDensity(x, y) {
   const C = cathedral;
   let m = 0;
-  if (C.cv) { const dx = (x - C.ox) / (1500 * MS), dy = (y - (C.oy - 120 * MS)) / (900 * MS); m = Math.max(0, 1 - (dx * dx + dy * dy)); }
+  if (C.cv) { const dx = (x - C.kx) / (1500 * MS), dy = (y - (C.ky - 120 * MS)) / (900 * MS); m = Math.max(0, 1 - (dx * dx + dy * dy)); }
   const qx = vnoise(x * 0.0021 + t * 0.03, y * 0.004) * 2.2, qy = vnoise(x * 0.0021 + 5.2, y * 0.004 - t * 0.025) * 2.2;   // warp
   const u = x * 0.0032 + qx - t * 0.06, v = y * 0.0058 + qy + t * 0.012;
   const n = vnoise(u, v) * 0.6 + vnoise(u * 2.3 - t * 0.09, v * 2.3) * 0.28 + vnoise(u * 5.1, v * 5.1 + t * 0.05) * 0.12;
@@ -26,7 +26,7 @@ function updateFog() {
     const wx = x0 + (i + 0.5) * sx, wy = y0 + (j + 0.5) * sy;
     let d = fogDensity(wx, wy);
     if (fogChunks.size) d = mapFog(d, wx, wy);   // world/map.js: fog brushed in the editor
-    { const C2 = cathedral; if (C2.cv) { const dx = (wx - C2.ox) / (230 * MS), dy = (wy - (C2.oy - 20 * MS)) / (200 * MS); d *= 1 - 0.65 * Math.exp(-(dx * dx + dy * dy)); } }  // the stair stays readable
+    { const C2 = cathedral; if (C2.cv) { const dx = (wx - C2.kx) / (230 * MS), dy = (wy - (C2.ky - 20 * MS)) / (200 * MS); d *= 1 - 0.65 * Math.exp(-(dx * dx + dy * dy)); } }  // the stair stays readable
     for (const b of braziers) { const dx = wx - b.x * CW, dy = (wy - ((b.y + 0.7) * CH - b.lift)) * 1.6, r = 150 * Math.min(MS, 1.4); d *= 1 - 0.55 * Math.exp(-(dx * dx + dy * dy) / (r * r)); }  // the heat thins the fog
     const k = j * fw + i;
     FG.d[k] = d;
@@ -62,7 +62,7 @@ function castleFogBanks(dt) {  // on the overlay, in world space
   const vx0 = camX * CW, vy0 = camY * CH;
   for (const b of fogBanks) {
     b.x += b.sp * dt;
-    if (b.x - b.rx > C.ox + 1200 * MS) b.x = C.ox - 1200 * MS - b.rx;
+    if (b.x - b.rx > C.kx + 1200 * MS) b.x = C.kx - 1200 * MS - b.rx;
     if (b.x + b.rx < vx0 || b.x - b.rx > vx0 + W / VZ || b.y + b.ry < vy0 || b.y - b.ry > vy0 + H / VZ) continue;
     const a = b.a * (0.8 + 0.2 * Math.sin(t * 0.4 + b.ph)) + flash * 0.05;
     ctx.save(); ctx.translate(b.x, b.y); ctx.scale(1, b.ry / b.rx);

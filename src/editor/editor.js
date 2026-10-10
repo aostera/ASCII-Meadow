@@ -9,7 +9,7 @@ const ED = {
   ui: null, mini: null, miniKey: '', draftTimer: 0,
 };
 const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['w', 'Вода', '9'], ['m', 'Болото', 'P'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
-const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['select', 'Выбрать и двигать', 'V']];
+const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['castle', 'Замок', 'L'], ['select', 'Выбрать и двигать', 'V']];
 const ED_FOG = [['fogl', 'Лёгкий туман', 'H'], ['fogd', 'Густой туман', 'J'], ['fogc', 'Убрать туман', 'N']];
 const ED_FOGCODE = { fogl: 2, fogd: 3, fogc: 1 };
 const ED_DRAFT = 'ascii-meadow-map-draft';
@@ -24,10 +24,11 @@ function mapFileText() {
   const paint = savePaint(), keys = Object.keys(paint), fog = saveFog(), fkeys = Object.keys(fog);
   const text = '// The meadow\'s map. Edit it in the game: open the page with ?edit and press M; «Сохранить» writes this file.\n' +
     '// Positions are castle ground units (px at MS = 1) from the foot of the castle mound: x to the right, z to the north.\n' +
+    '// castle: [x, z] the castle moved from its place (null: where it always stood).\n' +
     '// null: generated as before (trail false: no generated trail). fires: [x, z] on the ground, [x, z, h] raised h units.\n' +
     '// paint: brush strokes over the generated ground, run-length coded per 32×32 chunk; fog: the same for fog\n' +
     '// (c clear, l light, d dense; 16-unit cells).\n' +
-    'const MEADOW_MAP = {\n  "v": 1, "res": ' + PAINT_RES + ',\n  "start": ' + JSON.stringify(m.start) + ',\n  "fires": ' + rows(m.fires) +
+    'const MEADOW_MAP = {\n  "v": 1, "res": ' + PAINT_RES + ',\n  "castle": ' + JSON.stringify(m.castle || null) + ',\n  "start": ' + JSON.stringify(m.start) + ',\n  "fires": ' + rows(m.fires) +
     ',\n  "trail": ' + JSON.stringify(m.trail === false ? false : null) + ',\n  "cows": ' + rows(m.cows) + ',\n  "flora": ' + rows(m.flora) + ',\n  "paint": ' +
     (keys.length ? '{\n' + keys.map(k => '    ' + JSON.stringify(k) + ': ' + JSON.stringify(paint[k])).join(',\n') + '\n  }' : '{}') + ',\n  "fog": ' +
     (fkeys.length ? '{\n' + fkeys.map(k => '    ' + JSON.stringify(k) + ': ' + JSON.stringify(fog[k])).join(',\n') + '\n  }' : '{}') + '\n};\n';
@@ -39,7 +40,7 @@ function parseMapText(text) {
   if (typeof m !== 'object' || !m || m.v !== 1) throw new Error('not a map file');
   return m;
 }
-const mapSnapshot = () => JSON.parse(JSON.stringify({ start: MEADOW_MAP.start, trail: MEADOW_MAP.trail === false ? false : null, fires: MEADOW_MAP.fires, cows: MEADOW_MAP.cows, flora: MEADOW_MAP.flora, paint: savePaint(), fog: saveFog() }));   // a copy: edits must not reach it
+const mapSnapshot = () => JSON.parse(JSON.stringify({ castle: MEADOW_MAP.castle || null, start: MEADOW_MAP.start, trail: MEADOW_MAP.trail === false ? false : null, fires: MEADOW_MAP.fires, cows: MEADOW_MAP.cows, flora: MEADOW_MAP.flora, paint: savePaint(), fog: saveFog() }));   // a copy: edits must not reach it
 
 // ---------- applying changes ----------
 // Generated objects become map objects the first time one is moved, added or deleted.
@@ -59,10 +60,29 @@ function applyObjects(which) {
 }
 function applyWholeMap(src) {
   const m = JSON.parse(JSON.stringify(src));   // undo entries and drafts stay as they were
+  if (JSON.stringify(m.castle || null) !== JSON.stringify(MEADOW_MAP.castle || null)) { MEADOW_MAP.castle = m.castle || null; edRebuildCastle(); }
   Object.assign(MEADOW_MAP, { start: m.start || null, trail: m.trail === false ? false : null, fires: m.fires || null, cows: m.cows || null, flora: m.flora || null });
   loadPaint(m.paint); loadFog(m.fog); rebuildMap();
   if (!MEADOW_MAP.start) { const sy = ROWS - VR * 0.3; player.y = sy; player.x = pathX(sy) - 3; }   // the generated herd stands by the start
   applyObjects({ fires: 1, start: 1, cows: 1 });
+}
+// The castle again, where the map puts it: its rays, footprint and shade, the fires at its gate, the fog
+// banks round its mound; the ground and the trees are re-laid over it by rebuildMap.
+function edRebuildCastle() {
+  buildWorld();
+  bshadeCastle = bshade.slice();
+}
+// The castle's mound foot (the gate's) to ground point gx, gz, kept inside the world.
+function edMoveCastle(gx, gz) {
+  const C = cathedral, ax = C.ox, ay = C.oy;
+  const dx = Math.max((820 * MS - ax) / MS, Math.min((COLS * CW - 820 * MS - ax) / MS, gx));
+  const dz = Math.max((ay + 160 * MS - ROWS * CH) / (SINP * MS), Math.min((ay - 2150 * MS) / (SINP * MS), gz));
+  edRecord({ map: mapSnapshot() });
+  const [px, pz] = castleOff();
+  MEADOW_MAP.castle = Math.abs(dx) < 0.5 && Math.abs(dz) < 0.5 ? null : [edR1(dx), edR1(dz)];
+  const [nx, nz] = castleOff();
+  if (MEADOW_MAP.fires) for (const f of MEADOW_MAP.fires) if (f[2] > 0) { f[0] = edR1(f[0] + nx - px); f[1] = edR1(f[1] + nz - pz); }   // braziers on its terrace go with it
+  edRebuildCastle(); rebuildMap(); applyObjects({ fires: 1, cows: 1, start: 1 });
 }
 function edChanged() {
   ED.miniKey = '';
@@ -269,6 +289,11 @@ function drawEditor() {
     const r = ED.size * PAINT_RES;
     g.strokeStyle = 'rgba(250,250,250,.75)'; g.setLineDash([5, 4]); g.lineWidth = 1;
     if (edIsBrush(ED.tool) || edIsFog(ED.tool)) { g.beginPath(); g.ellipse(ED.mx, ED.my, r * MS * VZ, r * SINP * MS * VZ, 0, 0, Math.PI * 2); g.stroke(); }
+    else if (ED.tool === 'castle') {   // the castle's whole extent, its gate foot under the cursor
+      const w = 820 * MS * VZ, up = 2150 * MS * VZ, down = 110 * MS * VZ;
+      g.strokeRect(ED.mx - w, ED.my - up, w * 2, up + down);
+      g.beginPath(); g.ellipse(ED.mx, ED.my, 14, 6, 0, 0, Math.PI * 2); g.stroke();
+    }
     else if (ED.tool !== 'select') { g.beginPath(); g.ellipse(ED.mx, ED.my, 10, 4.5, 0, 0, Math.PI * 2); g.stroke(); }
     g.setLineDash([]);
     const t = ED.tool !== 'select' && ED_BRUSHES.concat(ED_FOG, ED_OBJECTS).find(b => b[0] === ED.tool);   // what a click will do
@@ -443,6 +468,7 @@ function edPointer(e) {
       if (o) ED.drag = { gx, gz, sx: e.clientX, sy: e.clientY, moved: false };   // nothing is baked until it really moves
       edSyncUI(); return;
     }
+    if (ED.tool === 'castle') { edMoveCastle(gx, gz); edSyncUI(); return; }
     edPlace(ED.tool, gx, gz); edSyncUI(); return;
   }
   if (e.type === 'pointermove') {

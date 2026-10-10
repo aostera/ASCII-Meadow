@@ -16,7 +16,7 @@ function buildWorld() {
   const C = cathedral;
   if (C.cv) for (let k = 0; k < 16; k++) {
     const rx = (260 + Math.random() * 300) * MS;
-    fogBanks.push({ x: C.ox + (Math.random() * 2 - 1) * 1100 * MS, y: C.oy - (Math.random() * 520 - 60) * MS, rx, ry: rx * (0.28 + Math.random() * 0.12), a: 0.14 + Math.random() * 0.1, sp: (6 + Math.random() * 14) * MS, ph: Math.random() * 6 });
+    fogBanks.push({ x: C.kx + (Math.random() * 2 - 1) * 1100 * MS, y: C.ky - (Math.random() * 520 - 60) * MS, rx, ry: rx * (0.28 + Math.random() * 0.12), a: 0.14 + Math.random() * 0.1, sp: (6 + Math.random() * 14) * MS, ph: Math.random() * 6 });
   }
   for (let k = 0; k < 14; k++) fogs.push({ x: Math.random() * COLS, y: ROWS * 0.25 + Math.random() * ROWS * 0.6, r: 18 + Math.random() * 30, a: 0.5 + Math.random() * 0.5, sp: 0.6 + Math.random() * 1.2 });
 }
