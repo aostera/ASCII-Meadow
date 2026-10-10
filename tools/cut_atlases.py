@@ -83,7 +83,8 @@ def cut(path, nrows, ncols):
 if __name__ == '__main__':
     base, out = sys.argv[1], sys.argv[2]
     spec = {'knight_idle': (5, 10), 'knight_walk': (5, 10), 'knight_run': (5, 10), 'knight_jump': (6, 10),
-            'cow_idle': (8, 6), 'cow_walk': (8, 7), 'cow_run': (8, 7), 'cow_jump': (8, 7)}
+            'cow_idle': (8, 6), 'cow_walk': (8, 7), 'cow_run': (8, 7), 'cow_jump': (8, 7),
+            'cow_eat': (8, 6)}   # cow_eat: run tools/cow/key_black.py on it first (it comes without alpha)
     R = {}
     for name, (nr, nc) in spec.items():
         who = name.split('_')[0]
