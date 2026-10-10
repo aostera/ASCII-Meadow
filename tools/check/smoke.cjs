@@ -196,6 +196,18 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
         const td = await page.evaluate(() => { const L = [...toads.values()]; return { n: L.length, onSpots: L.every(t => t.st !== 'sit' || toadSpot(Math.round(t.y) * COLS + Math.round(t.x))) }; });
         await page.evaluate(() => openEditor());
         check('marsh: toads live on it', td.n > 0 && td.onSpots, JSON.stringify(td));
+        // birds in the tall grass: placed only there, and up they go when the knight walks in
+        {
+          const kb = await page.evaluate(() => [(player.x - camX) * CW * VZ, (player.y + 0.7 - camY) * CH * VZ]);
+          await page.keyboard.press('Digit2'); await page.mouse.move(kb[0] - 120, kb[1] - 60); await page.mouse.down(); await page.mouse.move(kb[0] + 120, kb[1] - 60, { steps: 8 }); await page.mouse.up();
+          await page.mouse.move(kb[0] - 120, kb[1] - 20); await page.mouse.down(); await page.mouse.move(kb[0] + 120, kb[1] - 20, { steps: 8 }); await page.mouse.up(); await step(2);
+          await page.keyboard.press('KeyO'); await page.mouse.click(kb[0], kb[1] - 50); await step(2);
+          const placed = await page.evaluate(() => (MEADOW_MAP.events || []).length);
+          await page.evaluate(() => { closeEditor(); keys.add('w'); }); await step(90); await page.evaluate(() => keys.delete('w'));
+          const flew = await page.evaluate(() => birds.length);
+          await page.evaluate(() => openEditor());
+          check('editor: birds hidden in tall grass fly up when the knight walks in', placed === 1 && flew > 0, JSON.stringify({ placed, flew }));
+        }
       }
       // zoom: out to see more, a tree lands under the cursor at any scale, and the game is back at 100% when the editor closes
       await page.keyboard.press('KeyQ'); await page.keyboard.press('KeyQ'); await step(2);

@@ -5,7 +5,7 @@
 //  - a lightning flash throws a hard shadow away from the strike for as long as the flash lasts.
 // A body in the air casts from where it hangs, so its shadow parts from the feet.
 
-const CONTACT_S = 0.95, FIRE_S = 0.85, BOLT_S = 0.9;
+const CONTACT_S = 0.7, FIRE_S = 0.55, BOLT_S = 0.6;   // dark enough to read, never a black hole
 
 // A tapered capsule A→B in screen px, radius r0 at A and r1 at B, fading by `fade` towards B; ky stretches
 // vertical distances (a patch on the ground is flatter than it is wide). Solid core, soft rim, max-blended.
