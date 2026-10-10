@@ -8,7 +8,7 @@ const [url, out, mode = 'gl', W = '1280', H = '800', mob, scen = 'main'] = proce
   const { ctx, page: p, errs, step, key } = await openGame(b, url, { mode, viewport: { width: +W, height: +H }, mobile: !!mob });
   // only what the game draws is compared: the HUD and the fps line are browser text, whose rasterisation
   // jitters by ±1 between runs under mobile emulation (DPR 3)
-  await p.addStyleTag({ content: '.hud, .stats { visibility: hidden !important; }' });
+  await p.addStyleTag({ content: '.hud, .stats, .ed-open { visibility: hidden !important; }' });
   const shot = async name => { await p.screenshot({ path: `${out}_${name}.png`, timeout: 300000 }); };
   if (scen === 'main') {
   await step(90); await shot('01_start');

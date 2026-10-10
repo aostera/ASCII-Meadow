@@ -5,7 +5,7 @@
 // Crowns are noise-shaped clouds lit from the upper left with dappled light and gaps you can see
 // branches through; bare trees are nets of thin crooked branches. Each variant is baked once.
 const fid = (c, l) => KN0 + FCI[c] * KLV + Math.max(0, Math.min(KLV - 1, l));
-const VARS = [], flora = [];
+const VARS = [], flora = [], LILIES = [];   // LILIES: three pads, then two in flower (bakeLily)
 let tmask = null, FLMAXR = 0;
 const fbm3 = (x, y) => vnoise(x, y) * 0.55 + vnoise(x * 2.1 + 3.7, y * 2.1) * 0.3 + vnoise(x * 4.3, y * 4.3 + 1.3) * 0.15;
 function bakeVariant(type, sd) {
@@ -107,6 +107,37 @@ function bakeVariant(type, sd) {
   return { type, list: Int32Array.from(list), runs: Int16Array.from(runs), hide: Int16Array.from(hide), fw, fh, minY, R, Hc: crown ? -crown.y : K * 0.8, crownH: -minY * fh };
 }
 
+// A lily pad in the same fine dither: a flat leaf seen at a slant, a wedge cut to its middle, a pale rim on
+// the lit edge; in flower, a small cup of pale petals sits on it. Dark, like everything on the marsh.
+function bakeLily(flower, sd) {
+  const rnd = (k) => hash(sd * 31 + k, 977);
+  const K = knightPx(), fd = charDims(player), fw = fd.fcw, fh = fd.fch;
+  const rx = K * (0.13 + rnd(1) * 0.06), ry = rx * 0.45, cut = rnd(2) * 6.283, list = [], runs = [];
+  for (let cy = Math.floor(-ry * 1.1 / fh); cy <= Math.ceil(ry * 1.1 / fh); cy++) {
+    let r0 = 1e9, r1 = -1e9;
+    for (let cx = Math.floor(-rx * 1.1 / fw); cx <= Math.ceil(rx * 1.1 / fw); cx++) {
+      const u = cx * fw / rx, w = cy * fh / ry, r = Math.hypot(u, w);
+      if (r > 1) continue;
+      let da = Math.atan2(w, u) - cut; da = Math.abs(Math.atan2(Math.sin(da), Math.cos(da)));
+      if (da < 0.32 && r > 0.12) continue;                                  // the notch
+      r0 = Math.min(r0, cx); r1 = Math.max(r1, cx);
+      const rim = r > 0.72 && u + w < -0.2, vein = Math.abs(Math.sin(Math.atan2(w, u) * 4)) < 0.12 && r < 0.8;
+      let v = 0.42 + (rim ? 0.3 : 0) - (vein ? 0.14 : 0) - Math.max(0, u + w) * 0.1;   // veins: darker lines
+      v = Math.max(0, Math.min(0.9, v + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.12));
+      // a leaf is solid, not dithered air: dense glyphs, the tone carries the light
+      list.push(cx, cy, fid(rim ? '@' : vein ? ':' : '%', Math.floor(v * 7)), Math.round(Math.min(1, 0.55 + v * 0.6) * 100));
+    }
+    if (r1 >= r0) runs.push(cy, r0, r1 + 1);
+  }
+  if (flower) for (let k = 0; k < 15; k++) {                               // the cup: two rings of pale petals round a brighter heart, up off the leaf
+    const ring = k ? (k < 7 ? 1 : 2) : 0, a = k / (ring === 1 ? 6 : 8) * 6.283 + rnd(5) + ring;
+    const cx = Math.round(Math.cos(a) * ring * 1.1 - rx * 0.1 / fw), cy = Math.round(Math.sin(a) * ring * 0.6 - ry * 0.9 / fh - (ring === 1 ? 1 : 0));
+    list.push(cx, cy, fid(ring ? (ring === 1 ? '#' : '*') : '@', ring === 2 ? 4 : 6), ring === 2 ? 70 : 95);
+  }
+  let minY = 0; for (let k = 1; k < list.length; k += 4) minY = Math.min(minY, list[k]);
+  return { type: 'lily', list: Int32Array.from(list), runs: Int16Array.from(runs), hide: new Int16Array(0), fw, fh, minY, R: rx, Hc: ry, crownH: Math.max(1, -minY * fh) };
+}
+
 // Every variant is baked once into the glyph atlas as a picture, cut into horizontal slices.
 // A tree is then ~14 quads instead of ~1200 glyphs; each slice shifts with the wind by its height.
 const NSL = 14;
@@ -134,6 +165,7 @@ function bakeFloraSprites() {
   for (const it of items) {
     mg.drawImage(it.c, it.px, it.py);
     const v = it.v, hp = it.c.height / NSL, hc = it.ch / NSL;
+    v.whole = sprite(it.px, it.py, it.c.width, it.c.height, it.cw, it.ch, it.ox, it.oy);   // lily pads are drawn in one piece
     v.sl = [];
     for (let j = 0; j < NSL; j++) {
       const top = it.oy + j * hc, mid = -(top + hc / 2);
@@ -155,6 +187,8 @@ function bakeVariants() {
   for (let k = 0; k < 7; k++) VARS.push(bakeVariant('tree', k + 1));
   for (let k = 0; k < 4; k++) VARS.push(bakeVariant('dead', k + 21));
   for (let k = 0; k < 6; k++) VARS.push(bakeVariant('bush', k + 41));
+  LILIES.length = 0;
+  for (let k = 0; k < 5; k++) { const v = bakeLily(k >= 3, k + 81); LILIES.push(v); VARS.push(v); }
   FLMAXR = Math.ceil(Math.max(...VARS.map(v => v.crownH / CH))) + 2;
   bakeFloraSprites();
 }

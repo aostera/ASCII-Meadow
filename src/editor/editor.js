@@ -8,7 +8,7 @@ const ED = {
   undo: [], redo: [], keys: new Set(), mx: -1, my: -1, inView: false,
   ui: null, mini: null, miniKey: '', draftTimer: 0,
 };
-const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
+const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['w', 'Вода', '9'], ['m', 'Болото', 'P'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
 const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['select', 'Выбрать и двигать', 'V']];
 const ED_FOG = [['fogl', 'Лёгкий туман', 'H'], ['fogd', 'Густой туман', 'J'], ['fogc', 'Убрать туман', 'N']];
 const ED_FOGCODE = { fogl: 2, fogd: 3, fogc: 1 };
@@ -218,6 +218,7 @@ function closeEditor() {
   VZ = 1;   // the game is always seen at its own scale
   editing = false; ED.keys.clear(); ED.drag = ED.pan = ED.stroke = null;
   document.body.classList.remove('editing'); ED.ui.root.hidden = true; ED.ui.open.hidden = false;
+  [player.x, player.y] = dryNear(player.x, player.y);   // water painted over the knight: he steps out onto the nearest dry ground
 }
 function edPlayHere() {   // the knight walks on from the middle of the view
   let x = camX + VC / VZ / 2, y = camY + VR / VZ * 0.62;
@@ -289,6 +290,7 @@ function edMiniBase() {   // the whole field, one pixel per few cells, redrawn a
     else if (k === 2) { r = 22; gg = 20; b = 18; }                                        // earth
     else if (k === 5) r = gg = b = 96;                                                     // stones
     else if (k === 7) { r = 150; gg = 144; b = 132; }                                      // trail
+    else if (k === 8) { r = 26; gg = 34; b = 44; }                                         // water
     else { r = 200; gg = 198; b = 190; }                                                   // flowers
     if (fogChunks.size) { const [gx, gz] = cellXZ(x, y), fc = fogCodeAt(gx, gz); if (fc > 1) { const v = fc === 3 ? 0.5 : 0.28; r += (220 - r) * v; gg += (220 - gg) * v; b += (225 - b) * v; } }   // painted fog
     const o = (py * w + px) * 4; d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255;
@@ -333,11 +335,12 @@ function edSyncUI() {
   ED.ui.undo.disabled = !ED.undo.length; ED.ui.redo.disabled = !ED.redo.length;
   ED.ui.zoomPct.firstChild.textContent = Math.round(VZ * 100) + '%'; ED.ui.zoomOut.disabled = VZ <= ED_ZOOMS[0]; ED.ui.zoomIn.disabled = VZ >= ED_ZOOMS[ED_ZOOMS.length - 1];
 }
+// «Сохранить»: the map as a file. It goes to the repository as src/data/map.js, and the site picks it up.
 function edSave() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([mapFileText()], { type: 'text/javascript' })); a.download = 'map.js';
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  edStatus('map.js скачан. Положите его в src/data/ репозитория — сайт обновится сам.');
+  edStatus('map.js скачан. Отдайте его Claude — он положит карту в игру, и сайт обновится.');
 }
 function edBuildUI() {
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
@@ -357,7 +360,7 @@ function edBuildUI() {
   const acts = el('div', 'ed-acts'); const undo = btn('Отменить', '', { act: 'undo' }), redo = btn('Повторить', '', { act: 'redo' });
   const file = el('input'); file.type = 'file'; file.accept = '.js,.json,text/javascript,application/json'; file.hidden = true;
   acts.append(undo, redo, btn('Сохранить', '', { act: 'save' }), btn('Открыть…', '', { act: 'open' }), btn('Сбросить', '', { act: 'reset' }), btn('Играть отсюда', '', { act: 'play' }), file);
-  const help = el('p', 'ed-help', 'Камера: WASD или стрелки (Shift — быстрее), правая кнопка или пробел — тащить, клик по карте — перейти. Масштаб: Ctrl + колесо или щипок, Q и E, R — 100%. Колесо — размер кисти или вариант. Delete — удалить выбранное. Ctrl Z / Ctrl Shift Z — отменить и повторить, Ctrl S — сохранить.');
+  const help = el('p', 'ed-help', 'Камера: WASD или стрелки (Shift — быстрее), правая кнопка или пробел — тащить, клик по карте — перейти. Масштаб: Ctrl + колесо или щипок, Q и E, R — 100%. Колесо — размер кисти или вариант. Delete — удалить выбранное. Ctrl Z / Ctrl Shift Z — отменить и повторить, Ctrl S — сохранить на сайт (спросит пароль редактора один раз).');
   const status = el('p', 'ed-status');
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';

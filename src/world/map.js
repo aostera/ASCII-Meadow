@@ -3,7 +3,9 @@
 // follows the window, these units do not, so a map lands in the same place on every screen.
 // Fields left null are generated as before; `paint` holds brush strokes over the generated ground.
 
-const EDIT = /[?&]edit(=|&|$)/.test(location.search);   // the map editor (editor/editor.js) exists only with ?edit
+// The map editor (editor/editor.js) is open to everyone while the world is being built: the button and M.
+// When the project is done it goes behind a secret combination again; ?edit=0 turns it off for a page.
+const EDIT = !/[?&]edit=0(&|$)/.test(location.search);
 let editing = false;        // the editor is open: the knight stands still, the camera is the editor's
 let bshadeCastle = null, kindBase = null;   // edit mode only: the castle's shade and the ground before the trees,
                                             // so trees can move without re-casting the castle or regenerating the field
@@ -14,7 +16,7 @@ const mapToCell = (gx, gz) => [(gx * MS + cathedral.ox) / CW, (cathedral.oy - gz
 // ---------- paint: brush strokes over the generated ground ----------
 // A sparse grid of PAINT_RES-unit cells, kept in PCH×PCH chunks; a chunk is stored run-length coded.
 const PAINT_RES = 4, PCH = 32;
-const PCODES = '.gtserfpx';   // none, grass, tall grass, short grass, earth, stones (r), flowers (f), trail, empty ground: paintCell's codes 0-8
+const PCODES = '.gtserfpxwm';   // none, grass, tall grass, short grass, earth, stones (r), flowers (f), trail, empty ground, water, marsh: paintCell's codes 0-10
 const paintChunks = new Map();   // "cx,cz" → Uint8Array(PCH * PCH) of PCODES indices
 function rleEncode(a, codes = PCODES) {
   let s = '';
@@ -72,6 +74,16 @@ function paintCell(i, x, y, c) {
   else if (c === 5) kind[i] = s > 0.45 ? 5 : 2;                                        // stones on earth
   else if (c === 7) { kind[i] = 7; height[i] = Math.max(0, Math.min(1, 0.55 + 0.5 * vnoise(x * 0.11, y * 0.17))); segs[i] = 0; }   // trail
   else if (c === 8) { kind[i] = 0; segs[i] = 0; }                                       // nothing: bare dark ground
+  else if (c === 9) { kind[i] = 8; segs[i] = 0; wet[i] = 1; }                            // water
+  else if (c === 10) {                                                                  // marsh: water among tussocks and reeds
+    wet[i] = 1;
+    if (s < 0.16) { groundCell(x, y, i); wet[i] = 1; kind[i] = 1; height[i] = Math.max(height[i], 0.7); segs[i] = 3; }
+    else if (s < 0.3) { groundCell(x, y, i); wet[i] = 1; kind[i] = 1; height[i] = Math.min(height[i], 0.5); segs[i] = 1; }
+    else {   // open water, and in its still patches lily pads (segs 1 a pad, 3 a pad in flower)
+      kind[i] = 8; segs[i] = 0;
+      if (s > 0.3 && s < 0.6 && vnoise(x * 0.23 + 3, y * 0.31 - 7) > 0.56 && (x + y * 3) % 4 === 0 && y % 2 === 0) segs[i] = s < 0.36 ? 3 : 1;   // spaced: each pad spans a few cells
+    }
+  }
 }
 const trailOn = () => MEADOW_MAP.trail !== false;   // the generated trail, unless the map turned it off
 // Ground point of a cell's centre, and its paint code there.

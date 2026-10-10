@@ -58,7 +58,9 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       await page.mouse.move(300, 300); await step(2); await page.mouse.move(600, 320); await step(4);
       check('mouse brushes the grass', (await state(page)).mouse === true);
       await page.keyboard.press('KeyM'); await step(2);
-      check('M does nothing without ?edit', await page.evaluate(() => !editing && !document.querySelector('.ed')));
+      const mOpen = await page.evaluate(() => editing && !document.querySelector('.ed').hidden);
+      await page.keyboard.press('KeyM'); await step(2);
+      check('M opens the editor on the plain page and closes it again', mOpen && await page.evaluate(() => !editing));
       if (!quick) {
         // cows: the same herd for a while, then a running knight among them
         const seen = new Set(), phases = new Set();
@@ -124,12 +126,12 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       const re = realErrors(errs); check('no console errors (mobile)', re.length === 0, re.slice(0, 3).join(' | '));
       await ctx.close();
     }
-    // ---- map editor (?edit): open, paint, place, undo, save; the saved file builds the same map, at any size
+    // ---- map editor (button or M): open, paint, place, undo, save; the saved file builds the same map, at any size
     {
       const { ctx, page, errs, step } = await openGame(b, url + (url.includes('?') ? '&' : '?') + 'edit', { mode: 'gl', viewport: { width: 1100, height: 700 } });
       const count = () => page.evaluate(() => { let n = 0; for (let i = 0; i < N; i++) if (kind[i] === 2) n++; return { earth: n, flora: flora.length, cows: cows.map(c => toModelXZ(c.home[0], c.home[1]).map(Math.round)) }; });
       await step(20); await page.keyboard.press('KeyM'); await step(2);
-      check('editor: ?edit and M open the panel', await page.evaluate(() => editing && !document.querySelector('.ed').hidden));
+      check('editor: M opens the panel', await page.evaluate(() => editing && !document.querySelector('.ed').hidden));
       // selecting a generated tree changes nothing; stones and flowers paint what they say
       const fp = await page.evaluate(() => { const f = flora.find(f => f.br > VY0 + 12 && f.br < VY1 - 8 && f.x > VX0 + 12 && f.x < VX0 + VC * 0.6); return f ? [(f.x - camX) * CW, (f.br - camY) * CH - 4] : null; });
       if (fp) { await page.keyboard.press('KeyV'); await page.mouse.click(fp[0], fp[1]); await step(1); }
@@ -160,9 +162,9 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       const back = await page.evaluate(() => MEADOW_MAP.flora === null && MEADOW_MAP.cows === null && MEADOW_MAP.fires === null && cows.length === 3);
       await page.keyboard.press('Control+Shift+KeyZ'); await page.keyboard.press('Control+Shift+KeyZ'); await step(1);
       check('editor: undoing the first placement brings back the generated world', back && (await page.evaluate(() => flora.length)) === c0.flora + 1);
-      const [dl] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+KeyS')]);
+      const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=save]')]);
       const saved = fs.readFileSync(await dl.path(), 'utf8'), c3 = await count();
-      check('editor: «Сохранить» writes a map file', /const MEADOW_MAP = \{/.test(saved) && !/<\/script/i.test(saved), saved.length + ' bytes');
+      check('editor: «Сохранить» downloads the map file', /const MEADOW_MAP = \{/.test(saved) && !/<\/script/i.test(saved), saved.length + ' bytes');
       await shot(page, 'editor');
       // fog: dense fog where it is brushed, none where it is cleared
       const fogMean = (x0, y0, x1, y1) => page.evaluate(([x0, y0, x1, y1]) => { let s = 0, n = 0; for (let j = 0; j < FG.h; j++) for (let i = 0; i < FG.w; i++) { const x = (i + 0.5) / FG.w * W, y = (j + 0.5) / FG.h * H; if (x >= x0 && x <= x1 && y >= y0 && y <= y1) { s += FG.d[j * FG.w + i]; n++; } } return n ? s / n : 0; }, [x0, y0, x1, y1]);
@@ -172,6 +174,23 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       await page.keyboard.press('KeyN'); await page.mouse.move(120, 170); await page.mouse.down(); await page.mouse.move(360, 170, { steps: 8 }); await page.mouse.up(); await step(4);
       const fg2 = await fogMean(150, 120, 330, 220);
       check('editor: fog brushed in and cleared away', fg1 > Math.max(0.6, fg0 + 0.2) && fg2 < 0.08, `fog ${fg0.toFixed(2)} → dense ${fg1.toFixed(2)} → cleared ${fg2.toFixed(2)}`);
+      // water: a band painted across the knight's way north stops him at its edge
+      {
+        const kp = await page.evaluate(() => [(player.x - camX) * CW, (player.y + 0.7 - camY) * CH]);
+        await page.keyboard.press('Digit9'); await page.mouse.move(kp[0] - 300, kp[1] - 120); await page.mouse.down(); await page.mouse.move(kp[0] + 300, kp[1] - 120, { steps: 12 }); await page.mouse.up(); await step(2);
+        await page.evaluate(() => { closeEditor(); keys.add('w'); }); await step(200); await page.evaluate(() => { keys.delete('w'); openEditor(); });
+        const wr = await page.evaluate(() => { const cx = Math.round(player.x), cy = Math.round(player.y + 0.2); return { onWet: !!wet[cy * COLS + cx], ahead: !!wet[(cy - 1) * COLS + cx] || !!wet[(cy - 2) * COLS + cx], water: kind.reduce((n, k) => n + (k === 8), 0) }; });
+        check('editor: water stops the knight at its edge', wr.water > 100 && !wr.onWet && wr.ahead, JSON.stringify(wr));
+        // a start painted over with water: he spawns on the nearest dry ground, never inside it
+        const kq = await page.evaluate(() => [(player.x - camX) * CW * VZ, (player.y + 0.7 - camY) * CH * VZ]);
+        await page.keyboard.press('Digit9'); await page.mouse.move(kq[0] - 60, kq[1]); await page.mouse.down(); await page.mouse.move(kq[0] + 60, kq[1], { steps: 6 }); await page.mouse.up(); await step(2);
+        const sp = await page.evaluate(() => {
+          const wetAt = (x, y) => !!wet[Math.round(y + 0.2) * COLS + Math.round(x)], x0 = player.x, y0 = player.y, before = wetAt(x0, y0);
+          MEADOW_MAP.start = toModelXZ(x0, y0); placeEntities();
+          return { paintedOver: before, onWet: wetAt(player.x, player.y), moved: +Math.hypot(player.x - x0, (player.y - y0) * 2).toFixed(1) };
+        });
+        check('editor: a start under water moves to dry ground nearby', sp.paintedOver && !sp.onWet && sp.moved < 40, JSON.stringify(sp));
+      }
       // zoom: out to see more, a tree lands under the cursor at any scale, and the game is back at 100% when the editor closes
       await page.keyboard.press('KeyQ'); await page.keyboard.press('KeyQ'); await step(2);
       await page.keyboard.press('KeyT'); await page.mouse.click(500, 300); await step(2);
@@ -194,7 +213,7 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       if (!/\.html?(\?|$)/.test(url) || /index\.html/.test(url)) for (const [w, h] of [[1100, 700], [800, 600]]) {
         const g = await openGame(b, url, { mode: 'gl', viewport: { width: w, height: h }, files: { 'src/data/map\\.js$': saved } });
         await g.step(5);
-        const r = await g.page.evaluate(() => { let n = 0; for (let i = 0; i < N; i++) if (kind[i] === 2) n++; return { earth: n, flora: flora.length, cows: cows.map(c => toModelXZ(c.home[0], c.home[1]).map(Math.round)), editor: !!document.querySelector('.ed') }; });
+        const r = await g.page.evaluate(() => { let n = 0; for (let i = 0; i < N; i++) if (kind[i] === 2) n++; return { earth: n, flora: flora.length, cows: cows.map(c => toModelXZ(c.home[0], c.home[1]).map(Math.round)), editor: editing }; });
         const sameCows = r.cows.length === 4 && r.cows.every((p, k) => Math.abs(p[0] - c3.cows[k][0]) <= 1 && Math.abs(p[1] - c3.cows[k][1]) <= 1);
         if (w === 1100) check('saved map loads back the same', r.earth === c3.earth && r.flora === c3.flora && sameCows && !r.editor, JSON.stringify({ earth: r.earth, flora: r.flora }));
         else check('saved map stays put on another screen size', sameCows && r.flora > c3.flora * 0.8, `cows ${JSON.stringify(r.cows)}, flora ${r.flora}`);

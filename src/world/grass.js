@@ -93,7 +93,7 @@ function updateGrass(dt) {
     const s1 = Math.sin(ry), c1 = Math.cos(ry), s2 = Math.sin(-2 * ry), c2 = Math.cos(-2 * ry), s3 = Math.sin(-rf), c3 = Math.cos(-rf);
     for (let x = VX0; x <= VX1; x++) {
       const i = y * COLS + x, kd = kind[i];
-      if (kd === 0 || kd === 2 || kd === 5 || kd === 7) continue;
+      if (kd === 0 || kd === 2 || kd === 5 || kd === 7 || kd === 8) continue;
       const h = height[i], o = x * 6;
       const swell = (TA[o] * c1 + TA[o + 1] * s1) * 0.6 + (TA[o + 2] * c2 + TA[o + 3] * s2) * 0.25;
       const front = TA[o + 4] * c3 + TA[o + 5] * s3;

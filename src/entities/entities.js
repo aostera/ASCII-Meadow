@@ -12,9 +12,20 @@ const ents = [player, ...npcs];
 function placeEntities() {
   if (MEADOW_MAP.start) [player.x, player.y] = mapToCell(MEADOW_MAP.start[0], MEADOW_MAP.start[1]);
   else { player.y = ROWS - VR * 0.3; player.x = pathX(player.y) - 3; }
+  [player.x, player.y] = dryNear(player.x, player.y);
   player.dir = 'up'; player.d8 = 4;
   placeCows();
   updateCamera(0, true);
+}
+// The nearest point out of water and marsh: a stroke of either may cover the start, and he cannot walk out.
+function dryNear(x, y) {
+  const dry = (px, py) => { const i = Math.round(py + 0.2) * COLS + Math.round(px); return px >= 1 && py >= 1 && px < COLS - 1 && py < ROWS - 1 && !wet[i]; };
+  if (dry(x, y)) return [x, y];
+  for (let r = 1; r < 120; r++) for (let k = 0, n = 8 * r; k < n; k++) {   // rings outwards, a cell row is ~2 columns tall
+    const a = k / n * 6.2832, px = x + Math.cos(a) * r * 2, py = y + Math.sin(a) * r;
+    if (dry(px, py)) return [px, py];
+  }
+  return [x, y];
 }
 function charDims(e) {
   if (e && (e.cls === 'knight' || e.cls === 'cow')) { // ~16% of the screen tall, in fine grain
