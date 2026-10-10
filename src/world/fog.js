@@ -29,7 +29,8 @@ function updateFog() {
     for (const b of braziers) { const dx = wx - b.x * CW, dy = (wy - ((b.y + 0.7) * CH - b.lift)) * 1.6, r = 150 * Math.min(MS, 1.4); d *= 1 - 0.55 * Math.exp(-(dx * dx + dy * dy) / (r * r)); }  // the heat thins the fog
     const k = j * fw + i;
     FG.d[k] = d;
-    const c = 64 + d * 26, o = k * 4;          // dark, wet grey: it smothers the light rather than glowing
+    const gc = Math.min(COLS - 1, Math.max(0, (wx / CW) | 0)) + Math.min(ROWS - 1, Math.max(0, (wy / CH) | 0)) * COLS;
+    const c = (64 + d * 26) * (1 - 0.8 * shadow[gc]), o = k * 4;   // dark, wet grey: it smothers the light rather than glowing; in a body's shadow it is unlit
     px[o] = c; px[o + 1] = c; px[o + 2] = c; px[o + 3] = Math.min(150, d * 105 + d * d * 50);
   }
   FG.cv.getContext('2d').putImageData(FG.img, 0, 0);
@@ -43,7 +44,8 @@ function castleFogGlyphs() {  // grain of the fog, in the glyph batch on top of 
     if (d < 0.12) continue;
     const h = hash(x + ((t * 3) | 0), y);   // reshuffles a few times a second, so the grain seethes
     if (h > d * 1.3) continue;
-    blit(FOGCH[(h * 47 | 0) % FOGCH.length], C_WHITE, px + Math.sin(t * 0.7 + y * 0.3) * 3, py, Math.min(0.5, 0.08 + d * 0.4 + flash * 0.2));
+    const sh = shadow[y * COLS + x];   // the ground fog lying in a body's shadow is unlit too
+    blit(FOGCH[(h * 47 | 0) % FOGCH.length], C_WHITE, px + Math.sin(t * 0.7 + y * 0.3) * 3, py, Math.min(0.5, 0.08 + d * 0.4 + flash * 0.2) * (1 - 0.8 * sh));
   }
 }
 function drawFogField() {  // screen space, on the overlay
