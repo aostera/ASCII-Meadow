@@ -343,8 +343,8 @@ function buildCathedral() {
   // two small fires on the terrace, either side of the gate
   braziers.length = 0;
   for (const sx of [-1, 1]) braziers.push({ isFire: true, x: (ox + sx * 108 * MS) / CW, y: (oy - 66 * SINP * MS) / CH - 0.7, lift: 120 * COSP * MS, parts: [], seed: sx });
-  // and a campfire by the trail where he starts, so the firelight is a few steps away
-  { const sy = ROWS - VR * 0.3 - 5; braziers.push({ isFire: true, ground: true, x: pathX(sy) + 16, y: sy - 0.7, lift: 0, parts: [], seed: 3 }); }
+  // and ground fires: the map's, or a campfire by the trail where he starts (world/map.js)
+  placeGroundFires();
   // footprint (collision), ground shadows and a little contact darkness
   bmask.fill(0); bshade.fill(0);
   const fy0 = Math.max(0, Math.floor((oy - 1060 * SINP * MS) / CH)), fy1 = Math.min(ROWS - 1, Math.ceil((oy + 120 * SINP * MS) / CH));

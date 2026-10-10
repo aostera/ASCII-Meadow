@@ -57,6 +57,8 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       check('G sends a gust ring', sg.rings > 0, `rings ${sg.rings}`);
       await page.mouse.move(300, 300); await step(2); await page.mouse.move(600, 320); await step(4);
       check('mouse brushes the grass', (await state(page)).mouse === true);
+      await page.keyboard.press('KeyM'); await step(2);
+      check('M does nothing without ?edit', await page.evaluate(() => !editing && !document.querySelector('.ed')));
       if (!quick) {
         // cows: the same herd for a while, then a running knight among them
         const seen = new Set(), phases = new Set();
@@ -121,6 +123,44 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       await shot(page, 'mobile');
       const re = realErrors(errs); check('no console errors (mobile)', re.length === 0, re.slice(0, 3).join(' | '));
       await ctx.close();
+    }
+    // ---- map editor (?edit): open, paint, place, undo, save; the saved file builds the same map, at any size
+    {
+      const { ctx, page, errs, step } = await openGame(b, url + (url.includes('?') ? '&' : '?') + 'edit', { mode: 'gl', viewport: { width: 1100, height: 700 } });
+      const count = () => page.evaluate(() => { let n = 0; for (let i = 0; i < N; i++) if (kind[i] === 2) n++; return { earth: n, flora: flora.length, cows: cows.map(c => toModelXZ(c.home[0], c.home[1]).map(Math.round)) }; });
+      await step(20); await page.keyboard.press('KeyM'); await step(2);
+      check('editor: ?edit and M open the panel', await page.evaluate(() => editing && !document.querySelector('.ed').hidden));
+      const c0 = await count();
+      await page.keyboard.press('Digit4'); await page.mouse.move(300, 350); await page.mouse.down();
+      for (let x = 300; x <= 600; x += 25) { await page.mouse.move(x, 350); await step(1); }
+      await page.mouse.up(); await step(2);
+      const c1 = await count();
+      check('editor: an earth stroke paints the ground', c1.earth > c0.earth + 200, `${c0.earth} → ${c1.earth} earth cells`);
+      await page.keyboard.press('KeyT'); await page.mouse.click(700, 300); await step(2);
+      await page.keyboard.press('KeyC'); await page.mouse.click(650, 450); await step(2);
+      const c2 = await count();
+      check('editor: a tree and a cow placed', c2.flora === c0.flora + 1 && c2.cows.length === 4, `flora ${c0.flora} → ${c2.flora}, cows ${c2.cows.length}`);
+      await page.keyboard.press('Control+KeyZ'); await step(1);
+      const undone = await page.evaluate(() => cows.length);
+      await page.keyboard.press('Control+Shift+KeyZ'); await step(1);
+      check('editor: undo and redo', undone === 3 && (await page.evaluate(() => cows.length)) === 4);
+      const [dl] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+KeyS')]);
+      const saved = fs.readFileSync(await dl.path(), 'utf8'), c3 = await count();
+      check('editor: «Сохранить» writes a map file', /const MEADOW_MAP = \{/.test(saved) && !/<\/script/i.test(saved), saved.length + ' bytes');
+      await shot(page, 'editor');
+      const re = realErrors(errs); check('no console errors (editor)', re.length === 0, re.slice(0, 3).join(' | '));
+      await ctx.close();
+      // the bundle inlines its map: the reload needs the page that loads src/data/map.js
+      if (!/\.html?(\?|$)/.test(url) || /index\.html/.test(url)) for (const [w, h] of [[1100, 700], [800, 600]]) {
+        const g = await openGame(b, url, { mode: 'gl', viewport: { width: w, height: h }, files: { 'src/data/map\\.js$': saved } });
+        await g.step(5);
+        const r = await g.page.evaluate(() => { let n = 0; for (let i = 0; i < N; i++) if (kind[i] === 2) n++; return { earth: n, flora: flora.length, cows: cows.map(c => toModelXZ(c.home[0], c.home[1]).map(Math.round)), editor: !!document.querySelector('.ed') }; });
+        const sameCows = r.cows.length === 4 && r.cows.every((p, k) => Math.abs(p[0] - c3.cows[k][0]) <= 1 && Math.abs(p[1] - c3.cows[k][1]) <= 1);
+        if (w === 1100) check('saved map loads back the same', r.earth === c3.earth && r.flora === c3.flora && sameCows && !r.editor, JSON.stringify({ earth: r.earth, flora: r.flora }));
+        else check('saved map stays put on another screen size', sameCows && r.flora > c3.flora * 0.8, `cows ${JSON.stringify(r.cows)}, flora ${r.flora}`);
+        const re2 = realErrors(g.errs); if (re2.length) check('no console errors (saved map)', false, re2.slice(0, 3).join(' | '));
+        await g.ctx.close();
+      }
     }
     // ---- zero-size start (panels open at 0x0 and grow): real timing, no deterministic clock
     {

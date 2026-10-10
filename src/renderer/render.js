@@ -127,5 +127,6 @@ function render() {
   ctx.fillStyle = render.vg; ctx.fillRect(0, 0, W, H);
   if (flash > 0.02) { ctx.fillStyle = `rgba(250,250,250,${flash * 0.05})`; ctx.fillRect(0, 0, W, H); }
   drawPrompt();
+  if (editing) drawEditor();   // editor/editor.js: brush, markers, selection, over the fog and vignette
   if (GL.ok) GL.flush(camX * CW, camY * CH, castleDraw); else flush2D(camX * CW, camY * CH, castleDraw);
 }

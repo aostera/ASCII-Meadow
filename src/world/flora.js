@@ -145,33 +145,54 @@ function bakeFloraSprites() {
   if (GL.ok) GL.upload();
 }
 function buildFlora() {
-  VARS.length = 0; flora.length = 0;
+  bakeVariants();
+  if (EDIT) { bshadeCastle = bshade.slice(); kindBase = kind.slice(); }   // the ground before the trees: the editor re-lays them over it
+  placeFlora();
+}
+// The variants, baked once per window size: pictures in the atlas, cut into slices.
+function bakeVariants() {
+  VARS.length = 0;
   for (let k = 0; k < 7; k++) VARS.push(bakeVariant('tree', k + 1));
   for (let k = 0; k < 4; k++) VARS.push(bakeVariant('dead', k + 21));
   for (let k = 0; k < 6; k++) VARS.push(bakeVariant('bush', k + 41));
-  const trees = VARS.filter(v => v.type === 'tree'), dead = VARS.filter(v => v.type === 'dead'), bush = VARS.filter(v => v.type === 'bush');
+  FLMAXR = Math.ceil(Math.max(...VARS.map(v => v.crownH / CH))) + 2;
+  bakeFloraSprites();
+}
+const variantsOf = type => VARS.filter(v => v.type === type);
+// Where the plants stand: from the edited map when it lists them, otherwise generated. Then each plant
+// hides the grass under its crown, blocks the way with its trunk and shades the ground.
+function placeFlora() {
+  flora.length = 0;
+  const trees = variantsOf('tree'), dead = variantsOf('dead'), bush = variantsOf('bush');
   tmask = new Uint8Array(N);
-  const K = knightPx(), C = cathedral;
-  const gx = K * 0.8 / CW, gy = K * 0.55 / CH;           // placement grid, in cells
-  const startY = ROWS - VR * 0.3;
-  const pathNear = (x, y, r) => { for (let dy = -2; dy <= 2; dy++) for (let dx = -r; dx <= r; dx += 2) { const i = (Math.round(y) + dy) * COLS + Math.round(x) + dx; if (i >= 0 && i < N && (kind[i] === 7 || bmask[i])) return true; } return false; };
-  for (let j = 2; j * gy < ROWS - 2; j++) for (let i = 0; i * gx < COLS; i++) {
-    const x = (i + hash(i, j * 3) * 0.8 + 0.1) * gx, y = (j + hash(i * 5, j) * 0.8 + 0.1) * gy;
-    if (x < 3 || x > COLS - 4 || y > ROWS - 2) continue;
-    const forest = vnoise(x * 0.013 + 3, y * 0.021) * 0.75 + vnoise(x * 0.05, y * 0.07) * 0.25, r = hash(i * 17, j * 29);
-    const px = x * CW, py = y * CH, v0R = K * 0.9;
-    if (C.cv && py < C.oy + 30 * MS && px > C.cx0 * CW - K * 0.6 && px < (C.cx0 + C.BW) * CW + K * 0.6) continue; // never behind the castle
-    if (C.cv && Math.abs(px - C.ox) < 420 * MS + v0R && py < C.oy + 520 * SINP * MS + v0R && py > C.oy - 200 * MS) continue;  // a clear forecourt before the stair
-    if (Math.abs(y - startY) < 18 && Math.abs(x - pathX(y)) < 30) continue;
-    let v = null;
-    if (forest > 0.52 && r < (forest - 0.4) * 1.35) v = r < 0.16 ? dead[(r * 97 | 0) % dead.length] : trees[(r * 131 | 0) % trees.length];
-    else if (r < 0.12 + forest * 0.25) v = bush[(r * 211 | 0) % bush.length];
-    if (!v) continue;
-    if (pathNear(x, y, Math.ceil((v.type === 'bush' ? v.R * 0.7 : v.R * 0.45) / CW))) continue;
-    flora.push({ isFlora: true, v, x, y: Math.floor(y) - 0.7, br: Math.floor(y), ph: hash(i, j) * 6.28, rust: 0 });
+  if (MEADOW_MAP.flora) MEADOW_MAP.flora.forEach(([type, k, gx, gz], mi) => {
+    const set = type === 'dead' ? dead : type === 'bush' ? bush : trees, v = set[Math.max(0, Math.min(set.length - 1, k | 0))];
+    const [x, y] = mapToCell(gx, gz), br = Math.round(y + 0.7);
+    if (x < 3 || x > COLS - 4 || br < 2 || br > ROWS - 2) return;
+    flora.push({ isFlora: true, v, x, y: br - 0.7, br, ph: hash(Math.round(gx), Math.round(gz)) * 6.28, rust: 0, mi });
+  });
+  else {   // generated: a jittered grid, thick where the forest noise is high
+    const K = knightPx(), C = cathedral;
+    const gx = K * 0.8 / CW, gy = K * 0.55 / CH;           // placement grid, in cells
+    const startY = ROWS - VR * 0.3;
+    const pathNear = (x, y, r) => { for (let dy = -2; dy <= 2; dy++) for (let dx = -r; dx <= r; dx += 2) { const i = (Math.round(y) + dy) * COLS + Math.round(x) + dx; if (i >= 0 && i < N && (kind[i] === 7 || bmask[i])) return true; } return false; };
+    for (let j = 2; j * gy < ROWS - 2; j++) for (let i = 0; i * gx < COLS; i++) {
+      const x = (i + hash(i, j * 3) * 0.8 + 0.1) * gx, y = (j + hash(i * 5, j) * 0.8 + 0.1) * gy;
+      if (x < 3 || x > COLS - 4 || y > ROWS - 2) continue;
+      const forest = vnoise(x * 0.013 + 3, y * 0.021) * 0.75 + vnoise(x * 0.05, y * 0.07) * 0.25, r = hash(i * 17, j * 29);
+      const px = x * CW, py = y * CH, v0R = K * 0.9;
+      if (C.cv && py < C.oy + 30 * MS && px > C.cx0 * CW - K * 0.6 && px < (C.cx0 + C.BW) * CW + K * 0.6) continue; // never behind the castle
+      if (C.cv && Math.abs(px - C.ox) < 420 * MS + v0R && py < C.oy + 520 * SINP * MS + v0R && py > C.oy - 200 * MS) continue;  // a clear forecourt before the stair
+      if (Math.abs(y - startY) < 18 && Math.abs(x - pathX(y)) < 30) continue;
+      let v = null;
+      if (forest > 0.52 && r < (forest - 0.4) * 1.35) v = r < 0.16 ? dead[(r * 97 | 0) % dead.length] : trees[(r * 131 | 0) % trees.length];
+      else if (r < 0.12 + forest * 0.25) v = bush[(r * 211 | 0) % bush.length];
+      if (!v) continue;
+      if (pathNear(x, y, Math.ceil((v.type === 'bush' ? v.R * 0.7 : v.R * 0.45) / CW))) continue;
+      flora.push({ isFlora: true, v, x, y: Math.floor(y) - 0.7, br: Math.floor(y), ph: hash(i, j) * 6.28, rust: 0 });
+    }
   }
   flora.sort((a, b) => a.y - b.y);
-  FLMAXR = Math.ceil(Math.max(...VARS.map(v => v.crownH / CH))) + 2;
   for (const f of flora) {
     const v = f.v, bx = Math.round(f.x), br = f.br;
     for (let k = 0; k < v.hide.length; k += 2) { const cx = bx + v.hide[k], cy = br + v.hide[k + 1]; if (cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS) kind[cy * COLS + cx] = 0; }
@@ -185,7 +206,6 @@ function buildFlora() {
     }
   }
   build.flora = flora.length;
-  bakeFloraSprites();
 }
 
 function visibleFlora(out) {

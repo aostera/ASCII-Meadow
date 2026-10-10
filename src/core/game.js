@@ -6,6 +6,7 @@ function simulate(dt) {
   updateNpcs(dt);             // entities/entities.js
   updateEntityTimers(dt);     // entities/entities.js
 
+  if (editing) updateEditor(dt);   // editor/editor.js
   updateCamera(dt);           // core/camera.js
   applyGrassForces(dt);       // world/grass.js
   updateGusts(dt);            // world/wind.js

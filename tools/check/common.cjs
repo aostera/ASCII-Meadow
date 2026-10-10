@@ -30,9 +30,11 @@ function deterministic(mode) {
 
 // Opens the game in a fresh context. Returns { ctx, page, errs, step, key, ready }.
 // errs collects page errors and console errors/warnings (font loading failures are expected when blocked).
-async function openGame(browser, url, { mode = 'gl', viewport = { width: 1280, height: 800 }, mobile = false, blockFonts = true, det = true } = {}) {
+// files: { regexp source: body } served in place of the page's own (e.g. a saved map as src/data/map.js)
+async function openGame(browser, url, { mode = 'gl', viewport = { width: 1280, height: 800 }, mobile = false, blockFonts = true, det = true, files = {} } = {}) {
   const ctx = await browser.newContext(mobile ? { ...devices['iPhone 13'], hasTouch: true } : { viewport });
   if (blockFonts) await ctx.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+  for (const [re, body] of Object.entries(files)) await ctx.route(new RegExp(re), r => r.fulfill({ body, contentType: 'text/javascript' }));
   const page = await ctx.newPage();
   const errs = [];
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));

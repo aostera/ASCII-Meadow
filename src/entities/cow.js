@@ -87,13 +87,14 @@ function inCow(c, x, y, grow) {
 function placeCows() {
   for (let i = ents.length - 1; i >= 0; i--) if (ents[i].cls === 'cow') ents.splice(i, 1);
   cows.length = 0;
-  for (const [ox, oy] of [[34, -16], [-40, -30], [16, -54]]) {   // a small herd near the start
-    let x = player.x + ox, y = player.y + oy;
+  // the map's herd, or a small one near the start
+  const spots = MEADOW_MAP.cows ? MEADOW_MAP.cows.map(([gx, gz]) => mapToCell(gx, gz)) : [[34, -16], [-40, -30], [16, -54]].map(([ox, oy]) => [player.x + ox, player.y + oy]);
+  spots.forEach(([x, y], mi) => {
     for (let k = 0; k < 20 && blocked(x, y, null); k++) { x += 3; y -= 1; }
     const c = mk('cow', 'cow', [236, 236, 236]);
-    Object.assign(c, { seed: Math.random() * 6, x, y, home: [x, y], state: 'idle', at: 0, st: 1 + Math.random() * 3, d8: (Math.random() * 8) | 0 });
+    Object.assign(c, { seed: Math.random() * 6, x, y, home: [x, y], state: 'idle', at: 0, st: 1 + Math.random() * 3, d8: (Math.random() * 8) | 0, mi });
     cows.push(c); ents.push(c);
-  }
+  });
 }
 function updateCows(dt) {
   for (const c of cows) {

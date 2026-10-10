@@ -17,3 +17,32 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .hud p { margin: 0; font: 400 12px/1.4 var(--ui); color: var(--dim); }
 .hud kbd { font-family: inherit; color: var(--ink); }
 .stats { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; text-align: right; pointer-events: none; line-height: 1.5; white-space: pre; }
+
+/* Map editor (only with ?edit): a panel on the right in the HUD's look, and a button to open it. */
+[hidden] { display: none !important; }
+.ed-open { position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding: 8px 10px; background: var(--hud); border: 1px solid var(--line); color: var(--ink); font: 500 12px/1 var(--ui); cursor: pointer; }
+.ed-open:hover { border-color: #3a3a3a; }
+.ed { box-sizing: border-box; position: fixed; right: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); max-height: calc(100vh - 32px); width: 276px; overflow-y: auto; padding: 12px; background: rgba(12, 12, 12, .9); border: 1px solid var(--line); display: grid; align-content: start; gap: 12px; font: 400 12px/1.4 var(--ui); color: var(--dim); user-select: none; touch-action: auto; }
+.ed h2 { margin: 0; font: 500 14px/1.2 var(--ui); color: var(--ink); }
+.ed h3 { margin: 0 0 6px; font: 500 11px/1.2 var(--ui); color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
+.ed-head { display: flex; align-items: center; justify-content: space-between; }
+.ed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.ed-btn { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 26px; padding: 4px 8px; background: #141414; border: 1px solid var(--line); color: #d6d6d6; font: 400 12px/1.2 var(--ui); text-align: left; cursor: pointer; }
+.ed-btn:hover:not(:disabled) { border-color: #3a3a3a; color: var(--ink); }
+.ed-btn.on { border-color: #c9a45c; color: var(--ink); background: #1d1a14; }
+.ed-btn:disabled { opacity: .4; cursor: default; }
+.ed kbd, .ed-open kbd { font: 400 10px/1 var(--mono); color: var(--dim); }
+.ed-x { min-height: 0; padding: 2px 8px; font-size: 16px; }
+.ed-size, .ed-variant { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.ed-size input { flex: 1; accent-color: #c9a45c; }
+.ed output { min-width: 3.5em; color: var(--ink); font: 400 12px/1 var(--mono); text-align: center; }
+.ed-variant .ed-btn { min-height: 24px; padding: 2px 8px; }
+canvas.ed-mini { position: static; display: block; width: auto; height: auto; max-width: 100%; max-height: 190px; margin: 0 auto; border: 1px solid var(--line); cursor: crosshair; image-rendering: pixelated; }
+.ed-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.ed-draft { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid #3a3226; color: #d6c39a; }
+.ed-help, .ed-status { margin: 0; }
+.ed-status { color: #d6c39a; min-height: 1.4em; }
+body.editing .stats { display: none; }
+@media (max-width: 640px) {
+  .ed { left: 8px; right: 8px; top: auto; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 48vh; }
+}
