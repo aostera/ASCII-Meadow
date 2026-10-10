@@ -4,7 +4,7 @@
 // A prop has a footprint in grid cells (x0..x1, y0..y1) and optional spots the knight can use.
 const props = [];
 let activeSpot = null;
-let flash = 0, nextFlash = 6;
+let flash = 0, nextFlash = 6, flashAng = 0;   // flashAng: where the last bolt struck, as an angle round the knight
 const fogs = [];
 
 function buildWorld() {
@@ -25,7 +25,7 @@ function say(e, text) { e.say = text; e.sayT = 3; }
 
 function updateWorld(dt) {
   flash *= Math.exp(-dt * 7);
-  if ((nextFlash -= dt) <= 0) { flash = 1; nextFlash = 8 + Math.random() * 14; setTimeout(() => (flash = Math.max(flash, 0.7)), 140); }
+  if ((nextFlash -= dt) <= 0) { flash = 1; nextFlash = 8 + Math.random() * 14; flashAng = nextFlash * 2.39; setTimeout(() => (flash = Math.max(flash, 0.7)), 140); }
   for (const f of fogs) { f.x += f.sp * dt; if (f.x - f.r > COLS) f.x = -f.r; }
   activeSpot = null; let best = 1e9;
   for (const p of props) for (const sp of p.spots || []) {
