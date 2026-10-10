@@ -1,4 +1,4 @@
-# usage: python3 tools/cow/build_cow_frames.py raw.pkl cow_ascii.json preview.png  (cow_ascii.json → COW_ART, cow_ascii_index.json → CI6 in index.html; needs opencv-python-headless)
+# usage: python3 tools/cow/build_cow_frames.py raw.pkl cow_ascii.json preview.png  (after graze_frames.py; cow_ascii.json → COW_ART, cow_ascii_index.json → CI6 in index.html; needs opencv-python-headless)
 # Cow frames as glyph art, on the knight's fine grid. All frames face right (the atlas's left-facing ones
 # are mirrored); the game mirrors them back when a cow heads left.
 #   idle 5 poses; walk, run and eat cycles and the hurt and die moves get in-betweens made along optical
@@ -59,14 +59,13 @@ WALK = [img(1, 0), img(1, 1), img(1, 2), img(1, 3), Image.fromarray(trim(w4[:, :
 L = lambda r, c: img(r, c).transpose(Image.FLIP_LEFT_RIGHT)
 IDLE = [img(0, 3), L(0, 1), L(0, 0), L(0, 4), img(0, 5)]
 RUN = [img(2, c) for c in range(8)]
-# Grazing: the atlas's eat drawings are each a different, smaller cow, so cycling them made the body
-# morph. One clean head-down drawing, brought to the herd's size, is the grazing pose; the game moves
-# only its head and tail (in the game: head cells x >= 94, y <= 41; tail x <= 48).
-_e = img(3, 4); EATB = _e.resize((round(_e.width * 1.12), round(_e.height * 1.12)), Image.LANCZOS)
-EAT = [EATB]
+# Grazing: the atlas's eat drawings are each a different, smaller cow, so cycling them made the body morph.
+# Instead the standing drawing lowers its own head (tools/cow/graze_frames.py warps the head and neck
+# layer, the body stays): GRAZE[0] is the standing pose, GRAZE[-1] the head in the grass.
+GRAZE = pickle.load(open(sys.argv[1].replace('raw.pkl', 'graze.pkl'), 'rb'))
 HURT = [img(4, 0), img(4, 1), L(4, 2), L(4, 3), img(4, 4), L(4, 5)]
 DIE = [img(5, c) for c in range(7)]
-frames = IDLE + WALK + RUN + EAT + HURT + DIE
+frames = IDLE + WALK + RUN
 SCALE = 0.7 * 92 / IDLE[0].height          # a standing cow is about 0.7 of the knight
 def place(im, mode):
     a = np.asarray(im)[..., 3] > 40; ys, xs = np.nonzero(a); h = ys.max() - ys.min()
@@ -79,12 +78,12 @@ def place(im, mode):
     return t
 # Work at 3x the tile so the in-betweens are made from real detail, then print each frame as glyphs.
 K3 = 3
-def place3(im):
+def place3(im, anchor=None):
     a = np.asarray(im)[..., 3] > 40; ys, xs = np.nonzero(a); h = ys.max() - ys.min()
-    cx = np.median(xs[ys < ys.min() + h * 0.6]); sc = SCALE * K3
+    cx, by = (np.median(xs[ys < ys.min() + h * 0.6]), ys.max()) if anchor is None else anchor; sc = SCALE * K3
     s2 = im.resize((max(1, round(im.width * sc)), max(1, round(im.height * sc))), Image.LANCZOS)
     t = Image.new('RGBA', (TW * K3, TH * K3), (0, 0, 0, 0))
-    t.paste(s2, (round(FX * K3 - cx * sc), round(FY * K3 - ys.max() * sc)), s2)
+    t.paste(s2, (round(FX * K3 - cx * sc), round(FY * K3 - by * sc)), s2)
     return np.asarray(t).astype(np.float32)
 import cv2
 def tween(A, B, t, big=False):
@@ -110,11 +109,15 @@ def expand(seq, n, cyclic, big=False):
         for k in range(1, n): res.append(tween(A, B, k / n, big))
     if not cyclic: res.append(T[-1])
     return [Image.fromarray(np.clip(r, 0, 255).astype(np.uint8)) for r in res]
-SEQ = [('idle', IDLE, 1, False), ('walk', WALK, 6, True), ('run', RUN, 6, True), ('eat', EAT, 1, False)]
+SEQ = [('idle', IDLE, 1, False), ('walk', WALK, 6, True), ('run', RUN, 6, True)]
+_a = np.asarray(GRAZE[0])[..., 3] > 40; _ys, _xs = np.nonzero(_a); _h = _ys.max() - _ys.min()
+GANCHOR = (np.median(_xs[_ys < _ys.min() + _h * 0.6]), _ys.max())   # the standing pose's anchor, kept for every frame
 tiles, index = [], {}
 for name, seq, n, cyc in SEQ:
     fr = [Image.fromarray(place3(f).astype(np.uint8)) for f in seq] if n == 1 else expand(seq, n, cyc, name == 'graze')
     index[name] = [len(tiles), len(fr)]; tiles += fr
+fr = [Image.fromarray(place3(g, GANCHOR).astype(np.uint8)) for g in GRAZE]
+index['eat'] = [len(tiles), len(fr)]; tiles += fr
 print('index', index)
 json.dump(index, open(sys.argv[2].replace('.json', '_index.json'), 'w'))
 out = [to_ascii(t) for t in tiles]
