@@ -28,8 +28,12 @@
 
 ## Как работать
 1. Перед правкой перечитать [[Визуальное направление]].
-2. После правки: синтаксис (`node --check src/**/*.js`), при переносе кода — детерминированная сверка `tools/check/` (до/после попиксельно), скриншоты Playwright (`/opt/pw-browsers/chromium`, для WebGL флаги `--use-angle=swiftshader --enable-unsafe-swiftshader`), проверить: десктоп, iPhone, старт с нулевым размером панели.
+2. После правки: `npm run check:static` и `npm run check:browser` (см. `tools/check/README.md`); при переносе кода — детерминированная сверка `tools/check/` (до/после попиксельно; на PR это делает CI), скриншоты Playwright (`/opt/pw-browsers/chromium`, для WebGL флаги `--use-angle=swiftshader --enable-unsafe-swiftshader`), проверить: десктоп, iPhone, старт с нулевым размером панели.
 3. В программном рендере fps низкий (~5) — это не реальная цифра. Мерить CPU отдельно, отключив `GL.flush`.
 4. Если меняются кадры рыцаря: `tools/to_ascii.py` → вставить `KNIGHT_ART` в `src/data/knight-frames.js`, затем `node tools/find_blades.cjs` → вставить `KSW` туда же. Кадры коров — `COW_ART`/`CIX` в `src/data/cow-frames.js` и `src/entities/cow.js`.
 5. Опубликовать артефакт (страница + файлы `src/`, `styles/` через `files`, или одним файлом через `tools/bundle.py`), закоммитить, обновить [[Хронология]] и [[Бэклог]].
 6. Новый код — никогда не в `index.html`: свой файл в `src/`, `<script>` в правильном месте, вызов из `simulate()`/`render()`.
+
+## Публикация
+- GitHub Pages (`.github/workflows/pages.yml`) на 2026-10-10 **не работает**: репозиторий приватный, Pages в настройках не включён, каждый деплой падает на `configure-pages` («Get Pages site failed — Not Found»), https://aostera.github.io/ASCII-Meadow/ отдаёт 404. Нужно действие владельца: Settings → Pages → Source: GitHub Actions (для приватного репозитория — только на GitHub Pro/Team/Enterprise) или сделать репозиторий публичным. После этого перезапустить «Deploy to GitHub Pages» (workflow_dispatch) и проверить сайт smoke-тестом: `node tools/check/smoke.cjs https://aostera.github.io/ASCII-Meadow/ --quick`.
+- Артефакт claude.ai публикуется склейкой: `python3 tools/bundle.py <файл> --body`.
