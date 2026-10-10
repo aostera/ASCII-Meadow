@@ -17,5 +17,6 @@ page = re.sub(r'<script src="([^"]+)"></script>', script, page)
 if body_only:
     head = page[page.index('<title>'):page.index('</head>')]
     page = head + page[page.index('<body>') + len('<body>'):page.index('</body>')]
+os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
 open(out, 'w', encoding='utf-8').write(page)
 print(out, len(page), 'bytes')
