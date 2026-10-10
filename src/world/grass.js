@@ -32,10 +32,6 @@ function influence(e, dt) {
     const i = y * COLS + x;
     push[i] += Math.sign(dx || 0.01) * (1 - d) * (1 - d) * 2.6 * s;
     if (d < 0.12) flat[i] = Math.min(1, flat[i] + dt * 1.4);
-    // soft contact shadow, flattened ellipse around the feet
-    const sx = (x + 0.5 - e.x) / 7, sy = (y + 0.5 - e.y - 0.3) / 2;
-    const sd = sx * sx + sy * sy;
-    if (sd < 1) shadow[i] = Math.max(shadow[i], (1 - sd) * 0.7);
   }
 }
 
@@ -61,16 +57,20 @@ function light(i, x, y, cloud) {
   const h = height[i], f = flat[i], s = seed[i];
   const front = FR[i];
   let l = 0.24 + h * 0.52 + Math.max(0, ang[i]) * 0.16 + (front > 0.55 ? (front - 0.55) * 0.55 : 0)
-        - f * 0.38 - shadow[i] - cloud * 0.75 - bshade[i] + (s - 0.5) * 0.16;
-  return l < 0 ? 0 : l > 0.999 ? SH - 1 : (l * SH) | 0;
+        - f * 0.38 - cloud * 0.75 - bshade[i] + (s - 0.5) * 0.16;
+  // a body's shadow takes a share of the light, so it shows even on grass lit to the full
+  l = (l > 0.999 ? 0.999 : l) * (1 - shadow[i]);
+  return l < 0 ? 0 : (l * SH) | 0;
 }
 
 // Forces on the grass in view: cleared each step, then pushed by bodies and the hovering mouse.
+let SBX0 = 0, SBX1 = 0, SBY0 = 0, SBY1 = 0;   // the band cleared this step: shadows are written only inside it
 function applyGrassForces(dt) {
   // the grass only lives in view: clear just that band, not the whole field
-  const x0 = Math.max(0, VX0 - 12), x1 = Math.min(COLS, VX1 + 13), y0 = Math.max(0, VY0 - 10), y1 = Math.min(ROWS, VY1 + 12);
+  const x0 = SBX0 = Math.max(0, VX0 - 12), x1 = SBX1 = Math.min(COLS, VX1 + 13), y0 = SBY0 = Math.max(0, VY0 - 10), y1 = SBY1 = Math.min(ROWS, VY1 + 12);
   for (let y = y0; y < y1; y++) { const o = y * COLS; push.fill(0, o + x0, o + x1); shadow.fill(0, o + x0, o + x1); }
   for (const e of ents) influence(e, dt);
+  for (const e of ents) castShadow(e);   // world/shadows.js
   if (mouse.on) {
     const mx = mouse.x / CW + camX, my = mouse.y / CH + camY;
     const v = Math.hypot(mx - mouse.lx, (my - mouse.ly) * CH / CW) / Math.max(dt, 1e-3);

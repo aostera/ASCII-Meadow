@@ -58,7 +58,7 @@ function render() {
       }
       const cloud = cloudBuf[i], px = x * CW;
       if (kd === 7) { // the trail: pale grit and pebbles, dimmed by shade and cloud
-        const v = height[i] - cloud * 0.5 - shadow[i] * 0.6 - bshade[i];
+        const v = (height[i] - cloud * 0.5 - bshade[i]) * (1 - shadow[i]);
         if (v < 0.12) continue;
         const ci = s > 0.94 ? CI['o'] : s > 0.85 ? CI[':'] : s > 0.6 ? CI['.'] : s > 0.4 ? CI[','] : s > 0.2 ? CI['_'] : CI["'"];
         PF2(ci, PT0 + Math.min(PTN - 1, (v * PTN) | 0), px, py, x, y, baseY);
