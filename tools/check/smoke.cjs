@@ -130,6 +130,17 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       const count = () => page.evaluate(() => { let n = 0; for (let i = 0; i < N; i++) if (kind[i] === 2) n++; return { earth: n, flora: flora.length, cows: cows.map(c => toModelXZ(c.home[0], c.home[1]).map(Math.round)) }; });
       await step(20); await page.keyboard.press('KeyM'); await step(2);
       check('editor: ?edit and M open the panel', await page.evaluate(() => editing && !document.querySelector('.ed').hidden));
+      // selecting a generated tree changes nothing; stones and flowers paint what they say
+      const fp = await page.evaluate(() => { const f = flora.find(f => f.br > VY0 + 12 && f.br < VY1 - 8 && f.x > VX0 + 12 && f.x < VX0 + VC * 0.6); return f ? [(f.x - camX) * CW, (f.br - camY) * CH - 4] : null; });
+      if (fp) { await page.keyboard.press('KeyV'); await page.mouse.click(fp[0], fp[1]); await step(1); }
+      check('editor: selecting changes nothing', fp && await page.evaluate(() => !!ED.sel && MEADOW_MAP.flora === null && !ED.undo.length));
+      await page.keyboard.press('Escape');
+      const inView = () => page.evaluate(() => { let st = 0, fl = 0; for (let y = VY0; y <= VY1; y++) for (let x = VX0; x <= VX1; x++) { const k = kind[y * COLS + x]; if (k === 5) st++; if (k === 3 || k === 4 || k === 6) fl++; } return { st, fl }; });
+      const sf0 = await inView();
+      await page.keyboard.press('Digit5'); await page.mouse.move(250, 200); await page.mouse.down(); await page.mouse.move(450, 200, { steps: 6 }); await page.mouse.up();
+      await page.keyboard.press('Digit6'); await page.mouse.move(250, 260); await page.mouse.down(); await page.mouse.move(450, 260, { steps: 6 }); await page.mouse.up(); await step(2);
+      const sf1 = await inView();
+      check('editor: stones paint stones, flowers paint flowers', sf1.st > sf0.st + 50 && sf1.fl > sf0.fl + 10, JSON.stringify({ before: sf0, after: sf1 }));
       const c0 = await count();
       await page.keyboard.press('Digit4'); await page.mouse.move(300, 350); await page.mouse.down();
       for (let x = 300; x <= 600; x += 25) { await page.mouse.move(x, 350); await step(1); }
@@ -144,6 +155,11 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       const undone = await page.evaluate(() => cows.length);
       await page.keyboard.press('Control+Shift+KeyZ'); await step(1);
       check('editor: undo and redo', undone === 3 && (await page.evaluate(() => cows.length)) === 4);
+      await page.keyboard.press('Control+KeyZ'); await page.keyboard.press('Control+KeyZ'); await step(1);
+      // (regenerated over the strokes above: where earth covered the trail, trees may now grow)
+      const back = await page.evaluate(() => MEADOW_MAP.flora === null && MEADOW_MAP.cows === null && MEADOW_MAP.fires === null && cows.length === 3);
+      await page.keyboard.press('Control+Shift+KeyZ'); await page.keyboard.press('Control+Shift+KeyZ'); await step(1);
+      check('editor: undoing the first placement brings back the generated world', back && (await page.evaluate(() => flora.length)) === c0.flora + 1);
       const [dl] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+KeyS')]);
       const saved = fs.readFileSync(await dl.path(), 'utf8'), c3 = await count();
       check('editor: «Сохранить» writes a map file', /const MEADOW_MAP = \{/.test(saved) && !/<\/script/i.test(saved), saved.length + ' bytes');

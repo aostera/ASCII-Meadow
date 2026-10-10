@@ -121,6 +121,8 @@ function edStrokeTo(gx, gz) {
 // ---------- objects ----------
 // Ground point under a screen point: the feet of whoever would stand there.
 const edGround = (sx, sy) => toModelXZ(sx / CW + camX, sy / CH + camY - 0.7);
+// The selected tree as [type, variant]: from the map, or from the generated plant (same index before the bake).
+const edFloraEntry = mi => MEADOW_MAP.flora ? MEADOW_MAP.flora[mi] : [flora[mi].v.type, variantsOf(flora[mi].v.type).indexOf(flora[mi].v)];
 const edScreen = (x, y) => [(x - camX) * CW, (y + 0.7 - camY) * CH];   // the feet of x, y on the screen
 // Everything that can be picked, with its feet on the screen. Before the first bake the index in the
 // generated lists stands in for the map index: edBake lists them in the same order.
@@ -143,9 +145,10 @@ function edPick(sx, sy) {   // the frontmost object whose body covers the point
 }
 // A fire set on the castle's terrace or stair stands at its height: [x, z, h].
 function edFirePoint(gx, gz) { const [x, y] = mapToCell(gx, gz), h = surfAt(x, y); return isFinite(h) && h > 1 ? [edR1(gx), edR1(gz), Math.round(h)] : [edR1(gx), edR1(gz)]; }
+// Every object edit: remember the map as it was (generated lists still null), then make the lists explicit.
+function edBeginObjectEdit() { edRecord({ map: mapSnapshot() }); edBake(); }
 function edPlace(tool, gx, gz) {
-  edBake();
-  edRecord({ map: mapSnapshot() });
+  edBeginObjectEdit();
   const p = [edR1(gx), edR1(gz)];
   if (tool === 'start') { MEADOW_MAP.start = p; applyObjects({ start: 1 }); ED.sel = { kind: 'start', mi: 0 }; return; }
   if (tool === 'cow') { MEADOW_MAP.cows.push(p); applyObjects({ cows: 1 }); ED.sel = { kind: 'cows', mi: MEADOW_MAP.cows.length - 1 }; return; }
@@ -155,7 +158,7 @@ function edPlace(tool, gx, gz) {
 }
 function edMoveSelected(gx, gz) {
   const s = ED.sel, p = [edR1(gx), edR1(gz)];
-  edRecord({ map: mapSnapshot() });
+  edBeginObjectEdit();
   if (s.kind === 'start') MEADOW_MAP.start = p;
   else if (s.kind === 'flora') { const e = MEADOW_MAP.flora[s.mi]; e[2] = p[0]; e[3] = p[1]; }
   else MEADOW_MAP[s.kind][s.mi] = s.kind === 'fires' ? edFirePoint(gx, gz) : p;
@@ -163,7 +166,7 @@ function edMoveSelected(gx, gz) {
 }
 function edDeleteSelected() {
   const s = ED.sel; if (!s || s.kind === 'start') return;
-  edRecord({ map: mapSnapshot() });
+  edBeginObjectEdit();
   MEADOW_MAP[s.kind].splice(s.mi, 1);
   ED.sel = null;
   applyObjects({ [s.kind]: 1 });
@@ -171,8 +174,9 @@ function edDeleteSelected() {
 function edStepVariant(d) {
   const s = ED.sel;
   if (s && s.kind === 'flora') {
+    edBeginObjectEdit();
     const e = MEADOW_MAP.flora[s.mi], n = variantsOf(e[0]).length;
-    edRecord({ map: mapSnapshot() }); e[1] = (e[1] + d + n) % n; ED.variant[e[0]] = e[1];
+    e[1] = (e[1] + d + n) % n; ED.variant[e[0]] = e[1];
     applyObjects({ flora: 1 }); return;
   }
   const type = ED.variant[ED.tool] !== undefined ? ED.tool : null;
@@ -283,9 +287,9 @@ function edSyncUI() {
   if (!ED.ui) return;
   for (const b of ED.ui.root.querySelectorAll('[data-tool]')) b.classList.toggle('on', b.dataset.tool === ED.tool);
   ED.ui.size.value = ED.size; ED.ui.sizeOut.textContent = ED.size; ED.ui.trail.checked = trailOn();
-  const vt = ED.sel && ED.sel.kind === 'flora' ? MEADOW_MAP.flora[ED.sel.mi][0] : ED.variant[ED.tool] !== undefined ? ED.tool : null;
+  const fe = ED.sel && ED.sel.kind === 'flora' ? edFloraEntry(ED.sel.mi) : null, vt = fe ? fe[0] : ED.variant[ED.tool] !== undefined ? ED.tool : null;
   ED.ui.variant.hidden = !vt;
-  if (vt) ED.ui.variantOut.textContent = (ED.sel && ED.sel.kind === 'flora' ? MEADOW_MAP.flora[ED.sel.mi][1] : ED.variant[vt]) + 1 + ' из ' + variantsOf(vt).length;
+  if (vt) ED.ui.variantOut.textContent = (fe ? fe[1] : ED.variant[vt]) + 1 + ' из ' + variantsOf(vt).length;
   ED.ui.undo.disabled = !ED.undo.length; ED.ui.redo.disabled = !ED.redo.length;
 }
 function edSave() {
@@ -385,7 +389,7 @@ function edPointer(e) {
     if (ED.tool === 'select') {
       const o = edPick(e.clientX, e.clientY);
       ED.sel = o ? { kind: o.kind, mi: o.mi } : null;
-      if (o) { edBake(); ED.drag = { gx, gz, sx: e.clientX, sy: e.clientY, moved: false }; }
+      if (o) ED.drag = { gx, gz, sx: e.clientX, sy: e.clientY, moved: false };   // nothing is baked until it really moves
       edSyncUI(); return;
     }
     edPlace(ED.tool, gx, gz); edSyncUI(); return;

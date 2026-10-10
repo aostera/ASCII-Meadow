@@ -14,7 +14,7 @@ const mapToCell = (gx, gz) => [(gx * MS + cathedral.ox) / CW, (cathedral.oy - gz
 // ---------- paint: brush strokes over the generated ground ----------
 // A sparse grid of PAINT_RES-unit cells, kept in PCH×PCH chunks; a chunk is stored run-length coded.
 const PAINT_RES = 4, PCH = 32;
-const PCODES = '.gtsefrpx';   // none, grass, tall grass, short grass, earth, stones, flowers, trail, empty ground
+const PCODES = '.gtserfpx';   // none, grass, tall grass, short grass, earth, stones (r), flowers (f), trail, empty ground: paintCell's codes 0-8
 const paintChunks = new Map();   // "cx,cz" → Uint8Array(PCH * PCH) of PCODES indices
 function rleEncode(a) {
   let s = '';
