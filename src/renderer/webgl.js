@@ -7,6 +7,9 @@ const GL = { ok: false };
   const gl = c.getContext('webgl2', { alpha: false, antialias: false, premultipliedAlpha: true });
   if (!gl) { GL.ctx2 = c.getContext('2d', { alpha: false }); return; }
   const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+  // rows of the glyph and sprite textures: 4096 texels, or 2048 where the GPU allows no wider (the least
+  // WebGL2 promises)
+  const MAXT = gl.getParameter(gl.MAX_TEXTURE_SIZE), TW = MAXT >= 4096 ? 4096 : 2048, TS = TW === 4096 ? 12 : 11;
   const prog = gl.createProgram();
   // No vertex buffers: each glyph is six vertices (two triangles), and the vertex shader reads the glyph's
   // six floats (rectangle x0, y0, x1, y1, sprite, alpha) as two texels of the glyph texture and its uvs from
@@ -18,9 +21,9 @@ const GL = { ok: false };
         int g = gl_VertexID / 6, c = gl_VertexID - g * 6, k = c == 3 ? 1 : c == 4 ? 3 : c == 5 ? 2 : c;
         bool hx = (k & 1) == 1, hy = k > 1;
         int i = (g + u_base) * 2;
-        vec3 r = texelFetch(u_gly, ivec2(i & 4095, i >> 12), 0).xyz, e = texelFetch(u_gly, ivec2((i + 1) & 4095, (i + 1) >> 12), 0).xyz;
+        vec3 r = texelFetch(u_gly, ivec2(i & ${TW - 1}, i >> ${TS}), 0).xyz, e = texelFetch(u_gly, ivec2((i + 1) & ${TW - 1}, (i + 1) >> ${TS}), 0).xyz;
         int s = int(e.y + 0.5);   // texel one: x0, y0, x1; texel two: y1, sprite, alpha
-        vec4 t = texelFetch(u_spr, ivec2(s & 4095, s >> 12), 0);
+        vec4 t = texelFetch(u_spr, ivec2(s & ${TW - 1}, s >> ${TS}), 0);
         vec2 q = (vec2(hx ? r.z : r.x, hy ? e.x : r.y) - u_cam) / u_view * 2.0 - 1.0;
         gl_Position = vec4(q.x, -q.y, 0.0, 1.0);
         v_uv = vec2(hx ? t.z : t.x, hy ? t.w : t.y); v_a = e.z;
@@ -37,12 +40,12 @@ const GL = { ok: false };
   const mkTex = () => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); return t; };
   const atlasT = mkTex(), castT = mkTex();
   const fTex = (unit) => { const t = gl.createTexture(); gl.activeTexture(unit); gl.bindTexture(gl.TEXTURE_2D, t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST); return t; };
-  const glyT = fTex(gl.TEXTURE2);   // the frame's glyphs: two RGB float texels each, 4096 texels to a row
-  const sprT = gl.createTexture();   // the sprite uv table: u0, v0, u1, v1 per texel, 4096 to a row
+  const glyT = fTex(gl.TEXTURE2);   // the frame's glyphs: two RGB float texels each, TW texels to a row
+  const sprT = gl.createTexture();   // the sprite uv table: u0, v0, u1, v1 per texel, TW to a row
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, sprT);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   const uploadSprites = () => {
-    const n = GB.spr.length, w = Math.min(4096, Math.max(1, n)), h = Math.ceil(n / w) || 1, d = new Float32Array(w * h * 4);
+    const n = GB.spr.length, w = Math.min(TW, Math.max(1, n)), h = Math.ceil(n / w) || 1, d = new Float32Array(w * h * 4);
     for (let i = 0; i < n; i++) { const q = i * 8, o = i * 4; d[o] = SPF[q + 4]; d[o + 1] = SPF[q + 5]; d[o + 2] = SPF[q + 6]; d[o + 3] = SPF[q + 7]; }
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, sprT);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -74,11 +77,13 @@ const GL = { ok: false };
     const ext = castle ? (castle.flash > 0.02 ? 2 : 1) : 0;
     if (castle) { gput(CAST, castle.x, castle.y, castle.a); if (ext === 2) gput(CAST, castle.x, castle.y, castle.flash); }
     // the glyphs go up as whole rows of the texture (the batch buffer always holds whole rows)
-    const rows = Math.ceil(GB.n * 2 / 4096), cap = GB.buf.length / 12288;
+    const cap = Math.min(MAXT, GB.buf.length / (TW * 3)), maxG = cap * TW / 2;
+    if (GB.n > maxG) { GB.buf.copyWithin((maxG - ext) * 6, (GB.n - ext) * 6, GB.n * 6); GB.n = maxG; }   // more than the texture holds: the frontmost glyphs go, the castle stays
+    const rows = Math.ceil(GB.n * 2 / TW);
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, glyT);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-    if (gh !== cap) { gh = cap; gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, 4096, gh, 0, gl.RGB, gl.FLOAT, null); }
-    if (rows) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 4096, rows, gl.RGB, gl.FLOAT, GB.buf, 0);
+    if (gh !== cap) { gh = cap; gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, TW, gh, 0, gl.RGB, gl.FLOAT, null); }
+    if (rows) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, TW, rows, gl.RGB, gl.FLOAT, GB.buf, 0);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     const gn = GB.n - ext;
     if (castle) { draw(gn, 1, castT, false); if (ext === 2) draw(gn + 1, 1, castT, true); }
