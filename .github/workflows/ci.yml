@@ -79,14 +79,25 @@ jobs:
             /tmp/http.log
 
   visual-diff:
-    # Same seeded, scripted run of the base branch and of this PR, compared pixel by pixel. Informational:
-    # a PR that means to change the picture will differ; one that only moves code must not.
-    name: Visual diff against the base branch (informational)
+    # The base branch and this PR, run with the same seed, clock, window and scripted input on the same runner,
+    # compared pixel by pixel (no tolerance: only the game's canvases are captured). Blocking: a PR that
+    # only moves code must draw exactly the same frames. A PR that means to change the picture gets the
+    # `visual-change` label; the job still runs and uploads the diffs, but then passes.
+    name: Visual diff vs base (${{ matrix.name }})
     if: github.event_name == 'pull_request'
     needs: static
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    continue-on-error: true
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: knight,  args: 'gl 1280 800 "" main' }     # idle, walk, run, jump, mouse in the grass, resize
+          - { name: dirs,    args: 'gl 1280 800 "" dirs' }     # 8 walk directions, 4 run directions, the herd
+          - { name: cows,    args: 'gl 1280 800 "" cows' }     # standing, strolling, grazing, a spooked herd
+          - { name: castle,  args: 'gl 1280 800 "" castle' }   # wall, stair, terrace, E at the gate
+          - { name: fallback-2d, args: '2d 640 400 "" main' }  # the 2D canvas fallback
+          - { name: mobile,  args: 'gl 0 0 mob touch' }        # iPhone 13: drag to walk and run, taps
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,19 +115,42 @@ jobs:
         working-directory: head
       - run: npx playwright install --with-deps chromium
         working-directory: head
-      - name: Seeded runs (main scenario, WebGL2) and pixel diff
+      - name: Seeded runs of base and head
         working-directory: head
         run: |
-          node tools/check/det.cjs "file://$GITHUB_WORKSPACE/base/index.html" shots/base gl
-          node tools/check/det.cjs "file://$GITHUB_WORKSPACE/head/index.html" shots/head gl
-          python3 tools/check/diff.py shots/base shots/head --out shots/diff | tee shots/diff.txt
+          node tools/check/det.cjs "file://$GITHUB_WORKSPACE/base/index.html" shots/base ${{ matrix.args }}
+          node tools/check/det.cjs "file://$GITHUB_WORKSPACE/head/index.html" shots/head ${{ matrix.args }}
+      - name: Pixel diff
+        id: diff
+        working-directory: head
+        run: |
+          set +e
+          python3 tools/check/diff.py shots/base shots/head --out shots/diff > shots/diff.txt
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+          cat shots/diff.txt
       - name: Summary
         if: always()
         working-directory: head
         run: |
-          { echo '### Visual diff against the base branch'; echo '```'; cat shots/diff.txt 2>/dev/null || echo 'no result'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo "### Visual diff vs base: ${{ matrix.name }}"; echo '```'; cat shots/diff.txt 2>/dev/null || echo 'no result'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: visual-diff
+          name: visual-diff-${{ matrix.name }}
+          path: |
+            head/shots/diff/
+            head/shots/diff.txt
+      - uses: actions/upload-artifact@v4
+        if: failure() || steps.diff.outputs.code != '0'
+        with:
+          name: visual-shots-${{ matrix.name }}
           path: head/shots/
+      - name: Gate
+        if: steps.diff.outputs.code != '0'
+        run: |
+          if ${{ contains(github.event.pull_request.labels.*.name, 'visual-change') }}; then
+            echo "::warning::frames differ from the base branch; allowed by the visual-change label"
+          else
+            echo "::error::frames differ from the base branch (see the visual-diff artifacts). If the change to the picture is intended, add the visual-change label."
+            exit 1
+          fi
