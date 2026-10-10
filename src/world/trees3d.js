@@ -147,8 +147,22 @@ function t3Bake(type, model, sd) {
     for (const [ox, oy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) if (!solid(Math.round((gx + ox) * CW / fw), Math.round((gy + oy) * CH / fh))) { all = false; break; }
     if (all) hide.push(gx, gy);
   }
+  // its shadow on the ground: every clump and limb cast along the light, leaves letting some light through,
+  // so the shade has the crown's shape, its gaps, and falls the way the castle's does
+  const shm = new Map();
+  for (const s of S) {
+    const t = s[1] / LGT[1], gx = s[0] - LGT[0] * t, gz = s[2] - LGT[2] * t, r = s[3] * 1.15, a = s[4] === 0 ? 0.22 : 0.5;
+    const cx0s = Math.floor((gx - r) / CW), cx1s = Math.ceil((gx + r) / CW), cy0s = Math.floor(-(gz + r) * SINP / CH), cy1s = Math.ceil(-(gz - r) * SINP / CH);
+    for (let cy = cy0s; cy <= cy1s; cy++) for (let cx = cx0s; cx <= cx1s; cx++) {
+      const dx = (cx + 0.5) * CW - gx, dz = -(cy + 0.5) * CH / SINP - gz, q = (dx * dx + dz * dz) / (r * r);
+      if (q >= 1) continue;
+      const k = cy * 4096 + cx, o = shm.get(k) || 0; shm.set(k, 1 - (1 - o) * (1 - a * (1 - q * 0.6)));
+    }
+  }
+  const gshadow = [];
+  for (const [k, a] of shm) { const cy = Math.round(k / 4096), cx = k - cy * 4096; gshadow.push(cx, cy, Math.round(Math.min(0.62, a * 0.75) * 100)); }
   let minY = 0; for (let k = 1; k < list.length; k += 4) minY = Math.min(minY, list[k]);
-  return { type, list: Int32Array.from(list), runs: Int16Array.from(runs), hide: Int16Array.from(hide), fw, fh, minY, R, Hc: C[1], crownH: -minY * fh };
+  return { type, list: Int32Array.from(list), runs: Int16Array.from(runs), hide: Int16Array.from(hide), gshadow: Int16Array.from(gshadow), fw, fh, minY, R, Hc: C[1], crownH: -minY * fh };
 }
 const bakeTree3D = (type, sd) => t3Bake(type, t3Tree(type, sd), sd);
 
@@ -204,5 +218,7 @@ function bakeStone3D(size, sd) {
     if (s1 >= s0) shade.push(cy, s0, s1 + 1);
   }
   let minY = 0; for (let k = 1; k < list.length; k += 4) minY = Math.min(minY, list[k]);
-  return { type: 'stone', list: Int32Array.from(list), runs: Int16Array.from(runs), shade: Int16Array.from(shade), hide: new Int16Array(0), fw, fh, minY, R: rx, Hc: ryy, crownH: Math.max(1, -minY * fh) };
+  const block = [];   // a stone or a boulder stands in the way; a pebble does not
+  if (size > 0) for (let dy = -Math.ceil(rz * SINP / CH); dy <= 1; dy++) for (let dx = -Math.ceil(rx / CW); dx <= Math.ceil(rx / CW); dx++) if (((dx * CW) / rx) ** 2 + ((dy * CH / SINP) / rz) ** 2 < 0.8) block.push(dx, dy);
+  return { type: 'stone', list: Int32Array.from(list), runs: Int16Array.from(runs), shade: Int16Array.from(shade), hide: new Int16Array(0), block: block.length ? Int16Array.from(block) : null, solid: true, fw, fh, minY, R: rx, Hc: ryy, crownH: Math.max(1, -minY * fh) };
 }

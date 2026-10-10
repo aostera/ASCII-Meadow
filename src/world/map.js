@@ -137,9 +137,9 @@ function placeFires() {
     const sy = ROWS - VR * 0.3 - 5; braziers.push({ isFire: true, ground: true, x: pathX(sy) + 16, y: sy - 0.7, lift: 0, parts: [], seed: 3 });
     return;
   }
-  MEADOW_MAP.fires.forEach(([gx, gz, h], mi) => {
+  MEADOW_MAP.fires.forEach(([gx, gz, h, kd], mi) => {
     const [x, y] = mapToCell(gx, gz);
-    braziers.push(h > 0 ? { isFire: true, x, y, lift: h * COSP * MS, parts: [], seed: 3 + mi, mi } : { isFire: true, ground: true, x, y, lift: 0, parts: [], seed: 3 + mi, mi });
+    braziers.push(h > 0 ? { isFire: true, x, y, lift: h * COSP * MS, parts: [], seed: 3 + mi, mi } : { isFire: true, ground: true, cook: kd === 'cook', steam: [], x, y, lift: 0, parts: [], seed: 3 + mi, mi });   // 'cook': a pot over it
   });
 }
 

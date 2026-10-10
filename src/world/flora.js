@@ -236,6 +236,11 @@ function placeFlora() {
     for (let k = 0; k < v.hide.length; k += 2) { const cx = bx + v.hide[k], cy = br + v.hide[k + 1]; if (cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS) kind[cy * COLS + cx] = 0; }
     if (v.block) { const M = v.type === 'fence' ? fmask : tmask; for (let k = 0; k < v.block.length; k += 2) { const cx = bx + v.block[k], cy = br + v.block[k + 1]; if (cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS) M[cy * COLS + cx] = 1; } continue; }   // tents and fences: their footprint; their shadow is in the picture
     if (v.type !== 'bush') for (let dx = -1; dx <= 1; dx++) { const i = br * COLS + bx + dx; if (i >= 0 && i < N) tmask[i] = 1; }
+    if (v.gshadow) {   // world/trees3d.js: the crown's own shadow, cast along the castle's light
+      const G = v.gshadow;
+      for (let k = 0; k < G.length; k += 3) { const cx = bx + G[k], cy = br + G[k + 1]; if (cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS) { const i = cy * COLS + cx; bshade[i] = Math.min(0.7, bshade[i] + G[k + 2] * 0.01); } }
+      continue;
+    }
     const sr = v.R / CW, sx = bx + v.Hc * 0.6 / CW, sy = br - v.Hc * 0.55 / CH;
     for (let cy = Math.floor(sy - sr * CW / CH); cy <= Math.ceil(br + 2); cy++) for (let cx = Math.floor(Math.min(bx, sx) - sr); cx <= Math.ceil(Math.max(bx, sx) + sr); cx++) {
       if (cx < 0 || cy < 0 || cx >= COLS || cy >= ROWS) continue;
@@ -280,7 +285,7 @@ function updateFlora(dt) {
 function drawFlora(f) {
   const v = f.v, bx = Math.round(f.x) * CW, by = f.br * CH, H = v.crownH, fw = v.fw, fh = v.fh;
   const bush = v.type === 'bush';
-  const lean = (f.sw || 0) * (bush ? 4 : v.type === 'dead' ? 7 : 11);   // px at the very top
+  const lean = (f.sw || 0) * (bush ? 2 : v.type === 'dead' ? 6 : 5);   // px at the very top
   const rs = Math.min(1, (bush ? f.rust || 0 : 0) + (f.flut || 0) * 0.3), tick = Math.floor(t * 9);
   // a crown standing between the camera and the knight thins out, so he is never lost behind it
   let fade = 1;
@@ -292,7 +297,9 @@ function drawFlora(f) {
   const fa = f.fade, L = v.list, Rn = v.runs;
   if (v.solid) { gput(v.whole, bx, by, fa); return; }   // tents and fences stand still
   if (v.sl && !(bush && (f.rust || 0) > 0.05)) {   // a bush being pushed through is drawn leaf by leaf
-    for (const [sid, hf] of v.sl) gput(sid, bx + lean * hf * Math.sqrt(hf), by, fa);
+    // the trunk bends, the crown above it moves as one piece (slices shifted unevenly would tear it)
+    const cb = v.gshadow ? Math.max(0.1, Math.min(0.8, (v.Hc - v.R * 0.85) * COSP / v.crownH)) : 0;   // where the crown begins, as a share of the picture's height
+    for (const [sid, hf] of v.sl) { const k = cb ? Math.min(1, hf / cb) : hf * Math.sqrt(hf); gput(sid, bx + lean * (cb ? k * k * (3 - 2 * k) : k), by, fa); }
     return;
   }
   for (let k = 0; k < Rn.length; k += 3) {
