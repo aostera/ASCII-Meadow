@@ -3,6 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # labeled/unlabeled: adding or removing `visual-change` re-runs the checks with the PR's current labels
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main]
   workflow_dispatch:
