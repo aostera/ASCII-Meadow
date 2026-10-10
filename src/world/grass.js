@@ -70,7 +70,6 @@ function applyGrassForces(dt) {
   const x0 = SBX0 = Math.max(0, VX0 - 12), x1 = SBX1 = Math.min(COLS, VX1 + 13), y0 = SBY0 = Math.max(0, VY0 - 10), y1 = SBY1 = Math.min(ROWS, VY1 + 12);
   for (let y = y0; y < y1; y++) { const o = y * COLS; push.fill(0, o + x0, o + x1); shadow.fill(0, o + x0, o + x1); }
   for (const e of ents) influence(e, dt);
-  for (const e of ents) castShadow(e);   // world/shadows.js
   if (mouse.on) {
     const mx = mouse.x / CW + camX, my = mouse.y / CH + camY;
     const v = Math.hypot(mx - mouse.lx, (my - mouse.ly) * CH / CW) / Math.max(dt, 1e-3);

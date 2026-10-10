@@ -50,10 +50,12 @@ function castShadow(e) {
   // gives out near the edge of its light
   let fI = 0, gx = 0, gy = 0;
   for (const b of braziers) {
-    const dx = fx - b.x * CW, dy = ((e.y + 0.7) * CH - ((b.y + 0.7) * CH - b.lift)) * 1.6, d = Math.hypot(dx, dy), r = 300 * Math.min(MS, 1.4);
+    const dx = fx - b.x * CW, dy = (((e.y + 0.7) * CH - liftPx(e)) - ((b.y + 0.7) * CH - b.lift)) * 1.6, d = Math.hypot(dx, dy), r = 300 * Math.min(MS, 1.4);
     if (d < r && d > 1) { const v = (1 - d / r) ** 1.6 * (0.82 + 0.18 * flick(b.seed * 3, 5)); if (v > fI) { fI = v; gx = dx / d; gy = dy / d / 1.6; } }
   }
   if (fI > 0.03) castAlong(fx, fy, tx, ty, gx, gy, air * 1.1, h * 1.1, w, FIRE_S * Math.min(1, fI * 2.2) * (1 - 0.3 * k), 0.5, cow);
   // lightning: the bolt is far off and high, so its shadow is shorter and hard, gone with the flash
   if (flash > 0.05) castAlong(fx, fy, tx, ty, -Math.cos(flashAng) * 0.75, -Math.sin(flashAng) * 0.4, air * 0.75, h * 0.75, w, BOLT_S * Math.min(1, flash * 1.4) * (1 - 0.3 * k), 0.35, cow);
 }
+// Every body's shadow, into the band applyGrassForces cleared this step.
+function castShadows() { for (const e of ents) castShadow(e); }

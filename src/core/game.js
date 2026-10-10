@@ -13,6 +13,7 @@ function simulate(dt) {
 
   updateCows(dt);             // entities/cow.js
   updateWorld(dt);            // world/world.js
+  castShadows();              // world/shadows.js: after the cows moved and the lightning struck
   for (const b of braziers) updateFire(b, dt);   // world/lights.js
   updateFlora(dt);            // world/flora.js
   updateLife(dt);             // world/life.js
