@@ -17,8 +17,9 @@ const globals = ['window', 'document', 'addEventListener', 'matchMedia', 'device
 fs.writeFileSync(path.join(tmp, 'eslint.config.mjs'), `export default [{ files: ['**/*.js'], languageOptions: { ecmaVersion: 2022, sourceType: 'script',
   globals: { ${globals.map(g => `${g}: 'readonly'`).join(', ')}, KNIGHT_ART: 'writable', KSW: 'readonly', COW_ART: 'writable' } },
   rules: { 'no-undef': 'error', 'no-redeclare': 'error', 'no-dupe-keys': 'error', 'no-unused-vars': ['warn', { vars: 'all', args: 'none' }] } }];\n`);
-let bin;
-try { bin = require.resolve('eslint/bin/eslint.js', { paths: [root] }); } catch { bin = '/opt/node-tools/node_modules/eslint/bin/eslint.js'; }
+// eslint's package exports hide bin/, so find the file: the repo's node_modules (npm ci), else a global install
+const bin = [path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), '/opt/node-tools/node_modules/eslint/bin/eslint.js'].find(f => fs.existsSync(f));
+if (!bin) { console.error('eslint not found: run npm ci'); process.exit(2); }
 let report;
 try { report = execFileSync(process.execPath, [bin, '-f', 'json', '-c', 'eslint.config.mjs', 'game.js'], { cwd: tmp, encoding: 'utf8' }); }
 catch (e) { report = e.stdout; if (!report) { console.error(e.message); process.exit(2); } }
