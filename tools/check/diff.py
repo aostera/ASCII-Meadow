@@ -1,11 +1,36 @@
+# Compares two screenshot sets taken by det.cjs (<prefix>_<name>.png) pixel by pixel.
+# Exit 0 only when both sets hold the same shots and every pair matches; an empty or missing set is a failure,
+# never a pass.   usage: python3 tools/check/diff.py <reference prefix> <candidate prefix> [--tolerance N] [--out DIR]
+#   --tolerance N   ignore per-channel differences up to N (1 absorbs the ±1 text rasterisation noise of mobile runs)
+#   --out DIR       write a highlighted difference image for every pair that differs
 import sys, glob, os
 from PIL import Image, ImageChops
-a, b = sys.argv[1], sys.argv[2]; tot = 0
-for fa in sorted(f for f in glob.glob(a + '_*.png') if 'sheet' not in f):
-    fb = b + fa[len(a):]
-    if not os.path.exists(fb): print('missing', fb); tot += 1; continue
-    A, B = Image.open(fa).convert('RGB'), Image.open(fb).convert('RGB')
-    if A.size != B.size: print('size', fa, A.size, B.size); tot += 1; continue
-    d = ImageChops.difference(A, B); bb = d.getbbox(); n = sum(1 for p in d.get_flattened_data() if p != (0, 0, 0)) if bb else 0
-    print('%-28s %s' % (os.path.basename(fa)[len(os.path.basename(a)):], 'identical' if not bb else 'DIFF %d px bbox %s' % (n, bb))); tot += bool(bb)
-print('TOTAL differing shots:', tot)
+
+args = sys.argv[1:]
+def opt(name, default):
+    if name in args:
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    return default
+tol = int(opt('--tolerance', 0)); out = opt('--out', None)
+if len(args) != 2: sys.exit(__doc__ or 'usage: diff.py <reference prefix> <candidate prefix> [--tolerance N] [--out DIR]')
+a, b = args
+shots = lambda p: {f[len(p) + 1:] for f in glob.glob(p + '_*.png') if 'sheet' not in os.path.basename(f)}
+ref, cand = shots(a), shots(b)
+bad = 0
+if not ref: print('FAIL: no reference shots match', a + '_*.png'); sys.exit(1)
+for name in sorted(ref | cand):
+    if name not in cand: print('%-28s MISSING in candidate' % name); bad += 1; continue
+    if name not in ref: print('%-28s MISSING in reference' % name); bad += 1; continue
+    A = Image.open('%s_%s' % (a, name)).convert('RGB'); B = Image.open('%s_%s' % (b, name)).convert('RGB')
+    if A.size != B.size: print('%-28s SIZE %s vs %s' % (name, A.size, B.size)); bad += 1; continue
+    d = ImageChops.difference(A, B)
+    if tol: d = d.point(lambda v: v if v > tol else 0)
+    bb = d.getbbox()
+    if not bb: print('%-28s identical%s' % (name, ' (within ±%d)' % tol if tol else '')); continue
+    n = sum(1 for p in d.get_flattened_data() if p != (0, 0, 0))
+    print('%-28s DIFF %d px, bbox %s' % (name, n, bb)); bad += 1
+    if out:
+        os.makedirs(out, exist_ok=True)
+        Image.blend(A, d.point(lambda v: 255 if v else 0), 0.6).save(os.path.join(out, 'diff_' + name))
+print('compared %d shots, %d failing' % (len(ref | cand), bad))
+sys.exit(1 if bad else 0)

@@ -1,40 +1,38 @@
-// JS time per frame (CDP Performance.ScriptDuration) over the same deterministic run, for two pages, alternating.
-const { chromium } = require('playwright');
-const pages = process.argv.slice(2, 4), RUNS = +(process.argv[4] || 3), N = 240;
+// Performance of two versions of the page under the same seeded run, alternating, median of N runs:
+//  - load: real ms from navigation until the game has started (first frame queued)
+//  - cpu: real ms per frame to simulate and build the frame (GPU submits stubbed the same way in both pages,
+//    so the software GPU of a headless machine does not drown the numbers), near the start and while
+//    travelling north for 600 frames
+//  - glyphs/draws: what one frame sends to the GPU
+//  - heap: JS heap in use after the run (CDP)
+// usage: node tools/check/perf.cjs <url A> <url B> [runs]
+const { launch, openGame } = require('./common.cjs');
+const [A, B, RUNS = '5'] = process.argv.slice(2);
+if (!A || !B) { console.error('usage: node tools/check/perf.cjs <url A> <url B> [runs]'); process.exit(2); }
+const med = v => [...v].sort((a, b) => a - b)[v.length >> 1];
 (async () => {
-  const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-  const res = { [pages[0]]: [], [pages[1]]: [] };
-  for (let r = 0; r < RUNS; r++) for (const url of pages) {
-    const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
-    await ctx.route(/fonts\.(googleapis|gstatic)\.com/, x => x.abort());
-    const p = await ctx.newPage();
-    await p.addInitScript(() => {
-      let s = 0x9e3779b9; Math.random = () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-      let T = 1000; const raf = [], timers = []; let tid = 1; const real = performance.now.bind(performance);
-      performance.now = () => T; Date.now = () => 1.7e12 + T;
-      window.requestAnimationFrame = cb => { raf.push(cb); return raf.length; };
-      window.setTimeout = (cb, ms = 0) => { timers.push({ id: tid, at: T + ms, cb }); return tid++; };
-      window.__ready = () => raf.length > 0;
-      // CPU only: the GPU submits become no-ops (same proxy in both pages), everything that builds the frame stays
-      const gc = HTMLCanvasElement.prototype.getContext, noop = new Set(['drawElements', 'bufferSubData', 'clear']);
-      HTMLCanvasElement.prototype.getContext = function (k, o) { const c = gc.call(this, k, o); if (k !== 'webgl2' || !c) return c;
-        return new Proxy(c, { get(t, p) { const v = t[p]; return typeof v === 'function' ? (noop.has(p) ? () => {} : v.bind(t)) : v; } }); };
-      window.__step = n => { const t0 = real(); for (let i = 0; i < n; i++) { T += 1000 / 60; for (let k = timers.length - 1; k >= 0; k--) if (timers[k].at <= T) timers.splice(k, 1)[0].cb(); const q = raf.splice(0); for (const cb of q) cb(T); } return real() - t0; };
-    });
-    const t0 = Date.now(); await p.goto(url);
-    for (let i = 0; i < 100 && !(await p.evaluate(() => window.__ready && window.__ready())); i++) await p.waitForTimeout(50);
+  const b = await launch(), res = { [A]: [], [B]: [] };
+  for (let r = 0; r < +RUNS; r++) for (const url of [A, B]) {
+    const t0 = Date.now();
+    const { ctx, page, step, key } = await openGame(b, url, { viewport: { width: 1280, height: 800 } });
     const load = Date.now() - t0;
-    const cdp = await ctx.newCDPSession(p); await cdp.send('Performance.enable');
-    await p.evaluate(() => window.__step(60));
-    const m = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(x => [x.name, x.value]));
-    const a = await m();
-    await p.keyboard.down('KeyW'); let wall = await p.evaluate(n => window.__step(n), N / 2); await p.keyboard.up('KeyW');
-    await p.keyboard.down('KeyD'); await p.keyboard.down('ShiftLeft'); wall += await p.evaluate(n => window.__step(n), N / 2); await p.keyboard.up('KeyD'); await p.keyboard.up('ShiftLeft');
-    const z = await m();
-    res[url].push({ scriptMs: (z.ScriptDuration - a.ScriptDuration) * 1000 / N, wallMs: wall / N, load });
+    await page.evaluate(() => { window.__noGPU = true; });
+    await step(60);
+    const g0 = await page.evaluate(() => ({ ...window.__gpu }));
+    const timed = async (keys, n) => { for (const k of keys) await page.keyboard.down(k); const ms = await page.evaluate(n => window.__step(n), n); for (const k of keys) await page.keyboard.up(k); return ms / n; };
+    const near = ((await timed(['KeyW'], 120)) + (await timed(['KeyD', 'ShiftLeft'], 120))) / 2;
+    const g1 = await page.evaluate(() => ({ ...window.__gpu }));
+    const travel = await timed(['KeyW', 'ShiftLeft'], 600);
+    const cdp = await ctx.newCDPSession(page); await cdp.send('Performance.enable');
+    const m = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(x => [x.name, x.value]));
+    res[url].push({ load, near, travel, glyphs: (g1.glyphs - g0.glyphs) / 240, draws: (g1.draws - g0.draws) / 240, heapMB: m.JSHeapUsedSize / 1048576 });
     await ctx.close();
   }
-  for (const u of pages) { const v = res[u]; const med = k => v.map(x => x[k]).sort((a, b) => a - b)[v.length >> 1];
-    console.log(u.split('/').slice(-2).join('/').padEnd(40), 'CPU ms/frame (median)', med('wallMs').toFixed(2), ' load→start ms', med('load'), JSON.stringify(v.map(x => +x.wallMs.toFixed(2)))); }
   await b.close();
+  const row = (name, k, f = 2) => { const a = med(res[A].map(x => x[k])), c = med(res[B].map(x => x[k])); console.log(name.padEnd(30), a.toFixed(f).padStart(10), c.toFixed(f).padStart(10), ((c / a - 1) * 100).toFixed(1).padStart(7) + '%'); };
+  console.log('median of', RUNS, 'runs'.padEnd(18), 'A'.padStart(10), 'B'.padStart(10), 'B vs A'.padStart(8));
+  row('load to start, ms', 'load', 0); row('CPU ms/frame near start', 'near'); row('CPU ms/frame travelling', 'travel');
+  row('glyphs per frame', 'glyphs', 0); row('GPU draw calls per frame', 'draws'); row('JS heap after run, MB', 'heapMB', 1);
+  console.log('A =', A, '\nB =', B);
+  console.log(JSON.stringify(res));
 })();

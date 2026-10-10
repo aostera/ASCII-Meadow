@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Syntax, ESLint, resources, bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax of every script
+        run: node tools/check/syntax.cjs
+      - name: ESLint (the scripts linted in load order, as one global scope)
+        run: node tools/check/lint.cjs --warnings
+      - name: Page resources (exist, relative, all loaded, no inline code)
+        run: node tools/check/resources.cjs
+      - name: Standalone HTML (tools/bundle.py)
+        run: |
+          python3 tools/bundle.py dist/ascii-meadow.html
+          python3 tools/bundle.py dist/ascii-meadow.body.html --body
+          if grep -q '<script src=' dist/ascii-meadow.html; then echo 'bundle still loads external scripts'; exit 1; fi
+          if grep -q 'href="styles/' dist/ascii-meadow.html; then echo 'bundle still links styles/'; exit 1; fi
+          test "$(grep -c '^<script>$' dist/ascii-meadow.html)" = "$(grep -c '<script src=' index.html)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: standalone-html
+          path: dist/
+
+  browser:
+    name: Game in Chromium (WebGL2, 2D, touch, file://, HTTP sub-folder, bundle)
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Smoke test from file://
+        run: node tools/check/smoke.cjs "file://$GITHUB_WORKSPACE/index.html" --out shots/file
+      - name: Smoke test over HTTP from /ASCII-Meadow/ (like GitHub Pages)
+        run: |
+          sh tools/build_site.sh /tmp/site/ASCII-Meadow
+          (cd /tmp/site && python3 -m http.server 8080 > /tmp/http.log 2>&1 &)
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8080/ASCII-Meadow/ > /dev/null && break; sleep 1; done
+          node tools/check/smoke.cjs http://127.0.0.1:8080/ASCII-Meadow/ --out shots/http --quick
+      - name: Smoke test of the standalone HTML
+        run: |
+          python3 tools/bundle.py dist/ascii-meadow.html
+          node tools/check/smoke.cjs "file://$GITHUB_WORKSPACE/dist/ascii-meadow.html" --out shots/bundle --quick
+      - name: Upload screenshots and logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure
+          path: |
+            shots/
+            /tmp/http.log
+
+  visual-diff:
+    # Same seeded, scripted run of the base branch and of this PR, compared pixel by pixel. Informational:
+    # a PR that means to change the picture will differ; one that only moves code must not.
+    name: Visual diff against the base branch (informational)
+    if: github.event_name == 'pull_request'
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: head
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: head/package-lock.json
+      - run: npm ci --ignore-scripts
+        working-directory: head
+      - run: npx playwright install --with-deps chromium
+        working-directory: head
+      - name: Seeded runs (main scenario, WebGL2) and pixel diff
+        working-directory: head
+        run: |
+          node tools/check/det.cjs "file://$GITHUB_WORKSPACE/base/index.html" shots/base gl
+          node tools/check/det.cjs "file://$GITHUB_WORKSPACE/head/index.html" shots/head gl
+          python3 tools/check/diff.py shots/base shots/head --out shots/diff | tee shots/diff.txt
+      - name: Summary
+        if: always()
+        working-directory: head
+        run: |
+          { echo '### Visual diff against the base branch'; echo '```'; cat shots/diff.txt 2>/dev/null || echo 'no result'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-diff
+          path: head/shots/

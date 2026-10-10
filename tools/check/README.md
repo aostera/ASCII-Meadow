@@ -1,26 +1,41 @@
-# Проверка «до/после» без изменения поведения
+# Проверки
 
-Игра запускается детерминированно: `Math.random` с фиксированным зерном, фиктивные часы (`performance.now`,
-`Date.now`, `requestAnimationFrame`, `setTimeout`), записанный ввод, шрифты из сети отключены. Одинаковый код
-даёт одинаковые пиксели, поэтому перенос кода проверяется попиксельным сравнением скриншотов.
+Самой игре ничего не нужно. Инструментам проверки нужны Node 22 и `npm ci` (eslint, playwright).
+Chromium ставится командой `npx playwright install chromium`; можно указать свой: `CHROMIUM=/путь/к/chromium`.
+WebGL в безголовом режиме работает через SwiftShader, флаги уже в скриптах.
+
+| Скрипт | Что проверяет |
+| --- | --- |
+| `syntax.cjs` | `node --check` всех скриптов `src/` и `tools/` |
+| `lint.cjs [--warnings]` | ESLint по скриптам, склеенным в порядке загрузки (одна глобальная область): `no-undef`, `no-redeclare`, `no-dupe-keys`; ответ — `файл:строка` |
+| `resources.cjs` | подключения существуют и относительны, каждый файл `src/` подключён ровно один раз, нет встроенного кода в `index.html`, `main.js` последний |
+| `smoke.cjs <url> [--out DIR] [--quick]` | игра в Chromium с утверждениями: мир, WebGL2, 2D, управление, коровы, касания, ресайз, старт в окне нулевого размера, консоль |
+| `det.cjs` + `diff.py` | детерминированный прогон и попиксельное сравнение «до/после» |
+| `perf.cjs <A> <B> [N]` | загрузка, CPU на кадр (у старта и в пути), глифы и вызовы отрисовки, куча JS; медиана N прогонов |
+
+`common.cjs` — общее для всех: запуск Chromium и детерминированная среда.
+- `Math.random` с фиксированным зерном.
+- Фиктивные `performance.now`, `Date.now`, `requestAnimationFrame` и `setTimeout`.
+- Счётчики отправок на GPU и флаг `__noGPU`, который их глушит (для быстрых перемещений). Кадр при этом всё равно собирается.
+
+## Сравнение «до/после»
+
+Одинаковый код и одинаковый ввод дают одинаковые пиксели. Поэтому перенос кода проверяется сравнением скриншотов:
 
 ```sh
-# эталон: версия до правки
-git show <коммит>:index.html > /tmp/before.html          # однофайловая версия до рефакторинга
-#   или: git worktree add /tmp/before <коммит>           # модульная версия
-node tools/check/det.cjs file:///tmp/before.html /tmp/shots/b gl              # сценарий main (1280×800)
-node tools/check/det.cjs file://$PWD/index.html  /tmp/shots/a gl
-python3 tools/check/diff.py /tmp/shots/b /tmp/shots/a                        # identical / DIFF n px
-
-# режимы: gl | 2d (запасной путь; для скорости 640 400); мобильный: gl 0 0 mob
-# сценарии (7-й аргумент): main — старт, ходьба, бег, прыжок, мышь, ресайз; dirs — 8 направлений, бег, коровы;
-#                         castle — путь к замку, лестница, «E»; touch — касания (с mob)
-node tools/check/det.cjs file://$PWD/index.html /tmp/shots/a gl 1280 800 "" dirs
-
-# CPU на кадр (отправка на GPU заглушена одинаково в обеих страницах), медиана N прогонов
-node tools/check/perf.cjs file:///tmp/before.html file://$PWD/index.html 7
+git show <коммит>:index.html > /tmp/before.html          # версия до правки (одним файлом)
+#   или git worktree add /tmp/before <коммит>            # модульная версия
+node tools/check/det.cjs file:///tmp/before.html /tmp/shots/b gl
+node tools/check/det.cjs "file://$PWD/index.html" /tmp/shots/a gl
+python3 tools/check/diff.py /tmp/shots/b /tmp/shots/a --out /tmp/shots/diff   # код выхода 0 = совпадает
 ```
 
-Нужны Playwright и Chromium (`CHROMIUM=/путь/к/chromium`, по умолчанию `/opt/pw-browsers/chromium`);
-WebGL в безголовом режиме — через SwiftShader (флаги уже в скриптах). Мобильные снимки шумят на ±1 уровень
-в паре пикселей текста HUD даже между двумя прогонами одной версии: это растеризация текста, не игра.
+- **Аргументы `det.cjs`:** `<url> <префикс> [gl|2d] [ширина] [высота] [mob] [сценарий]`.
+- **Сценарии:**
+  - `main` — старт, ходьба, бег, прыжок, мышь, ресайз;
+  - `dirs` — 8 направлений, бег, коровы;
+  - `cows` — стадо, испуг;
+  - `castle` — стена, лестница, ворота, «E»;
+  - `touch` — касания (вместе с `mob`).
+- **Режимы:** 2D-резерв удобнее гонять в окне 640×400; мобильный режим — `gl 0 0 mob`.
+- **`diff.py`:** падает на пустом наборе, на пропусках и на различиях. `--tolerance 1` гасит шум ±1 в тексте на мобильном: такой шум есть даже между двумя прогонами одной версии.
