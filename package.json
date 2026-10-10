@@ -1,8 +1,9 @@
 {
   "name": "ascii-meadow",
   "private": true,
-  "description": "ASCII Meadow: the game needs no build or install; these dev tools only run the checks (tools/check).",
+  "description": "ASCII Meadow: the game needs no build; `npm ci` copies the site into dist/ (prepare) for Cloudflare, and the dev tools run the checks (tools/check).",
   "scripts": {
+    "prepare": "sh tools/build_site.sh dist",
     "check": "npm run check:static && npm run check:browser",
     "check:static": "node tools/check/syntax.cjs && node tools/check/lint.cjs && node tools/check/resources.cjs",
     "check:browser": "node tools/check/smoke.cjs \"file://$PWD/index.html\" --out shots/smoke",
