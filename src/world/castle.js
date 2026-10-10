@@ -294,7 +294,10 @@ function buildCathedral() {
   buildBins();
   // ax, ay: the map's origin, where the mound's front foot stands by default (map coordinates are measured from
   // it); ox, oy: where it stands now, moved by the map's castle offset (ground units)
-  const ax = COLS * 0.5 * CW, ay = 2150 * MS + 40, [dx, dz] = castleOff();
+  const ax = COLS * 0.5 * CW, ay = 2150 * MS + 40, [ox0, oz0] = castleOff();
+  // the map's offset, kept inside this world (a smaller window makes a smaller one): the castle is never cut
+  const dx = Math.max((820 * MS - ax) / MS, Math.min((COLS * CW - 820 * MS - ax) / MS, ox0));
+  const dz = Math.max((ay + 160 * MS - ROWS * CH) / (SINP * MS), Math.min((ay - 2150 * MS) / (SINP * MS), oz0));
   const ox = ax + dx * MS, oy = ay - dz * SINP * MS;
   const Dv = [0, -SINP, COSP];
   const cx0 = Math.max(0, Math.floor((ox - 820 * MS) / CW)), cx1 = Math.min(COLS - 1, Math.ceil((ox + 820 * MS) / CW));
@@ -338,7 +341,7 @@ function buildCathedral() {
     runs.push(r);
   }
   const cv = true;
-  Object.assign(cathedral, { cv, cx0, cy0, BW, BH: BH2, lum, dep, glyph, lev, runs, ox: ax, oy: ay, kx: ox, ky: oy, face, gateRow: (oy + 110 * SINP * MS) / CH, trailRow: (ay + 110 * SINP * MS) / CH, lit });   // the trail is its own thing: it starts where the gate stands by default
+  Object.assign(cathedral, { cv, cx0, cy0, BW, BH: BH2, lum, dep, glyph, lev, runs, ox: ax, oy: ay, kx: ox, ky: oy, off: [dx, dz], face, gateRow: (oy + 110 * SINP * MS) / CH, trailRow: (ay + 110 * SINP * MS) / CH, lit });   // the trail is its own thing: it starts where the gate stands by default
   // one glow per lit window, at its centre
   const wins = new Map();
   for (let j = 0; j < lit.length; j += 3) { const w = wins.get(lit[j + 2]) || [0, 0, 0]; w[0] += lit[j]; w[1] += lit[j + 1]; w[2]++; wins.set(lit[j + 2], w); }
@@ -368,7 +371,7 @@ const toModelXZ = (x, y) => [(x * CW - cathedral.ox) / MS, -((y + 0.7) * CH - ca
 // Infinity inside walls and towers.
 function surfAt(x, y) {
   if (!cathedral.cv) return 0;
-  const [mx, mz] = toModelXZ(x, y), [dx, dz] = castleOff(), gx = mx - dx, gz = mz - dz;   // into the castle's own frame
+  const [mx, mz] = toModelXZ(x, y), [dx, dz] = cathedral.off || [0, 0], gx = mx - dx, gz = mz - dz;   // into the castle's own frame (as built)
   if (gz < -140 || gz > 1060 || Math.abs(gx) > 800) return 0;
   const h = cast(gx, 5000, gz, 0, -1, 0, 0, BINS.down(gx, 0, gz));
   if (!h) return 0;
