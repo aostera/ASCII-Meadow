@@ -122,7 +122,7 @@ function bakeLily(flower, sd) {
       if (da < 0.32 && r > 0.12) continue;                                  // the notch
       r0 = Math.min(r0, cx); r1 = Math.max(r1, cx);
       const rim = r > 0.72 && u + w < -0.2, vein = Math.abs(Math.sin(Math.atan2(w, u) * 4)) < 0.12 && r < 0.8;
-      let v = 0.42 + (rim ? 0.3 : 0) - (vein ? 0.14 : 0) - Math.max(0, u + w) * 0.1;   // veins: darker lines
+      let v = 0.2 + (rim ? 0.16 : 0) - (vein ? 0.08 : 0) - Math.max(0, u + w) * 0.06;   // dark leaves (the toads on them must read); veins darker still
       v = Math.max(0, Math.min(0.9, v + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.12));
       // a leaf is solid, not dithered air: dense glyphs, the tone carries the light
       list.push(cx, cy, fid(rim ? '@' : vein ? ':' : '%', Math.floor(v * 7)), Math.round(Math.min(1, 0.55 + v * 0.6) * 100));
@@ -151,7 +151,7 @@ function bakeFloraSprites() {
     const ox = x0 * v.fw - 2, oy = y0 * v.fh - 2, cw = (x1 - x0 + 2) * v.fw + 4, ch = (y1 - y0 + 2) * v.fh + 4;
     const c = document.createElement('canvas'); c.width = Math.ceil(cw * bd); c.height = Math.ceil(ch * bd);
     const g = c.getContext('2d'); g.setTransform(bd, 0, 0, bd, -ox * bd, -oy * bd);
-    if (v.shade) { g.fillStyle = 'rgba(6,6,6,0.5)'; const Sh = v.shade; for (let k = 0; k < Sh.length; k += 3) g.fillRect(Sh[k + 1] * v.fw - 0.3, Sh[k] * v.fh - 0.3, (Sh[k + 2] - Sh[k + 1]) * v.fw + 0.6, v.fh + 0.6); }   // a cast shadow on the ground
+    if (v.shade) { g.fillStyle = 'rgba(6,6,6,0.28)'; const Sh = v.shade; for (let k = 0; k < Sh.length; k += 3) g.fillRect(Sh[k + 1] * v.fw - 0.3, Sh[k] * v.fh - 0.3, (Sh[k + 2] - Sh[k + 1]) * v.fw + 0.6, v.fh + 0.6); }   // a cast shadow on the ground
     g.fillStyle = 'rgba(12,12,12,0.97)';
     for (let k = 0; k < Rn.length; k += 3) g.fillRect(Rn[k + 1] * v.fw - 0.3, Rn[k] * v.fh - 0.3, (Rn[k + 2] - Rn[k + 1]) * v.fw + 0.6, v.fh + 0.6);
     for (let k = 0; k < L.length; k += 4) { const sp = GB.spr[L[k + 2]]; g.globalAlpha = L[k + 3] * 0.01; g.drawImage(A, sp[0], sp[1], sp[2], sp[3], L[k] * v.fw + sp[6], L[k + 1] * v.fh + sp[7], sp[4], sp[5]); }

@@ -9,6 +9,7 @@ function simulate(dt) {
   if (editing) updateEditor(dt);   // editor/editor.js
   updateCamera(dt);           // core/camera.js
   applyGrassForces(dt);       // world/grass.js
+  updateBirds(dt);            // world/birds.js: a flock bursting out thrashes the grass
   updateGusts(dt);            // world/wind.js
   updateGrass(dt);            // world/grass.js
 

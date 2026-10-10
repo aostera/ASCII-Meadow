@@ -67,7 +67,7 @@ function paintCell(i, x, y, c) {
   if (c === 1 || c === 2 || c === 3 || c === 6) {
     groundCell(x, y, i); kind[i] = 1;
     if (c === 2) { height[i] = Math.max(height[i], 0.72); segs[i] = s > 0.4 ? 4 : 3; }   // tall: up to the knight's knees
-    else if (c === 3) { height[i] = Math.min(height[i], 0.42); segs[i] = 1; }           // short, mown
+    else if (c === 3) { height[i] = Math.max(height[i], 0.62 + s * 0.12); segs[i] = 1; }                     // short, mown: one bent tip over the stem, and it catches the light
     else if (c === 6) kind[i] = s > 0.88 ? 3 : s > 0.8 ? 4 : s > 0.72 ? 6 : 1;          // flowers among the grass
   }
   else if (c === 4) kind[i] = 2;                                                       // bare earth

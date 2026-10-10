@@ -72,7 +72,7 @@ function render() {
         if (segs[i]) {   // a lily pad lying on the water, lifted a little as each ripple passes under it, drifting on its stem
           const lift = w > 0.4 ? (w - 0.4) * 0.9 : 0, sway = Math.sin(t * 0.7 + s * 9) * 0.6;
           const lp = LILIES[segs[i] === 3 ? 3 + ((s * 97) | 0) % 2 : ((s * 89) | 0) % 3];
-          if (!(slowRow && covered(x, y, baseY))) gput(lp.whole, px + CW * 0.5 + sway, py + CH * 0.6 - lift, lit < 0.45 ? 0.45 : lit);
+          if (!(slowRow && covered(x, y, baseY))) gput(lp.whole, px + CW * 0.5 + sway, py + CH * 0.6 - lift, lit < 0.35 ? 0.35 : lit * 0.85);
           continue;
         }
         // the surface: faint level strokes everywhere, so water reads as a sheet; brighter crests ride over them;
@@ -114,6 +114,7 @@ function render() {
     blit(open ? CI['^'] : CI[';'], f.c, f.x * CW, f.y * CH);
   }
 
+  drawBirds();         // world/birds.js
   drawToadRipples();   // world/toads.js: rings where a toad went in or came out
 
   // gust ring
