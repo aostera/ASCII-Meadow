@@ -110,7 +110,7 @@ def expand(seq, n, cyclic, big=False):
         for k in range(1, n): res.append(tween(A, B, k / n, big))
     if not cyclic: res.append(T[-1])
     return [Image.fromarray(np.clip(r, 0, 255).astype(np.uint8)) for r in res]
-SEQ = [('idle', IDLE, 1, False), ('walk', WALK, 6, True), ('run', RUN, 6, True), ('eat', EAT, 1, False), ('hurt', HURT, 3, False), ('die', DIE, 3, False)]
+SEQ = [('idle', IDLE, 1, False), ('walk', WALK, 6, True), ('run', RUN, 6, True), ('eat', EAT, 1, False)]
 tiles, index = [], {}
 for name, seq, n, cyc in SEQ:
     fr = [Image.fromarray(place3(f).astype(np.uint8)) for f in seq] if n == 1 else expand(seq, n, cyc, name == 'graze')
