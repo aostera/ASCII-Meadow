@@ -95,13 +95,36 @@ function campFence(ang, stakes, sd) {
   return { S, ropes: [], foot, R: len / 2, H: h };
 }
 
+// A cooking fire's gear: three poles leaning together over the flames, a chain from where they cross, and a
+// sooty iron pot on it, dark stew inside. Stands over a campfire whose map entry says 'cook'.
+function campCook() {
+  const K = knightPx(), S = [], apex = [0, K * 0.82, 0], up = [0, 1, 0];
+  for (let k = 0; k < 3; k++) {
+    const a = k / 3 * 6.2832 + 0.5, foot = [Math.cos(a) * K * 0.3, 0, Math.sin(a) * K * 0.3 * 0.8];
+    const d = campV(apex[0] - foot[0], apex[1] - foot[1], apex[2] - foot[2]), len = Math.hypot(apex[0] - foot[0], apex[1] - foot[1], apex[2] - foot[2]);
+    let ex = campV(d[1] * 0 - d[2] * 1, d[2] * 0 - d[0] * 0, d[0] * 1 - d[1] * 0); if (!isFinite(ex[0]) || Math.hypot(...ex) < 0.5) ex = [1, 0, 0];
+    const ez = [d[1] * ex[2] - d[2] * ex[1], d[2] * ex[0] - d[0] * ex[2], d[0] * ex[1] - d[1] * ex[0]];
+    S.push(campBox([(apex[0] + foot[0]) / 2, (apex[1] + foot[1]) / 2 + K * 0.04, (apex[2] + foot[2]) / 2], [K * 0.016, len / 2 + K * 0.05, K * 0.016], ex, d, ez, 'wood'));
+  }
+  const py = K * 0.42, pr = K * 0.13, ph = K * 0.14, p = [[0, -1, 0, -(py - ph / 2)], [0, 1, 0, py + ph / 2]];
+  for (let k = 0; k < 10; k++) {   // ten staves of iron, bellied: the lower half tucks in
+    const a = (k + 0.5) / 10 * 6.2832, c = Math.cos(a), s = Math.sin(a);
+    p.push([c, 0, s, pr]);
+    const n = campV(c, -0.9, s); p.push([n[0], n[1], n[2], campDot(n, [c * pr, py - ph * 0.1, s * pr])]);
+  }
+  S.push({ p, mat: 'iron', bs: [0, py, 0, Math.hypot(pr, ph) + 1] });
+  S.push(campBox([0, (py + ph / 2 + apex[1]) / 2, 0], [K * 0.006, (apex[1] - py - ph / 2) / 2, K * 0.006], [1, 0, 0], up, [0, 0, 1], 'iron'));   // the chain
+  return { S, ropes: [], foot: () => false, R: K * 0.34, H: apex[1], glow: true };
+}
+let COOKV = null;   // its baked picture
+
 // ---------- baking: the model into fine glyphs ----------
 function bakeCamp(type, model, sd) {
   const fd = charDims(player), fw = fd.fcw, fh = fd.fch, D = [0, -SINP, COSP], { S, ropes, R, H } = model;
   const list = [], runs = [], shade = [], half = R * 1.75;
   const y0 = Math.floor(-(H + 0.1 * knightPx()) * COSP / fh - R * 1.2 * SINP / fh) - 2, y1 = Math.ceil(R * 1.2 * SINP / fh) + 2;
   for (let cy = y0; cy <= y1; cy++) {
-    let r0 = 1e9, r1 = -1e9, s0 = 1e9, s1 = -1e9;
+    let s0 = 1e9, s1 = -1e9, seg = 1e9, segEnd = -1e9;   // backing in runs of cells actually covered: gaps (between poles, holes) stay open
     for (let cx = Math.floor(-half / fw); cx <= Math.ceil(half / fw); cx++) {
       const sx = cx * fw, sy = cy * fh, P = [sx, -sy * COSP, -sy * SINP], O = [P[0], P[1] - D[1] * 1e4, P[2] - D[2] * 1e4];
       const hit = campHit(S, O, D);
@@ -112,7 +135,8 @@ function bakeCamp(type, model, sd) {
       }
       const p = [O[0] + D[0] * hit.t, O[1] + D[1] * hit.t, O[2] + D[2] * hit.t], n = hit.n, s = hit.s;
       if (s.torn && vnoise(p[0] * 0.09 + sd, p[1] * 0.07 + p[2] * 0.05) > 0.74) continue;   // holes in the old cloth
-      r0 = Math.min(r0, cx); r1 = Math.max(r1, cx);
+      if (cx !== segEnd + 1) { if (segEnd >= seg) runs.push(cy, seg, segEnd + 1); seg = cx; }
+      segEnd = cx;
       const diff = Math.max(0, campDot(n, LGT)), lit = diff > 0 && campHit(s.others || (s.others = S.filter(o => o !== s)), [p[0] + n[0] * 0.6, p[1] + n[1] * 0.6, p[2] + n[2] * 0.6], LGT) ? 0.45 : 1;
       let alb, c = null;
       if (s.mat === 'cloth') {
@@ -125,19 +149,23 @@ function bakeCamp(type, model, sd) {
         if (s.door && s.door(p)) { alb = 0.04; c = ' '; }                                          // the dark inside
         else if (s.flap && s.flap(p)) alb *= 1.25;                                                 // the flap tied back
         else if (Math.abs(n[1]) < 0.95 && Math.abs(n[2]) < 0.5 && hash(cx * 3 + 1, cy * 5) < 0.45) c = n[0] < 0 ? '/' : '\\';   // slopes run in strokes
+      } else if (s.mat === 'iron') {
+        alb = n[1] > 0.9 ? 0.16 + (hash(cx, cy) > 0.8 ? 0.2 : 0) : 0.3 * (0.8 + 0.3 * vnoise(p[0] * 0.4, p[1] * 0.5));   // sooty iron; the stew a dark sheen on top
+        if (n[1] <= 0.9) alb += 0.42 * Math.max(0, Math.min(1, (knightPx() * 0.52 - p[1]) / (knightPx() * 0.2)));   // its sides lit from below by the flames, brightest low down
       } else if (s.mat === 'flag') { alb = 0.62 * (0.8 + 0.3 * vnoise(p[0] * 0.2, p[1] * 0.3 + sd));   // a faded pennant, paler than the canvas
     } else {
         alb = 0.4 * (0.75 + 0.4 * vnoise(p[0] * 0.3 + p[2] * 0.3 + sd, p[1] * 0.06));            // grain
         if (Math.abs(n[1]) < 0.3 && hash(cx, cy * 7) < 0.5) c = Math.abs(n[0]) > Math.abs(n[2]) * 1.5 && Math.abs(D[2] * n[2]) < 0.5 ? '|' : null;
       }
       let v = Math.pow(Math.min(1, alb * (0.22 + 0.95 * diff * lit) * 1.15), 0.7);   // the castle's tone curve
+      if (model.glow) v = Math.min(0.9, v * 1.35 + 0.1 * Math.max(0, -n[1]) + 0.06);   // lit from below by the fire
       v = Math.max(0, Math.min(0.95, v + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.1));
       if (c === ' ') continue;
       const ci = Math.min(RAMP.length - 1, Math.floor(v * 9));
       if (!c) c = ci > 0 ? RAMP[ci] : null;
       if (c) list.push(cx, cy, fid(c, Math.floor(v * 8)), Math.round(Math.min(1, 0.45 + v * 0.8) * 100));
     }
-    if (r1 >= r0) runs.push(cy, r0, r1 + 1);
+    if (segEnd >= seg) runs.push(cy, seg, segEnd + 1);
     if (s1 >= s0) shade.push(cy, s0, s1 + 1);
   }
   for (const [a, b] of ropes) {   // guy ropes: thin dim strokes from the cloth to the pegs
@@ -156,4 +184,5 @@ function bakeCamp(type, model, sd) {
 function bakeCampVariants(out) {
   [['ridge', 101], ['ridge', 104], ['torn', 103], ['torn', 107]].forEach(([k, sd]) => out.push(bakeCamp('tent', campTent(k, sd), sd)));   // whole and torn
   [[0, 0], [Math.PI / 2, 0], [Math.PI / 4, 0], [-Math.PI / 4, 0], [0, 1], [Math.PI / 2, 1]].forEach(([a, st], k) => out.push(bakeCamp('fence', campFence(a, st, 111 + k), 111 + k)));
+  COOKV = bakeCamp('cook', campCook(), 131); out.push(COOKV);
 }

@@ -132,6 +132,8 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       const count = () => page.evaluate(() => { let n = 0; for (let i = 0; i < N; i++) if (kind[i] === 2) n++; return { earth: n, flora: flora.length, cows: cows.map(c => toModelXZ(c.home[0], c.home[1]).map(Math.round)) }; });
       await step(20); await page.keyboard.press('KeyM'); await step(2);
       check('editor: M opens the panel', await page.evaluate(() => editing && !document.querySelector('.ed').hidden));
+      // the checks below start from the generated world: the editor's own «Сбросить», whatever the shipped map holds
+      await page.evaluate(() => { applyWholeMap({}); ED.undo.length = ED.redo.length = 0; ED.sel = null; edSyncUI(); }); await step(2);
       // selecting a generated tree changes nothing; stones and flowers paint what they say
       const fp = await page.evaluate(() => { const f = flora.find(f => f.br > VY0 + 12 && f.br < VY1 - 8 && f.x > VX0 + 12 && f.x < VX0 + VC * 0.6); return f ? [(f.x - camX) * CW, (f.br - camY) * CH - 4] : null; });
       if (fp) { await page.keyboard.press('KeyV'); await page.mouse.click(fp[0], fp[1]); await step(1); }

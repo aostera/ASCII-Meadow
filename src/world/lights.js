@@ -25,6 +25,11 @@ function updateFire(b, dt) {
     q.life -= dt * (0.9 + q.k * 0.8); q.y += q.vy * dt; q.x += (q.vx + Math.sin(t * 9 + q.k * 20) * 6 * Math.min(MS, 1.4)) * dt;
     if (q.life <= 0) b.parts.splice(i, 1);
   }
+  if (b.cook) {   // steam off the pot: slow, swelling, leaning with the wind, gone in a few seconds
+    const S = b.steam;
+    if (S.length < 26 && Math.random() < dt * 7) S.push({ x: (Math.random() - 0.5) * 6, y: 0, life: 1, k: Math.random() });
+    for (let i = S.length - 1; i >= 0; i--) { const q = S[i]; q.life -= dt * 0.38; q.y -= (10 + q.k * 6) * dt * MS; q.x += (9 + Math.sin(t * 1.3 + q.k * 9) * 5) * dt * MS; if (q.life <= 0) S.splice(i, 1); }
+  }
 }
 function drawBrazier(b) {
   const bx = b.x * CW, by = (b.y + 0.7) * CH - b.lift;
@@ -46,6 +51,8 @@ function drawBrazier(b) {
     const ci = FLAMECH[Math.min(FLAMECH.length - 1, ((1 - q.life) * FLAMECH.length) | 0)];
     blit(ci, BL0 + Math.min(BLN - 1, Math.round(6 + q.life * 8)), bx + q.x - CW * 0.5, by + fy + q.y, Math.min(1, q.life * 1.6));
   }
+  if (b.cook && COOKV) gput(COOKV.whole, bx, by - CH * 0.4, 1);   // world/camp.js: the tripod and the pot over the flames, its dark belly in front of them
+  if (b.cook) { const top = by - CH * 0.4 - knightPx() * 0.5; for (const q of b.steam) blit(CI[q.life > 0.6 ? '~' : q.k > 0.5 ? '°' : '.'], C_WHITE, bx + q.x - CW * 0.5, top + q.y, Math.min(0.7, q.life) * (1 - Math.max(0, q.life - 0.9) * 8)); }
 }
 let glowCv = null;
 function glowSprite() {
