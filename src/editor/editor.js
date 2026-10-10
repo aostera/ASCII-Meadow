@@ -9,7 +9,7 @@ const ED = {
   ui: null, mini: null, miniKey: '', draftTimer: 0,
 };
 const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['w', 'Вода', '9'], ['m', 'Болото', 'P'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
-const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['tent', 'Палатка', 'Y'], ['fence', 'Забор', 'I'], ['toad', 'Жаба', 'G'], ['birds', 'Птицы в траве', 'O'], ['castle', 'Замок', 'L'], ['select', 'Выбрать и двигать', 'V']];
+const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['tent', 'Палатка', 'Y'], ['fence', 'Забор', 'I'], ['toad', 'Жаба', 'G'], ['frog', 'Лягушка', 'X'], ['birds', 'Птицы в траве', 'O'], ['castle', 'Замок', 'L'], ['select', 'Выбрать и двигать', 'V']];
 const ED_FOG = [['fogl', 'Лёгкий туман', 'H'], ['fogd', 'Густой туман', 'J'], ['fogc', 'Убрать туман', 'N']];
 const ED_FOGCODE = { fogl: 2, fogd: 3, fogc: 1 };
 const ED_DRAFT = 'ascii-meadow-map-draft';
@@ -206,7 +206,7 @@ function edPlace(tool, gx, gz) {
   const p = [edR1(gx), edR1(gz)];
   if (tool === 'start') { MEADOW_MAP.start = p; applyObjects({ start: 1 }); ED.sel = { kind: 'start', mi: 0 }; return; }
   if (tool === 'cow') { MEADOW_MAP.cows.push(p); applyObjects({ cows: 1 }); ED.sel = { kind: 'cows', mi: MEADOW_MAP.cows.length - 1 }; return; }
-  if (tool === 'toad') { (MEADOW_MAP.toads = MEADOW_MAP.toads || []).push(p); applyObjects({ toads: 1 }); ED.sel = { kind: 'toads', mi: MEADOW_MAP.toads.length - 1 }; return; }
+  if (tool === 'toad' || tool === 'frog') { (MEADOW_MAP.toads = MEADOW_MAP.toads || []).push(tool === 'frog' ? [...p, 'frog'] : p); applyObjects({ toads: 1 }); ED.sel = { kind: 'toads', mi: MEADOW_MAP.toads.length - 1 }; return; }
   if (tool === 'fire') { MEADOW_MAP.fires.push(edFirePoint(gx, gz)); applyObjects({ fires: 1 }); ED.sel = { kind: 'fires', mi: MEADOW_MAP.fires.length - 1 }; return; }
   MEADOW_MAP.flora.push([tool, ED.variant[tool], ...p]);
   applyObjects({ flora: 1 }); ED.sel = { kind: 'flora', mi: MEADOW_MAP.flora.length - 1 };
@@ -217,6 +217,7 @@ function edMoveSelected(gx, gz) {
   if (s.kind === 'start') MEADOW_MAP.start = p;
   else if (s.kind === 'flora') { const e = MEADOW_MAP.flora[s.mi]; e[2] = p[0]; e[3] = p[1]; }
   else if (s.kind === 'events') { const e = MEADOW_MAP.events[s.mi]; e[1] = p[0]; e[2] = p[1]; }
+  else if (s.kind === 'toads') { const e = MEADOW_MAP.toads[s.mi]; e[0] = p[0]; e[1] = p[1]; }
   else MEADOW_MAP[s.kind][s.mi] = s.kind === 'fires' ? edFirePoint(gx, gz) : p;
   applyObjects({ [s.kind]: 1 });
 }
@@ -291,7 +292,7 @@ function drawEditor() {
     if (on || hov) g.strokeRect(o.sx - o.r, o.sy - o.top, o.r * 2, o.top + CH * 1.5 * VZ);
     g.beginPath(); g.ellipse(o.sx, o.sy, Math.min(o.r, 8), Math.min(o.r, 8) * 0.45, 0, 0, Math.PI * 2); g.stroke();
     if (o.area) { g.setLineDash([2, 4]); g.beginPath(); g.ellipse(o.sx, o.sy, o.area, o.area * 0.5 * CH / CW, 0, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); }   // where the knight sets them off
-    const label = o.kind === 'start' ? 'старт' : o.kind === 'fires' ? 'костёр' : o.kind === 'cows' ? 'корова' : o.kind === 'toads' ? 'жаба' : o.kind === 'events' ? 'птицы' : on || hov ? ({ tree: 'дерево ', dead: 'сухое ', bush: 'куст ', tent: 'палатка ', fence: 'забор ' }[o.f.v.type] || '') + (variantsOf(o.f.v.type).indexOf(o.f.v) + 1) : '';
+    const label = o.kind === 'start' ? 'старт' : o.kind === 'fires' ? 'костёр' : o.kind === 'cows' ? 'корова' : o.kind === 'toads' ? (MEADOW_MAP.toads[o.mi][2] === 'frog' ? 'лягушка' : 'жаба') : o.kind === 'events' ? 'птицы' : on || hov ? ({ tree: 'дерево ', dead: 'сухое ', bush: 'куст ', tent: 'палатка ', fence: 'забор ' }[o.f.v.type] || '') + (variantsOf(o.f.v.type).indexOf(o.f.v) + 1) : '';
     if (label) { g.fillStyle = on ? 'rgba(255,214,120,.95)' : 'rgba(250,250,250,.7)'; g.fillText(label, o.sx + 6, o.sy - 4); }
   }
   if (ED.drag && ED.drag.moved) {   // where the dragged object will land

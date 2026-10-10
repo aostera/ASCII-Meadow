@@ -13,11 +13,11 @@ const toadFree = i => toadSpot(i) || (!wet[i] && !bmask[i] && !tmask[i] && kind[
 // Toads the map places (MEADOW_MAP.toads, [x, z]): they live where they were put, anywhere; keyed 'm' + index.
 function toadsFromMap() {
   const L = MEADOW_MAP.toads; if (!L) return;
-  L.forEach(([gx, gz], mi) => {
+  L.forEach(([gx, gz, kd], mi) => {
     const key = 'm' + mi; if (toads.has(key)) return;
     const [x, y] = mapToCell(gx, gz);
     if (x < VX0 - 80 || x > VX1 + 80 || y < VY0 - 40 || y > VY1 + 40) return;
-    toads.set(key, { home: key, mi, free: true, x: Math.round(x), y: Math.round(y), st: 'sit', t: 0, wait: 1 + hash(mi, 3) * 4, dir: hash(mi, 7) > 0.5 ? 1 : -1, s: (mi * 2654435761 + 7) >>> 0, h: 0 });
+    toads.set(key, { home: key, mi, free: true, kind: kd === 'frog' ? 'frog' : 'toad', x: Math.round(x), y: Math.round(y), st: 'sit', t: 0, wait: 1 + hash(mi, 3) * 4, dir: hash(mi, 7) > 0.5 ? 1 : -1, s: (mi * 2654435761 + 7) >>> 0, h: 0 });
   });
 }
 function resetMapToads() { for (const k of [...toads.keys()]) if (typeof k === 'string') toads.delete(k); toadScan = 0; }
@@ -31,36 +31,74 @@ function toadSplash(td, n, up) {
 }
 function toadRnd(td) { td.s = (td.s * 1103515245 + 12345) >>> 0; return (td.s >>> 8) / 16777216; }
 
-// ---------- pictures: sitting, puffed, mid-hop; facing right (mirrored when it faces left) ----------
-let TOADF = null, toadK = 0;
-function toadFrames() {
-  const K = knightPx();
-  if (TOADF && toadK === K && TOADF.kn === KN0) return TOADF;
-  const fd = charDims(player), fw = fd.fcw, fh = fd.fch, rx = K * 0.11, ry = rx * 0.62;
-  const frame = (stretch, puff) => {
-    const out = [], ax = rx * (1 + stretch * 0.25), ay = ry * (1 - stretch * 0.2);
-    for (let cy = Math.floor(-ay * 2.4 / fh); cy <= 1; cy++) for (let cx = Math.floor(-ax * 1.9 / fw); cx <= Math.ceil(ax * 1.6 / fw); cx++) {
-      const u = cx * fw / ax, w = (cy * fh + ay) / ay;
-      const body = u * u + w * w, head = ((u - 0.72) / 0.5) ** 2 + ((w + 0.15) / 0.55) ** 2;
-      let c = null, v = 0, a = 0.9;
-      if (body < 1 || head < 1) {
-        const nz = Math.sqrt(Math.max(0, 1 - Math.min(1, body))), lam = Math.max(0, -0.45 * u - 0.7 * w + 0.55 * nz);
-        v = 0.3 + lam * 0.55 + (hash(cx * 5 + 2, cy * 9 + 1) > 0.78 ? 0.14 : 0) - (w > 0.55 ? 0.1 : 0);   // a warty back, its belly in shadow
-        if (head < 0.32 && w < -0.25 && Math.abs(u - 0.82) < 0.22) { c = '@'; v = 0.8; a = 1; }      // the eye, wet and bright
-      } else if (puff && ((u - 0.95) / 0.36) ** 2 + ((w - 0.55) / 0.42) ** 2 < 1) { c = '%'; v = 0.5 + puff * 0.15; }   // the throat sac
-      else if (stretch && w > 0.2 && w < 0.95 && u < -0.9 && u > -1.9) { c = '-'; v = 0.22; }            // hind legs flung out
-      else if (!stretch && Math.abs(w - 0.75) < 0.3 && Math.abs(Math.abs(u) - 0.95) < 0.2) { c = u < 0 ? '\\' : '/'; v = 0.2; }   // legs folded at its sides
-      else continue;
-      v = Math.max(0, Math.min(0.9, v + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.12));
-      // the skin is solid, dense glyphs in the warm graphite the knight's armour takes by the fire; the eye stays cold
-      const warm = c !== '@' || v < 0.7 ? 2 * KNS : 0;
-      if (!c) c = v > 0.42 ? '#' : v > 0.26 ? '%' : '=';
-      out.push(cx * fw, cy * fh, fid(c, Math.floor(v * 8)) + warm, a);
+// ---------- pictures: sitting, croaking, mid-leap; seen from the side, facing right (mirrored to the left) ----------
+// Built from their parts as they are: a toad squat and heavy, broad round snout, short legs, a warty dry
+// back, the two swollen glands behind its eyes, eyes on top with a copper iris and a level pupil, a pale
+// belly, the throat puffing as it calls. A frog slim and smooth, a pointed snout, the eardrum behind the
+// eye, pale ridges down its back, dark spots, its long hind leg folded in a zigzag, sacs at the mouth.
+const CRF = {};   // kind → frames, rebuilt with the atlas
+function creatureFrames(kind) {
+  const K = knightPx(), key = K + ':' + KN0;
+  if (CRF[kind] && CRF[kind].key === key) return CRF[kind];
+  const fd = charDims(player), fw = fd.fcw, fh = fd.fch, frog = kind === 'frog', blk = (KBLK + (frog ? 1 : 0)) * KNS;
+  const L = K * (frog ? 0.36 : 0.33), H = L * (frog ? 0.5 : 0.62);
+  const ell = (X, Y, cx, cy, rx, ry, rot) => { let dx = X - cx, dy = Y - cy; if (rot) { const c = Math.cos(rot), s = Math.sin(rot); [dx, dy] = [dx * c + dy * s, -dx * s + dy * c]; } const u = dx / rx, w = dy / ry; return [u * u + w * w, u, w]; };
+  const frame = (pose) => {   // 0 sitting, 1 calling, 2 leaping
+    const out = [], leap = pose === 2;
+    for (let cy = Math.floor(-H * 1.25 / fh) - 1; cy <= 1; cy++) for (let cx = Math.floor(-L * (leap ? 1.05 : 0.6) / fw); cx <= Math.ceil(L * 0.62 / fw); cx++) {
+      const X = cx * fw, Y = -cy * fh;
+      let part = null, u = 0, w = 0, q;
+      const test = (name, r) => { if (!part && r[0] < 1) { part = name; u = r[1]; w = r[2]; } };
+      if (frog) {
+        const eye = ell(X, Y, 0.3 * L, 0.86 * H, 0.08 * L, 0.08 * L);
+        if (eye[0] < 1) part = Math.abs(Y - 0.86 * H) < 0.022 * L && Math.abs(X - 0.3 * L) < 0.055 * L ? 'pupil' : 'eye';
+        if (pose === 1) test('sac', ell(X, Y, 0.3 * L, 0.36 * H, 0.085 * L, 0.085 * L));
+        test('drum', ell(X, Y, 0.15 * L, 0.62 * H, 0.045 * L, 0.045 * L));
+        { const t = Math.max(0, (X - 0.28 * L) / (0.25 * L)); q = ell(X, Y, 0.28 * L, 0.56 * H, 0.25 * L, 0.24 * H * (1 - t * 0.55)); test('head', q); }   // tapering to a point
+        if (leap) { test('leg', ell(X, Y, -0.62 * L, 0.3 * H, 0.38 * L, 0.06 * L, 0.2)); test('arm', ell(X, Y, 0.38 * L, 0.2 * H, 0.12 * L, 0.03 * L, -0.6)); }
+        else { test('leg', ell(X, Y, -0.2 * L, 0.32 * H, 0.22 * L, 0.11 * H, -0.45)); test('leg', ell(X, Y, -0.12 * L, 0.11 * H, 0.25 * L, 0.075 * H, 0.12)); if (!part && Y >= 0 && Y < 0.06 * H && X > -0.05 * L && X < 0.3 * L) part = 'foot'; if (!part && X > 0.2 * L && X < 0.25 * L && Y >= 0 && Y < 0.34 * H) part = 'arm'; }
+        test('body', ell(X, Y, -0.05 * L, 0.44 * H, 0.36 * L, 0.32 * H, leap ? 0.1 : 0.22));
+      } else {
+        const eye = ell(X, Y, 0.27 * L, 0.72 * H, 0.09 * L, 0.09 * L);   // bulging up out of the head
+        if (eye[0] < 1) part = Math.abs(Y - 0.72 * H) < 0.025 * L && Math.abs(X - 0.27 * L) < 0.06 * L ? 'pupil' : 'eye';
+        test('gland', ell(X, Y, 0.08 * L, 0.66 * H, 0.12 * L, 0.1 * H));
+        if (pose === 1) test('sac', ell(X, Y, 0.34 * L, 0.14 * H, 0.13 * L, 0.13 * L));
+        test('head', ell(X, Y, 0.26 * L, 0.35 * H, 0.22 * L, 0.3 * H));
+        if (leap) { test('leg', ell(X, Y, -0.48 * L, 0.24 * H, 0.26 * L, 0.06 * L, 0.15)); test('arm', ell(X, Y, 0.34 * L, 0.12 * H, 0.1 * L, 0.035 * L, -0.5)); }
+        else { if (X > 0.21 * L && X < 0.3 * L && Y >= 0 && Y < 0.3 * H) part = part || 'arm'; test('leg', ell(X, Y, -0.29 * L, 0.22 * H, 0.17 * L, 0.21 * H)); if (!part && Y >= 0 && Y < 0.07 * H && X > -0.44 * L && X < 0.02 * L) part = 'foot'; }
+        test('body', ell(X, Y, -0.08 * L, 0.4 * H, 0.4 * L, 0.42 * H));
+      }
+      if (!part) continue;
+      // light from the upper left and a little in front, as on everything else
+      const nz = Math.sqrt(Math.max(0, 1 - Math.min(1, u * u + w * w))), lam = Math.max(0, -0.35 * u + 0.75 * w + 0.55 * nz);
+      let v = (frog ? 0.4 : 0.36) + lam * 0.45, c = null, b = blk, a = 1;
+      if (part === 'eye') { v = u * u + w * w > 0.75 ? 0.3 : 0.95; c = '@'; }   // a dark rim round the bright iris                                         // copper (toad) or yellowish (frog), wet
+      else if (part === 'pupil') { v = 0; c = '-'; b = 0; a = 1; }
+      else if (part === 'sac') { v = 0.6 + 0.1 * nz; c = '@'; b = 0; }
+      else if (part === 'drum') { v = 0.22; c = '%'; }
+      else if (part === 'gland') v += 0.12;                                                  // the swollen glands catch the light
+      else if (part === 'foot' || part === 'arm') v = 0.3 + lam * 0.2;
+      else if (part === 'leg') v = u * u + w * w > 0.6 ? v * 0.55 : v + 0.04;   // the folded thigh, its fold drawn dark
+      if (part === 'body' || part === 'head' || part === 'gland') {
+        if (Y < (frog ? 0.22 : 0.2) * H && X > -0.25 * L) { v = 0.5; b = 0; }               // the pale belly
+        else if (frog) {
+          if (w > 0.55 && w < 0.78 && part === 'body') v += 0.16;                            // the ridge along its back
+          if (vnoise(X * 0.35 + 3, Y * 0.35) > 0.64) v -= 0.12;                              // dark spots
+          if (lam > 0.8) { c = '*'; v += 0.1; }                                              // a wet sheen
+        } else if (hash(cx * 7 + 3, cy * 5 + 1) > 0.74 && w > -0.3) { c = '*'; v = Math.min(0.62, v + 0.12); }  // warts (never the eye's copper)
+        else if (vnoise(X * 0.4 + 7, Y * 0.4) > 0.66) v -= 0.08;                             // mottling
+      }
+      // the outline: a little darker where the shape turns away
+      if (part !== 'eye' && part !== 'pupil' && part !== 'leg' && u * u + w * w > 0.8) v *= 0.7;
+      if (part === 'arm' && (cx & 1)) v *= 0.8;
+      v = Math.max(0, Math.min(0.95, v));
+      if (!c) c = v > 0.52 ? '@' : v > 0.36 ? '#' : v > 0.22 ? '%' : '=';
+      out.push(cx * fw, cy * fh, fid(c, Math.floor(v * 8)) + b, a);
     }
     return out;
   };
-  TOADF = { sit: frame(0, 0), puff: frame(0, 1), hop: frame(1, 0), kn: KN0 }; toadK = K;
-  return TOADF;
+  CRF[kind] = { sit: frame(0), puff: frame(1), hop: frame(2), key };
+  return CRF[kind];
 }
 
 // ---------- life ----------
@@ -84,7 +122,8 @@ function updateToads(dt) {
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const i = y * COLS + x;
       if (!wet[i] || hash(x * 7 + 3, y * 13 + 1) > 0.014 || toads.has(i) || !toadSpot(i)) continue;
-      toads.set(i, { home: i, x, y, st: 'sit', t: 0, wait: 1 + hash(x, y) * 5, dir: hash(y, x) > 0.5 ? 1 : -1, s: (x * 73856093 ^ y * 19349663) >>> 0, h: 0 });
+      toads.set(i, { home: i, kind: kind[i] === 8 || hash(x * 3, y * 11) > 0.55 ? 'frog' : 'toad', x, y, st: 'sit',   // frogs on the pads, toads mostly on the tussocks
+        t: 0, wait: 1 + hash(x, y) * 5, dir: hash(y, x) > 0.5 ? 1 : -1, s: (x * 73856093 ^ y * 19349663) >>> 0, h: 0 });
     }
     toadsFromMap();
     for (const [i, td] of toads) {
@@ -97,16 +136,17 @@ function updateToads(dt) {
     const dk = Math.hypot(td.x - player.x, (td.y - player.y - 0.7) * 2), near = (dk < 26 && player.moving) || dk < 12 || (dk < 40 && (player.run || 0) > 0.5);
     if (td.st === 'sit' || td.st === 'croak') {
       if (near) {   // startled: away from him, or into the water
-        const w = toadRnd(td) < 0.7 && toadNear(td, 2, 7, toadWater, true);   // mostly: into the water, away from him
+        const fr = td.kind === 'frog', w = toadRnd(td) < (fr ? 0.85 : 0.45) && toadNear(td, 2, fr ? 9 : 5, toadWater, true);   // a frog nearly always into the water, a toad half the time
         if (w) toadHop(td, w, true);
-        else { const to = toadNear(td, 6, 14, td.free ? toadFree : toadSpot, true) || toadNear(td, 3, 10, td.free ? toadFree : toadSpot, true); if (to) toadHop(td, to, false); }
+        else { const to = toadNear(td, fr ? 8 : 4, fr ? 16 : 9, td.free ? toadFree : toadSpot, true) || toadNear(td, 3, 10, td.free ? toadFree : toadSpot, true); if (to) toadHop(td, to, false); }
         continue;
       }
       if (td.st === 'croak') { if (td.t > td.dur) { td.st = 'sit'; td.t = 0; td.wait = 2 + toadRnd(td) * 6; } continue; }
       if (td.t < td.wait) continue;
       const r = toadRnd(td);
       if (r < 0.45) { td.st = 'croak'; td.t = 0; td.dur = 0.9 + toadRnd(td) * 1.2; }
-      else if (r < 0.75) { const to = toadNear(td, 2, 5, td.free ? toadFree : toadSpot, false); if (to) toadHop(td, to, false); else { td.t = 0; td.wait = 3; } }
+      else if (r < 0.75) { const to = td.kind === 'frog' ? toadNear(td, 3, 8, td.free ? toadFree : toadSpot, false) : toadNear(td, 1, 3, td.free ? toadFree : toadSpot, false);   // a toad only shuffles a little
+        if (to) toadHop(td, to, false); else { td.t = 0; td.wait = 3; } }
       else if (r < 0.85) { const w = toadNear(td, 1, 4, toadWater, false); if (w) toadHop(td, w, true); else { td.t = 0; td.wait = 2; } }   // a swim, now and then
       else { td.dir = -td.dir; td.t = 0; td.wait = 2 + toadRnd(td) * 4; }
     } else if (td.st === 'hop') {
@@ -139,7 +179,7 @@ function visibleToads(out) {
   return out;
 }
 function drawToad(e) {
-  const td = e.td, F = toadFrames(), i = Math.round(td.y) * COLS + Math.round(td.x);
+  const td = e.td, F = creatureFrames(td.kind), i = Math.round(td.y) * COLS + Math.round(td.x);
   const fr = td.st === 'hop' ? F.hop : td.st === 'croak' && Math.sin(td.t * 11) > 0 ? F.puff : F.sit;
   const lit = Math.max(0.6, (1 - shadow[i]) * (1 - (cloudBuf ? cloudBuf[i] : 0) * 0.6) * (1 - bshade[i] * 0.8));
   const bx = td.x * CW + CW * 0.5, by = td.y * CH + CH * 0.8 - td.h;

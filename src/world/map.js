@@ -106,7 +106,7 @@ function applyPaint() {
 function paintRect(gx0, gz0, gx1, gz1, fresh) {
   const C = cathedral, x0 = Math.max(0, Math.floor((gx0 * MS + C.ox) / CW - 1)), x1 = Math.min(COLS - 1, Math.ceil((gx1 * MS + C.ox) / CW));
   const y0 = Math.max(0, Math.floor((C.oy - gz1 * SINP * MS) / CH - 1)), y1 = Math.min(ROWS - 1, Math.ceil((C.oy - gz0 * SINP * MS) / CH));
-  const g = Math.floor(C.gateRow || ROWS * 0.45);
+  const g = Math.floor(C.trailRow || ROWS * 0.45);
   for (let y = y0; y <= y1; y++) {
     const cx = y >= g ? pathX(y) : 0, hw = y >= g ? pathHalfWidth(y, g) : 0;
     for (let x = x0; x <= x1; x++) {

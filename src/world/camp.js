@@ -42,27 +42,29 @@ function campHit(solids, O, D) {
 // ---------- the models (px, the knight's height K; x to the right, y up, z to the north) ----------
 function campTent(kind, sd) {
   const rnd = k => hash(sd * 37 + k, 613), K = knightPx(), S = [], ropes = [];
-  if (kind === 'bell') {   // a round tent: a low wall of eight panels, a cone of eight, a pole through the top
-    const R = K * (0.55 + rnd(1) * 0.08), Hw = K * 0.24, Hh = K * (0.95 + rnd(2) * 0.1), p = [[0, -1, 0, 0]];
-    for (let k = 0; k < 8; k++) {
-      const a = (k + 0.5) / 8 * 6.2832, cx = Math.cos(a), cz = Math.sin(a);
-      p.push([cx, 0, cz, R]);
-      const n = campV(cx * (Hh - Hw), R, cz * (Hh - Hw)); p.push([n[0], n[1], n[2], n[1] * Hh]);
-    }
-    S.push({ p, mat: 'cloth', bs: [0, Hh / 2, 0, Math.hypot(R, Hh / 2) + 1], door: (h) => h[2] < 0 && Math.abs(h[0]) < R * 0.17 && h[1] < Hh * 0.52, flap: h => h[2] < 0 && h[0] > R * 0.17 && h[0] < R * 0.42 && h[1] < Hh * 0.5 - (h[0] - R * 0.17) * 0.9, H: Hh });
-    S.push(campBox([0, Hh + K * 0.06, 0], [K * 0.018, K * 0.1, K * 0.018], [1, 0, 0], [0, 1, 0], [0, 0, 1], 'wood'));
-    for (let k = 0; k < 6; k++) { const a = k / 6 * 6.2832 + 0.4; ropes.push([[Math.cos(a) * R, Hw * 0.95, Math.sin(a) * R], [Math.cos(a) * R * 1.45, 0, Math.sin(a) * R * 1.45]]); }
-    return { S, ropes, foot: (x, z) => Math.hypot(x, z) < R, R, H: Hh };
-  }
-  // a ridge tent: two cloth slopes over a ridge running away from us, the door in the end facing us
-  const torn = kind === 'torn', W = K * (torn ? 0.8 : 0.95 + rnd(1) * 0.1), L = K * (torn ? 0.95 : 1.15 + rnd(2) * 0.15), Hh = K * (torn ? 0.62 : 0.72 + rnd(3) * 0.08);
-  const nl = campV(-Hh, W / 2, 0), nr = campV(Hh, W / 2, 0);
+  // A medieval wedge tent: two canvas slopes over a ridge running away from us, sewn in panels, a dark
+  // band with a dagged edge along the ridge, the door in the end facing us with one flap tied back,
+  // wooden poles at both ends, a pennant on the front one, guy ropes to pegs. Torn: lower, sagging,
+  // holed, its pennant gone to a rag.
+  const torn = kind === 'torn', big = rnd(9) > 0.5;
+  const W = K * (torn ? 0.8 : big ? 1.05 : 0.92), L = K * (torn ? 0.95 + rnd(2) * 0.1 : big ? 1.3 : 1.12), Hh = K * (torn ? 0.6 + rnd(3) * 0.05 : big ? 0.8 : 0.72);
+  const nl = campV(-Hh, W / 2, 0), nr = campV(Hh, W / 2, 0), seam = L / (big ? 6 : 5);
   S.push({ p: [[0, -1, 0, 0], nl.concat(nl[1] * Hh), nr.concat(nr[1] * Hh), [0, 0, 1, L / 2], [0, 0, -1, L / 2]], mat: 'cloth', torn, bs: [0, Hh / 2, 0, Math.hypot(W / 2, Hh / 2, L / 2) + 1],
     door: h => h[2] < -L / 2 + 0.5 && h[1] < Hh * 0.72 && Math.abs(h[0]) < (Hh * 0.72 - h[1]) / Hh * W * 0.36,
-    flap: h => h[2] < -L / 2 + 0.5 && h[1] < Hh * 0.6 && h[0] > (Hh * 0.72 - h[1]) / Hh * W * 0.36 && h[0] < (Hh * 0.72 - h[1]) / Hh * W * 0.36 + K * 0.12, H: Hh });
-  for (const z of [-L / 2 - K * 0.02, L / 2 + K * 0.02]) S.push(campBox([0, Hh * 0.55, z], [K * 0.02, Hh * 0.55 + K * 0.05, K * 0.02], [1, 0, 0], [0, 1, 0], [0, 0, 1], 'wood'));
+    flap: h => h[2] < -L / 2 + 0.5 && h[1] < Hh * 0.6 && h[0] > (Hh * 0.72 - h[1]) / Hh * W * 0.36 && h[0] < (Hh * 0.72 - h[1]) / Hh * W * 0.36 + K * 0.12,
+    seam: h => Math.abs(((h[2] / seam) % 1 + 1) % 1 - 0.5) > 0.42,                                     // the panels' seams
+    dag: h => h[1] < Hh * (0.13 + 0.07 * Math.abs(Math.sin(h[2] / L * Math.PI * (big ? 9 : 7)))) && h[1] > Hh * 0.04,   // a dagged valance along the eaves
+    band: h => h[1] > Hh * (0.8 + 0.04 * Math.sin(h[2] / L * 6.2832 * (big ? 6 : 5) * 2)),           // the ridge band, dagged
+    H: Hh });
+  const lean = torn ? (rnd(4) - 0.5) * 0.25 : 0;
+  for (const z of [-L / 2 - K * 0.02, L / 2 + K * 0.02]) S.push(campBox([0, (Hh + (z < 0 ? K * 0.3 : K * 0.06)) / 2, z], [K * 0.02, (Hh + (z < 0 ? K * 0.3 : K * 0.06)) / 2, K * 0.02], [1, 0, 0], campRot([0, 1, 0], [0, 0, 1], z < 0 ? lean : 0), campRot([0, 0, 1], [0, 0, 1], 0), 'wood'));
+  // the pennant: a thin cloth tongue off the front pole's top, streaming downwind; a rag on a torn tent
+  { const top = Hh + K * 0.3, z = -L / 2 - K * 0.02, fl = K * (torn ? 0.12 : 0.3), fh = K * 0.1;
+    const up = campV(0.55 * fh, fl, 0), dn = campV(0.45 * fh, -fl, 0);   // its upper and lower edges, out of the triangle
+    S.push({ p: [[0, 0, 1, z + 0.6], [0, 0, -1, -z + 0.6], [-1, 0, 0, 0], up.concat(campDot(up, [0, top, 0])), dn.concat(campDot(dn, [0, top - fh, 0]))], mat: 'flag', bs: [fl / 2, top - fh / 2, z, Math.hypot(fl, fh) + 2] }); }
   for (const z of [-L / 2, L / 2]) { ropes.push([[0, Hh + K * 0.08, z], [0, 0, z + Math.sign(z) * K * 0.45]]); }
   for (const s of [-1, 1]) for (const z of [-L * 0.3, L * 0.3]) ropes.push([[s * W * 0.36, Hh * 0.28, z], [s * W * 0.8, 0, z]]);
+  for (const r of ropes) { const [x, , z] = r[1]; S.push(campBox([x, K * 0.03, z], [K * 0.012, K * 0.03, K * 0.012], [1, 0, 0], [0, 1, 0], [0, 0, 1], 'wood')); }   // the pegs
   return { S, ropes, foot: (x, z) => Math.abs(x) < W / 2 && Math.abs(z) < L / 2, R: W / 2, H: Hh };
 }
 // A stretch of fence turned by ang (radians, 0: running left to right): weathered posts and two rails,
@@ -117,10 +119,14 @@ function bakeCamp(type, model, sd) {
         alb = 0.52 * (0.78 + 0.34 * vnoise(p[0] * 0.07 + sd * 3, p[2] * 0.035 + p[1] * 0.02));      // folds and sag
         if (vnoise(p[0] * 0.21 + 9, p[1] * 0.19 + p[2] * 0.11) > 0.7) alb *= 0.68;                // stains, patches
         if (p[1] < s.H * 0.14) alb *= 0.62;                                                        // mud along the hem
+        if (s.seam && s.seam(p)) alb *= 0.5;
+        if (s.dag && s.dag(p)) alb *= 1.35;
+        if (s.band && s.band(p)) alb *= 0.6;
         if (s.door && s.door(p)) { alb = 0.04; c = ' '; }                                          // the dark inside
         else if (s.flap && s.flap(p)) alb *= 1.25;                                                 // the flap tied back
         else if (Math.abs(n[1]) < 0.95 && Math.abs(n[2]) < 0.5 && hash(cx * 3 + 1, cy * 5) < 0.45) c = n[0] < 0 ? '/' : '\\';   // slopes run in strokes
-      } else {
+      } else if (s.mat === 'flag') { alb = 0.62 * (0.8 + 0.3 * vnoise(p[0] * 0.2, p[1] * 0.3 + sd));   // a faded pennant, paler than the canvas
+    } else {
         alb = 0.4 * (0.75 + 0.4 * vnoise(p[0] * 0.3 + p[2] * 0.3 + sd, p[1] * 0.06));            // grain
         if (Math.abs(n[1]) < 0.3 && hash(cx, cy * 7) < 0.5) c = Math.abs(n[0]) > Math.abs(n[2]) * 1.5 && Math.abs(D[2] * n[2]) < 0.5 ? '|' : null;
       }
@@ -146,8 +152,8 @@ function bakeCamp(type, model, sd) {
   let minY = 0; for (let k = 1; k < list.length; k += 4) minY = Math.min(minY, list[k]);
   return { type, list: Int32Array.from(list), runs: Int16Array.from(runs), shade: Int16Array.from(shade), hide: Int16Array.from(block), block: Int16Array.from(block), fw, fh, minY, R, Hc: H, crownH: Math.max(1, -minY * fh), solid: true };
 }
-// The camp's variants: three tents, six stretches of fence (rails at four turns, stakes at two).
+// The camp's variants: four tents (two whole, two torn), six stretches of fence (rails at four turns, stakes at two).
 function bakeCampVariants(out) {
-  [['ridge', 101], ['bell', 102], ['torn', 103]].forEach(([k, sd]) => out.push(bakeCamp('tent', campTent(k, sd), sd)));
+  [['ridge', 101], ['ridge', 104], ['torn', 103], ['torn', 107]].forEach(([k, sd]) => out.push(bakeCamp('tent', campTent(k, sd), sd)));   // whole and torn
   [[0, 0], [Math.PI / 2, 0], [Math.PI / 4, 0], [-Math.PI / 4, 0], [0, 1], [Math.PI / 2, 1]].forEach(([a, st], k) => out.push(bakeCamp('fence', campFence(a, st, 111 + k), 111 + k)));
 }

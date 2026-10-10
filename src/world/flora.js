@@ -6,7 +6,7 @@
 // branches through; bare trees are nets of thin crooked branches. Each variant is baked once.
 const fid = (c, l) => KN0 + FCI[c] * KLV + Math.max(0, Math.min(KLV - 1, l));
 const VARS = [], flora = [], LILIES = [];   // LILIES: three pads, then two in flower (bakeLily)
-let tmask = null, FLMAXR = 0;
+let tmask = null, fmask = null, FLMAXR = 0;   // tmask: trunks and tents; fmask: fences, which a jump clears
 const fbm3 = (x, y) => vnoise(x, y) * 0.55 + vnoise(x * 2.1 + 3.7, y * 2.1) * 0.3 + vnoise(x * 4.3, y * 4.3 + 1.3) * 0.15;
 function bakeVariant(type, sd) {
   const rnd = (k) => hash(sd * 31 + k, 977);
@@ -200,7 +200,7 @@ const variantsOf = type => VARS.filter(v => v.type === type);
 function placeFlora() {
   flora.length = 0;
   const trees = variantsOf('tree'), dead = variantsOf('dead'), bush = variantsOf('bush');
-  tmask = new Uint8Array(N);
+  tmask = new Uint8Array(N); fmask = new Uint8Array(N);
   if (MEADOW_MAP.flora) MEADOW_MAP.flora.forEach(([type, k, gx, gz], mi) => {
     const own = variantsOf(type), set = own.length ? own : trees, v = set[Math.max(0, Math.min(set.length - 1, k | 0))];
     const [x, y] = mapToCell(gx, gz), br = Math.round(y + 0.7);
@@ -232,7 +232,7 @@ function placeFlora() {
   for (const f of flora) {
     const v = f.v, bx = Math.round(f.x), br = f.br;
     for (let k = 0; k < v.hide.length; k += 2) { const cx = bx + v.hide[k], cy = br + v.hide[k + 1]; if (cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS) kind[cy * COLS + cx] = 0; }
-    if (v.block) { for (let k = 0; k < v.block.length; k += 2) { const cx = bx + v.block[k], cy = br + v.block[k + 1]; if (cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS) tmask[cy * COLS + cx] = 1; } continue; }   // tents and fences: their footprint; their shadow is in the picture
+    if (v.block) { const M = v.type === 'fence' ? fmask : tmask; for (let k = 0; k < v.block.length; k += 2) { const cx = bx + v.block[k], cy = br + v.block[k + 1]; if (cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS) M[cy * COLS + cx] = 1; } continue; }   // tents and fences: their footprint; their shadow is in the picture
     if (v.type !== 'bush') for (let dx = -1; dx <= 1; dx++) { const i = br * COLS + bx + dx; if (i >= 0 && i < N) tmask[i] = 1; }
     const sr = v.R / CW, sx = bx + v.Hc * 0.6 / CW, sy = br - v.Hc * 0.55 / CH;
     for (let cy = Math.floor(sy - sr * CW / CH); cy <= Math.ceil(br + 2); cy++) for (let cx = Math.floor(Math.min(bx, sx) - sr); cx <= Math.ceil(Math.max(bx, sx) + sr); cx++) {

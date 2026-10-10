@@ -338,7 +338,7 @@ function buildCathedral() {
     runs.push(r);
   }
   const cv = true;
-  Object.assign(cathedral, { cv, cx0, cy0, BW, BH: BH2, lum, dep, glyph, lev, runs, ox: ax, oy: ay, kx: ox, ky: oy, face, gateRow: (oy + 110 * SINP * MS) / CH, lit });
+  Object.assign(cathedral, { cv, cx0, cy0, BW, BH: BH2, lum, dep, glyph, lev, runs, ox: ax, oy: ay, kx: ox, ky: oy, face, gateRow: (oy + 110 * SINP * MS) / CH, trailRow: (ay + 110 * SINP * MS) / CH, lit });   // the trail is its own thing: it starts where the gate stands by default
   // one glow per lit window, at its centre
   const wins = new Map();
   for (let j = 0; j < lit.length; j += 3) { const w = wins.get(lit[j + 2]) || [0, 0, 0]; w[0] += lit[j]; w[1] += lit[j + 1]; w[2]++; wins.set(lit[j + 2], w); }
