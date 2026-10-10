@@ -1,10 +1,10 @@
-// Finds the sword blade in every knight frame of index.html and prints the KSW table for the page.
+// Finds the sword blade in every knight frame and prints the KSW table for src/data/knight-frames.js.
 // A blade is the longest straight run of glyphs with (almost) nothing beside it; the page keeps those
-// cells rigid while the cloak and legs move.   usage: node tools/find_blades.cjs index.html
+// cells rigid while the cloak and legs move.   usage: node tools/find_blades.cjs [src/data/knight-frames.js]
 const fs = require('fs');
-const src = fs.readFileSync(process.argv[2] || 'index.html', 'utf8');
-const a = src.indexOf('const KNIGHT_ART = ['), b = src.indexOf('\n  ];', a);
-const KA = eval(src.slice(a + 'const KNIGHT_ART = '.length, b + 4));
+const src = fs.readFileSync(process.argv[2] || 'src/data/knight-frames.js', 'utf8');
+const a = src.indexOf('const KNIGHT_ART = ['), b = src.indexOf('\n];', a);
+const KA = eval(src.slice(a + 'const KNIGHT_ART = '.length, b + 2));
 const AX = 0.6, AY = 0.9;   // a cell is 0.6 wide, 0.9 tall
 function cells(f) { const L = f.split('\n'), top = +L[0], g = []; for (let k = 1; k < L.length; k++) for (let x = 0; x < L[k].length; x++) if (L[k][x] !== ' ') g.push([x, top + k - 1]); return g; }
 function rng(s) { return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }

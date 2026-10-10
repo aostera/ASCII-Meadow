@@ -23,7 +23,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Collect the site
-        run: mkdir _site && cp index.html _site/ && touch _site/.nojekyll
+        # the page, its styles and its scripts as they are: no build step
+        run: sh tools/build_site.sh _site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
