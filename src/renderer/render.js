@@ -65,6 +65,13 @@ function render() {
         PF2(ci, PT0 + Math.min(PTN - 1, (v * PTN) | 0), px, py, x, y, baseY);
         continue;
       }
+      if (kd === 8) {   // water: dark and still; ripples drift across it and catch what light there is
+        const w = Math.sin(x * 0.55 + y * 0.9 - t * 1.3 + s * 6) + Math.sin(x * 0.21 - y * 0.37 + t * 0.8) * 0.6;
+        const lit = (1 - shadow[i]) * (1 - cloud * 0.6) * (1 - bshade[i]);
+        if (w > 0.4) PF2(w > 1.05 ? CI['~'] : CI['-'], Math.max(4, Math.min(SH - 1, ((6 + (w - 0.4) * 6) * lit) | 0)), px + Math.sin(t * 0.9 + y) * 1.5, py, x, y, baseY);
+        else if (s > 0.9) PF2(CI['.'], Math.max(4, (7 * lit) | 0), px, py, x, y, baseY);
+        continue;
+      }
       if (kd === 2) { if (s > 0.55) PF2(s > 0.8 ? CI[','] : CI['.'], s > 0.75 ? C_DIRT : C_DIRT2, px, py, x, y, baseY); continue; }
       if (kd === 5) { PF2(s > 0.6 ? CI['@'] : s > 0.3 ? CI['o'] : CI['°'], s > 0.5 ? C_STONE : C_STONE2, px, py, x, y, baseY); continue; }
       if (kd >= 3) { P(flat[i] > 0.5 ? CI['.'] : (kd === 3 ? CI['*'] : kd === 4 ? CI['o'] : CI['"']), kd === 3 ? C_WHITE : kd === 4 ? C_YEL : C_LAV, px + ang[i] * 1.5, py, x, y, baseY); continue; }

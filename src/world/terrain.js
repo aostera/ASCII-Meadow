@@ -29,7 +29,7 @@ function groundCell(x, y, i) {
   const n = vnoise(x * 0.035, y * 0.055) * 0.65 + vnoise(x * 0.12, y * 0.18) * 0.25 + vnoise(x * 0.4, y * 0.6) * 0.1;
   const rock = vnoise(x * 0.09 + 50, y * 0.14 + 50);
   const r = hash(x + 911, y + 37);
-  seed[i] = hash(x, y);
+  seed[i] = hash(x, y); wet[i] = 0;
   height[i] = Math.min(1, Math.max(0.12, n * 1.35 - 0.08 + (r - 0.5) * 0.4));
   let blade = 0;
   if (rock > 0.9 && r > 0.35) kind[i] = 5;                           // stones
@@ -62,7 +62,7 @@ function build() {
   bshade = new Float32Array(N); bmask = new Uint8Array(N); FR = new Float32Array(N);
   TA = new Float32Array(COLS * 6);
   push = new Float32Array(N); shadow = new Float32Array(N);
-  height = new Float32Array(N); seed = new Float32Array(N); kind = new Uint8Array(N); segs = new Uint8Array(N);
+  height = new Float32Array(N); seed = new Float32Array(N); kind = new Uint8Array(N); segs = new Uint8Array(N); wet = new Uint8Array(N);
   fillTerrain();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   buildAtlas();

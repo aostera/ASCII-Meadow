@@ -172,6 +172,14 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       await page.keyboard.press('KeyN'); await page.mouse.move(120, 170); await page.mouse.down(); await page.mouse.move(360, 170, { steps: 8 }); await page.mouse.up(); await step(4);
       const fg2 = await fogMean(150, 120, 330, 220);
       check('editor: fog brushed in and cleared away', fg1 > Math.max(0.6, fg0 + 0.2) && fg2 < 0.08, `fog ${fg0.toFixed(2)} → dense ${fg1.toFixed(2)} → cleared ${fg2.toFixed(2)}`);
+      // water: a band painted across the knight's way north stops him at its edge
+      {
+        const kp = await page.evaluate(() => [(player.x - camX) * CW, (player.y + 0.7 - camY) * CH]);
+        await page.keyboard.press('Digit9'); await page.mouse.move(kp[0] - 300, kp[1] - 120); await page.mouse.down(); await page.mouse.move(kp[0] + 300, kp[1] - 120, { steps: 12 }); await page.mouse.up(); await step(2);
+        await page.evaluate(() => { closeEditor(); keys.add('w'); }); await step(200); await page.evaluate(() => { keys.delete('w'); openEditor(); });
+        const wr = await page.evaluate(() => { const cx = Math.round(player.x), cy = Math.round(player.y + 0.2); return { onWet: !!wet[cy * COLS + cx], ahead: !!wet[(cy - 1) * COLS + cx] || !!wet[(cy - 2) * COLS + cx], water: kind.reduce((n, k) => n + (k === 8), 0) }; });
+        check('editor: water stops the knight at its edge', wr.water > 100 && !wr.onWet && wr.ahead, JSON.stringify(wr));
+      }
       // zoom: out to see more, a tree lands under the cursor at any scale, and the game is back at 100% when the editor closes
       await page.keyboard.press('KeyQ'); await page.keyboard.press('KeyQ'); await step(2);
       await page.keyboard.press('KeyT'); await page.mouse.click(500, 300); await step(2);

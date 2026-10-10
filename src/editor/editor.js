@@ -8,7 +8,7 @@ const ED = {
   undo: [], redo: [], keys: new Set(), mx: -1, my: -1, inView: false,
   ui: null, mini: null, miniKey: '', draftTimer: 0,
 };
-const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
+const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['w', 'Вода', '9'], ['m', 'Болото', 'P'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
 const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['select', 'Выбрать и двигать', 'V']];
 const ED_FOG = [['fogl', 'Лёгкий туман', 'H'], ['fogd', 'Густой туман', 'J'], ['fogc', 'Убрать туман', 'N']];
 const ED_FOGCODE = { fogl: 2, fogd: 3, fogc: 1 };
@@ -289,6 +289,7 @@ function edMiniBase() {   // the whole field, one pixel per few cells, redrawn a
     else if (k === 2) { r = 22; gg = 20; b = 18; }                                        // earth
     else if (k === 5) r = gg = b = 96;                                                     // stones
     else if (k === 7) { r = 150; gg = 144; b = 132; }                                      // trail
+    else if (k === 8) { r = 26; gg = 34; b = 44; }                                         // water
     else { r = 200; gg = 198; b = 190; }                                                   // flowers
     if (fogChunks.size) { const [gx, gz] = cellXZ(x, y), fc = fogCodeAt(gx, gz); if (fc > 1) { const v = fc === 3 ? 0.5 : 0.28; r += (220 - r) * v; gg += (220 - gg) * v; b += (225 - b) * v; } }   // painted fog
     const o = (py * w + px) * 4; d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255;

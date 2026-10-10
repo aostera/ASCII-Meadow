@@ -8,6 +8,6 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const FONT = '"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace';
 
 let DPR, W, H, FS, CW, CH, COLS, ROWS, N, HZ = 0, VC, VR, bshade, bmask, segs, FR, TA;
-let ang, vel, flat, push, shadow, height, seed, kind;
+let ang, vel, flat, push, shadow, height, seed, kind, wet;   // wet: water or marsh, no way through
 
 let t = 0;
