@@ -115,6 +115,10 @@ jobs:
         working-directory: head
       - run: npx playwright install --with-deps chromium
         working-directory: head
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pillow   # the pixel diff
       - name: Seeded runs of base and head
         working-directory: head
         run: |
@@ -148,6 +152,10 @@ jobs:
       - name: Gate
         if: steps.diff.outputs.code != '0'
         run: |
+          code=${{ steps.diff.outputs.code }}
+          if [ "$code" != "1" ]; then
+            echo "::error::the comparison itself failed (diff.py exit $code): see the log above"; exit 1
+          fi
           if ${{ contains(github.event.pull_request.labels.*.name, 'visual-change') }}; then
             echo "::warning::frames differ from the base branch; allowed by the visual-change label"
           else

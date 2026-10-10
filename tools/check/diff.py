@@ -4,7 +4,10 @@
 #   --tolerance N   ignore per-channel differences up to N (1 absorbs the ±1 text rasterisation noise of mobile runs)
 #   --out DIR       write a highlighted difference image for every pair that differs
 import sys, glob, os
-from PIL import Image, ImageChops
+try:
+    from PIL import Image, ImageChops
+except ImportError:
+    print('ERROR: Pillow is not installed (pip install pillow)'); sys.exit(2)
 
 args = sys.argv[1:]
 def opt(name, default):
@@ -12,12 +15,12 @@ def opt(name, default):
         i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
     return default
 tol = int(opt('--tolerance', 0)); out = opt('--out', None)
-if len(args) != 2: sys.exit(__doc__ or 'usage: diff.py <reference prefix> <candidate prefix> [--tolerance N] [--out DIR]')
+if len(args) != 2: print('usage: diff.py <reference prefix> <candidate prefix> [--tolerance N] [--out DIR]'); sys.exit(2)
 a, b = args
 shots = lambda p: {f[len(p) + 1:] for f in glob.glob(p + '_*.png') if 'sheet' not in os.path.basename(f)}
 ref, cand = shots(a), shots(b)
 bad = 0
-if not ref: print('FAIL: no reference shots match', a + '_*.png'); sys.exit(1)
+if not ref: print('ERROR: no reference shots match', a + '_*.png'); sys.exit(2)
 for name in sorted(ref | cand):
     if name not in cand: print('%-28s MISSING in candidate' % name); bad += 1; continue
     if name not in ref: print('%-28s MISSING in reference' % name); bad += 1; continue
@@ -27,7 +30,8 @@ for name in sorted(ref | cand):
     if tol: d = d.point(lambda v: v if v > tol else 0)
     bb = d.getbbox()
     if not bb: print('%-28s identical%s' % (name, ' (within ±%d)' % tol if tol else '')); continue
-    n = sum(1 for p in d.get_flattened_data() if p != (0, 0, 0))
+    r, g, bl = d.split(); m = ImageChops.lighter(ImageChops.lighter(r, g), bl)
+    n = m.width * m.height - m.histogram()[0]   # pixels where any channel differs
     print('%-28s DIFF %d px, bbox %s' % (name, n, bb)); bad += 1
     if out:
         os.makedirs(out, exist_ok=True)
