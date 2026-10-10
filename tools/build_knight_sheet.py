@@ -1,6 +1,4 @@
-# Knight frames from the dark-knight atlases (assets/dark_knight/), cut by tools/cut_atlases.py.
-# usage: python3 tools/build_knight_sheet.py raw4.pkl tools knight_ascii.json preview.png
-#   -> knight_ascii.json holds the frames as text for KNIGHT_ART in index.html. Game d8 order: 0 S, 1 SW, 2 W, 3 NW, 4 N, 5 NE, 6 E, 7 SE.
+# Knight sheet from the dark-knight atlases. Game d8 order: 0 S, 1 SW, 2 W, 3 NW, 4 N, 5 NE, 6 E, 7 SE.
 # The atlases cover the left-facing half; the right-facing directions are mirrored where no frame exists.
 #   0-7      idle, one pose per direction (from the idle turntable)
 #   8-87     walk, 8 directions x 10 frames ("run" atlas: a calm stride whose legs really alternate)
@@ -9,9 +7,11 @@
 import pickle, sys, json, numpy as np
 from PIL import Image
 sys.path.insert(0, sys.argv[2])
-from to_ascii2 import frame_to_ascii
-R = pickle.load(open(sys.argv[1], 'rb'))
-def fr(name, idx): return R[name][idx // 10][idx % 10]
+from to_ascii import frame_to_ascii
+R5 = pickle.load(open(sys.argv[1], 'rb'))
+def fr(name, idx):
+    a = R5['knight_' + name][idx // 10][idx % 10]['rgba']
+    return dict(L=a[..., :3].mean(2).astype(np.uint8), A=a[..., 3].copy())
 def erode(m, r):
     o = m.copy()
     for dy in range(-r, r + 1):
@@ -24,7 +24,9 @@ def meas(f):
     tx = np.median(xs[sel])
     return dict(tx=tx, top=top, bot=bot, h=h)
 TW, TH, FX, FY, FH = 144, 112, 72, 107, 92
-IDLE = {0: 0, 1: 4, 2: 9, 3: 14, 4: 20, 5: 30, 6: 32, 7: 35}
+# Every frame was looked at. The idle turntable turns S -> W -> N, then back to W, then jumps to E -> S:
+# there is no back-right (NE) pose, so NE is NW mirrored (frame 3.0 is E in profile, not NE).
+IDLE = {0: 0, 1: 6, 2: 9, 3: 14, 4: 20, 5: 14, 6: 31, 7: 35}; IFLIP = {5}
 STAND = np.median([meas(fr('idle', i))['h'] for i in IDLE.values()])
 def place(f, mode='feet', ref=None, flip=False):
     m = meas(f); ref = ref or STAND; sc = FH / ref
@@ -37,22 +39,31 @@ def place(f, mode='feet', ref=None, flip=False):
     return t.transpose(Image.FLIP_LEFT_RIGHT) if flip else t
 def seq(ids, n): return [ids[min(len(ids) - 1, int(k * len(ids) / n))] for k in range(n)]
 tiles = []
-for d in range(8): tiles.append(place(fr('idle', IDLE[d])))
+for d in range(8): tiles.append(place(fr('idle', IDLE[d]), flip=d in IFLIP))
 WALK = {0: list(range(0, 10)), 1: list(range(10, 20)), 2: list(range(20, 30)), 5: list(range(30, 40)), 4: list(range(40, 47))}   # row 3 walks away to the right
 MIR = {3: 5, 5: 3, 6: 2, 7: 1}
 WREF = np.median([meas(fr('run', i))['h'] for ids in WALK.values() for i in ids]) / 0.985
 for d in range(8):
     src, flip = (WALK[d], False) if d in WALK else (WALK[MIR[d]], True)
     for i in seq(src, 10): tiles.append(place(fr('run', i), ref=WREF, flip=flip))
-RUN = {0: list(range(40, 50)), 1: list(range(10, 16)), 2: list(range(16, 20)), 3: list(range(20, 27)), 4: list(range(30, 36))}
+# Run ("walk" atlas): row 1 back-left (1.0-1.5) turning front-left (1.6-1.9), row 2 back-left (2.0-2.3)
+# turning to profile (2.4-2.9), row 3 back-right (3.0-3.5) turning front-right (3.6-3.9), row 4 S. There is
+# no straight-back run: N takes the back-right frames. Only E is a mirror.
+RUN = {0: list(range(40, 50)), 1: list(range(16, 20)), 2: list(range(24, 30)), 3: list(range(10, 16)), 4: list(range(30, 36)),
+       5: list(range(30, 36)), 7: list(range(36, 40))}
+RMIR = {6: 2}
 RREF = np.median([meas(fr('walk', i))['h'] for ids in RUN.values() for i in ids]) / 0.97
 for d in range(8):
-    src, flip = (RUN[d], False) if d in RUN else (RUN[MIR[d]], True)
+    src, flip = (RUN[d], False) if d in RUN else (RUN[RMIR[d]], True)
     for i in seq(src, 8): tiles.append(place(fr('walk', i), ref=RREF, flip=flip))
-JROWS = [(list(range(0, 10)), False), (list(range(40, 50)), False), (list(range(30, 40)), False), (list(range(40, 50)), True)]
-JREF = np.median([meas(fr('jump', ids[-1]))['h'] for ids, _ in JROWS])
-for ids, flip in JROWS:
-    for c, i in enumerate(ids): tiles.append(place(fr('jump', i), 'air' if 2 <= c <= 5 else 'feet', ref=JREF, flip=flip))
+# Jump rows: 0 and 1 S, 2 back-right (2.8-2.9 land facing back-left), 3 back-left, 4 back-right with
+# 4.4 straight back (4.7-4.9 land facing the camera!), 5 back-left (5.9 lands facing the camera).
+# Game rows S, NW, N, NE; the landings that turn are replaced by row 3's landing, mirrored where needed.
+J = lambda ids, fl=False: [(i, fl) for i in ids]
+JROWS = [J(range(0, 10)), J(range(30, 40)), J(range(40, 47)) + J(range(37, 40), True), J(range(20, 28)) + J(range(38, 40), True)]
+JREF = np.median([meas(fr('jump', 39))['h'], meas(fr('jump', 9))['h']])
+for row in JROWS:
+    for c, (i, flip) in enumerate(row): tiles.append(place(fr('jump', i), 'air' if 2 <= c <= 5 else 'feet', ref=JREF, flip=flip))
 out = []
 for t in tiles:
     top, lines = frame_to_ascii(t)

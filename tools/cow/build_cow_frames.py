@@ -1,12 +1,18 @@
-# usage: python3 tools/cow/build_cow_frames.py raw.pkl cow_ascii.json preview.png  (after graze_frames.py; cow_ascii.json → COW_ART, cow_ascii_index.json → CI6 in index.html; needs opencv-python-headless)
-# Cow frames as glyph art, on the knight's fine grid. All frames face right (the atlas's left-facing ones
-# are mirrored); the game mirrors them back when a cow heads left.
-#   idle 5 poses; walk, run and eat cycles and the hurt and die moves get in-betweens made along optical
-#   flow, so the motion reads smooth (frame ranges are written to <out>_index.json)
-import sys, pickle, json, numpy as np
+# Cow frames from the dark-fantasy cow atlases (idle, walk, run, jump; tools/cut_atlases5.py cuts them).
+# Every frame was looked at; the atlases have faults, worked around here:
+#  - directions per row are not the game's eight (walk has no clean E, N or W; run and idle have no NW):
+#    each game direction takes the nearest drawn row, mirrored where that is closer (a cow is symmetric);
+#  - in the walk and run rows seen from the front the tail travels right to left and snaps back at the loop:
+#    the row is followed by its own mirror, so the tail swings back instead of jumping;
+#  - idle front, frame 4: the tail jumps to the other leg for one frame: dropped. Idle loops ping-pong;
+#  - the jump sheet has directions in columns and phases in rows, and most columns turn mid-jump (S, SE,
+#    NE...): only N, W and SW are clean; E and SE are their mirrors; the rest don't hop.
+# In-betweens along optical flow make the cycles smooth; the glyphs are lit like the trees (moonlight on the
+# back, belly and legs in the grass). d8 order: S, SW, W, NW, N, NE, E, SE.
+import sys, pickle, json, numpy as np, cv2
 from PIL import Image, ImageFilter
 R = pickle.load(open(sys.argv[1], 'rb'))
-COLS, ROWS = 144, 54                    # 0.6 x 0.9 cells: a 199 x 112 tile keeps its shape
+COLS, ROWS = 144, 54
 TW, TH, FX, FY = 199, 112, 99.5, 107
 RAMP = " .:-=+*#%@"
 B = np.array([0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]).reshape(4, 4) / 16 - 0.5
@@ -14,26 +20,24 @@ def h32(x, y):
     M = 0xffffffff; h = (x * 374761393 + y * 668265263) & M; h = ((h ^ (h >> 13)) * 1274126177) & M
     return ((h ^ (h >> 16)) & M) / 4294967295
 GRAIN = np.array([[(h32(cx * 7 + 91, cy * 13) - 0.5) * 0.05 for cx in range(COLS)] for cy in range(ROWS)])
-def to_ascii(tile, detail=1.0):
+def to_ascii(tile):
     t = tile.resize((COLS * 2, ROWS * 2), Image.BICUBIC); a = np.asarray(t).astype(float)
     lum = a[..., :3].mean(2) / 255; al = a[..., 3] / 255
     pm = Image.fromarray((lum * al * 255).astype(np.uint8)); cov = Image.fromarray((al * 255).astype(np.uint8))
     bl = np.asarray(pm.filter(ImageFilter.GaussianBlur(2.5))).astype(float); bc = np.asarray(cov.filter(ImageFilter.GaussianBlur(2.5))).astype(float)
-    sharp = lum + detail * (lum - np.where(bc > 8, bl / np.maximum(bc, 1), lum))
+    sharp = lum + (lum - np.where(bc > 8, bl / np.maximum(bc, 1), lum))
     A = al.reshape(ROWS, 2, COLS, 2).mean((1, 3))
     S = (sharp * al).reshape(ROWS, 2, COLS, 2).sum((1, 3)) / np.maximum(al.reshape(ROWS, 2, COLS, 2).sum((1, 3)), 1e-6)
-    inside = A >= 0.3; lo, hi = np.percentile(S[inside], 3), np.percentile(S[inside], 98)
+    inside = A >= 0.3
+    if inside.sum() < 5: return '0\n'
+    lo, hi = np.percentile(S[inside], 3), np.percentile(S[inside], 98)
     V = np.clip((S - lo) / max(1e-3, hi - lo), 0, 1)
-    # Lit like the trees: a dark mass under a low moon. The coat's own pattern is kept only faintly;
-    # the light catches the back, the poll and the rump (the top edge of every column) and dies away
-    # down the flank, so belly and legs sink into the grass.
     rim = np.zeros_like(V)
     for cx in range(COLS):
         col = np.nonzero(inside[:, cx])[0]
         if len(col) == 0: continue
-        d = np.arange(ROWS) - col.min()
-        rim[:, cx] = np.clip(1 - d / 7.0, 0, 1) ** 1.4
-    down = np.clip((np.arange(ROWS)[:, None] - 30) / 22, 0, 1)        # lower rows: belly and legs darker
+        rim[:, cx] = np.clip(1 - (np.arange(ROWS) - col.min()) / 7.0, 0, 1) ** 1.4
+    down = np.clip((np.arange(ROWS)[:, None] - 30) / 22, 0, 1)
     L = (0.32 * V ** 1.2 + 0.62 * rim) * (1 - 0.55 * down)
     lines = []
     for cy in range(ROWS):
@@ -47,82 +51,78 @@ def to_ascii(tile, detail=1.0):
     top = 0
     while top < len(lines) and not lines[top]: top += 1
     return str(top) + '\n' + '\n'.join(lines[top:])
-def img(r, c):
-    f = R[r][c]; return Image.fromarray(f['rgba'])
-walk = R[1]
-# the 5th walk cow is two cows touching: split them at the emptiest column
-w4 = walk[4]['rgba']; col = (w4[..., 3] > 40).sum(0); mid = w4.shape[1] // 2
-cut = mid - 40 + int(np.argmin(col[mid - 40: mid + 40]))
-def trim(a):
-    ys, xs = np.nonzero(a[..., 3] > 10); return a[ys.min(): ys.max() + 1, xs.min(): xs.max() + 1]
-WALK = [img(1, 0), img(1, 1), img(1, 2), img(1, 3), Image.fromarray(trim(w4[:, :cut])), Image.fromarray(trim(w4[:, cut:])), img(1, 5), img(1, 6)]
-L = lambda r, c: img(r, c).transpose(Image.FLIP_LEFT_RIGHT)
-IDLE = [img(0, 3), L(0, 1), L(0, 0), L(0, 4), img(0, 5)]
-RUN = [img(2, c) for c in range(8)]
-# Grazing: the atlas's eat drawings are each a different, smaller cow, so cycling them made the body morph.
-# Instead the standing drawing lowers its own head (tools/cow/graze_frames.py warps the head and neck
-# layer, the body stays): GRAZE[0] is the standing pose, GRAZE[-1] the head in the grass.
-GRAZE = pickle.load(open(sys.argv[1].replace('raw.pkl', 'graze.pkl'), 'rb'))
-HURT = [img(4, 0), img(4, 1), L(4, 2), L(4, 3), img(4, 4), L(4, 5)]
-DIE = [img(5, c) for c in range(7)]
-frames = IDLE + WALK + RUN
-SCALE = 0.7 * 92 / IDLE[0].height          # a standing cow is about 0.7 of the knight
-def place(im, mode):
-    a = np.asarray(im)[..., 3] > 40; ys, xs = np.nonzero(a); h = ys.max() - ys.min()
-    band = ys < ys.min() + h * 0.6                # the back and flank, not the legs or a swinging tail
-    cx = np.median(xs[band])
-    w, hh = max(1, round(im.width * SCALE)), max(1, round(im.height * SCALE))
-    s = im.resize((w, hh), Image.LANCZOS)
-    t = Image.new('RGBA', (TW, TH), (0, 0, 0, 0))
-    t.paste(s, (round(FX - cx * SCALE), round(FY - ys.max() * SCALE)), s)
-    return t
-# Work at 3x the tile so the in-betweens are made from real detail, then print each frame as glyphs.
+def fr(atlas, r, c, flip=False):
+    im = Image.fromarray(R['cow_' + atlas][r][c]['rgba']); return im.transpose(Image.FLIP_LEFT_RIGHT) if flip else im
+def H(im): a = np.asarray(im)[..., 3] > 60; ys = np.nonzero(a)[0]; return ys.max() - ys.min()
+# one scale per atlas: the front rows matched to idle's front row; idle's profile row sets the size
+med = lambda ims: float(np.median([H(i) for i in ims]))
+ref_S = med([fr('idle', 0, c) for c in range(6)])
+BASE = 0.7 * 92 / med([fr('idle', 2, c) for c in range(6)])       # a standing cow ~0.7 of the knight
+SC = {'idle': BASE, 'walk': BASE * ref_S / med([fr('walk', 0, c) for c in range(7)]),
+      'run': BASE * ref_S / med([fr('run', 0, c) for c in range(7)]),
+      }
+# the jump sheet's cows are drawn at their own sizes per column: each clean column is matched, standing
+# frames to standing frames, to the idle row of the same direction
+JMATCH = {4: 4, 5: 6, 6: 7}
+JSC = {c: BASE * med([fr('idle', r, k) for k in range(6)]) / med([fr('jump', 0, c), fr('jump', 7, c)]) for c, r in JMATCH.items()}
 K3 = 3
-def place3(im, anchor=None):
+def place3(im, sc, anchor=None):
     a = np.asarray(im)[..., 3] > 40; ys, xs = np.nonzero(a); h = ys.max() - ys.min()
-    cx, by = (np.median(xs[ys < ys.min() + h * 0.6]), ys.max()) if anchor is None else anchor; sc = SCALE * K3
-    s2 = im.resize((max(1, round(im.width * sc)), max(1, round(im.height * sc))), Image.LANCZOS)
+    cx, by = (np.median(xs[ys < ys.min() + h * 0.6]), ys.max()) if anchor is None else anchor
+    s = sc * K3; s2 = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
     t = Image.new('RGBA', (TW * K3, TH * K3), (0, 0, 0, 0))
-    t.paste(s2, (round(FX * K3 - cx * sc), round(FY * K3 - by * sc)), s2)
+    t.paste(s2, (round(FX * K3 - cx * s), round(FY * K3 - by * s)), s2)
     return np.asarray(t).astype(np.float32)
-import cv2
-def tween(A, B, t, big=False):
-    """A frame t of the way from A to B: both warped along dense optical flow and blended."""
+def tween(A, B, t):
     ga = (A[..., :3].mean(2) * A[..., 3] / 255).astype(np.uint8); gb = (B[..., :3].mean(2) * B[..., 3] / 255).astype(np.uint8)
-    P = (0.5, 6, 61, 8, 7, 1.5, 0) if big else (0.5, 4, 21, 5, 7, 1.5, 0)   # a big move (head down to the grass) needs a wide search
-    fab = cv2.calcOpticalFlowFarneback(ga, gb, None, *P)
-    fba = cv2.calcOpticalFlowFarneback(gb, ga, None, *P)
+    P = (0.5, 4, 25, 5, 7, 1.5, 0)
+    fab = cv2.calcOpticalFlowFarneback(ga, gb, None, *P); fba = cv2.calcOpticalFlowFarneback(gb, ga, None, *P)
     h, w = ga.shape; gx, gy = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
-    # backward warping: a pixel of the in-between at p came from A at p - t*f and from B at p + (1-t)*f
     wa = cv2.remap(A, gx - t * fab[..., 0], gy - t * fab[..., 1], cv2.INTER_LINEAR, borderValue=0)
     wb = cv2.remap(B, gx - (1 - t) * fba[..., 0], gy - (1 - t) * fba[..., 1], cv2.INTER_LINEAR, borderValue=0)
-    out = wa * (1 - t) + wb * t
-    # keep the coat crisp: colour from whichever source dominates, coverage blended
-    return out
-def expand(seq, n, cyclic, big=False):
-    """n frames between each pair (the originals included)."""
-    T = [place3(f) for f in seq]; res = []
-    pairs = len(T) if cyclic else len(T) - 1
-    for i in range(pairs):
-        A, B = T[i], T[(i + 1) % len(T)]
-        res.append(A)
-        for k in range(1, n): res.append(tween(A, B, k / n, big))
+    return wa * (1 - t) + wb * t
+def expand(T, n, cyclic):
+    res = []
+    for i in range(len(T) if cyclic else len(T) - 1):
+        A, Bb = T[i], T[(i + 1) % len(T)]; res.append(A)
+        for k in range(1, n): res.append(tween(A, Bb, k / n))
     if not cyclic: res.append(T[-1])
-    return [Image.fromarray(np.clip(r, 0, 255).astype(np.uint8)) for r in res]
-SEQ = [('idle', IDLE, 1, False), ('walk', WALK, 6, True), ('run', RUN, 6, True)]
-_a = np.asarray(GRAZE[0])[..., 3] > 40; _ys, _xs = np.nonzero(_a); _h = _ys.max() - _ys.min()
-GANCHOR = (np.median(_xs[_ys < _ys.min() + _h * 0.6]), _ys.max())   # the standing pose's anchor, kept for every frame
-tiles, index = [], {}
-for name, seq, n, cyc in SEQ:
-    fr = [Image.fromarray(place3(f).astype(np.uint8)) for f in seq] if n == 1 else expand(seq, n, cyc, name == 'graze')
-    index[name] = [len(tiles), len(fr)]; tiles += fr
-fr = [Image.fromarray(place3(g, GANCHOR).astype(np.uint8)) for g in GRAZE]
-index['eat'] = [len(tiles), len(fr)]; tiles += fr
-print('index', index)
+    return res
+def row(atlas, r, cols, flip=False): return [fr(atlas, r, c, flip) for c in cols]
+I6, W7 = range(6), range(7)
+# game direction -> drawn frames
+IDLE = [row('idle', 0, [0, 1, 2, 3, 5]), row('idle', 5, I6), row('idle', 6, I6), row('idle', 3, I6, True),
+        row('idle', 4, I6), row('idle', 3, I6), row('idle', 2, I6), row('idle', 1, I6)]
+WALK = [row('walk', 0, W7) + row('walk', 0, W7, True), row('walk', 5, W7), row('walk', 4, W7), row('walk', 3, W7, True),
+        row('walk', 3, W7), row('walk', 2, W7), row('walk', 4, W7, True), row('walk', 1, W7)]
+RUN = [row('run', 0, W7) + row('run', 0, W7, True), row('run', 7, W7), row('run', 6, W7), row('run', 3, W7, True),
+       row('run', 4, W7), row('run', 3, W7), row('run', 2, W7), row('run', 1, W7)]
+JCOL = {1: (6, False), 2: (5, False), 4: (4, False), 6: (5, True), 7: (6, True)}
+tiles, index = [], {'idle': [], 'walk': [], 'run': [], 'jump': []}
+def add(name, frames):
+    index[name].append([len(tiles), len(frames)]); tiles.extend(Image.fromarray(np.clip(f, 0, 255).astype(np.uint8)) for f in frames)
+for d in range(8):
+    add('idle', expand([place3(f, SC['idle']) for f in IDLE[d]], 2, False))     # played back and forth
+for d in range(8):
+    add('walk', expand([place3(f, SC['walk']) for f in WALK[d]], 3, True))
+for d in range(8):
+    add('run', expand([place3(f, SC['run']) for f in RUN[d]], 2, True))
+for d in range(8):
+    if d not in JCOL: index['jump'].append([-1, 0]); continue
+    c, fl = JCOL[d]; seq = [fr('jump', r, c, fl) for r in range(8)]
+    a0 = np.asarray(seq[0])[..., 3] > 40; ys0 = np.nonzero(a0)[0]; stand = ys0.max() - ys0.min()
+    T = []
+    for r, im in enumerate(seq):
+        a = np.asarray(im)[..., 3] > 40; ys, xs = np.nonzero(a); h = ys.max() - ys.min()
+        cx = np.median(xs[ys < ys.min() + h * 0.6])
+        by = ys.min() + stand if 2 <= r <= 5 else ys.max()        # in the air: hang from the back, the game adds the arc
+        T.append(place3(im, JSC[c], (cx, by)))
+    add('jump', expand(T, 2, False))
+print('index', json.dumps(index))
 json.dump(index, open(sys.argv[2].replace('.json', '_index.json'), 'w'))
-out = [to_ascii(t) for t in tiles]
+out = [to_ascii(t.resize((TW, TH), Image.LANCZOS)) for t in tiles]
 json.dump(out, open(sys.argv[2], 'w'))
-prev = Image.new('RGB', (TW * 8, TH * ((len(tiles) + 7) // 8)), (40, 40, 40))
-for i, t in enumerate(tiles): t2 = t.resize((TW, TH), Image.LANCZOS); prev.paste(t2, ((i % 8) * TW, (i // 8) * TH), t2)
+prev = Image.new('RGB', (TW * 10, TH * ((len(tiles) + 9) // 10)), (40, 40, 40))
+for i, t in enumerate(tiles): t2 = t.resize((TW, TH), Image.LANCZOS); prev.paste(t2, ((i % 10) * TW, (i // 10) * TH), t2)
 prev.save(sys.argv[3])
-print('frames', len(out), 'chars', sum(map(len, out)), 'cut', cut)
+print('frames', len(out), 'chars', sum(map(len, out)), 'scales', SC, JSC)
