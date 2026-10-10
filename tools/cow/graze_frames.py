@@ -22,7 +22,7 @@ HEADC = np.array([150.0, 34.0]) * K
 axis = (HEADC - C) / np.linalg.norm(HEADC - C)
 U0, U1 = 2 * K, 26 * K                     # along the neck: still at the cut, fully carried by the head
 MUZ = np.array([172.0, 58.0]) * K
-def frame(s, theta_end=np.radians(62), muz_end=np.array([160.0, 113.0]) * K):
+def frame(s, theta_end=np.radians(50), muz_end=np.array([150.0, 114.0]) * K):
     th = theta_end * s
     c, sn = np.cos(th), np.sin(th)
     Rm = np.array([[c, -sn], [sn, c]])
