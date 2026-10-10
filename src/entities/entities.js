@@ -29,7 +29,9 @@ function dryNear(x, y) {
 }
 function charDims(e) {
   if (e && (e.cls === 'knight' || e.cls === 'cow')) { // ~16% of the screen tall, in fine grain
-    const ffs = Math.max(3.2, Math.min(4.2, FS * 0.38));
+    let ffs = Math.max(3.2, Math.min(4.2, FS * 0.38));
+    // a phone: the knight a share of the screen's height, larger when it is held upright, smaller across
+    if (W < 640 || H < 560) ffs = Math.max(2, Math.min(4.8, H * (W < H ? 0.175 : 0.16) / 40));
     return { ffs, fcw: ffs * 0.6, fch: ffs * 0.9, u: Math.max(1, Math.min(2, H * 0.16 / 92)) };
   }
   const ffs = Math.max(3.8, FS * 0.42);

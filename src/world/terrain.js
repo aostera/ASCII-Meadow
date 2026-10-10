@@ -56,8 +56,12 @@ function build() {
   FS = Math.max(8, Math.min(11, Math.sqrt(W * H / (0.59 * 24000))));
   CW = FS * 0.6; CH = FS * 0.92;
   VC = W / CW; VR = H / CH;                       // what the camera sees
-  MS = Math.max(0.5, Math.min(1.25, H / 820)) * CASTLE_SCALE;  // castle model unit → px; gate ≈ 3.3 knights tall
-  COLS = Math.ceil(Math.max(VC * 2.2, (1800 * MS + W) / CW)); ROWS = Math.ceil((2180 * MS + 60 + H * 5) / CH); N = COLS * ROWS; // castle far north, a long walk up to it
+  WS = Math.max(0.5, Math.min(1.25, H / 820)) * CASTLE_SCALE;  // map unit → px
+  // castle model unit → px; gate ≈ 3.3 knights tall. On a narrow upright screen (a phone held upright) the
+  // castle would be ten screens wide: it is drawn smaller there, the map's distances kept (WS).
+  MS = WS * (W < H * 0.95 ? Math.max(0.55, Math.pow(W / (H * 0.95), 0.75)) : 1);
+  COLS = Math.ceil(Math.max(VC * 2.2, (1800 * WS + W) / CW, 2320 * WS / CW));   // never narrower than the map is wide (±1160 units)
+  ROWS = Math.ceil((2180 * WS + 60 + H * 5) / CH); N = COLS * ROWS;   // castle far north, a long walk up to it; room for the whole map
   ang = new Float32Array(N); vel = new Float32Array(N); flat = new Float32Array(N);
   bshade = new Float32Array(N); bmask = new Uint8Array(N); FR = new Float32Array(N);
   TA = new Float32Array(COLS * 6);
