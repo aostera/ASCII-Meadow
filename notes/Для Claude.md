@@ -35,7 +35,7 @@
 6. Новый код — никогда не в `index.html`: свой файл в `src/`, `<script>` в правильном месте, вызов из `simulate()`/`render()`.
 
 ## Карта
-- Карта игры — `src/data/map.js` (`MEADOW_MAP`), её рисует пользователь в редакторе (`?edit`, M) и присылает файлом или загружает в `src/data/`. Не перезаписывать её генерацией: `null`-поля = генерация, заполненные — его работа.
+- Карта игры — `src/data/map.js` (`MEADOW_MAP`), её рисует пользователь в редакторе (`?edit`, M). «Сохранить» на сайте коммитит её в `main` через Worker (`worker/index.mjs`, секреты `EDITOR_PASSWORD` и `GITHUB_TOKEN` в Cloudflare) — коммиты «Map: saved from the editor» в `main` делает он сам, перед работой с картой делать `git pull`. Не перезаписывать её генерацией: `null`-поля = генерация, заполненные — его работа.
 - Новый вид объекта на карте: поле в `MEADOW_MAP`, расстановка в `world/map.js` (по образцу `placeGroundFires`), инструмент в `ED_OBJECTS` и ветка в `edPlace`/`edBake` (`editor/editor.js`), проверка в `smoke.cjs`.
 
 ## Публикация

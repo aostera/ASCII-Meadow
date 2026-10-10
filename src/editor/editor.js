@@ -334,7 +334,28 @@ function edSyncUI() {
   ED.ui.undo.disabled = !ED.undo.length; ED.ui.redo.disabled = !ED.redo.length;
   ED.ui.zoomPct.firstChild.textContent = Math.round(VZ * 100) + '%'; ED.ui.zoomOut.disabled = VZ <= ED_ZOOMS[0]; ED.ui.zoomIn.disabled = VZ >= ED_ZOOMS[ED_ZOOMS.length - 1];
 }
-function edSave() {
+// «Сохранить»: on the site, straight to production — the Worker (worker/index.mjs) commits the map to
+// GitHub and Cloudflare rebuilds the site; opened from a file, or where there is no Worker, a download.
+const ED_PASSWORD = 'ascii-meadow-editor-password';
+async function edSave() {
+  if (!/^https?:$/.test(location.protocol)) { edDownload(); return; }
+  let pw = ''; try { pw = localStorage.getItem(ED_PASSWORD) || ''; } catch { /* no storage: ask every time */ }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (!pw) { pw = prompt('Пароль редактора (сохраняется в этом браузере):') || ''; if (!pw) { edStatus('Не сохранено: нужен пароль редактора.'); return; } }
+    edStatus('Сохраняю на сайт…');
+    let r; try { r = await fetch('api/map', { method: 'POST', headers: { authorization: 'Bearer ' + pw, 'content-type': 'text/javascript' }, body: mapFileText() }); } catch { r = null; }
+    if (r && r.status === 401) { pw = ''; try { localStorage.removeItem(ED_PASSWORD); } catch { /* nothing stored */ } edStatus('Неверный пароль.'); continue; }
+    const body = r ? await r.json().catch(() => ({})) : {};
+    if (r && r.ok) {
+      try { localStorage.setItem(ED_PASSWORD, pw); } catch { /* remembered for this page only */ }
+      edStatus(body.unchanged ? 'На сайте уже эта карта.' : 'Сохранено на сайт. Он обновится через 1–2 минуты.');
+      return;
+    }
+    edDownload(); edStatus('На сайт сохранить не вышло (' + (body.error || (r ? 'ошибка ' + r.status : 'нет связи')) + '). Скачан map.js — его можно загрузить в src/data/ вручную.');
+    return;
+  }
+}
+function edDownload() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([mapFileText()], { type: 'text/javascript' })); a.download = 'map.js';
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -357,8 +378,8 @@ function edBuildUI() {
   zoomPct.title = 'Вернуть 100% (R)'; zoomRow.append(zoomOut, zoomPct, zoomIn); sMap.append(zoomRow, mini);
   const acts = el('div', 'ed-acts'); const undo = btn('Отменить', '', { act: 'undo' }), redo = btn('Повторить', '', { act: 'redo' });
   const file = el('input'); file.type = 'file'; file.accept = '.js,.json,text/javascript,application/json'; file.hidden = true;
-  acts.append(undo, redo, btn('Сохранить', '', { act: 'save' }), btn('Открыть…', '', { act: 'open' }), btn('Сбросить', '', { act: 'reset' }), btn('Играть отсюда', '', { act: 'play' }), file);
-  const help = el('p', 'ed-help', 'Камера: WASD или стрелки (Shift — быстрее), правая кнопка или пробел — тащить, клик по карте — перейти. Масштаб: Ctrl + колесо или щипок, Q и E, R — 100%. Колесо — размер кисти или вариант. Delete — удалить выбранное. Ctrl Z / Ctrl Shift Z — отменить и повторить, Ctrl S — сохранить.');
+  acts.append(undo, redo, btn('Сохранить', '', { act: 'save' }), btn('Скачать map.js', '', { act: 'download' }), btn('Открыть…', '', { act: 'open' }), btn('Сбросить', '', { act: 'reset' }), btn('Играть отсюда', '', { act: 'play' }), file);
+  const help = el('p', 'ed-help', 'Камера: WASD или стрелки (Shift — быстрее), правая кнопка или пробел — тащить, клик по карте — перейти. Масштаб: Ctrl + колесо или щипок, Q и E, R — 100%. Колесо — размер кисти или вариант. Delete — удалить выбранное. Ctrl Z / Ctrl Shift Z — отменить и повторить, Ctrl S — сохранить на сайт (спросит пароль редактора один раз).');
   const status = el('p', 'ed-status');
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
@@ -378,6 +399,7 @@ function edBuildUI() {
     else if (a === 'zoom-' || a === 'zoom+') edZoomStep(a === 'zoom+' ? 1 : -1);
     else if (a === 'zoom1') edZoomTo(1);
     else if (a === 'save') edSave();
+    else if (a === 'download') edDownload();
     else if (a === 'open') file.click();
     else if (a === 'play') edPlayHere();
     else if (a === 'reset') {
