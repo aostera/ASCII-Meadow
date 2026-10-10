@@ -53,16 +53,6 @@ function tipGlyph(b, s) {
   return s > 0.66 ? CI["'"] : s > 0.33 ? CI['i'] : CI['|'];
 }
 
-function light(i, x, y, cloud) {
-  const h = height[i], f = flat[i], s = seed[i];
-  const front = FR[i];
-  let l = 0.24 + h * 0.52 + Math.max(0, ang[i]) * 0.16 + (front > 0.55 ? (front - 0.55) * 0.55 : 0)
-        - f * 0.38 - cloud * 0.75 - bshade[i] + (s - 0.5) * 0.16;
-  // a body's shadow takes a share of the light, so it shows even on grass lit to the full
-  l = (l > 0.999 ? 0.999 : l) * (1 - shadow[i]);
-  return l < 0 ? 0 : (l * SH) | 0;
-}
-
 // Forces on the grass in view: cleared each step, then pushed by bodies and the hovering mouse.
 let SBX0 = 0, SBX1 = 0, SBY0 = 0, SBY1 = 0;   // the band cleared this step: shadows are written only inside it
 function applyGrassForces(dt) {
@@ -88,22 +78,23 @@ function updateGrass(dt) {
     const a = x * 0.06 - t * 1.5, b = x * 0.17 - t * 2.3, c = x * 0.028 - t * 0.55, o = x * 6;
     TA[o] = Math.sin(a); TA[o + 1] = Math.cos(a); TA[o + 2] = Math.sin(b); TA[o + 3] = Math.cos(b); TA[o + 4] = Math.sin(c); TA[o + 5] = Math.cos(c);
   }
+  const KD = kind, SD = seed, HT = height, FL = flat, AN = ang, VL = vel, PU = push, FRT = FR, T6 = TA;   // locals: see render()
   for (let y = VY0; y <= Math.min(ROWS - 1, VY1 + 4); y++) {
     const ry = y * 0.035, rf = y * 0.012;
     const s1 = Math.sin(ry), c1 = Math.cos(ry), s2 = Math.sin(-2 * ry), c2 = Math.cos(-2 * ry), s3 = Math.sin(-rf), c3 = Math.cos(-rf);
     for (let x = VX0; x <= VX1; x++) {
-      const i = y * COLS + x, kd = kind[i];
+      const i = y * COLS + x, kd = KD[i];
       if (kd === 0 || kd === 2 || kd === 5 || kd === 7 || kd === 8) continue;
-      const h = height[i], o = x * 6;
-      const swell = (TA[o] * c1 + TA[o + 1] * s1) * 0.6 + (TA[o + 2] * c2 + TA[o + 3] * s2) * 0.25;
-      const front = TA[o + 4] * c3 + TA[o + 5] * s3;
-      FR[i] = front;
+      const h = HT[i], o = x * 6;
+      const swell = (T6[o] * c1 + T6[o + 1] * s1) * 0.6 + (T6[o + 2] * c2 + T6[o + 3] * s2) * 0.25;
+      const front = T6[o + 4] * c3 + T6[o + 5] * s3;
+      FRT[i] = front;
       const gb = front > 0.55 ? (front - 0.55) * 2.2 : 0;
-      const wind = (0.16 + swell * 0.24 + gb * 0.95 + (seed[i] - 0.5) * 0.28) * amp;
-      const target = wind * (0.45 + h) + push[i] * (0.55 + h * 0.65);
-      vel[i] = (vel[i] + (target - ang[i]) * k * (0.8 + seed[i] * 0.4) * dt) * damp;
-      ang[i] += vel[i] * dt;
-      if (flat[i] > 0) flat[i] = Math.max(0, flat[i] - dt * 0.2);
+      const wind = (0.16 + swell * 0.24 + gb * 0.95 + (SD[i] - 0.5) * 0.28) * amp;
+      const target = wind * (0.45 + h) + PU[i] * (0.55 + h * 0.65);
+      VL[i] = (VL[i] + (target - AN[i]) * k * (0.8 + SD[i] * 0.4) * dt) * damp;
+      AN[i] += VL[i] * dt;
+      if (FL[i] > 0) FL[i] = Math.max(0, FL[i] - dt * 0.2);
     }
   }
 }

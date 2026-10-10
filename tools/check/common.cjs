@@ -20,11 +20,11 @@ function deterministic(mode) {
   window.__step = n => { const t0 = realNow(); for (let i = 0; i < n; i++) { T += 1000 / 60; for (let k = timers.length - 1; k >= 0; k--) if (timers[k].at <= T) { const t = timers.splice(k, 1)[0]; t.cb(); } const q = raf.splice(0); for (const cb of q) cb(T); } return realNow() - t0; };
   // GPU submits are counted, and become no-ops while window.__noGPU is set (fast travel; the frame is still built)
   window.__gpu = { draws: 0, glyphs: 0 };
-  { const gc = HTMLCanvasElement.prototype.getContext, noop = new Set(['drawElements', 'bufferSubData', 'clear']);
+  { const gc = HTMLCanvasElement.prototype.getContext, noop = new Set(['drawElements', 'drawArrays', 'bufferSubData', 'texSubImage2D', 'clear']);
     HTMLCanvasElement.prototype.getContext = function (k, o) { const c = gc.call(this, k, o); if (k !== 'webgl2' || !c) return c;
       return new Proxy(c, { get(t, p) { const v = t[p]; if (typeof v !== 'function') return v;
         if (!noop.has(p)) return v.bind(t);
-        return (...a) => { if (p === 'drawElements') window.__gpu.draws++; if (p === 'bufferSubData') window.__gpu.glyphs += (a[4] || 0) / 20; if (!window.__noGPU) v.apply(t, a); }; } }); }; }
+        return (...a) => { if (p === 'drawElements') window.__gpu.draws++; if (p === 'bufferSubData') window.__gpu.glyphs += (a[4] || 0) / 20; if (p === 'drawArrays') { window.__gpu.draws++; window.__gpu.glyphs += a[2] / 6; } if (!window.__noGPU) v.apply(t, a); }; } }); }; }
   if (mode === '2d') { const g = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (k, o) { return k === 'webgl2' ? null : g.call(this, k, o); }; }
 }
 

@@ -18,16 +18,22 @@ function fogDensity(x, y) {
   return Math.max(0, Math.min(1, (n - 0.56 + thick * 0.42) * 2.4)) * thick;
 }
 function updateFog() {
-  const fw = Math.max(32, Math.round(W / 12)), fh = Math.max(24, Math.round(H / 12));
+  const cs = Math.max(12, W / 160), fw = Math.max(32, Math.round(W / cs)), fh = Math.max(24, Math.round(H / cs));   // a cell of 12 px, coarser past 1920 px wide: it is drawn smoothed anyway
   if (FG.w !== fw || FG.h !== fh) { FG.w = fw; FG.h = fh; FG.cv.width = fw; FG.cv.height = fh; FG.d = new Float32Array(fw * fh); FG.img = FG.cv.getContext('2d').createImageData(fw, fh); FG.tick = 0; }
   if ((FG.tick++ & 1) && FG.tick > 2) return;
   const x0 = camX * CW, y0 = camY * CH, sx = W / VZ / fw, sy = H / VZ / fh, px = FG.img.data;
+  // the fires near enough to thin the fog on screen. Past q = 37 a term is exactly 1 in double precision
+  // (0.55·e^-q and 0.65·e^-q drop under half an ulp), so leaving it out changes no bit: √37 ≈ 6.1 radii
+  // across, 6.1 / 1.6 ≈ 3.8 down
+  const r = 150 * Math.min(MS, 1.4), hot = [];
+  for (const b of braziers) { const bx = b.x * CW, by = (b.y + 0.7) * CH - b.lift; if (bx > x0 - 6.2 * r && bx < x0 + W / VZ + 6.2 * r && by > y0 - 3.9 * r && by < y0 + H / VZ + 3.9 * r) hot.push(bx, by); }
+  const C2 = cathedral, sw = 230 * MS, sh = 200 * MS;
   for (let j = 0; j < fh; j++) for (let i = 0; i < fw; i++) {
     const wx = x0 + (i + 0.5) * sx, wy = y0 + (j + 0.5) * sy;
     let d = fogDensity(wx, wy);
     if (fogChunks.size) d = mapFog(d, wx, wy);   // world/map.js: fog brushed in the editor
-    { const C2 = cathedral; if (C2.cv) { const dx = (wx - C2.kx) / (230 * MS), dy = (wy - (C2.ky - 20 * MS)) / (200 * MS); d *= 1 - 0.65 * Math.exp(-(dx * dx + dy * dy)); } }  // the stair stays readable
-    for (const b of braziers) { const dx = wx - b.x * CW, dy = (wy - ((b.y + 0.7) * CH - b.lift)) * 1.6, r = 150 * Math.min(MS, 1.4); d *= 1 - 0.55 * Math.exp(-(dx * dx + dy * dy) / (r * r)); }  // the heat thins the fog
+    if (C2.cv) { const dx = (wx - C2.kx) / sw, dy = (wy - (C2.ky - 20 * MS)) / sh, q = dx * dx + dy * dy; if (q < 37) d *= 1 - 0.65 * Math.exp(-q); }  // the stair stays readable
+    for (let k = 0; k < hot.length; k += 2) { const dx = wx - hot[k], dy = (wy - hot[k + 1]) * 1.6, q = (dx * dx + dy * dy) / (r * r); if (q < 37) d *= 1 - 0.55 * Math.exp(-q); }  // the heat thins the fog
     const k = j * fw + i;
     FG.d[k] = d;
     const gc = Math.min(COLS - 1, Math.max(0, (wx / CW) | 0)) + Math.min(ROWS - 1, Math.max(0, (wy / CH) | 0)) * COLS;
