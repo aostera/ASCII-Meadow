@@ -185,9 +185,11 @@ function buildFlora() {
 // The variants, baked once per window size: pictures in the atlas, cut into slices.
 function bakeVariants() {
   VARS.length = 0;
-  for (let k = 0; k < 7; k++) VARS.push(bakeVariant('tree', k + 1));
+  for (let k = 0; k < 7; k++) VARS.push(bakeTree3D('tree', k + 1));   // world/trees3d.js
   for (let k = 0; k < 4; k++) VARS.push(bakeVariant('dead', k + 21));
-  for (let k = 0; k < 6; k++) VARS.push(bakeVariant('bush', k + 41));
+  for (let k = 0; k < 6; k++) VARS.push(bakeTree3D('bush', k + 41));
+  STONES.length = 0;
+  for (let k = 0; k < 9; k++) { const v = bakeStone3D(k % 3, k + 61); STONES.push(v); VARS.push(v); }
   LILIES.length = 0;
   for (let k = 0; k < 5; k++) { const v = bakeLily(k >= 3, k + 81); LILIES.push(v); VARS.push(v); }
   bakeCampVariants(VARS);   // world/camp.js: tents and fences
