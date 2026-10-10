@@ -8,7 +8,7 @@ const LGT = (() => { const v = [-0.45, 0.65, -0.6], m = Math.hypot(...v); return
 // letters per surface: front walls, side walls, roofs, spires, openings (empty), rock, steps
 const FACESETS = ["0Q@0Q8", "dbqd8b", "=#=+=", "^*^%", "", ",;:o%.", "=_-="];
 const solids = [];
-let MS = 1;
+let MS = 1, WS = 1;   // MS: castle model unit → px; WS: map unit → px (the same on wide screens; a narrow one shrinks only the castle)
 const CASTLE_SCALE = 2.5;
 const P3 = (a, b, c, d) => [a, b, c, d];
 const plane = (nx, ny, nz, px, py, pz) => { const m = Math.hypot(nx, ny, nz); nx /= m; ny /= m; nz /= m; return [nx, ny, nz, nx * px + ny * py + nz * pz]; };
@@ -294,11 +294,11 @@ function buildCathedral() {
   buildBins();
   // ax, ay: the map's origin, where the mound's front foot stands by default (map coordinates are measured from
   // it); ox, oy: where it stands now, moved by the map's castle offset (ground units)
-  const ax = COLS * 0.5 * CW, ay = 2150 * MS + 40, [ox0, oz0] = castleOff();
+  const ax = COLS * 0.5 * CW, ay = 2150 * WS + 40, [ox0, oz0] = castleOff();   // the map's origin: room above it for the whole map
   // the map's offset, kept inside this world (a smaller window makes a smaller one): the castle is never cut
-  const dx = Math.max((820 * MS - ax) / MS, Math.min((COLS * CW - 820 * MS - ax) / MS, ox0));
-  const dz = Math.max((ay + 160 * MS - ROWS * CH) / (SINP * MS), Math.min((ay - 2150 * MS) / (SINP * MS), oz0));
-  const ox = ax + dx * MS, oy = ay - dz * SINP * MS;
+  const dx = Math.max((820 * MS - ax) / WS, Math.min((COLS * CW - 820 * MS - ax) / WS, ox0));
+  const dz = Math.max((ay + 160 * MS - ROWS * CH) / (SINP * WS), Math.min((ay - 2150 * MS) / (SINP * WS), oz0));
+  const ox = ax + dx * WS, oy = ay - dz * SINP * WS;   // the offset is a map position
   const Dv = [0, -SINP, COSP];
   const cx0 = Math.max(0, Math.floor((ox - 820 * MS) / CW)), cx1 = Math.min(COLS - 1, Math.ceil((ox + 820 * MS) / CW));
   const cy0 = Math.max(0, Math.floor((oy - 2150 * MS) / CH)), cy1 = Math.min(ROWS - 1, Math.ceil((oy + 110 * MS) / CH));
@@ -366,12 +366,12 @@ function buildCathedral() {
 }
 
 // Grid position → castle model ground point under the feet.
-const toModelXZ = (x, y) => [(x * CW - cathedral.ox) / MS, -((y + 0.7) * CH - cathedral.oy) / (SINP * MS)];
+const toModelXZ = (x, y) => [(x * CW - cathedral.ox) / WS, -((y + 0.7) * CH - cathedral.oy) / (SINP * WS)];   // map units
 // Height of the walkable surface under a point: 0 on the field, the top of rock or stair on the mound,
 // Infinity inside walls and towers.
 function surfAt(x, y) {
   if (!cathedral.cv) return 0;
-  const [mx, mz] = toModelXZ(x, y), [dx, dz] = cathedral.off || [0, 0], gx = mx - dx, gz = mz - dz;   // into the castle's own frame (as built)
+  const C = cathedral, gx = (x * CW - C.kx) / MS, gz = -((y + 0.7) * CH - C.ky) / (SINP * MS);   // into the castle's own frame, from where it stands
   if (gz < -140 || gz > 1060 || Math.abs(gx) > 800) return 0;
   const h = cast(gx, 5000, gz, 0, -1, 0, 0, BINS.down(gx, 0, gz));
   if (!h) return 0;

@@ -11,7 +11,7 @@ let bshadeCastle = null, kindBase = null;   // edit mode only: the castle's shad
                                             // so trees can move without re-casting the castle or regenerating the field
 
 // ground point → grid position of whoever stands there (feet at (y + 0.7) * CH); toModelXZ (castle.js) is the inverse
-const mapToCell = (gx, gz) => [(gx * MS + cathedral.ox) / CW, (cathedral.oy - gz * SINP * MS) / CH - 0.7];
+const mapToCell = (gx, gz) => [(gx * WS + cathedral.ox) / CW, (cathedral.oy - gz * SINP * WS) / CH - 0.7];
 
 // ---------- paint: brush strokes over the generated ground ----------
 // A sparse grid of PAINT_RES-unit cells, kept in PCH×PCH chunks; a chunk is stored run-length coded.
@@ -50,7 +50,7 @@ function fogCodeAt(gx, gz) {
 // Fog density d (generated, 0..1) at world px (wx, wy) once the map's fog is laid over it: the four nearest
 // fog cells blend, so a stroke has soft edges, and painted fog rolls with the same slow noise as the rest.
 function mapFog(d, wx, wy) {
-  const C = cathedral, gx = (wx - C.ox) / MS, gz = -(wy - C.oy) / (SINP * MS), h = FOG_RES * 0.5;
+  const C = cathedral, gx = (wx - C.ox) / WS, gz = -(wy - C.oy) / (SINP * WS), h = FOG_RES * 0.5;
   const roll = 0.72 + 0.4 * vnoise(wx * 0.004 + t * 0.05, wy * 0.006 - t * 0.02);
   let sum = 0;
   for (const [ox, oz] of [[-h, -h], [h, -h], [-h, h], [h, h]]) {
@@ -86,9 +86,13 @@ function paintCell(i, x, y, c) {
   }
 }
 const trailOn = () => MEADOW_MAP.trail !== false;
-const castleOff = () => MEADOW_MAP.castle || [0, 0];   // the castle moved from its place, in ground units ([x, z])   // the generated trail, unless the map turned it off
+const castleOff = () => MEADOW_MAP.castle || [0, 0];   // the castle moved from its place, in ground units ([x, z])
+// Things that stand on the castle (braziers on its terrace) are kept in its own frame: map units at the
+// castle's scale from its foot, plus its offset. On a narrow screen the castle is drawn smaller than the map.
+const castleToCell = (gx, gz) => { const C = cathedral, [dx, dz] = C.off || [0, 0]; return [(C.kx + (gx - dx) * MS) / CW, (C.ky - (gz - dz) * SINP * MS) / CH - 0.7]; };
+const cellToCastle = (x, y) => { const C = cathedral, [dx, dz] = C.off || [0, 0]; return [(x * CW - C.kx) / MS + dx, -((y + 0.7) * CH - C.ky) / (SINP * MS) + dz]; };   // the generated trail, unless the map turned it off
 // Ground point of a cell's centre, and its paint code there.
-const cellXZ = (x, y) => [((x + 0.5) * CW - cathedral.ox) / MS, -((y + 0.5) * CH - cathedral.oy) / (SINP * MS)];
+const cellXZ = (x, y) => [((x + 0.5) * CW - cathedral.ox) / WS, -((y + 0.5) * CH - cathedral.oy) / (SINP * WS)];
 function paintAt(gx, gz) {
   const px = Math.floor(gx / PAINT_RES), pz = Math.floor(gz / PAINT_RES), a = paintChunks.get((px >> 5) + ',' + (pz >> 5));
   return a ? a[(px & 31) + (pz & 31) * PCH] : 0;
@@ -104,8 +108,8 @@ function applyPaint() {
 // Re-lay the ground of the cells whose centres fall in a ground rectangle: generated, castle, trail, paint.
 // `fresh` regenerates them first (the editor's live strokes); applyPaint paints over a fresh build.
 function paintRect(gx0, gz0, gx1, gz1, fresh) {
-  const C = cathedral, x0 = Math.max(0, Math.floor((gx0 * MS + C.ox) / CW - 1)), x1 = Math.min(COLS - 1, Math.ceil((gx1 * MS + C.ox) / CW));
-  const y0 = Math.max(0, Math.floor((C.oy - gz1 * SINP * MS) / CH - 1)), y1 = Math.min(ROWS - 1, Math.ceil((C.oy - gz0 * SINP * MS) / CH));
+  const C = cathedral, x0 = Math.max(0, Math.floor((gx0 * WS + C.ox) / CW - 1)), x1 = Math.min(COLS - 1, Math.ceil((gx1 * WS + C.ox) / CW));
+  const y0 = Math.max(0, Math.floor((C.oy - gz1 * SINP * WS) / CH - 1)), y1 = Math.min(ROWS - 1, Math.ceil((C.oy - gz0 * SINP * WS) / CH));
   const g = Math.floor(C.trailRow || ROWS * 0.45);
   for (let y = y0; y <= y1; y++) {
     const cx = y >= g ? pathX(y) : 0, hw = y >= g ? pathHalfWidth(y, g) : 0;
@@ -138,7 +142,7 @@ function placeFires() {
     return;
   }
   MEADOW_MAP.fires.forEach(([gx, gz, h, kd], mi) => {
-    const [x, y] = mapToCell(gx, gz);
+    const [x, y] = h > 0 ? castleToCell(gx, gz) : mapToCell(gx, gz);
     braziers.push(h > 0 ? { isFire: true, x, y, lift: h * COSP * MS, parts: [], seed: 3 + mi, mi } : { isFire: true, ground: true, cook: kd === 'cook', steam: [], x, y, lift: 0, parts: [], seed: 3 + mi, mi });   // 'cook': a pot over it
   });
 }

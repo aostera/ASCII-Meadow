@@ -50,7 +50,7 @@ function edBake() {
   const M = MEADOW_MAP;
   if (!M.flora) { M.flora = flora.map(f => [f.v.type, variantsOf(f.v.type).indexOf(f.v), ...edXZ(f.x, f.br - 0.7)]); flora.forEach((f, k) => { f.mi = k; }); }
   if (!M.cows) { M.cows = cows.map(c => edXZ(c.home[0], c.home[1])); cows.forEach((c, k) => { c.mi = k; }); }
-  if (!M.fires) { M.fires = braziers.map(b => b.ground ? edXZ(b.x, b.y) : [...edXZ(b.x, b.y), edR1(b.lift / (COSP * MS))]); braziers.forEach((b, k) => { b.mi = k; }); }
+  if (!M.fires) { M.fires = braziers.map(b => b.ground ? edXZ(b.x, b.y) : [...cellToCastle(b.x, b.y).map(edR1), edR1(b.lift / (COSP * MS))]); braziers.forEach((b, k) => { b.mi = k; }); }
   if (!M.start) { const sy = ROWS - VR * 0.3; M.start = edXZ(pathX(sy) - 3, sy); }
 }
 function applyObjects(which) {
@@ -79,8 +79,8 @@ function edRebuildCastle() {
 // The castle's mound foot (the gate's) to ground point gx, gz, kept inside the world.
 function edMoveCastle(gx, gz) {
   const C = cathedral, ax = C.ox, ay = C.oy;
-  const dx = Math.max((820 * MS - ax) / MS, Math.min((COLS * CW - 820 * MS - ax) / MS, gx));
-  const dz = Math.max((ay + 160 * MS - ROWS * CH) / (SINP * MS), Math.min((ay - 2150 * MS) / (SINP * MS), gz));
+  const dx = Math.max((820 * MS - ax) / WS, Math.min((COLS * CW - 820 * MS - ax) / WS, gx));
+  const dz = Math.max((ay + 160 * MS - ROWS * CH) / (SINP * WS), Math.min((ay - 2150 * MS) / (SINP * WS), gz));
   edRecord({ map: mapSnapshot() });
   const [px, pz] = castleOff();
   MEADOW_MAP.castle = Math.abs(dx) < 0.5 && Math.abs(dz) < 0.5 ? null : [edR1(dx), edR1(dz)];
@@ -132,7 +132,7 @@ function edRehide(x0, y0, x1, y1) {
 function edRepaintRect(gx0, gz0, gx1, gz1) {
   paintRect(gx0, gz0, gx1, gz1, true);
   const C = cathedral;
-  edRehide((gx0 * MS + C.ox) / CW, (C.oy - gz1 * SINP * MS) / CH, (gx1 * MS + C.ox) / CW, (C.oy - gz0 * SINP * MS) / CH);
+  edRehide((gx0 * WS + C.ox) / CW, (C.oy - gz1 * SINP * WS) / CH, (gx1 * WS + C.ox) / CW, (C.oy - gz0 * SINP * WS) / CH);
 }
 function edRepaintChunk(key) { const [kx, kz] = key.split(',').map(Number), s = PCH * PAINT_RES; edRepaintRect(kx * s, kz * s, (kx + 1) * s, (kz + 1) * s); }
 function edStamp(gx, gz) {
@@ -194,7 +194,7 @@ function edPick(sx, sy) {   // the frontmost object whose body covers the point
   return best;
 }
 // A fire set on the castle's terrace or stair stands at its height: [x, z, h].
-function edFirePoint(gx, gz) { const [x, y] = mapToCell(gx, gz), h = surfAt(x, y); return isFinite(h) && h > 1 ? [edR1(gx), edR1(gz), Math.round(h)] : [edR1(gx), edR1(gz)]; }
+function edFirePoint(gx, gz) { const [x, y] = mapToCell(gx, gz), h = surfAt(x, y); return isFinite(h) && h > 1 ? [...cellToCastle(x, y).map(edR1), Math.round(h)] : [edR1(gx), edR1(gz)]; }   // on the castle: in its frame
 // Every object edit: remember the map as it was (generated lists still null), then make the lists explicit.
 function edBeginObjectEdit() { edRecord({ map: mapSnapshot() }); edBake(); }
 function edPlace(tool, gx, gz) {
@@ -304,7 +304,7 @@ function drawEditor() {
   if (ED.inView && !ED.pan && ED.mx >= 0) {
     const r = ED.size * PAINT_RES;
     g.strokeStyle = 'rgba(250,250,250,.75)'; g.setLineDash([5, 4]); g.lineWidth = 1;
-    if (edIsBrush(ED.tool) || edIsFog(ED.tool)) { g.beginPath(); g.ellipse(ED.mx, ED.my, r * MS * VZ, r * SINP * MS * VZ, 0, 0, Math.PI * 2); g.stroke(); }
+    if (edIsBrush(ED.tool) || edIsFog(ED.tool)) { g.beginPath(); g.ellipse(ED.mx, ED.my, r * WS * VZ, r * SINP * WS * VZ, 0, 0, Math.PI * 2); g.stroke(); }
     else if (ED.tool === 'castle') {   // the castle's whole extent, its gate foot under the cursor
       const w = 820 * MS * VZ, up = 2150 * MS * VZ, down = 110 * MS * VZ;
       g.strokeRect(ED.mx - w, ED.my - up, w * 2, up + down);
