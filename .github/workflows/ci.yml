@@ -42,7 +42,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: standalone-html
-          path: dist/
+          path: dist/ascii-meadow*.html
 
   browser:
     name: Game in Chromium (WebGL2, 2D, touch, file://, HTTP sub-folder, bundle)
