@@ -3,7 +3,7 @@
 Связано: [[ASCII Meadow]] · [[Техническая архитектура]] · [[Визуальное направление]]
 
 ## Где что лежит
-- Репозиторий `aostera/ASCII-Meadow`, ветка `main`. Игра — `index.html`, заметки — `notes/`.
+- Репозиторий `aostera/ASCII-Meadow`, ветка `main`. Игра — `index.html` (только точка входа) + `styles/main.css` + `src/` (код по подсистемам, кадры в `src/data/`), заметки — `notes/`. Карта файлов и правила размещения кода — [[Техническая архитектура]].
 - Опубликованный артефакт: https://claude.ai/artifact/J3wgnky6xvhkRMzyJTyV14 (обновлять по этому `url`, сначала `read`).
 - Артефакт без обёртки `<html>/<head>/<body>`; в репозитории — та же страница, обёрнутая в полный документ.
 
@@ -28,7 +28,8 @@
 
 ## Как работать
 1. Перед правкой перечитать [[Визуальное направление]].
-2. После правки: синтаксис (`node --check` по скрипту), скриншоты Playwright (`/opt/pw-browsers/chromium`, для WebGL флаги `--use-angle=swiftshader --enable-unsafe-swiftshader`), проверить: десктоп, iPhone, старт с нулевым размером панели.
+2. После правки: синтаксис (`node --check src/**/*.js`), при переносе кода — детерминированная сверка `tools/check/` (до/после попиксельно), скриншоты Playwright (`/opt/pw-browsers/chromium`, для WebGL флаги `--use-angle=swiftshader --enable-unsafe-swiftshader`), проверить: десктоп, iPhone, старт с нулевым размером панели.
 3. В программном рендере fps низкий (~5) — это не реальная цифра. Мерить CPU отдельно, отключив `GL.flush`.
-4. Если меняются кадры рыцаря: `tools/to_ascii.py` → вставить `KNIGHT_ART`, затем `node tools/find_blades.cjs index.html` → вставить `KSW`.
-5. Опубликовать артефакт, закоммитить `index.html`, обновить [[Хронология]] и [[Бэклог]].
+4. Если меняются кадры рыцаря: `tools/to_ascii.py` → вставить `KNIGHT_ART` в `src/data/knight-frames.js`, затем `node tools/find_blades.cjs` → вставить `KSW` туда же. Кадры коров — `COW_ART`/`CIX` в `src/data/cow-frames.js` и `src/entities/cow.js`.
+5. Опубликовать артефакт (страница + файлы `src/`, `styles/` через `files`, или одним файлом через `tools/bundle.py`), закоммитить, обновить [[Хронология]] и [[Бэклог]].
+6. Новый код — никогда не в `index.html`: свой файл в `src/`, `<script>` в правильном месте, вызов из `simulate()`/`render()`.
