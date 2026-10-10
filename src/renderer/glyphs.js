@@ -54,7 +54,7 @@ function buildMegaAtlas() {
   const k = charDims(player), kfs = k.ffs * DPR;
   const KAW = Math.ceil(k.fcw * DPR) + 2, KAH = Math.ceil(k.fch * DPR) + 2;
   const KX = 0, KY = atlas.height + 2, kw = KAW * KCH.length;
-  const mw = Math.max(atlas.width, kw + 16), mh = KY + KAH * KLV * KBLK + 2;
+  const mw = Math.max(atlas.width, kw + 16), mh = KY + KAH * KLV * KBLK_ALL + 2;
   const m = document.createElement('canvas'); m.width = mw; m.height = mh;
   const g = m.getContext('2d');
   g.drawImage(atlas, 0, 0);
@@ -62,6 +62,10 @@ function buildMegaAtlas() {
   const [tr, tg, tb] = player.tint;
   // The knight's glyphs in firelight: block 0 is the cold grey; blocks 1-4 are the armour darkening to warm
   // graphite with copper edges, 5-8 the cloth (cloak, mantle, tabard) turning crimson, as in the reference.
+  for (let bk = KBLK; bk < KBLK_ALL; bk++) for (let l = 0; l < KLV; l++) {   // the creatures' colours
+    const [r, gg, bb] = ramp3(KCREATURES[bk - KBLK], l / (KLV - 1)); g.fillStyle = `rgb(${r | 0},${gg | 0},${bb | 0})`;
+    for (let c = 1; c < KCH.length; c++) g.fillText(KCH[c], KX + c * KAW + 1, KY + (bk * KLV + l) * KAH + 1);
+  }
   for (let bk = 0; bk < KBLK; bk++) for (let l = 0; l < KLV; l++) {
     const f = 0.3 + 0.85 * (l / (KLV - 1)), u = l / (KLV - 1), cloth = bk > KWH - 1, h = cloth ? bk - KWH + 1 : bk;
     const mix = (cloth ? KCMIX : KMMIX)[h];
@@ -74,7 +78,7 @@ function buildMegaAtlas() {
   GB.spr.length = 0;
   for (let c = 0; c < CHARS.length; c++) for (let b = 0; b < NB; b++) sprite(c * AW, b * AH, AW, AH, AW / DPR, AH / DPR, -1 / DPR, -1 / DPR);
   KN0 = GB.spr.length;
-  for (let bk = 0; bk < KBLK; bk++) for (let c = 0; c < KCH.length; c++) for (let l = 0; l < KLV; l++) sprite(KX + c * KAW, KY + (bk * KLV + l) * KAH, KAW, KAH, KAW / DPR, KAH / DPR, -1 / DPR, -1 / DPR);
+  for (let bk = 0; bk < KBLK_ALL; bk++) for (let c = 0; c < KCH.length; c++) for (let l = 0; l < KLV; l++) sprite(KX + c * KAW, KY + (bk * KLV + l) * KAH, KAW, KAH, KAW / DPR, KAH / DPR, -1 / DPR, -1 / DPR);
   const sb = (w, h, ox, oy) => sprite(kw + 6, KY + 2, 2, 2, w, h, ox, oy);
   SOLID_CELL = sb(CW + 0.8, CH + 0.8, -0.4, -0.4);
   SOLID_FRONT = sb(CW + 0.6, CH - 1, -0.3, 1);

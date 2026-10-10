@@ -9,6 +9,13 @@ const lerp3 = (a, b, u) => [0, 1, 2].map(i => a[i] + (b[i] - a[i]) * u);
 const ramp3 = (st, u) => { let k = 0; while (k < st.length - 2 && u > st[k + 1][0]) k++; const [u0, a] = st[k], [u1, b] = st[k + 1]; return lerp3(a, b, Math.min(1, Math.max(0, (u - u0) / (u1 - u0)))); };
 const KFIRE_ARMOUR = [[0, [24, 19, 18]], [0.5, [66, 55, 51]], [0.8, [104, 89, 82]], [0.92, [150, 92, 60]], [1, [206, 146, 100]]];
 const KFIRE_CLOTH = [[0, [52, 12, 12]], [0.4, [117, 28, 24]], [0.78, [185, 54, 46]], [1, [226, 99, 82]]];
+// After the knight's blocks: the marsh's creatures, in their own muted colours by level. A toad is
+// grey-brown, its brightest glyphs the copper of its eye; a frog is olive, its brightest a wet yellowish sheen.
+const KCREATURES = [
+  [[0, [20, 17, 14]], [0.45, [60, 50, 40]], [0.75, [94, 80, 62]], [0.9, [126, 104, 78]], [1, [196, 128, 66]]],
+  [[0, [13, 17, 11]], [0.45, [42, 54, 32]], [0.75, [70, 86, 50]], [0.9, [100, 114, 66]], [1, [150, 156, 96]]],
+];
+const KBLK_ALL = KBLK + KCREATURES.length;   // every block in the atlas
 
 // Firelight: near a brazier the side facing it and the lower body catch the light, as in a painting lit
 // by embers: the cloak turns red, the armour dark metal with warm edges. Steps are dithered per glyph.
