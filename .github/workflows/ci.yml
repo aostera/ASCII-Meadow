@@ -61,7 +61,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Smoke test from file://
         run: node tools/check/smoke.cjs "file://$GITHUB_WORKSPACE/index.html" --out shots/file
-      - name: Smoke test over HTTP from /ASCII-Meadow/ (like GitHub Pages)
+      - name: Smoke test over HTTP from a sub-folder, /ASCII-Meadow/ (relative paths only)
         run: |
           sh tools/build_site.sh /tmp/site/ASCII-Meadow
           (cd /tmp/site && python3 -m http.server 8080 > /tmp/http.log 2>&1 &)
