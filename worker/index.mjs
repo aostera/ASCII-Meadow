@@ -21,12 +21,18 @@ function base64(text) {
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
 }
-// A map file as the editor writes it: the MEADOW_MAP object is plain JSON.
+// A map file as the editor writes it, and nothing else: line comments, then `const MEADOW_MAP = ` and a
+// plain JSON object to the end of the file. The whole object is parsed as JSON, so no code can ride along:
+// the file is loaded as a script by every visitor. (Comments end only at a newline here, never at U+2028.)
+const MAP_FILE = /^(?:\/\/[^\n\r\u2028\u2029]*\n)*const MEADOW_MAP = (\{[\s\S]*\});\n?$/;
 function checkMap(text) {
   if (text.length > MAX) return 'map too large';
-  const k = text.indexOf('const MEADOW_MAP = {'), a = text.indexOf('{', k), b = text.lastIndexOf('}');
-  if (k < 0 || b < a) return 'not a map file';
-  try { const m = JSON.parse(text.slice(a, b + 1)); if (!m || m.v !== 1) return 'unknown map version'; } catch { return 'map is not valid JSON'; }
+  const f = MAP_FILE.exec(text);
+  if (!f) return 'not a map file';
+  try {
+    const m = JSON.parse(f[1]);
+    if (!m || typeof m !== 'object' || Array.isArray(m) || m.v !== 1) return 'unknown map version';
+  } catch { return 'map is not valid JSON'; }
   if (/<\/script/i.test(text)) return 'map contains </script';
   return '';
 }

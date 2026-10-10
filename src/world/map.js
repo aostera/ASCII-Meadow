@@ -3,7 +3,9 @@
 // follows the window, these units do not, so a map lands in the same place on every screen.
 // Fields left null are generated as before; `paint` holds brush strokes over the generated ground.
 
-const EDIT = /[?&]edit(=|&|$)/.test(location.search);   // the map editor (editor/editor.js) exists only with ?edit
+// The map editor (editor/editor.js) is open to everyone while the world is being built: the button and M.
+// When the project is done it goes behind a secret combination again; ?edit=0 turns it off for a page.
+const EDIT = !/[?&]edit=0(&|$)/.test(location.search);
 let editing = false;        // the editor is open: the knight stands still, the camera is the editor's
 let bshadeCastle = null, kindBase = null;   // edit mode only: the castle's shade and the ground before the trees,
                                             // so trees can move without re-casting the castle or regenerating the field
