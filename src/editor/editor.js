@@ -3,13 +3,13 @@
 // and is seen at once, with the wind, shadows and fog. «Сохранить» downloads src/data/map.js for the repository.
 
 const ED = {
-  tool: 'g', size: 6, variant: { tree: 0, dead: 0, bush: 0 },
+  tool: 'g', size: 6, variant: { tree: 0, dead: 0, bush: 0, tent: 0, fence: 0 },
   sel: null, hover: null, drag: null, pan: null, stroke: null, space: false,
   undo: [], redo: [], keys: new Set(), mx: -1, my: -1, inView: false,
   ui: null, mini: null, miniKey: '', draftTimer: 0,
 };
 const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['w', 'Вода', '9'], ['m', 'Болото', 'P'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
-const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['castle', 'Замок', 'L'], ['select', 'Выбрать и двигать', 'V']];
+const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['tent', 'Палатка', 'Y'], ['fence', 'Забор', 'I'], ['castle', 'Замок', 'L'], ['select', 'Выбрать и двигать', 'V']];
 const ED_FOG = [['fogl', 'Лёгкий туман', 'H'], ['fogd', 'Густой туман', 'J'], ['fogc', 'Убрать туман', 'N']];
 const ED_FOGCODE = { fogl: 2, fogd: 3, fogc: 1 };
 const ED_DRAFT = 'ascii-meadow-map-draft';
@@ -278,7 +278,7 @@ function drawEditor() {
     g.strokeStyle = on ? 'rgba(255,214,120,.95)' : hov ? 'rgba(250,250,250,.8)' : o.kind === 'flora' ? 'rgba(250,250,250,.2)' : 'rgba(250,250,250,.4)'; g.lineWidth = on ? 1.5 : 1;
     if (on || hov) g.strokeRect(o.sx - o.r, o.sy - o.top, o.r * 2, o.top + CH * 1.5 * VZ);
     g.beginPath(); g.ellipse(o.sx, o.sy, Math.min(o.r, 8), Math.min(o.r, 8) * 0.45, 0, 0, Math.PI * 2); g.stroke();
-    const label = o.kind === 'start' ? 'старт' : o.kind === 'fires' ? 'костёр' : o.kind === 'cows' ? 'корова' : on || hov ? (o.f.v.type === 'tree' ? 'дерево ' : o.f.v.type === 'dead' ? 'сухое ' : 'куст ') + (variantsOf(o.f.v.type).indexOf(o.f.v) + 1) : '';
+    const label = o.kind === 'start' ? 'старт' : o.kind === 'fires' ? 'костёр' : o.kind === 'cows' ? 'корова' : on || hov ? ({ tree: 'дерево ', dead: 'сухое ', bush: 'куст ', tent: 'палатка ', fence: 'забор ' }[o.f.v.type] || '') + (variantsOf(o.f.v.type).indexOf(o.f.v) + 1) : '';
     if (label) { g.fillStyle = on ? 'rgba(255,214,120,.95)' : 'rgba(250,250,250,.7)'; g.fillText(label, o.sx + 6, o.sy - 4); }
   }
   if (ED.drag && ED.drag.moved) {   // where the dragged object will land

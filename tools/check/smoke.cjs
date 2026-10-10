@@ -206,6 +206,18 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
         check('editor: the castle moves to the click, and back on undo', cm.moved && Array.isArray(cm.map) && cm.gate > 50 && cm.fires && back, JSON.stringify(cm));
         await page.keyboard.press('KeyV');
       }
+      // a camp: a tent and a stretch of fence go down where clicked, and stand in the knight's way
+      {
+        await page.keyboard.press('KeyY'); await page.mouse.click(300, 380); await step(2);
+        await page.keyboard.press('KeyI'); await page.mouse.click(520, 420); await step(2);
+        const cp = await page.evaluate(() => {
+          const tents = flora.filter(f => f.v.type === 'tent'), fences = flora.filter(f => f.v.type === 'fence');
+          const t = tents[tents.length - 1], blocks = t ? blocked(t.x, t.br - 0.7, player) : false;
+          return { tents: tents.length, fences: fences.length, blocks, saved: /"tent"/.test(mapFileText()) && /"fence"/.test(mapFileText()) };
+        });
+        check('editor: tents and fences are placed, saved and solid', cp.tents >= 1 && cp.fences >= 1 && cp.blocks && cp.saved, JSON.stringify(cp));
+        await page.keyboard.press('KeyV');
+      }
       // nothing on the map is fixed: the «Стереть» brush clears the ground, the trail switches off, every object deletes
       await page.keyboard.press('Digit8'); await page.mouse.move(300, 500); await page.mouse.down(); await page.mouse.move(420, 500, { steps: 6 }); await page.mouse.up(); await step(2);
       const empty = await page.evaluate(() => { let n = 0; for (let y = VY0; y <= VY1; y++) for (let x = VX0; x <= VX1; x++) if (!kind[y * COLS + x]) n++; return n; });
