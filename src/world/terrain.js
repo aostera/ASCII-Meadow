@@ -67,6 +67,7 @@ function build() {
   TA = new Float32Array(COLS * 6);
   push = new Float32Array(N); shadow = new Float32Array(N);
   height = new Float32Array(N); seed = new Float32Array(N); kind = new Uint8Array(N); segs = new Uint8Array(N); wet = new Uint8Array(N);
+  worldGen++;
   fillTerrain();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   buildAtlas();

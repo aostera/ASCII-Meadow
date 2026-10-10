@@ -6,7 +6,7 @@
 // No Math.random here: each toad draws from its own seeded sequence, so the rest of the world is unmoved.
 
 const toads = new Map(), toadRipples = [], toadDrops = [];   // home cell → toad; small rings on the water; splash drops (px)
-let toadScan = 0, toadCols = 0;   // toads are keyed by cell: a rebuilt grid (another width) starts them afresh
+let toadScan = 0, toadGen = -1;   // toads are keyed by cell: a rebuilt grid (any resize) starts them afresh
 const toadSpot = i => wet && wet[i] && (kind[i] === 1 || (kind[i] === 8 && segs[i] > 0));   // a tussock or a lily pad
 const toadWater = i => wet && wet[i] && kind[i] === 8 && !segs[i];
 const toadFree = i => toadSpot(i) || (!wet[i] && !bmask[i] && !tmask[i] && kind[i] > 0 && kind[i] !== 7);   // a placed toad also sits on dry ground
@@ -118,7 +118,7 @@ function toadHop(td, to, dive) {
 function updateToads(dt) {
   if ((toadScan -= dt) <= 0) {   // homes round the view; toads far away are let go
     toadScan = 0.7;
-    if (toadCols !== COLS) { toads.clear(); toadRipples.length = toadDrops.length = 0; toadCols = COLS; }
+    if (toadGen !== worldGen) { toads.clear(); toadRipples.length = toadDrops.length = 0; toadGen = worldGen; }
     const x0 = Math.max(1, VX0 - 20), x1 = Math.min(COLS - 2, VX1 + 20), y0 = Math.max(1, VY0 - 10), y1 = Math.min(ROWS - 2, VY1 + 10);
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const i = y * COLS + x;

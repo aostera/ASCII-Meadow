@@ -7,8 +7,9 @@
 const birds = [], birdEvents = [], BIRD_R = 30;   // BIRD_R: how near (cells across; rows count double) walking into the grass sets them off   // birds in the air; per event: { mi, x, y, wait, s }
 const birdTall = i => kind[i] === 1 && segs[i] >= 3 && !(wet && wet[i]);   // tall grass, where they can hide
 function birdRnd(o) { o.s = (o.s * 1103515245 + 12345) >>> 0; return (o.s >>> 8) / 16777216; }
+let birdGen = -1;   // the grid the events' cells belong to
 function resetBirds() {
-  birdEvents.length = 0; birds.length = 0;
+  birdGen = worldGen; birdEvents.length = 0; birds.length = 0;
   (MEADOW_MAP.events || []).forEach(([kindOf, gx, gz], mi) => {
     if (kindOf !== 'birds') return;
     const [x, y] = mapToCell(gx, gz);
@@ -16,7 +17,7 @@ function resetBirds() {
   });
 }
 function updateBirds(dt) {
-  if (birdEvents.length !== (MEADOW_MAP.events || []).length) resetBirds();
+  if (birdGen !== worldGen || birdEvents.length !== (MEADOW_MAP.events || []).length) resetBirds();   // a resize moves every cell
   for (const ev of birdEvents) {
     if (ev.wait > 0) { ev.wait -= dt; continue; }
     const px = player.x, py = player.y + 0.7, d = Math.hypot(px - ev.x, (py - ev.y) * 2);
