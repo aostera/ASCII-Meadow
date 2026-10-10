@@ -59,7 +59,11 @@ WALK = [img(1, 0), img(1, 1), img(1, 2), img(1, 3), Image.fromarray(trim(w4[:, :
 L = lambda r, c: img(r, c).transpose(Image.FLIP_LEFT_RIGHT)
 IDLE = [img(0, 3), L(0, 1), L(0, 0), L(0, 4), img(0, 5)]
 RUN = [img(2, c) for c in range(8)]
-EAT = [L(3, 0), img(3, 2), img(3, 3), img(3, 4), L(3, 5), img(3, 6)]
+# Grazing: the atlas's eat drawings are each a different, smaller cow, so cycling them made the body
+# morph. One clean head-down drawing, brought to the herd's size, is the grazing pose; the game moves
+# only its head and tail (in the game: head cells x >= 94, y <= 41; tail x <= 48).
+_e = img(3, 4); EATB = _e.resize((round(_e.width * 1.12), round(_e.height * 1.12)), Image.LANCZOS)
+EAT = [EATB]
 HURT = [img(4, 0), img(4, 1), L(4, 2), L(4, 3), img(4, 4), L(4, 5)]
 DIE = [img(5, c) for c in range(7)]
 frames = IDLE + WALK + RUN + EAT + HURT + DIE
@@ -83,11 +87,12 @@ def place3(im):
     t.paste(s2, (round(FX * K3 - cx * sc), round(FY * K3 - ys.max() * sc)), s2)
     return np.asarray(t).astype(np.float32)
 import cv2
-def tween(A, B, t):
+def tween(A, B, t, big=False):
     """A frame t of the way from A to B: both warped along dense optical flow and blended."""
     ga = (A[..., :3].mean(2) * A[..., 3] / 255).astype(np.uint8); gb = (B[..., :3].mean(2) * B[..., 3] / 255).astype(np.uint8)
-    fab = cv2.calcOpticalFlowFarneback(ga, gb, None, 0.5, 4, 21, 5, 7, 1.5, 0)
-    fba = cv2.calcOpticalFlowFarneback(gb, ga, None, 0.5, 4, 21, 5, 7, 1.5, 0)
+    P = (0.5, 6, 61, 8, 7, 1.5, 0) if big else (0.5, 4, 21, 5, 7, 1.5, 0)   # a big move (head down to the grass) needs a wide search
+    fab = cv2.calcOpticalFlowFarneback(ga, gb, None, *P)
+    fba = cv2.calcOpticalFlowFarneback(gb, ga, None, *P)
     h, w = ga.shape; gx, gy = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
     # backward warping: a pixel of the in-between at p came from A at p - t*f and from B at p + (1-t)*f
     wa = cv2.remap(A, gx - t * fab[..., 0], gy - t * fab[..., 1], cv2.INTER_LINEAR, borderValue=0)
@@ -95,20 +100,20 @@ def tween(A, B, t):
     out = wa * (1 - t) + wb * t
     # keep the coat crisp: colour from whichever source dominates, coverage blended
     return out
-def expand(seq, n, cyclic):
+def expand(seq, n, cyclic, big=False):
     """n frames between each pair (the originals included)."""
     T = [place3(f) for f in seq]; res = []
     pairs = len(T) if cyclic else len(T) - 1
     for i in range(pairs):
         A, B = T[i], T[(i + 1) % len(T)]
         res.append(A)
-        for k in range(1, n): res.append(tween(A, B, k / n))
+        for k in range(1, n): res.append(tween(A, B, k / n, big))
     if not cyclic: res.append(T[-1])
     return [Image.fromarray(np.clip(r, 0, 255).astype(np.uint8)) for r in res]
-SEQ = [('idle', IDLE, 1, False), ('walk', WALK, 6, True), ('run', RUN, 6, True), ('eat', EAT, 5, True), ('hurt', HURT, 3, False), ('die', DIE, 3, False)]
+SEQ = [('idle', IDLE, 1, False), ('walk', WALK, 6, True), ('run', RUN, 6, True), ('eat', EAT, 1, False), ('hurt', HURT, 3, False), ('die', DIE, 3, False)]
 tiles, index = [], {}
 for name, seq, n, cyc in SEQ:
-    fr = [Image.fromarray(place3(f).astype(np.uint8)) for f in seq] if n == 1 else expand(seq, n, cyc)
+    fr = [Image.fromarray(place3(f).astype(np.uint8)) for f in seq] if n == 1 else expand(seq, n, cyc, name == 'graze')
     index[name] = [len(tiles), len(fr)]; tiles += fr
 print('index', index)
 json.dump(index, open(sys.argv[2].replace('.json', '_index.json'), 'w'))
