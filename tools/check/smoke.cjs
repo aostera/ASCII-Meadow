@@ -190,6 +190,12 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
           return { paintedOver: before, onWet: wetAt(player.x, player.y), moved: +Math.hypot(player.x - x0, (player.y - y0) * 2).toFixed(1) };
         });
         check('editor: a start under water moves to dry ground nearby', sp.paintedOver && !sp.onWet && sp.moved < 40, JSON.stringify(sp));
+        // the marsh fills with toads: they sit on its tussocks and pads, and leap off as the knight walks up
+        await page.keyboard.press('KeyP'); await page.mouse.move(kq[0] + 80, kq[1] - 60); await page.mouse.down(); await page.mouse.move(kq[0] + 320, kq[1] - 60, { steps: 10 }); await page.mouse.up();
+        await page.evaluate(() => closeEditor()); await step(90);
+        const td = await page.evaluate(() => { const L = [...toads.values()]; return { n: L.length, onSpots: L.every(t => t.st !== 'sit' || toadSpot(Math.round(t.y) * COLS + Math.round(t.x))) }; });
+        await page.evaluate(() => openEditor());
+        check('marsh: toads live on it', td.n > 0 && td.onSpots, JSON.stringify(td));
       }
       // zoom: out to see more, a tree lands under the cursor at any scale, and the game is back at 100% when the editor closes
       await page.keyboard.press('KeyQ'); await page.keyboard.press('KeyQ'); await step(2);

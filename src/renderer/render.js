@@ -16,7 +16,7 @@ function render() {
   drawCathedral();
   const C = cathedral;
   drawWindows();
-  const order = visibleFlora([...ents, ...braziers]).sort((a, b) => a.y - b.y);
+  const order = visibleToads(visibleFlora([...ents, ...braziers])).sort((a, b) => a.y - b.y);
   let oi = 0;
   let cloudRow = 0;
   const boxes = [];  // people already drawn: grass in front of them gets a dark backing so it hides their legs
@@ -41,6 +41,7 @@ function render() {
     while (oi < order.length && (order[oi].y + 0.7) * CH < (y + 1) * CH) {
       const e = order[oi++];
       if (e.isFlora) { drawFlora(e); continue; }
+      if (e.isToad) { drawToad(e); continue; }
       if (e.isFire) { drawBrazier(e); continue; }
       drawEntity(e); occlude(e);
       const G = geomOf(e); boxes.push([G.left + G.w * 0.18, G.top + G.h * 0.05, G.left + G.w * 0.82, G.gy + 2]);
@@ -99,7 +100,7 @@ function render() {
       }
     }
   }
-  while (oi < order.length) { const e = order[oi++]; if (e.isFlora) drawFlora(e); else if (e.isFire) drawBrazier(e); else { drawEntity(e); occlude(e); } }
+  while (oi < order.length) { const e = order[oi++]; if (e.isFlora) drawFlora(e); else if (e.isToad) drawToad(e); else if (e.isFire) drawBrazier(e); else { drawEntity(e); occlude(e); } }
 
   for (const d of dew) {
     const i = d.i, x = i % COLS, y = (i / COLS) | 0;
@@ -112,6 +113,8 @@ function render() {
     const open = Math.sin(f.ph) > 0;
     blit(open ? CI['^'] : CI[';'], f.c, f.x * CW, f.y * CH);
   }
+
+  drawToadRipples();   // world/toads.js: rings where a toad went in or came out
 
   // gust ring
   for (const g of rings) {
