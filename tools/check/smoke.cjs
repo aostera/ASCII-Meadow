@@ -164,6 +164,14 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       const saved = fs.readFileSync(await dl.path(), 'utf8'), c3 = await count();
       check('editor: «Сохранить» writes a map file', /const MEADOW_MAP = \{/.test(saved) && !/<\/script/i.test(saved), saved.length + ' bytes');
       await shot(page, 'editor');
+      // fog: dense fog where it is brushed, none where it is cleared
+      const fogMean = (x0, y0, x1, y1) => page.evaluate(([x0, y0, x1, y1]) => { let s = 0, n = 0; for (let j = 0; j < FG.h; j++) for (let i = 0; i < FG.w; i++) { const x = (i + 0.5) / FG.w * W, y = (j + 0.5) / FG.h * H; if (x >= x0 && x <= x1 && y >= y0 && y <= y1) { s += FG.d[j * FG.w + i]; n++; } } return n ? s / n : 0; }, [x0, y0, x1, y1]);
+      const fg0 = await fogMean(150, 120, 330, 220);
+      await page.keyboard.press('KeyJ'); await page.mouse.move(120, 170); await page.mouse.down(); await page.mouse.move(360, 170, { steps: 8 }); await page.mouse.up(); await step(4);
+      const fg1 = await fogMean(150, 120, 330, 220);
+      await page.keyboard.press('KeyN'); await page.mouse.move(120, 170); await page.mouse.down(); await page.mouse.move(360, 170, { steps: 8 }); await page.mouse.up(); await step(4);
+      const fg2 = await fogMean(150, 120, 330, 220);
+      check('editor: fog brushed in and cleared away', fg1 > Math.max(0.6, fg0 + 0.2) && fg2 < 0.08, `fog ${fg0.toFixed(2)} → dense ${fg1.toFixed(2)} → cleared ${fg2.toFixed(2)}`);
       // zoom: out to see more, a tree lands under the cursor at any scale, and the game is back at 100% when the editor closes
       await page.keyboard.press('KeyQ'); await page.keyboard.press('KeyQ'); await step(2);
       await page.keyboard.press('KeyT'); await page.mouse.click(500, 300); await step(2);

@@ -25,6 +25,7 @@ function updateFog() {
   for (let j = 0; j < fh; j++) for (let i = 0; i < fw; i++) {
     const wx = x0 + (i + 0.5) * sx, wy = y0 + (j + 0.5) * sy;
     let d = fogDensity(wx, wy);
+    if (fogChunks.size) d = mapFog(d, wx, wy);   // world/map.js: fog brushed in the editor
     { const C2 = cathedral; if (C2.cv) { const dx = (wx - C2.ox) / (230 * MS), dy = (wy - (C2.oy - 20 * MS)) / (200 * MS); d *= 1 - 0.65 * Math.exp(-(dx * dx + dy * dy)); } }  // the stair stays readable
     for (const b of braziers) { const dx = wx - b.x * CW, dy = (wy - ((b.y + 0.7) * CH - b.lift)) * 1.6, r = 150 * Math.min(MS, 1.4); d *= 1 - 0.55 * Math.exp(-(dx * dx + dy * dy) / (r * r)); }  // the heat thins the fog
     const k = j * fw + i;

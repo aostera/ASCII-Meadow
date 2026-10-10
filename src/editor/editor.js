@@ -10,22 +10,27 @@ const ED = {
 };
 const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
 const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['select', 'Выбрать и двигать', 'V']];
+const ED_FOG = [['fogl', 'Лёгкий туман', 'H'], ['fogd', 'Густой туман', 'J'], ['fogc', 'Убрать туман', 'N']];
+const ED_FOGCODE = { fogl: 2, fogd: 3, fogc: 1 };
 const ED_DRAFT = 'ascii-meadow-map-draft';
 const edIsBrush = tool => tool.length === 1 && PCODES.includes(tool);
+const edIsFog = tool => tool in ED_FOGCODE;
 const edR1 = v => Math.round(v * 10) / 10;
 const edXZ = (x, y) => toModelXZ(x, y).map(edR1);
 
 // ---------- the map as a file ----------
 function mapFileText() {
   const m = MEADOW_MAP, rows = a => a === null ? 'null' : a.length ? '[\n' + a.map(e => '    ' + JSON.stringify(e)).join(',\n') + '\n  ]' : '[]';
-  const paint = savePaint(), keys = Object.keys(paint);
+  const paint = savePaint(), keys = Object.keys(paint), fog = saveFog(), fkeys = Object.keys(fog);
   const text = '// The meadow\'s map. Edit it in the game: open the page with ?edit and press M; «Сохранить» writes this file.\n' +
     '// Positions are castle ground units (px at MS = 1) from the foot of the castle mound: x to the right, z to the north.\n' +
     '// null: generated as before (trail false: no generated trail). fires: [x, z] on the ground, [x, z, h] raised h units.\n' +
-    '// paint: brush strokes over the generated ground, run-length coded per 32×32 chunk.\n' +
+    '// paint: brush strokes over the generated ground, run-length coded per 32×32 chunk; fog: the same for fog\n' +
+    '// (c clear, l light, d dense; 16-unit cells).\n' +
     'const MEADOW_MAP = {\n  "v": 1, "res": ' + PAINT_RES + ',\n  "start": ' + JSON.stringify(m.start) + ',\n  "fires": ' + rows(m.fires) +
     ',\n  "trail": ' + JSON.stringify(m.trail === false ? false : null) + ',\n  "cows": ' + rows(m.cows) + ',\n  "flora": ' + rows(m.flora) + ',\n  "paint": ' +
-    (keys.length ? '{\n' + keys.map(k => '    ' + JSON.stringify(k) + ': ' + JSON.stringify(paint[k])).join(',\n') + '\n  }' : '{}') + '\n};\n';
+    (keys.length ? '{\n' + keys.map(k => '    ' + JSON.stringify(k) + ': ' + JSON.stringify(paint[k])).join(',\n') + '\n  }' : '{}') + ',\n  "fog": ' +
+    (fkeys.length ? '{\n' + fkeys.map(k => '    ' + JSON.stringify(k) + ': ' + JSON.stringify(fog[k])).join(',\n') + '\n  }' : '{}') + '\n};\n';
   return text.replace(/<\/script/gi, '<\\/script');   // the single-file bundle inlines it in a <script>
 }
 function parseMapText(text) {
@@ -34,7 +39,7 @@ function parseMapText(text) {
   if (typeof m !== 'object' || !m || m.v !== 1) throw new Error('not a map file');
   return m;
 }
-const mapSnapshot = () => JSON.parse(JSON.stringify({ start: MEADOW_MAP.start, trail: MEADOW_MAP.trail === false ? false : null, fires: MEADOW_MAP.fires, cows: MEADOW_MAP.cows, flora: MEADOW_MAP.flora, paint: savePaint() }));   // a copy: edits must not reach it
+const mapSnapshot = () => JSON.parse(JSON.stringify({ start: MEADOW_MAP.start, trail: MEADOW_MAP.trail === false ? false : null, fires: MEADOW_MAP.fires, cows: MEADOW_MAP.cows, flora: MEADOW_MAP.flora, paint: savePaint(), fog: saveFog() }));   // a copy: edits must not reach it
 
 // ---------- applying changes ----------
 // Generated objects become map objects the first time one is moved, added or deleted.
@@ -55,7 +60,7 @@ function applyObjects(which) {
 function applyWholeMap(src) {
   const m = JSON.parse(JSON.stringify(src));   // undo entries and drafts stay as they were
   Object.assign(MEADOW_MAP, { start: m.start || null, trail: m.trail === false ? false : null, fires: m.fires || null, cows: m.cows || null, flora: m.flora || null });
-  loadPaint(m.paint); rebuildMap();
+  loadPaint(m.paint); loadFog(m.fog); rebuildMap();
   if (!MEADOW_MAP.start) { const sy = ROWS - VR * 0.3; player.y = sy; player.x = pathX(sy) - 3; }   // the generated herd stands by the start
   applyObjects({ fires: 1, start: 1, cows: 1 });
 }
@@ -69,9 +74,12 @@ function edUndoRedo(from, to) {
   const e = from.pop(); if (!e) return;
   if (e.paint) {
     const back = new Map();
-    for (const [k, a] of e.paint) { const cur = paintChunks.get(k); back.set(k, cur ? cur.slice() : null); if (a) paintChunks.set(k, a.slice()); else paintChunks.delete(k); }
+    for (const [key, a] of e.paint) {   // 'f:' keys are fog chunks, the rest ground paint
+      const L = key.startsWith('f:') ? fogChunks : paintChunks, k = key.replace('f:', ''), cur = L.get(k);
+      back.set(key, cur ? cur.slice() : null); if (a) L.set(k, a.slice()); else L.delete(k);
+    }
     to.push({ paint: back });
-    for (const k of e.paint.keys()) edRepaintChunk(k);
+    for (const k of e.paint.keys()) if (!k.startsWith('f:')) edRepaintChunk(k);
     edChanged();
   } else if (e.map) {
     to.push({ map: mapSnapshot() });
@@ -111,10 +119,25 @@ function edStamp(gx, gz) {
   }
   edRepaintRect(gx - r - PAINT_RES, gz - r - PAINT_RES, gx + r + PAINT_RES, gz + r + PAINT_RES);
 }
+function edSetFog(px, pz, code) {
+  const key = (px >> 5) + ',' + (pz >> 5);
+  let a = fogChunks.get(key);
+  if (ED.stroke && !ED.stroke.has('f:' + key)) ED.stroke.set('f:' + key, a ? a.slice() : null);
+  if (!a) { a = new Uint8Array(PCH * PCH); fogChunks.set(key, a); }
+  a[(px & 31) + (pz & 31) * PCH] = code;
+}
+function edFogStamp(gx, gz) {   // every fog cell under the brush, and at least the one under its centre
+  const r = ED.size * PAINT_RES + FOG_RES * 0.5, code = ED_FOGCODE[ED.tool];
+  for (let pz = Math.floor((gz - r) / FOG_RES); pz <= Math.floor((gz + r) / FOG_RES); pz++) for (let px = Math.floor((gx - r) / FOG_RES); px <= Math.floor((gx + r) / FOG_RES); px++) {
+    const dx = (px + 0.5) * FOG_RES - gx, dz = (pz + 0.5) * FOG_RES - gz;
+    if (dx * dx + dz * dz <= r * r) edSetFog(px, pz, code);
+  }
+  FG.tick = 0;   // the fog field redraws on the next frame
+}
 function edStrokeTo(gx, gz) {
   const s = ED.stroke, step = Math.max(PAINT_RES, ED.size * PAINT_RES * 0.5);
   const d = Math.hypot(gx - s.gx, gz - s.gz), n = Math.ceil(d / step);
-  for (let k = 1; k <= n; k++) edStamp(s.gx + (gx - s.gx) * k / n, s.gz + (gz - s.gz) * k / n);
+  for (let k = 1; k <= n; k++) (edIsFog(ED.tool) ? edFogStamp : edStamp)(s.gx + (gx - s.gx) * k / n, s.gz + (gz - s.gz) * k / n);
   s.gx = gx; s.gz = gz;
 }
 
@@ -244,10 +267,10 @@ function drawEditor() {
   if (ED.inView && !ED.pan && ED.mx >= 0) {
     const r = ED.size * PAINT_RES;
     g.strokeStyle = 'rgba(250,250,250,.75)'; g.setLineDash([5, 4]); g.lineWidth = 1;
-    if (edIsBrush(ED.tool)) { g.beginPath(); g.ellipse(ED.mx, ED.my, r * MS * VZ, r * SINP * MS * VZ, 0, 0, Math.PI * 2); g.stroke(); }
+    if (edIsBrush(ED.tool) || edIsFog(ED.tool)) { g.beginPath(); g.ellipse(ED.mx, ED.my, r * MS * VZ, r * SINP * MS * VZ, 0, 0, Math.PI * 2); g.stroke(); }
     else if (ED.tool !== 'select') { g.beginPath(); g.ellipse(ED.mx, ED.my, 10, 4.5, 0, 0, Math.PI * 2); g.stroke(); }
     g.setLineDash([]);
-    const t = ED.tool !== 'select' && ED_BRUSHES.concat(ED_OBJECTS).find(b => b[0] === ED.tool);   // what a click will do
+    const t = ED.tool !== 'select' && ED_BRUSHES.concat(ED_FOG, ED_OBJECTS).find(b => b[0] === ED.tool);   // what a click will do
     if (t) { g.fillStyle = 'rgba(250,250,250,.8)'; g.fillText(t[1] + (ED.variant[ED.tool] !== undefined ? ' ' + (ED.variant[ED.tool] + 1) : ''), ED.mx + 12, ED.my - 8); }
   }
   g.restore();
@@ -267,6 +290,7 @@ function edMiniBase() {   // the whole field, one pixel per few cells, redrawn a
     else if (k === 5) r = gg = b = 96;                                                     // stones
     else if (k === 7) { r = 150; gg = 144; b = 132; }                                      // trail
     else { r = 200; gg = 198; b = 190; }                                                   // flowers
+    if (fogChunks.size) { const [gx, gz] = cellXZ(x, y), fc = fogCodeAt(gx, gz); if (fc > 1) { const v = fc === 3 ? 0.5 : 0.28; r += (220 - r) * v; gg += (220 - gg) * v; b += (225 - b) * v; } }   // painted fog
     const o = (py * w + px) * 4; d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255;
   }
   const g = (ED.miniImg || (ED.miniImg = document.createElement('canvas')));
@@ -324,6 +348,7 @@ function edBuildUI() {
   const sBr = el('section', 'ed-sec', '<h3>Кисть</h3>'), gBr = el('div', 'ed-grid'); for (const [t, n, k] of ED_BRUSHES) gBr.append(btn(n, k, { tool: t })); sBr.append(gBr);
   const trailRow = el('label', 'ed-check'); const trail = el('input'); trail.type = 'checkbox'; trailRow.append(trail, 'Сгенерированная тропа'); sBr.append(trailRow);
   const sizeRow = el('label', 'ed-size', 'Размер'); const size = el('input'); size.type = 'range'; size.min = 1; size.max = 30; const sizeOut = el('output'); sizeRow.append(size, sizeOut); sBr.append(sizeRow);
+  const sFog = el('section', 'ed-sec', '<h3>Туман</h3>'), gFog = el('div', 'ed-grid'); for (const [t, n, k] of ED_FOG) gFog.append(btn(n, k, { tool: t })); sFog.append(gFog);
   const sOb = el('section', 'ed-sec', '<h3>Объекты</h3>'), gOb = el('div', 'ed-grid'); for (const [t, n, k] of ED_OBJECTS) gOb.append(btn(n, k, { tool: t })); sOb.append(gOb);
   const variant = el('div', 'ed-variant', 'Вариант'); const variantOut = el('output'); variant.append(btn('‹', '[', { act: 'var-' }), variantOut, btn('›', ']', { act: 'var+' })); sOb.append(variant);
   const sMap = el('section', 'ed-sec', '<h3>Карта</h3>'); const mini = el('canvas', 'ed-mini'); mini.width = 216; mini.height = 300;
@@ -334,7 +359,7 @@ function edBuildUI() {
   acts.append(undo, redo, btn('Сохранить', '', { act: 'save' }), btn('Открыть…', '', { act: 'open' }), btn('Сбросить', '', { act: 'reset' }), btn('Играть отсюда', '', { act: 'play' }), file);
   const help = el('p', 'ed-help', 'Камера: WASD или стрелки (Shift — быстрее), правая кнопка или пробел — тащить, клик по карте — перейти. Масштаб: Ctrl + колесо или щипок, Q и E, R — 100%. Колесо — размер кисти или вариант. Delete — удалить выбранное. Ctrl Z / Ctrl Shift Z — отменить и повторить, Ctrl S — сохранить.');
   const status = el('p', 'ed-status');
-  root.append(head, draft, sBr, sOb, sMap, acts, help, status);
+  root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
   ED.ui = { root, open, size, sizeOut, variant, variantOut, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
@@ -394,7 +419,7 @@ function edKey(e) {
   if (c === 'KeyQ' || c === 'KeyE') { edZoomStep(c === 'KeyE' ? 1 : -1); return; }
   if (c === 'KeyR') { edZoomTo(1); return; }
   if (c === 'Minus' || c === 'Equal') { ED.size = Math.max(1, Math.min(30, ED.size + (c === 'Equal' ? 1 : -1))); edSyncUI(); return; }
-  const tool = ED_BRUSHES.concat(ED_OBJECTS).find(b => c === (b[2] >= '0' && b[2] <= '9' ? 'Digit' : 'Key') + b[2]);
+  const tool = ED_BRUSHES.concat(ED_FOG, ED_OBJECTS).find(b => c === (b[2] >= '0' && b[2] <= '9' ? 'Digit' : 'Key') + b[2]);
   if (tool) { ED.tool = tool[0]; edSyncUI(); return; }
   if (c.startsWith('Arrow')) e.preventDefault();
   ED.keys.add(c);
@@ -408,7 +433,7 @@ function edPointer(e) {
     if (e.button === 1 || e.button === 2 || ED.space) { ED.pan = { x: e.clientX, y: e.clientY, cx: camX, cy: camY }; e.preventDefault(); return; }
     if (e.button !== 0) return;
     const [gx, gz] = edGround(e.clientX, e.clientY);
-    if (edIsBrush(ED.tool)) { ED.stroke = new Map(); ED.stroke.gx = gx; ED.stroke.gz = gz; edStamp(gx, gz); return; }
+    if (edIsBrush(ED.tool) || edIsFog(ED.tool)) { ED.stroke = new Map(); ED.stroke.gx = gx; ED.stroke.gz = gz; (edIsFog(ED.tool) ? edFogStamp : edStamp)(gx, gz); return; }
     if (ED.tool === 'select') {
       const o = edPick(e.clientX, e.clientY);
       ED.sel = o ? { kind: o.kind, mi: o.mi } : null;
@@ -426,7 +451,7 @@ function edPointer(e) {
     return;
   }
   // pointerup / pointercancel
-  if (ED.stroke) { if (ED.stroke.size) edRecord({ paint: ED.stroke }); ED.stroke = null; edChanged(); }
+  if (ED.stroke) { if (ED.stroke.size) edRecord({ paint: ED.stroke }); ED.stroke = null; edChanged(); FG.tick = 0; }
   if (ED.drag) { if (ED.drag.moved && ED.sel) edMoveSelected(ED.drag.gx, ED.drag.gz); ED.drag = null; }
   ED.pan = null;
 }
@@ -443,6 +468,6 @@ if (EDIT) {
     e.preventDefault();
     if (e.ctrlKey || e.metaKey) { edZoomTo(VZ * Math.exp(-Math.max(-60, Math.min(60, e.deltaY)) * 0.01), e.clientX, e.clientY); return; }   // pinch and Ctrl + wheel
     const d = e.deltaY > 0 ? -1 : 1;
-    if (edIsBrush(ED.tool)) { ED.size = Math.max(1, Math.min(30, ED.size + d)); edSyncUI(); } else edStepVariant(d);
+    if (edIsBrush(ED.tool) || edIsFog(ED.tool)) { ED.size = Math.max(1, Math.min(30, ED.size + d)); edSyncUI(); } else edStepVariant(d);
   }, { passive: false });
 }
