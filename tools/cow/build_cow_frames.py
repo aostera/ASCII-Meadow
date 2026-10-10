@@ -105,7 +105,7 @@ def expand(seq, n, cyclic):
         for k in range(1, n): res.append(tween(A, B, k / n))
     if not cyclic: res.append(T[-1])
     return [Image.fromarray(np.clip(r, 0, 255).astype(np.uint8)) for r in res]
-SEQ = [('idle', IDLE, 1, False), ('walk', WALK, 3, True), ('run', RUN, 3, True), ('eat', EAT, 3, True), ('hurt', HURT, 2, False), ('die', DIE, 2, False)]
+SEQ = [('idle', IDLE, 1, False), ('walk', WALK, 6, True), ('run', RUN, 6, True), ('eat', EAT, 5, True), ('hurt', HURT, 3, False), ('die', DIE, 3, False)]
 tiles, index = [], {}
 for name, seq, n, cyc in SEQ:
     fr = [Image.fromarray(place3(f).astype(np.uint8)) for f in seq] if n == 1 else expand(seq, n, cyc)
