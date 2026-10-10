@@ -192,9 +192,11 @@ function bakeStone3D(size, sd) {
       let alb = 0.42 * (0.78 + 0.4 * vnoise(P[0] * 0.35 + ox, P[1] * 0.35 + P[2] * 0.2));       // grain and lichen
       if (Math.abs(vnoise(P[0] * 0.12 + oz, P[2] * 0.12 + P[1] * 0.1) - 0.5) < 0.03) alb *= 0.35;   // cracks
       if (P[1] < ryy * 0.12) alb *= 0.6;                                                    // damp and dirt at the foot
-      let v = alb * (0.18 + 0.95 * diff * (1 - sh * 0.75));
+      const lam = diff * (1 - sh * 0.75), step = Math.floor(lam * 4) / 4;          // light in steps: flat faces meeting at edges
+      let v = alb * (0.16 + 0.95 * (step * 0.65 + lam * 0.35));
+      if (n[1] > 0.55 && diff > 0.45 && hash(cx * 3 + 7, cy) > 0.35) v += 0.06;        // a worn, paler top
       v = Math.pow(Math.min(1, v * 1.15), 0.7) * 0.95;
-      v = Math.max(0, Math.min(0.92, v + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.1));
+      v = Math.max(0, Math.min(0.92, v + BAYER[(cy & 3) * 4 + (cx & 3)] * 0.05));
       const ci = Math.min(RAMP.length - 1, Math.floor(v * 9));
       if (ci > 0) list.push(cx, cy, fid(RAMP[ci], Math.floor(v * 8)), Math.round(Math.min(1, 0.5 + v * 0.7) * 100));
     }
