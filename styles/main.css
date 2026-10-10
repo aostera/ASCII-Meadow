@@ -1,0 +1,19 @@
+/* Layout: one full-bleed canvas world, a quiet HUD tucked into the corners. Single dark look by choice. */
+:root {
+  --bg: #0c0c0c;
+  --ink: #fafafa;
+  --dim: #6b6b6b;
+  --hud: rgba(12, 12, 12, .78);
+  --line: #222222;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ui: "Rubik", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--mono); overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.hud { position: fixed; left: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); max-width: calc(100% - 32px); padding: 10px 12px; background: var(--hud); border: 1px solid var(--line); display: grid; gap: 4px; pointer-events: none; }
+.hud h1 { margin: 0; font: 500 14px/1.2 var(--ui); letter-spacing: .01em; }
+.hud p { margin: 0; font: 400 12px/1.4 var(--ui); color: var(--dim); }
+.hud kbd { font-family: inherit; color: var(--ink); }
+.stats { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; text-align: right; pointer-events: none; line-height: 1.5; white-space: pre; }
