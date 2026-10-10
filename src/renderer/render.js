@@ -68,8 +68,18 @@ function render() {
       if (kd === 8) {   // water: dark and still; ripples drift across it and catch what light there is
         const w = Math.sin(x * 0.55 + y * 0.9 - t * 1.3 + s * 6) + Math.sin(x * 0.21 - y * 0.37 + t * 0.8) * 0.6;
         const lit = (1 - shadow[i]) * (1 - cloud * 0.6) * (1 - bshade[i]);
-        if (w > 0.4) PF2(w > 1.05 ? CI['~'] : CI['-'], Math.max(4, Math.min(SH - 1, ((6 + (w - 0.4) * 6) * lit) | 0)), px + Math.sin(t * 0.9 + y) * 1.5, py, x, y, baseY);
-        else if (s > 0.9) PF2(CI['.'], Math.max(4, (7 * lit) | 0), px, py, x, y, baseY);
+        if (segs[i]) {   // a lily pad lying on the water, lifted a little as each ripple passes under it, drifting on its stem
+          const lift = w > 0.4 ? (w - 0.4) * 0.9 : 0, sway = Math.sin(t * 0.7 + s * 9) * 0.6;
+          const lp = LILIES[segs[i] === 3 ? 3 + ((s * 97) | 0) % 2 : ((s * 89) | 0) % 3];
+          if (!(slowRow && covered(x, y, baseY))) gput(lp.whole, px + CW * 0.5 + sway, py + CH * 0.6 - lift, lit < 0.45 ? 0.45 : lit);
+          continue;
+        }
+        // the surface: faint level strokes everywhere, so water reads as a sheet; brighter crests ride over them;
+        // a lightning flash shows on the whole sheet at once
+        const gl = lit * (1 + flash * 0.8), dx = px + Math.sin(t * 0.9 + y) * 1.5;
+        if (w > 0.4) PF2(w > 1.05 ? CI['~'] : CI['-'], Math.max(6, Math.min(SH - 1, ((11 + (w - 0.4) * 5) * gl) | 0)), dx, py, x, y, baseY);
+        else if (s > 0.45) PF2(s > 0.8 ? CI['~'] : CI['-'], Math.max(6, Math.min(SH - 1, ((8.5 + w) * gl) | 0)), dx, py, x, y, baseY);
+        else if (s > 0.3) PF2(CI['.'], Math.max(6, (8 * gl) | 0), px, py, x, y, baseY);
         continue;
       }
       if (kd === 2) { if (s > 0.55) PF2(s > 0.8 ? CI[','] : CI['.'], s > 0.75 ? C_DIRT : C_DIRT2, px, py, x, y, baseY); continue; }

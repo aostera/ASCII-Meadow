@@ -162,20 +162,10 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       const back = await page.evaluate(() => MEADOW_MAP.flora === null && MEADOW_MAP.cows === null && MEADOW_MAP.fires === null && cows.length === 3);
       await page.keyboard.press('Control+Shift+KeyZ'); await page.keyboard.press('Control+Shift+KeyZ'); await step(1);
       check('editor: undoing the first placement brings back the generated world', back && (await page.evaluate(() => flora.length)) === c0.flora + 1);
-      const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=download]')]);
+      const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=save]')]);
       const saved = fs.readFileSync(await dl.path(), 'utf8'), c3 = await count();
-      check('editor: «Скачать map.js» writes a map file', /const MEADOW_MAP = \{/.test(saved) && !/<\/script/i.test(saved), saved.length + ' bytes');
+      check('editor: «Сохранить» downloads the map file', /const MEADOW_MAP = \{/.test(saved) && !/<\/script/i.test(saved), saved.length + ' bytes');
       await shot(page, 'editor');
-      // «Сохранить» on the site posts the map to the Worker (mocked here), which commits it to GitHub
-      if (/^https?:/.test(url)) {
-        let posted = '';
-        await page.route(/\/api\/map$/, async r => { posted = r.request().postData() || ''; await r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }); });
-        await page.evaluate(() => localStorage.setItem('ascii-meadow-editor-password', 'test'));
-        await page.keyboard.press('Control+KeyS'); await page.waitForTimeout(300); await step(2);
-        const st = await page.evaluate(() => document.querySelector('.ed-status').textContent);
-        check('editor: «Сохранить» sends the map to the site', /const MEADOW_MAP = \{/.test(posted) && /Сохранено на сайт/.test(st), st);
-        await page.unroute(/\/api\/map$/);
-      }
       // fog: dense fog where it is brushed, none where it is cleared
       const fogMean = (x0, y0, x1, y1) => page.evaluate(([x0, y0, x1, y1]) => { let s = 0, n = 0; for (let j = 0; j < FG.h; j++) for (let i = 0; i < FG.w; i++) { const x = (i + 0.5) / FG.w * W, y = (j + 0.5) / FG.h * H; if (x >= x0 && x <= x1 && y >= y0 && y <= y1) { s += FG.d[j * FG.w + i]; n++; } } return n ? s / n : 0; }, [x0, y0, x1, y1]);
       const fg0 = await fogMean(150, 120, 330, 220);

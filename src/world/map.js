@@ -79,7 +79,10 @@ function paintCell(i, x, y, c) {
     wet[i] = 1;
     if (s < 0.16) { groundCell(x, y, i); wet[i] = 1; kind[i] = 1; height[i] = Math.max(height[i], 0.7); segs[i] = 3; }
     else if (s < 0.3) { groundCell(x, y, i); wet[i] = 1; kind[i] = 1; height[i] = Math.min(height[i], 0.5); segs[i] = 1; }
-    else { kind[i] = 8; segs[i] = 0; }
+    else {   // open water, and in its still patches lily pads (segs 1 a pad, 3 a pad in flower)
+      kind[i] = 8; segs[i] = 0;
+      if (s > 0.3 && s < 0.6 && vnoise(x * 0.23 + 3, y * 0.31 - 7) > 0.56 && (x + y * 3) % 4 === 0 && y % 2 === 0) segs[i] = s < 0.36 ? 3 : 1;   // spaced: each pad spans a few cells
+    }
   }
 }
 const trailOn = () => MEADOW_MAP.trail !== false;   // the generated trail, unless the map turned it off
