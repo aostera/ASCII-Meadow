@@ -197,11 +197,9 @@ function edPick(sx, sy) {   // the frontmost object whose body covers the point
 function edFirePoint(gx, gz) { const [x, y] = mapToCell(gx, gz), h = surfAt(x, y); return isFinite(h) && h > 1 ? [edR1(gx), edR1(gz), Math.round(h)] : [edR1(gx), edR1(gz)]; }
 // Every object edit: remember the map as it was (generated lists still null), then make the lists explicit.
 function edBeginObjectEdit() { edRecord({ map: mapSnapshot() }); edBake(); }
+function edTallAt(gx, gz) { const [x, y] = mapToCell(gx, gz); return birdTall(Math.round(y + 0.7) * COLS + Math.round(x)); }
 function edPlace(tool, gx, gz) {
-  if (tool === 'birds') {   // only where there is tall grass for them to hide in
-    const [x, y] = mapToCell(gx, gz);
-    if (!birdTall(Math.round(y + 0.7) * COLS + Math.round(x))) { edStatus('Птиц можно спрятать только в высокой траве.'); return; }
-  }
+  if (tool === 'birds' && !edTallAt(gx, gz)) { edStatus('Птиц можно спрятать только в высокой траве.'); return; }   // only where there is tall grass for them to hide in
   edBeginObjectEdit();
   if (tool === 'birds') { (MEADOW_MAP.events = MEADOW_MAP.events || []).push(['birds', edR1(gx), edR1(gz)]); applyObjects({ events: 1 }); ED.sel = { kind: 'events', mi: MEADOW_MAP.events.length - 1 }; edStatus('Птицы вылетят, когда рыцарь зайдёт в эту траву.'); return; }
   const p = [edR1(gx), edR1(gz)];
@@ -214,6 +212,7 @@ function edPlace(tool, gx, gz) {
 }
 function edMoveSelected(gx, gz) {
   const s = ED.sel, p = [edR1(gx), edR1(gz)];
+  if (s.kind === 'events' && !edTallAt(gx, gz)) { edStatus('Птиц можно спрятать только в высокой траве.'); return; }   // as when placed
   edBeginObjectEdit();
   if (s.kind === 'start') MEADOW_MAP.start = p;
   else if (s.kind === 'flora') { const e = MEADOW_MAP.flora[s.mi]; e[2] = p[0]; e[3] = p[1]; }
