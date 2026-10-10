@@ -54,7 +54,7 @@ const GL = { ok: false };
   GL.flush = (camx, camy, castle) => {
     gl.clearColor(12 / 255, 12 / 255, 12 / 255, 1); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.BLEND);
-    gl.uniform2f(U('u_cam'), camx, camy); gl.uniform2f(U('u_view'), W, H);
+    gl.uniform2f(U('u_cam'), camx, camy); gl.uniform2f(U('u_view'), W / VZ, H / VZ);
     gl.uniform1i(U('u_tex'), 0);
     // castle quads go after the glyphs in the buffer, then are drawn first
     const ext = castle ? (castle.flash > 0.02 ? 2 : 1) : 0;

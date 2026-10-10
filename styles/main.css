@@ -48,3 +48,5 @@ body.editing .stats { display: none; }
 @media (max-width: 640px) {
   .ed { left: 8px; right: 8px; top: auto; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 48vh; }
 }
+.ed-zoom { display: grid; grid-template-columns: auto 1fr 2fr 1fr; align-items: center; gap: 4px; margin-bottom: 8px; }
+.ed-zoom .ed-btn { justify-content: center; min-height: 24px; }

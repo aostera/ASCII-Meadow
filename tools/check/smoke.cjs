@@ -164,6 +164,12 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       const saved = fs.readFileSync(await dl.path(), 'utf8'), c3 = await count();
       check('editor: «Сохранить» writes a map file', /const MEADOW_MAP = \{/.test(saved) && !/<\/script/i.test(saved), saved.length + ' bytes');
       await shot(page, 'editor');
+      // zoom: out to see more, a tree lands under the cursor at any scale, and the game is back at 100% when the editor closes
+      await page.keyboard.press('KeyQ'); await page.keyboard.press('KeyQ'); await step(2);
+      await page.keyboard.press('KeyT'); await page.mouse.click(500, 300); await step(2);
+      const zt = await page.evaluate(() => { const e = MEADOW_MAP.flora[MEADOW_MAP.flora.length - 1], [x, y] = mapToCell(e[2], e[3]); return { z: VZ, cols: VX1 - VX0, sx: (x - camX) * CW * VZ, sy: (y + 0.7 - camY) * CH * VZ }; });
+      await page.evaluate(() => { closeEditor(); }); const z1 = await page.evaluate(() => VZ); await page.evaluate(() => { openEditor(); });
+      check('editor: zoom out, place under the cursor, back to 100% on close', zt.z < 1 && Math.hypot(zt.sx - 500, zt.sy - 300) < 8 && z1 === 1, JSON.stringify({ zoom: zt.z, cellsAcross: zt.cols, foot: [Math.round(zt.sx), Math.round(zt.sy)] }));
       // nothing on the map is fixed: the «Стереть» brush clears the ground, the trail switches off, every object deletes
       await page.keyboard.press('Digit8'); await page.mouse.move(300, 500); await page.mouse.down(); await page.mouse.move(420, 500, { steps: 6 }); await page.mouse.up(); await step(2);
       const empty = await page.evaluate(() => { let n = 0; for (let y = VY0; y <= VY1; y++) for (let x = VX0; x <= VX1; x++) if (!kind[y * COLS + x]) n++; return n; });

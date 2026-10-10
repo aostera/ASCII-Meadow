@@ -8,6 +8,7 @@ function render() {
   ctx.clearRect(0, 0, W, H);
   GB.n = 0; castleDraw = null;
   ctx.save();
+  if (VZ !== 1) ctx.scale(VZ, VZ);   // the editor's zoom
   ctx.translate(-camX * CW, -camY * CH);
   if (!cloudBuf || cloudBuf.length !== N) { cloudBuf = new Float32Array(N); cloudTick = 0; }
   else cloudTick = (cloudTick + 1) % 3;

@@ -120,25 +120,26 @@ function edStrokeTo(gx, gz) {
 
 // ---------- objects ----------
 // Ground point under a screen point: the feet of whoever would stand there.
-const edGround = (sx, sy) => toModelXZ(sx / CW + camX, sy / CH + camY - 0.7);
+const edGround = (sx, sy) => toModelXZ(sx / (CW * VZ) + camX, sy / (CH * VZ) + camY - 0.7);
 // The selected tree as [type, variant]: from the map, or from the generated plant (same index before the bake).
 const edFloraEntry = mi => MEADOW_MAP.flora ? MEADOW_MAP.flora[mi] : [flora[mi].v.type, variantsOf(flora[mi].v.type).indexOf(flora[mi].v)];
-const edScreen = (x, y) => [(x - camX) * CW, (y + 0.7 - camY) * CH];   // the feet of x, y on the screen
+const edScreen = (x, y) => [(x - camX) * CW * VZ, (y + 0.7 - camY) * CH * VZ];   // the feet of x, y on the screen
 // Everything that can be picked, with its feet on the screen. Before the first bake the index in the
 // generated lists stands in for the map index: edBake lists them in the same order.
 function edObjects() {
   const out = [];
-  flora.forEach((f, k) => { if (f.br > VY0 - 4 && f.br < VY1 + 40) { const [sx, sy] = edScreen(f.x, f.br - 0.7); out.push({ kind: 'flora', mi: f.mi ?? k, sx, sy, r: Math.max(10, f.v.R * 0.45), top: f.v.Hc * 1.1, f }); } });
-  cows.forEach((c, k) => { const [sx, sy] = edScreen(c.x, c.y); out.push({ kind: 'cows', mi: c.mi ?? k, sx, sy, r: cowHalf() * CW * 0.8, top: knightPx() * 0.5 }); });
-  braziers.forEach((b, k) => { const [sx, sy] = edScreen(b.x, b.y); out.push({ kind: 'fires', mi: b.mi ?? k, sx, sy: sy - b.lift, r: 3 * CW, top: 4 * CH }); });
+  const z = VZ;   // sizes on the screen follow the zoom
+  flora.forEach((f, k) => { if (f.br > VY0 - 4 && f.br < VY1 + 40) { const [sx, sy] = edScreen(f.x, f.br - 0.7); out.push({ kind: 'flora', mi: f.mi ?? k, sx, sy, r: Math.max(10, f.v.R * 0.45 * z), top: f.v.Hc * 1.1 * z, f }); } });
+  cows.forEach((c, k) => { const [sx, sy] = edScreen(c.x, c.y); out.push({ kind: 'cows', mi: c.mi ?? k, sx, sy, r: Math.max(8, cowHalf() * CW * 0.8 * z), top: knightPx() * 0.5 * z }); });
+  braziers.forEach((b, k) => { const [sx, sy] = edScreen(b.x, b.y); out.push({ kind: 'fires', mi: b.mi ?? k, sx, sy: sy - b.lift * z, r: Math.max(8, 3 * CW * z), top: 4 * CH * z }); });
   const st = MEADOW_MAP.start ? mapToCell(MEADOW_MAP.start[0], MEADOW_MAP.start[1]) : [pathX(ROWS - VR * 0.3) - 3, ROWS - VR * 0.3], [sx, sy] = edScreen(st[0], st[1]);
-  out.push({ kind: 'start', mi: 0, sx, sy, r: 3 * CW, top: knightPx() * 0.9 });
+  out.push({ kind: 'start', mi: 0, sx, sy, r: Math.max(8, 3 * CW * z), top: knightPx() * 0.9 * z });
   return out;
 }
 function edPick(sx, sy) {   // the frontmost object whose body covers the point
   let best = null;
   for (const o of edObjects()) {
-    const inside = Math.abs(sx - o.sx) < o.r && sy < o.sy + CH * 1.5 && sy > o.sy - o.top;
+    const inside = Math.abs(sx - o.sx) < o.r && sy < o.sy + CH * 1.5 * VZ && sy > o.sy - o.top;
     if (inside && (!best || o.sy > best.sy)) best = o;
   }
   return best;
@@ -191,14 +192,29 @@ function openEditor() {
   edCheckDraft(); edSyncUI();
 }
 function closeEditor() {
+  VZ = 1;   // the game is always seen at its own scale
   editing = false; ED.keys.clear(); ED.drag = ED.pan = ED.stroke = null;
   document.body.classList.remove('editing'); ED.ui.root.hidden = true; ED.ui.open.hidden = false;
 }
 function edPlayHere() {   // the knight walks on from the middle of the view
-  let x = camX + VC / 2, y = camY + VR * 0.62;
+  let x = camX + VC / VZ / 2, y = camY + VR / VZ * 0.62;
   for (let k = 0; k < 40 && blocked(x, y, null); k++) y += 1;
   player.x = x; player.y = y; const h = surfAt(x, y); player.hT = player.h = isFinite(h) ? h : 0;
   closeEditor();
+}
+
+// Zoom about a screen point, which stays over the same ground.
+const ED_ZOOMS = [0.35, 0.5, 0.7, 1, 1.4, 2];
+function edZoomTo(z, sx = W / 2, sy = H / 2) {
+  z = Math.max(ED_ZOOMS[0], Math.min(ED_ZOOMS[ED_ZOOMS.length - 1], z));
+  const wx = sx / (CW * VZ) + camX, wy = sy / (CH * VZ) + camY;
+  VZ = Math.abs(z - 1) < 0.02 ? 1 : z;
+  camX = wx - sx / (CW * VZ); camY = wy - sy / (CH * VZ);
+  edSyncUI();
+}
+function edZoomStep(d, sx, sy) {   // to the next stop of the scale
+  const z = d > 0 ? ED_ZOOMS.find(v => v > VZ + 0.01) : [...ED_ZOOMS].reverse().find(v => v < VZ - 0.01);
+  if (z) edZoomTo(z, sx, sy);
 }
 
 // ---------- the frame: camera keys, and the overlay ----------
@@ -206,7 +222,7 @@ function updateEditor(dt) {
   const k = ED.keys, fast = k.has('ShiftLeft') || k.has('ShiftRight') ? 2.6 : 1;
   const mx = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
   const my = (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0) - (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0);
-  camX += mx * VC * 0.8 * fast * dt; camY += my * VR * 0.8 * fast * dt;
+  camX += mx * VC / VZ * 0.8 * fast * dt; camY += my * VR / VZ * 0.8 * fast * dt;
 }
 function drawEditor() {
   const g = ctx;
@@ -216,7 +232,7 @@ function drawEditor() {
     const on = sel && sel.kind === o.kind && sel.mi === o.mi, hov = ED.hover && ED.hover.kind === o.kind && ED.hover.mi === o.mi;
     if (o.kind === 'flora' && !on && !hov && ED.tool !== 'select') continue;
     g.strokeStyle = on ? 'rgba(255,214,120,.95)' : hov ? 'rgba(250,250,250,.8)' : o.kind === 'flora' ? 'rgba(250,250,250,.2)' : 'rgba(250,250,250,.4)'; g.lineWidth = on ? 1.5 : 1;
-    if (on || hov) g.strokeRect(o.sx - o.r, o.sy - o.top, o.r * 2, o.top + CH * 1.5);
+    if (on || hov) g.strokeRect(o.sx - o.r, o.sy - o.top, o.r * 2, o.top + CH * 1.5 * VZ);
     g.beginPath(); g.ellipse(o.sx, o.sy, Math.min(o.r, 8), Math.min(o.r, 8) * 0.45, 0, 0, Math.PI * 2); g.stroke();
     const label = o.kind === 'start' ? 'старт' : o.kind === 'fires' ? 'костёр' : o.kind === 'cows' ? 'корова' : on || hov ? (o.f.v.type === 'tree' ? 'дерево ' : o.f.v.type === 'dead' ? 'сухое ' : 'куст ') + (variantsOf(o.f.v.type).indexOf(o.f.v) + 1) : '';
     if (label) { g.fillStyle = on ? 'rgba(255,214,120,.95)' : 'rgba(250,250,250,.7)'; g.fillText(label, o.sx + 6, o.sy - 4); }
@@ -228,7 +244,7 @@ function drawEditor() {
   if (ED.inView && !ED.pan && ED.mx >= 0) {
     const r = ED.size * PAINT_RES;
     g.strokeStyle = 'rgba(250,250,250,.75)'; g.setLineDash([5, 4]); g.lineWidth = 1;
-    if (edIsBrush(ED.tool)) { g.beginPath(); g.ellipse(ED.mx, ED.my, r * MS, r * SINP * MS, 0, 0, Math.PI * 2); g.stroke(); }
+    if (edIsBrush(ED.tool)) { g.beginPath(); g.ellipse(ED.mx, ED.my, r * MS * VZ, r * SINP * MS * VZ, 0, 0, Math.PI * 2); g.stroke(); }
     else if (ED.tool !== 'select') { g.beginPath(); g.ellipse(ED.mx, ED.my, 10, 4.5, 0, 0, Math.PI * 2); g.stroke(); }
     g.setLineDash([]);
     const t = ED.tool !== 'select' && ED_BRUSHES.concat(ED_OBJECTS).find(b => b[0] === ED.tool);   // what a click will do
@@ -267,11 +283,11 @@ function edDrawMini() {
   g.fillStyle = '#f2efe6'; for (const cw of cows) g.fillRect(cw.x * sx - 1.5, cw.y * sy - 1.5, 3, 3);
   g.fillStyle = '#e0803a'; for (const b of braziers) g.fillRect(b.x * sx - 1.5, b.y * sy - 1.5, 3, 3);
   g.fillStyle = '#d04b3c'; g.beginPath(); g.arc(player.x * sx, player.y * sy, 2.5, 0, Math.PI * 2); g.fill();
-  g.strokeStyle = 'rgba(250,250,250,.9)'; g.lineWidth = 1; g.strokeRect(camX * sx + 0.5, camY * sy + 0.5, VC * sx, VR * sy);
+  g.strokeStyle = 'rgba(250,250,250,.9)'; g.lineWidth = 1; g.strokeRect(camX * sx + 0.5, camY * sy + 0.5, VC / VZ * sx, VR / VZ * sy);
 }
 function edMiniJump(e) {
   const r = ED.mini.getBoundingClientRect();
-  camX = (e.clientX - r.left) / r.width * COLS - VC / 2; camY = (e.clientY - r.top) / r.height * ROWS - VR / 2;
+  camX = (e.clientX - r.left) / r.width * COLS - VC / VZ / 2; camY = (e.clientY - r.top) / r.height * ROWS - VR / VZ / 2;
 }
 
 // ---------- the panel ----------
@@ -291,6 +307,7 @@ function edSyncUI() {
   ED.ui.variant.hidden = !vt;
   if (vt) ED.ui.variantOut.textContent = (fe ? fe[1] : ED.variant[vt]) + 1 + ' из ' + variantsOf(vt).length;
   ED.ui.undo.disabled = !ED.undo.length; ED.ui.redo.disabled = !ED.redo.length;
+  ED.ui.zoomPct.firstChild.textContent = Math.round(VZ * 100) + '%'; ED.ui.zoomOut.disabled = VZ <= ED_ZOOMS[0]; ED.ui.zoomIn.disabled = VZ >= ED_ZOOMS[ED_ZOOMS.length - 1];
 }
 function edSave() {
   const a = document.createElement('a');
@@ -309,16 +326,18 @@ function edBuildUI() {
   const sizeRow = el('label', 'ed-size', 'Размер'); const size = el('input'); size.type = 'range'; size.min = 1; size.max = 30; const sizeOut = el('output'); sizeRow.append(size, sizeOut); sBr.append(sizeRow);
   const sOb = el('section', 'ed-sec', '<h3>Объекты</h3>'), gOb = el('div', 'ed-grid'); for (const [t, n, k] of ED_OBJECTS) gOb.append(btn(n, k, { tool: t })); sOb.append(gOb);
   const variant = el('div', 'ed-variant', 'Вариант'); const variantOut = el('output'); variant.append(btn('‹', '[', { act: 'var-' }), variantOut, btn('›', ']', { act: 'var+' })); sOb.append(variant);
-  const sMap = el('section', 'ed-sec', '<h3>Карта</h3>'); const mini = el('canvas', 'ed-mini'); mini.width = 216; mini.height = 300; sMap.append(mini);
+  const sMap = el('section', 'ed-sec', '<h3>Карта</h3>'); const mini = el('canvas', 'ed-mini'); mini.width = 216; mini.height = 300;
+  const zoomRow = el('div', 'ed-zoom', 'Масштаб'); const zoomOut = btn('−', 'Q', { act: 'zoom-' }), zoomPct = btn('100%', '', { act: 'zoom1' }), zoomIn = btn('+', 'E', { act: 'zoom+' });
+  zoomPct.title = 'Вернуть 100% (R)'; zoomRow.append(zoomOut, zoomPct, zoomIn); sMap.append(zoomRow, mini);
   const acts = el('div', 'ed-acts'); const undo = btn('Отменить', '', { act: 'undo' }), redo = btn('Повторить', '', { act: 'redo' });
   const file = el('input'); file.type = 'file'; file.accept = '.js,.json,text/javascript,application/json'; file.hidden = true;
   acts.append(undo, redo, btn('Сохранить', '', { act: 'save' }), btn('Открыть…', '', { act: 'open' }), btn('Сбросить', '', { act: 'reset' }), btn('Играть отсюда', '', { act: 'play' }), file);
-  const help = el('p', 'ed-help', 'Камера: WASD или стрелки (Shift — быстрее), правая кнопка или пробел — тащить, клик по карте — перейти. Колесо — размер кисти или вариант. Delete — удалить выбранное. Ctrl Z / Ctrl Shift Z — отменить и повторить, Ctrl S — сохранить.');
+  const help = el('p', 'ed-help', 'Камера: WASD или стрелки (Shift — быстрее), правая кнопка или пробел — тащить, клик по карте — перейти. Масштаб: Ctrl + колесо или щипок, Q и E, R — 100%. Колесо — размер кисти или вариант. Delete — удалить выбранное. Ctrl Z / Ctrl Shift Z — отменить и повторить, Ctrl S — сохранить.');
   const status = el('p', 'ed-status');
   root.append(head, draft, sBr, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
-  ED.ui = { root, open, size, sizeOut, variant, variantOut, undo, redo, draft, draftText, status, file, trail };
+  ED.ui = { root, open, size, sizeOut, variant, variantOut, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
   ED.mini = mini;
 
   open.addEventListener('click', () => { open.blur(); openEditor(); });
@@ -330,6 +349,8 @@ function edBuildUI() {
     else if (a === 'undo') edUndo();
     else if (a === 'redo') edRedo();
     else if (a === 'var-' || a === 'var+') edStepVariant(a === 'var+' ? 1 : -1);
+    else if (a === 'zoom-' || a === 'zoom+') edZoomStep(a === 'zoom+' ? 1 : -1);
+    else if (a === 'zoom1') edZoomTo(1);
     else if (a === 'save') edSave();
     else if (a === 'open') file.click();
     else if (a === 'play') edPlayHere();
@@ -370,6 +391,8 @@ function edKey(e) {
   if (c === 'Space') { ED.space = true; e.preventDefault(); return; }
   if (c === 'Delete' || c === 'Backspace') { e.preventDefault(); edDeleteSelected(); return; }
   if (c === 'BracketLeft' || c === 'BracketRight') { edStepVariant(c === 'BracketRight' ? 1 : -1); return; }
+  if (c === 'KeyQ' || c === 'KeyE') { edZoomStep(c === 'KeyE' ? 1 : -1); return; }
+  if (c === 'KeyR') { edZoomTo(1); return; }
   if (c === 'Minus' || c === 'Equal') { ED.size = Math.max(1, Math.min(30, ED.size + (c === 'Equal' ? 1 : -1))); edSyncUI(); return; }
   const tool = ED_BRUSHES.concat(ED_OBJECTS).find(b => c === (b[2] >= '0' && b[2] <= '9' ? 'Digit' : 'Key') + b[2]);
   if (tool) { ED.tool = tool[0]; edSyncUI(); return; }
@@ -395,7 +418,7 @@ function edPointer(e) {
     edPlace(ED.tool, gx, gz); edSyncUI(); return;
   }
   if (e.type === 'pointermove') {
-    if (ED.pan) { camX = ED.pan.cx - (e.clientX - ED.pan.x) / CW; camY = ED.pan.cy - (e.clientY - ED.pan.y) / CH; return; }
+    if (ED.pan) { camX = ED.pan.cx - (e.clientX - ED.pan.x) / (CW * VZ); camY = ED.pan.cy - (e.clientY - ED.pan.y) / (CH * VZ); return; }
     const [gx, gz] = edGround(e.clientX, e.clientY);
     if (ED.stroke) { edStrokeTo(gx, gz); return; }
     if (ED.drag) { const d = ED.drag; d.gx = gx; d.gz = gz; if (Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 4) d.moved = true; return; }
@@ -418,6 +441,7 @@ if (EDIT) {
   cv.addEventListener('wheel', e => {
     if (!editing) return;
     e.preventDefault();
+    if (e.ctrlKey || e.metaKey) { edZoomTo(VZ * Math.exp(-Math.max(-60, Math.min(60, e.deltaY)) * 0.01), e.clientX, e.clientY); return; }   // pinch and Ctrl + wheel
     const d = e.deltaY > 0 ? -1 : 1;
     if (edIsBrush(ED.tool)) { ED.size = Math.max(1, Math.min(30, ED.size + d)); edSyncUI(); } else edStepVariant(d);
   }, { passive: false });

@@ -3,8 +3,9 @@
 // 2D fallback: the same batch, one drawImage per glyph
 function flush2D(camx, camy, castle) {
   const g = GL.ctx2; if (!g) return;
-  g.setTransform(DPR, 0, 0, DPR, -camx * DPR, -camy * DPR);
-  g.fillStyle = '#0c0c0c'; g.fillRect(camx, camy, W, H);
+  const s = DPR * VZ;
+  g.setTransform(s, 0, 0, s, -camx * s, -camy * s);
+  g.fillStyle = '#0c0c0c'; g.fillRect(camx, camy, W / VZ, H / VZ);
   if (castle) {
     g.globalAlpha = castle.a; g.drawImage(cathedral.cv, castle.x, castle.y, cathedral.BW * CW, cathedral.BH * CH);
     if (castle.flash > 0.02) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = castle.flash; g.drawImage(cathedral.cv, castle.x, castle.y, cathedral.BW * CW, cathedral.BH * CH); g.globalCompositeOperation = 'source-over'; }

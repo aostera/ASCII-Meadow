@@ -67,7 +67,7 @@ function fireSprite() {   // the fires burn warm: ember red at the rim, orange a
 }
 function drawLights() {  // on the overlay, above the fog, so the light pushes through it
   const G = glowSprite(), FG = fireSprite(), ox = camX * CW, oy = camY * CH;
-  const spot = (x, y, r, a, S = G) => { x -= ox; y -= oy; if (x + r < 0 || y + r < 0 || x - r > W || y - r > H) return; ctx.globalAlpha = Math.max(0, Math.min(1, a)); ctx.drawImage(S, x - r, y - r, r * 2, r * 2); };
+  const spot = (x, y, r, a, S = G) => { x = (x - ox) * VZ; y = (y - oy) * VZ; r *= VZ; if (x + r < 0 || y + r < 0 || x - r > W || y - r > H) return; ctx.globalAlpha = Math.max(0, Math.min(1, a)); ctx.drawImage(S, x - r, y - r, r * 2, r * 2); };
   for (const w of cathedral.glows || []) spot(w.x, w.y, w.r * 1.5, (w.id < 0 ? 0.2 : 0.42) * (w.id < 0 ? 1 : flick(w.id, 2.2)));
   for (const b of braziers) {
     const bx = b.x * CW, by = (b.y + 0.7) * CH - b.lift - CH * 3.5, f = flick(b.seed * 3, 11);

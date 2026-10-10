@@ -2,8 +2,9 @@
 
 // ---------- camera: hovers above the knight and drifts after him ----------
 let camX = 0, camY = 0, VX0 = 0, VX1 = 0, VY0 = 0, VY1 = 0;
+let VZ = 1;   // view zoom: 1 in the game; the map editor zooms out to see more and in to see detail
 function updateCamera(dt, snap) {
-  if (editing) { camX = Math.max(0, Math.min(COLS - VC, camX)); camY = Math.max(0, Math.min(ROWS - VR, camY)); setView(); return; }   // the editor moves it
+  if (editing) { camX = Math.max(0, Math.min(COLS - VC / VZ, camX)); camY = Math.max(0, Math.min(ROWS - VR / VZ, camY)); setView(); return; }   // the editor moves it
   const tx = Math.max(0, Math.min(COLS - VC, player.x - VC / 2));
   const near = Math.max(0, Math.min(1, 1 - (player.y - (cathedral.gateRow || 0)) / (VR * 2)));  // by the castle, look up at it
   const ty = Math.max(0, Math.min(ROWS - VR, player.y - liftPx(player) / CH - VR * (0.72 + 0.18 * near)));
@@ -12,6 +13,6 @@ function updateCamera(dt, snap) {
   setView();
 }
 function setView() {
-  VX0 = Math.max(0, Math.floor(camX) - 1); VX1 = Math.min(COLS - 1, Math.ceil(camX + VC) + 1);
-  VY0 = Math.max(0, Math.floor(camY) - 2); VY1 = Math.min(ROWS - 1, Math.ceil(camY + VR) + 3);
+  VX0 = Math.max(0, Math.floor(camX) - 1); VX1 = Math.min(COLS - 1, Math.ceil(camX + VC / VZ) + 1);
+  VY0 = Math.max(0, Math.floor(camY) - 2); VY1 = Math.min(ROWS - 1, Math.ceil(camY + VR / VZ) + 3);
 }
