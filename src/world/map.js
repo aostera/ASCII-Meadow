@@ -40,24 +40,33 @@ loadPaint(MEADOW_MAP.paint);
 // The same chunked layer, coarser (FOG_RES units a cell): clear it away, or lay light or dense fog.
 const FOG_RES = 16, FCODES = '.cld';   // none (generated), clear, light, dense
 const fogChunks = new Map();
-function loadFog(obj) { fogChunks.clear(); for (const k in obj || {}) fogChunks.set(k, rleDecode(obj[k], FCODES)); }
+function loadFog(obj) { fogChunks.clear(); for (const k in obj || {}) fogChunks.set(k, rleDecode(obj[k], FCODES)); fogTouch(); }
+// The fog is read for every cell of the fog field each frame: by number, not by string key, and only where
+// some was painted. fogTouch() after any change to fogChunks rebuilds the index and its bounds.
+const fogNum = new Map(); let fogB = null;
+function fogTouch() {
+  fogNum.clear(); fogB = null;
+  for (const [k, a] of fogChunks) {
+    const [kx, kz] = k.split(',').map(Number); fogNum.set(kx * 65536 + kz, a);
+    if (!fogB) fogB = [kx, kz, kx, kz]; else { fogB[0] = Math.min(fogB[0], kx); fogB[1] = Math.min(fogB[1], kz); fogB[2] = Math.max(fogB[2], kx); fogB[3] = Math.max(fogB[3], kz); }
+  }
+}
 function saveFog() { const o = {}; for (const [k, a] of fogChunks) if (a.some(c => c)) o[k] = rleEncode(a, FCODES); return o; }
 loadFog(MEADOW_MAP.fog);
 function fogCodeAt(gx, gz) {
-  const px = Math.floor(gx / FOG_RES), pz = Math.floor(gz / FOG_RES), a = fogChunks.get((px >> 5) + ',' + (pz >> 5));
+  const px = Math.floor(gx / FOG_RES), pz = Math.floor(gz / FOG_RES), a = fogNum.get((px >> 5) * 65536 + (pz >> 5));
   return a ? a[(px & 31) + (pz & 31) * PCH] : 0;
 }
 // Fog density d (generated, 0..1) at world px (wx, wy) once the map's fog is laid over it: the four nearest
 // fog cells blend, so a stroke has soft edges, and painted fog rolls with the same slow noise as the rest.
 function mapFog(d, wx, wy) {
-  const C = cathedral, gx = (wx - C.ox) / WS, gz = -(wy - C.oy) / (SINP * WS), h = FOG_RES * 0.5;
-  const roll = 0.72 + 0.4 * vnoise(wx * 0.004 + t * 0.05, wy * 0.006 - t * 0.02);
-  let sum = 0;
-  for (const [ox, oz] of [[-h, -h], [h, -h], [-h, h], [h, h]]) {
-    const c = fogCodeAt(gx + ox, gz + oz);
-    sum += c === 1 ? 0 : c === 2 ? Math.max(d, 0.5 * roll) : c === 3 ? Math.max(d, Math.min(1, 0.95 * roll)) : d;
-  }
-  return sum / 4;
+  const C = cathedral, gx = (wx - C.ox) / WS, gz = -(wy - C.oy) / (SINP * WS), h = FOG_RES * 0.5, S = FOG_RES * PCH;
+  if (!fogB || gx < fogB[0] * S - h || gz < fogB[1] * S - h || gx > (fogB[2] + 1) * S + h || gz > (fogB[3] + 1) * S + h) return d;   // nowhere near any painted fog
+  const c0 = fogCodeAt(gx - h, gz - h), c1 = fogCodeAt(gx + h, gz - h), c2 = fogCodeAt(gx - h, gz + h), c3 = fogCodeAt(gx + h, gz + h);
+  if (!(c0 | c1 | c2 | c3)) return d;
+  const roll = 0.72 + 0.4 * vnoise(wx * 0.004 + t * 0.05, wy * 0.006 - t * 0.02), lf = Math.max(d, 0.5 * roll), df = Math.max(d, Math.min(1, 0.95 * roll));
+  const f = c => c === 1 ? 0 : c === 2 ? lf : c === 3 ? df : d;
+  return (f(c0) + f(c1) + f(c2) + f(c3)) / 4;
 }
 
 // The brush of paint code c on cell i, starting from the generated ground (groundCell) where it keeps the

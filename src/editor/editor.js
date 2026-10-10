@@ -101,6 +101,7 @@ function edUndoRedo(from, to) {
     for (const [key, a] of e.paint) {   // 'f:' keys are fog chunks, the rest ground paint
       const L = key.startsWith('f:') ? fogChunks : paintChunks, k = key.replace('f:', ''), cur = L.get(k);
       back.set(key, cur ? cur.slice() : null); if (a) L.set(k, a.slice()); else L.delete(k);
+      if (L === fogChunks) fogTouch();
     }
     to.push({ paint: back });
     for (const k of e.paint.keys()) if (!k.startsWith('f:')) edRepaintChunk(k);
@@ -147,7 +148,7 @@ function edSetFog(px, pz, code) {
   const key = (px >> 5) + ',' + (pz >> 5);
   let a = fogChunks.get(key);
   if (ED.stroke && !ED.stroke.has('f:' + key)) ED.stroke.set('f:' + key, a ? a.slice() : null);
-  if (!a) { a = new Uint8Array(PCH * PCH); fogChunks.set(key, a); }
+  if (!a) { a = new Uint8Array(PCH * PCH); fogChunks.set(key, a); fogTouch(); }
   a[(px & 31) + (pz & 31) * PCH] = code;
 }
 function edFogStamp(gx, gz) {   // every fog cell under the brush, and at least the one under its centre

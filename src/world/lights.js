@@ -9,7 +9,9 @@ const flick = (k, sp) => 0.62 + 0.22 * Math.sin(t * sp + k * 1.7) + 0.16 * Math.
 function drawWindows() {
   const L = cathedral.lit; if (!L) return;
   for (let j = 0; j < L.length; j += 3) {
-    const id = L[j + 2], f = id < 0 ? 0.55 : flick(id, 2.2), cx = L[j], cy = L[j + 1];
+    const cx = L[j], cy = L[j + 1];
+    if (cy < VY0 - 1 || cy > VY1 + 1 || cx < VX0 - 1 || cx > VX1 + 1) continue;   // only the windows in view
+    const id = L[j + 2], f = id < 0 ? 0.55 : flick(id, 2.2);
     const lv = BL0 + Math.min(BLN - 1, Math.round((0.7 + 0.3 * f) * (BLN - 1)));
     blit(LIGHTCH[(hash(cx, cy) * LIGHTCH.length) | 0], lv, cx * CW, cy * CH, 0.75 + 0.25 * f);
   }
