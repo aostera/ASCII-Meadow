@@ -61,6 +61,8 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
+      - name: Road and castle-front fire coordinates (desktop/mobile)
+        run: node tools/check/map-placement.cjs
       - name: Smoke test from file://
         run: node tools/check/smoke.cjs "file://$GITHUB_WORKSPACE/index.html" --out shots/file
       - name: Smoke test over HTTP from a sub-folder, /ASCII-Meadow/ (relative paths only)
