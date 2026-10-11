@@ -286,7 +286,7 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
           }));
         }
         if (w === 1100) check('saved map loads back the same', r.earth === c3.earth && r.flora === c3.flora && sameCows && !r.editor, JSON.stringify({ before: c3, after: r, earthDelta: r.earth - c3.earth, floraDelta: r.flora - c3.flora, sameCows }));
-        else check('saved map stays put on another screen size', sameCows && r.flora > c3.flora * 0.8, `cows ${JSON.stringify(r.cows)}, flora ${r.flora}`);
+        else check('saved map preserves every authored object on another screen size', sameCows && r.flora === c3.flora, `expected flora ${c3.flora}, actual flora ${r.flora}; cows ${JSON.stringify(r.cows)}`);
         const re2 = realErrors(g.errs); if (re2.length) check('no console errors (saved map)', false, re2.slice(0, 3).join(' | '));
         await g.ctx.close();
       }
