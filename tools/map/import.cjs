@@ -50,7 +50,20 @@ function parseExport(raw) {
   catch (e) { throw new Error('map is not valid JSON: ' + e.message); }
   if (!map || typeof map !== 'object' || Array.isArray(map)) throw new Error('map data must be an object');
   for (const key of REQUIRED) if (!Object.hasOwn(map, key)) throw new Error('missing field: ' + key);
-  if (map.v !== 1 || map.res !== 4) throw new Error('unsupported map format v=' + map.v + ', res=' + map.res);
+  if ((map.v !== 1 && map.v !== 2) || map.res !== 4) throw new Error('unsupported map format v=' + map.v + ', res=' + map.res);
+  if (map.v === 2) {
+    if (!Array.isArray(map.actors)) throw new Error('v2 map requires actors array');
+    const ids = new Set();
+    for (const [i, actor] of map.actors.entries()) {
+      if (!Array.isArray(actor) || actor.length !== 4) throw new Error('actors[' + i + ']: expected [id, type, x, z]');
+      const [id, type, x, z] = actor;
+      if (typeof id !== 'string' || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(id)) throw new Error('actors[' + i + ']: invalid id');
+      if (ids.has(id)) throw new Error('actors[' + i + ']: duplicate id ' + id);
+      if (typeof type !== 'string' || !/^[a-z][a-z0-9-]{0,47}$/.test(type)) throw new Error('actors[' + i + ']: invalid type');
+      if (!Number.isFinite(x) || !Number.isFinite(z)) throw new Error('actors[' + i + ']: invalid coordinates');
+      ids.add(id);
+    }
+  } else if (Object.hasOwn(map, 'actors')) throw new Error('v1 map cannot contain actors: upgrade to v2');
   if (map.castle !== null) pair(map.castle, 'castle');
   if (map.start !== null) pair(map.start, 'start');
   if (map.trail !== null && map.trail !== false) throw new Error('trail must be null or false');
@@ -82,7 +95,8 @@ function summary(m) {
   const count = k => m[k] === null ? 'generated (null)' : m[k].length;
   return 'start=' + JSON.stringify(m.start) + ', fires=' + count('fires') + ', cows=' + count('cows') +
     ', toads=' + count('toads') + ', events=' + count('events') + ', flora=' + count('flora') +
-    ', paint chunks=' + Object.keys(m.paint).length + ', fog chunks=' + Object.keys(m.fog).length;
+    ', paint chunks=' + Object.keys(m.paint).length + ', fog chunks=' + Object.keys(m.fog).length +
+    (m.v === 2 ? ', actors=' + m.actors.length : '');
 }
 function main() {
   const args = process.argv.slice(2), apply = args.includes('--apply'), check = args.includes('--check');
