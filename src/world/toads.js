@@ -122,9 +122,12 @@ function updateToads(dt) {
     const x0 = Math.max(1, VX0 - 20), x1 = Math.min(COLS - 2, VX1 + 20), y0 = Math.max(1, VY0 - 10), y1 = Math.min(ROWS - 2, VY1 + 10);
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const i = y * COLS + x;
-      if (!wet[i] || hash(x * 7 + 3, y * 13 + 1) > 0.014 || toads.has(i) || !toadSpot(i)) continue;
-      toads.set(i, { home: i, kind: kind[i] === 8 || hash(x * 3, y * 11) > 0.55 ? 'frog' : 'toad', x, y, st: 'sit',   // frogs on the pads, toads mostly on the tussocks
-        t: 0, wait: 1 + hash(x, y) * 5, dir: hash(y, x) > 0.5 ? 1 : -1, s: (x * 73856093 ^ y * 19349663) >>> 0, h: 0 });
+      // Use stable world-seeded positions, not the padded grid column. Adding a
+      // safety border must not rearrange or delete the marsh's generated toads.
+      const sx = x - terrainSeedOffset;
+      if (!wet[i] || hash(sx * 7 + 3, y * 13 + 1) > 0.014 || toads.has(i) || !toadSpot(i)) continue;
+      toads.set(i, { home: i, kind: kind[i] === 8 || hash(sx * 3, y * 11) > 0.55 ? 'frog' : 'toad', x, y, st: 'sit',   // frogs on the pads, toads mostly on the tussocks
+        t: 0, wait: 1 + hash(sx, y) * 5, dir: hash(y, sx) > 0.5 ? 1 : -1, s: (sx * 73856093 ^ y * 19349663) >>> 0, h: 0 });
     }
     toadsFromMap();
     for (const [i, td] of toads) {
