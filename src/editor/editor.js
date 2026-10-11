@@ -30,8 +30,8 @@ function mapFileText() {
     '// null: generated as before (trail false: no generated trail). fires: [x, z] on the ground, [x, z, h] raised h units.\n' +
     '// paint: brush strokes over the generated ground, run-length coded per 32×32 chunk; fog: the same for fog\n' +
     '// (c clear, l light, d dense; 16-unit cells).\n' +
-    'const MEADOW_MAP = {\n  "v": 1, "res": ' + PAINT_RES + ',\n  "castle": ' + JSON.stringify(m.castle || null) + ',\n  "start": ' + JSON.stringify(m.start) + ',\n  "fires": ' + rows(m.fires) +
-    ',\n  "trail": ' + JSON.stringify(m.trail === false ? false : null) + ',\n  "cows": ' + rows(m.cows) + ',\n  "toads": ' + rows(m.toads || null) + ',\n  "events": ' + rows(m.events || null) + ',\n  "flora": ' + rows(m.flora) + ',\n  "paint": ' +
+    'const MEADOW_MAP = {\n  "v": ' + (m.actors ? 2 : 1) + ', "res": ' + PAINT_RES + ',\n  "castle": ' + JSON.stringify(m.castle || null) + ',\n  "start": ' + JSON.stringify(m.start) + ',\n  "fires": ' + rows(m.fires) +
+    ',\n  "trail": ' + JSON.stringify(m.trail === false ? false : null) + ',\n  "cows": ' + rows(m.cows) + ',\n  "toads": ' + rows(m.toads || null) + ',\n  "events": ' + rows(m.events || null) + ',\n  "flora": ' + rows(m.flora) + (m.actors ? ',\n  "actors": ' + rows(m.actors) : '') + ',\n  "paint": ' +
     (keys.length ? '{\n' + keys.map(k => '    ' + JSON.stringify(k) + ': ' + JSON.stringify(paint[k])).join(',\n') + '\n  }' : '{}') + ',\n  "fog": ' +
     (fkeys.length ? '{\n' + fkeys.map(k => '    ' + JSON.stringify(k) + ': ' + JSON.stringify(fog[k])).join(',\n') + '\n  }' : '{}') + '\n};\n';
   return text.replace(/<\/script/gi, '<\\/script');   // the single-file bundle inlines it in a <script>
@@ -39,10 +39,19 @@ function mapFileText() {
 function parseMapText(text) {
   const a = text.indexOf('{', Math.max(0, text.indexOf('MEADOW_MAP'))), b = text.lastIndexOf('}');
   const m = JSON.parse(text.slice(a, b + 1));
-  if (typeof m !== 'object' || !m || m.v !== 1) throw new Error('not a map file');
+  if (typeof m !== 'object' || !m || (m.v !== 1 && m.v !== 2)) throw new Error('not a map file');
+  if (m.v === 2) {
+    if (!Array.isArray(m.actors)) throw new Error('v2 map requires actors array');
+    const ids = new Set();
+    for (const [id, type, x, z] of m.actors) {
+      if (typeof id !== 'string' || ids.has(id) || !ACTOR_TYPES.has(type) || !Number.isFinite(x) || !Number.isFinite(z))
+        throw new Error('invalid map actor: ' + id);
+      ids.add(id);
+    }
+  } else if (m.actors !== undefined) throw new Error('v1 map cannot contain actors');
   return m;
 }
-const mapSnapshot = () => JSON.parse(JSON.stringify({ castle: MEADOW_MAP.castle || null, start: MEADOW_MAP.start, trail: MEADOW_MAP.trail === false ? false : null, fires: MEADOW_MAP.fires, cows: MEADOW_MAP.cows, toads: MEADOW_MAP.toads || null, events: MEADOW_MAP.events || null, flora: MEADOW_MAP.flora, paint: savePaint(), fog: saveFog() }));   // a copy: edits must not reach it
+const mapSnapshot = () => JSON.parse(JSON.stringify({ v: MEADOW_MAP.v || 1, actors: MEADOW_MAP.actors || null, castle: MEADOW_MAP.castle || null, start: MEADOW_MAP.start, trail: MEADOW_MAP.trail === false ? false : null, fires: MEADOW_MAP.fires, cows: MEADOW_MAP.cows, toads: MEADOW_MAP.toads || null, events: MEADOW_MAP.events || null, flora: MEADOW_MAP.flora, paint: savePaint(), fog: saveFog() }));   // a copy: edits must not reach it
 
 // ---------- applying changes ----------
 // Generated objects become map objects the first time one is moved, added or deleted.
@@ -62,16 +71,17 @@ function applyObjects(which) {
   if (which.start && MEADOW_MAP.start) { [player.x, player.y] = mapToCell(MEADOW_MAP.start[0], MEADOW_MAP.start[1]); const h = surfAt(player.x, player.y); player.hT = player.h = isFinite(h) ? h : 0; }
   if (which.cows) placeCows();
   if (which.toads) resetMapToads();
+  if (which.actors) syncMapActors();
   if (which.events) resetBirds();
   edChanged();
 }
 function applyWholeMap(src) {
   const m = JSON.parse(JSON.stringify(src));   // undo entries and drafts stay as they were
   if (JSON.stringify(m.castle || null) !== JSON.stringify(MEADOW_MAP.castle || null)) { MEADOW_MAP.castle = m.castle || null; edRebuildCastle(); }
-  Object.assign(MEADOW_MAP, { start: m.start || null, trail: m.trail === false ? false : null, fires: m.fires || null, cows: m.cows || null, toads: m.toads || null, events: m.events || null, flora: m.flora || null });
+  Object.assign(MEADOW_MAP, { v: m.v === 2 ? 2 : 1, actors: m.v === 2 ? (m.actors || []) : null, start: m.start || null, trail: m.trail === false ? false : null, fires: m.fires || null, cows: m.cows || null, toads: m.toads || null, events: m.events || null, flora: m.flora || null });
   loadPaint(m.paint); loadFog(m.fog); rebuildMap();
   if (!MEADOW_MAP.start) { const sy = ROWS - VR * 0.3; player.y = sy; player.x = pathX(sy) - 3; }   // the generated herd stands by the start
-  applyObjects({ fires: 1, start: 1, cows: 1, toads: 1, events: 1 });
+  applyObjects({ fires: 1, start: 1, cows: 1, toads: 1, events: 1, actors: 1 });
 }
 // The castle again, where the map puts it: its rays, footprint and shade, the fires at its gate, the fog
 // banks round its mound; the ground and the trees are re-laid over it by rebuildMap.
