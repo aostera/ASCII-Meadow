@@ -111,7 +111,7 @@ function build() {
   MS = WS * (W < H * 0.95 ? Math.max(0.55, Math.pow(W / (H * 0.95), 0.75)) : 1);
   // Authored objects extend to ±1157 map units. Give their full silhouettes a safe margin at every
   // aspect ratio; previously a narrow grid discarded plants near the edge during placeFlora().
-  COLS = Math.ceil(Math.max(VC * 2.2, (1800 * WS + W) / CW, 2500 * WS / CW));   // ±1250 map units
+  COLS = Math.ceil(Math.max(VC * 2.2, (1800 * WS + W) / CW, 2750 * WS / CW));   // ±1375 map units: reserve space around baked editor objects
   // A FIXED southern extent, independent of the current exported list of objects.
   // Resizing ROWS from the content made the editor's world have a different number of
   // ground cells after export/reload (up to 470 extra earth cells in the smoke test).
