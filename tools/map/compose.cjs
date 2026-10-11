@@ -46,13 +46,14 @@ const { launch, openGame } = require('../check/common.cjs');
     // ---- a fence along the field right of the trail, by the start
     const fld = side(4, 38);
     M.flora.push(['fence', 0, ...fld], ['fence', 0, ...off(fld, 220, 0)], ['fence', 3, ...off(fld, 410, 65)]);
-    // ---- the marsh: beside the camp, west of it; open water in its middle, fog lying on it, toads and frogs
-    const marsh = off(camp, -540, 40);
-    clear(marsh, 280); paint(marsh, 260, 150, 2); paint(marsh, 220, 105, 10); paint(off(marsh, 30, -10), 110, 50, 9);
-    fog(marsh, 280, 150, 2); fog(off(marsh, 30, -10), 90, 45, 3);
-    M.toads = [[...off(marsh, -190, -20)], [...off(marsh, 140, -80)], [...off(marsh, -60, 40), 'frog'], [...off(marsh, 60, -40), 'frog'], [...off(marsh, 150, 45), 'frog']];
-    M.flora.push(['stone', 5, ...off(marsh, -250, -70)], ['stone', 8, ...off(marsh, -225, -100)], ['dead', 1, ...off(marsh, 210, 110)], ['dead', 2, ...off(marsh, -215, 100)]);
-    paint(off(marsh, -270, -120), 60, 35, 5);   // a stony bank
+    // ---- the marsh: beside the camp, west of it; open water in its middle, fog lying on it, toads and frogs.
+    // Everything of it stays east of x = -1100: the world is only ±1160 wide on small screens
+    const marsh = off(camp, -440, 40);
+    clear(marsh, 215); paint(marsh, 215, 140, 2); paint(marsh, 180, 100, 10); paint(off(marsh, 20, -10), 95, 45, 9);   // clear only its own ground: the camp's west fence stands 228 off
+    fog(marsh, 230, 140, 2); fog(off(marsh, 20, -10), 80, 40, 3);
+    M.toads = [[...off(marsh, -150, -15)], [...off(marsh, 120, -70)], [...off(marsh, -50, 40), 'frog'], [...off(marsh, 50, -35), 'frog'], [...off(marsh, 125, 40), 'frog']];
+    M.flora.push(['stone', 5, ...off(marsh, -200, -95)], ['stone', 8, ...off(marsh, -165, -125)], ['dead', 1, ...off(marsh, 165, 120)], ['dead', 2, ...off(marsh, -185, 95)]);
+    paint(off(marsh, -175, -140), 55, 32, 5);   // a stony bank
     // ---- tall grass ahead on the trail's left, birds hidden in it
     const grass = side(-74, -48);
     clear(grass, 110); paint(grass, 120, 70, 2);
