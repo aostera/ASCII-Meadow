@@ -362,7 +362,7 @@ function buildCathedral() {
     if (cast(gx, 0.5, gz, LGT[0], LGT[1], LGT[2], 0.01, BINS.sun(gx, 0.5, gz))) bshade[i] = 0.38;
   }
   props.length = 0;
-  props.push({ spots: [{ x: ox / CW, y: (oy - 74 * SINP * MS) / CH - 0.7, r: 16, need: () => (player.hT || 0) > 100, label: 'push the great gate', use: () => say(player, 'the gate is sealed. something stirs within.') }] });
+  props.push({ spots: [{ x: ox / CW, y: (oy - 74 * SINP * MS) / CH - 0.7, r: 16, need: () => (player.hT || 0) > 100, label: 'push the great gate', action: 'inspect', onUse: () => say(player, 'the gate is sealed. something stirs within.') }] });
 }
 
 // Grid position → castle model ground point under the feet.
