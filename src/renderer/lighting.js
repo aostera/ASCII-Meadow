@@ -12,8 +12,8 @@ const KFIRE_CLOTH = [[0, [52, 12, 12]], [0.4, [117, 28, 24]], [0.78, [185, 54, 4
 // After the knight's blocks: the marsh's creatures, colourless like the rest of the meadow, by level. A
 // toad is the darker grey, its brightest glyph the gleam of its eye; a frog a shade lighter, wet.
 const KCREATURES = [
-  [[0, [17, 17, 17]], [0.45, [52, 52, 52]], [0.75, [84, 84, 84]], [0.9, [112, 112, 112]], [1, [178, 178, 178]]],
-  [[0, [19, 19, 19]], [0.45, [60, 60, 60]], [0.75, [94, 94, 94]], [0.9, [126, 126, 126]], [1, [190, 190, 190]]],
+  [[0, [22, 22, 22]], [0.45, [68, 68, 68]], [0.75, [108, 108, 108]], [0.9, [142, 142, 142]], [1, [210, 210, 210]]],
+  [[0, [25, 25, 25]], [0.45, [77, 77, 77]], [0.75, [120, 120, 120]], [0.9, [156, 156, 156]], [1, [222, 222, 222]]],
 ];
 const KBLK_ALL = KBLK + KCREATURES.length;   // every block in the atlas
 
