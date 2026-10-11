@@ -38,9 +38,14 @@ function pickInteraction() {
   return nearest;
 }
 function performInteraction(spot) {
+  if (!spot) return false;
+  if (spot.targetId) {
+    if (!spot.target || spot.target.actorId !== spot.targetId ||
+        !npcs.includes(spot.target)) return false; // despawned or replaced actor
+    // The candidate belongs to the previous frame; use the LIVE position.
+    spot.x = spot.target.x; spot.y = spot.target.y;
+  }
   if (!interactionAvailable(spot)) return false;
-  if (spot.targetId && (!spot.target || spot.target.actorId !== spot.targetId ||
-      !npcs.includes(spot.target))) return false; // despawned or replaced actor
   const handler = INTERACTION_ACTIONS.get(spot.action || 'use');
   return handler(spot) !== false;
 }
