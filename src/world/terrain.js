@@ -74,11 +74,15 @@ function carveCell(x, y, cx, hw) {
   else if (kind[i] === 1) { segs[i] = 1; height[i] *= 0.35 + d * 0.15; }  // trodden verge
 }
 // One cell of the generated ground: seed, height, kind and blade length from the noise. Returns 1 for grass.
+let terrainSeedOffset = 0; // extra symmetric map border in glyph cells
 function groundCell(x, y, i) {
-  const n = vnoise(x * 0.035, y * 0.055) * 0.65 + vnoise(x * 0.12, y * 0.18) * 0.25 + vnoise(x * 0.4, y * 0.6) * 0.1;
-  const rock = vnoise(x * 0.09 + 50, y * 0.14 + 50);
-  const r = hash(x + 911, y + 37);
-  seed[i] = hash(x, y); wet[i] = 0;
+  // Align procedural noise to the old world origin after adding invisible border cells.
+  // The authored meadow must not be regenerated just because COLS has increased.
+  const sx = x - terrainSeedOffset;
+  const n = vnoise(sx * 0.035, y * 0.055) * 0.65 + vnoise(sx * 0.12, y * 0.18) * 0.25 + vnoise(sx * 0.4, y * 0.6) * 0.1;
+  const rock = vnoise(sx * 0.09 + 50, y * 0.14 + 50);
+  const r = hash(sx + 911, y + 37);
+  seed[i] = hash(sx, y); wet[i] = 0;
   height[i] = Math.min(1, Math.max(0.12, n * 1.35 - 0.08 + (r - 0.5) * 0.4));
   let blade = 0;
   if (rock > 0.9 && r > 0.35) kind[i] = 5;                           // stones
@@ -88,7 +92,7 @@ function groundCell(x, y, i) {
   else if (r > 0.978 && n > 0.6) kind[i] = 6;             // heather
   else { kind[i] = 1; blade = 1; }
   // tall meadow in broad patches: up to four glyphs high, enough to hide a knight's boots and knees
-  const tall = Math.max(0, Math.min(1, (vnoise(x * 0.018 + 9, y * 0.028) - 0.32) / 0.4));
+  const tall = Math.max(0, Math.min(1, (vnoise(sx * 0.018 + 9, y * 0.028) - 0.32) / 0.4));
   segs[i] = 1 + Math.round(tall * (0.4 + height[i] * 0.6) * 3.4);
   return blade;
 }
@@ -111,7 +115,13 @@ function build() {
   MS = WS * (W < H * 0.95 ? Math.max(0.55, Math.pow(W / (H * 0.95), 0.75)) : 1);
   // Authored objects extend to ±1157 map units. Give their full silhouettes a safe margin at every
   // aspect ratio; previously a narrow grid discarded plants near the edge during placeFlora().
-  COLS = Math.ceil(Math.max(VC * 2.2, (1800 * WS + W) / CW, 2750 * WS / CW));   // ±1375 map units: reserve space around baked editor objects
+  // Add cells equally on both sides. Use an EVEN amount so old glyph centres stay
+  // on integer cells, then align procedural hashes to the original coordinate grid.
+  // The minimum ±1250 world units includes authored objects at ±1157 with ample margin.
+  const classicCols = Math.ceil(Math.max(VC * 2.2, (1800 * WS + W) / CW, 2320 * WS / CW));
+  const wantedCols = Math.ceil(Math.max(classicCols, 2500 * WS / CW));
+  terrainSeedOffset = Math.ceil((wantedCols - classicCols) / 2);
+  COLS = classicCols + terrainSeedOffset * 2;
   // A FIXED southern extent, independent of the current exported list of objects.
   // Resizing ROWS from the content made the editor's world have a different number of
   // ground cells after export/reload (up to 470 extra earth cells in the smoke test).
