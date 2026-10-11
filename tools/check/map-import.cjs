@@ -28,7 +28,7 @@ invalid(m => { m.paint['0,0'] = 'g1023'; }, /expected 1024/);
 invalid(m => { m.paint['0,0'] = 'z1024'; }, /unknown cell code/);
 invalid(m => { m.fog['-1,-1'] = 'l0'; }, /invalid run length/);
 invalid(m => { m.start = ['not a number', -20]; }, /finite numbers/);
-invalid(m => { m.v = 2; }, /unsupported map format/);
+invalid(m => { m.v = 3; }, /unsupported map format/);
 invalid(m => { delete m.flora; }, /missing field/);
 invalid(m => { m.cows = [[3, Infinity]]; }, /finite numbers/); // JSON.stringify converts Infinity to null
 invalid(m => { m.fires = [[0, 0, 0, 'arbitrary']]; }, /unknown fire kind/);
@@ -36,6 +36,22 @@ invalid(m => { m.events = [['birds', 0, 'bad']]; }, /finite numbers/);
 assert.throws(() => parseExport(Buffer.from(original.toString() + 'alert("extra code");')), /no extra code/); cases++;
 assert.throws(() => parseExport(Buffer.from('const MEADOW_MAP = {"v":1};\n// another assignment')), /no extra code/); cases++;
 assert.throws(() => parseExport(Buffer.from('const MEADOW_MAP = {}; </script>')), /cannot be safely bundled/); cases++;
+
+// Maps exported before NPC support must remain byte-for-byte compatible.
+const v2 = { ...base, v: 2, actors: [['villager-1', 'villager', -10.5, -60], ['guard-2', 'guard', 15, 7]] };
+assert.deepEqual(parseExport(source(v2)), v2); cases++;
+const badV2 = (mutator, pattern) => {
+  const v = JSON.parse(JSON.stringify(v2));
+  mutator(v);
+  assert.throws(() => parseExport(source(v)), pattern);
+  cases++;
+};
+badV2(v => { delete v.actors; }, /requires actors array/);
+badV2(v => { v.actors[1][0] = 'villager-1'; }, /duplicate id/);
+badV2(v => { v.actors[0][2] = 'offmap'; }, /invalid coordinates/);
+badV2(v => { v.actors[0][1] = '../secret'; }, /invalid type/);
+badV2(v => { v.actors[0] = ['npc-1', 'villager']; }, /expected \[id, type, x, z\]/);
+invalid(m => { m.actors = []; }, /v1 map cannot contain actors/);
 
 const installedPath = path.resolve(__dirname, '../../src/data/map.js');
 const installed = fs.readFileSync(installedPath);
