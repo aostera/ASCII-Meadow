@@ -54,10 +54,10 @@ function render() {
     for (const bb of boxes) if (py + CH > bb[1] && py - CH * 4 < bb[3]) { slowRow = true; break; }
     const P = slowRow ? put : fastPut, PF2 = slowRow ? putFlat : fastPut;
     for (let x = VX0; x <= VX1; x++) {
-      const i = y * COLS + x, kd = KD[i], s = SD[i];
+      const i = y * COLS + x, kd = KD[i], s = SD[i], sx = x - terrainSeedOffset;
       if (!kd) continue;
       if (cloudTick === 0) { // cloud shadow is soft: sample it every fourth column and share it
-        if ((x & 3) === 0 || x === VX0) { const cn = vnoise(x * 0.018 - t * 0.06, y * 0.03 + t * 0.015); cloudRow = cn > 0.54 ? (cn - 0.54) * 1.4 : 0; }
+        if ((sx & 3) === 0 || x === VX0) { const cn = vnoise(sx * 0.018 - t * 0.06, y * 0.03 + t * 0.015); cloudRow = cn > 0.54 ? (cn - 0.54) * 1.4 : 0; }
         CB[i] = cloudRow;
       }
       const cloud = CB[i], px = x * CW;
@@ -69,7 +69,7 @@ function render() {
         continue;
       }
       if (kd === 8) {   // water: dark and still; ripples drift across it and catch what light there is
-        const w = Math.sin(x * 0.55 + y * 0.9 - t * 1.3 + s * 6) + Math.sin(x * 0.21 - y * 0.37 + t * 0.8) * 0.6;
+        const w = Math.sin(sx * 0.55 + y * 0.9 - t * 1.3 + s * 6) + Math.sin(sx * 0.21 - y * 0.37 + t * 0.8) * 0.6;
         const lit = (1 - SHD[i]) * (1 - cloud * 0.6) * (1 - BS[i]);
         if (SG[i]) {   // a lily pad lying on the water, lifted a little as each ripple passes under it, drifting on its stem
           const lift = w > 0.4 ? (w - 0.4) * 0.9 : 0, sway = Math.sin(t * 0.7 + s * 9) * 0.6;
@@ -87,8 +87,8 @@ function render() {
       }
       if (kd === 2) { if (s > 0.55) PF2(s > 0.8 ? CI[','] : CI['.'], s > 0.75 ? C_DIRT : C_DIRT2, px, py, x, y, baseY); continue; }
       if (kd === 5) {   // stony ground: one stone to a 4×3 block of cells, set at random in it, grit between
-        const bx = x >> 2, by = (y / 3) | 0, h = hash(bx, by * 7 + 1);
-        if (h > 0.12 && x === bx * 4 + ((h * 4) | 0) && y === by * 3 + ((hash(bx * 3 + 5, by) * 3) | 0)) {
+        const bx = sx >> 2, by = (y / 3) | 0, h = hash(bx, by * 7 + 1);
+        if (h > 0.12 && sx === bx * 4 + ((h * 4) | 0) && y === by * 3 + ((hash(bx * 3 + 5, by) * 3) | 0)) {
           if (slowRow && covered(x, y, baseY)) continue;
           const z = hash(by * 5 + 3, bx), st = STONES[(h * 97 | 0) % 3 * 3 + (z < 0.4 ? 0 : z < 0.8 ? 1 : 2)];
           const lit = (1 - SHD[i]) * (1 - cloud * 0.55) * (1 - BS[i] * 0.8);
