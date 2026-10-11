@@ -172,6 +172,9 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       check('editor: undoing the first placement brings back the generated world', back && (await page.evaluate(() => flora.length)) === c0.flora + 1);
       const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=save]')]);
       const saved = fs.readFileSync(await dl.path(), 'utf8'), c3 = await count();
+      await page.evaluate(() => rebuildMap());
+      const rebuilt = await count();
+      console.log('EDITOR map ground vs canonical rebuild:', JSON.stringify({ before: c3, rebuilt, delta: rebuilt.earth - c3.earth }));
       check('editor: «Сохранить» downloads the map file', /const MEADOW_MAP = \{/.test(saved) && !/<\/script/i.test(saved), saved.length + ' bytes');
       await shot(page, 'editor');
       // fog: dense fog where it is brushed, none where it is cleared
