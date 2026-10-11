@@ -24,7 +24,7 @@ function mapFileText() {
   const m = MEADOW_MAP, rows = a => a === null ? 'null' : a.length ? '[\n' + a.map(e => '    ' + JSON.stringify(e)).join(',\n') + '\n  ]' : '[]';
   const paint = savePaint(), keys = Object.keys(paint), fog = saveFog(), fkeys = Object.keys(fog);
   const text = '// The meadow\'s map. Edit it in the game: open the page with ?edit and press M; «Сохранить» writes this file.\n' +
-    '// Positions are castle ground units (px at MS = 1) from the foot of the castle mound: x to the right, z to the north.\n' +
+    '// Positions are world-map units (WS = 1), x to the right, z to the north, relative to the castle\'s default position.\n' +
     '// castle: [x, z] the castle moved from its place (null: where it always stood). events: ["birds", x, z]\n' +
     '// a flock hidden in the tall grass there, bursting out when the knight walks in.\n' +
     '// null: generated as before (trail false: no generated trail). fires: [x, z] on the ground, [x, z, h] raised h units.\n' +
@@ -381,7 +381,7 @@ function edSave() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([mapFileText()], { type: 'text/javascript' })); a.download = 'map.js';
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  edStatus('map.js скачан. Отдайте его Claude — он положит карту в игру, и сайт обновится.');
+  edStatus('map.js скачан. Передайте оригинальный файл без изменений: node tools/map/import.cjs <файл> --apply.');
 }
 function edBuildUI() {
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
@@ -401,7 +401,7 @@ function edBuildUI() {
   const acts = el('div', 'ed-acts'); const undo = btn('Отменить', '', { act: 'undo' }), redo = btn('Повторить', '', { act: 'redo' });
   const file = el('input'); file.type = 'file'; file.accept = '.js,.json,text/javascript,application/json'; file.hidden = true;
   acts.append(undo, redo, btn('Сохранить', '', { act: 'save' }), btn('Открыть…', '', { act: 'open' }), btn('Сбросить', '', { act: 'reset' }), btn('Играть отсюда', '', { act: 'play' }), file);
-  const help = el('p', 'ed-help', 'Камера: WASD или стрелки (Shift — быстрее), правая кнопка или пробел — тащить, клик по карте — перейти. Масштаб: Ctrl + колесо или щипок, Q и E, R — 100%. Колесо — размер кисти или вариант. Delete — удалить выбранное. Ctrl Z / Ctrl Shift Z — отменить и повторить, Ctrl S — сохранить на сайт (спросит пароль редактора один раз).');
+  const help = el('p', 'ed-help', 'Камера: WASD или стрелки (Shift — быстрее), правая кнопка или пробел — тащить, клик по карте — перейти. Масштаб: Ctrl + колесо или щипок, Q и E, R — 100%. Колесо — размер кисти или вариант. Delete — удалить выбранное. Ctrl Z / Ctrl Shift Z — отменить и повторить, Ctrl S — скачать файл map.js для точного импорта в репозиторий.');
   const status = el('p', 'ed-status');
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
