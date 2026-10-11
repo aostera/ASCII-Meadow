@@ -343,7 +343,7 @@ function drawEditor() {
     if (on || hov) g.strokeRect(o.sx - o.r, o.sy - o.top, o.r * 2, o.top + CH * 1.5 * VZ);
     g.beginPath(); g.ellipse(o.sx, o.sy, Math.min(o.r, 8), Math.min(o.r, 8) * 0.45, 0, 0, Math.PI * 2); g.stroke();
     if (o.area) { g.setLineDash([2, 4]); g.beginPath(); g.ellipse(o.sx, o.sy, o.area, o.area * 0.5 * CH / CW, 0, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); }   // where the knight sets them off
-    const label = o.kind === 'start' ? 'старт' : o.kind === 'fires' ? (MEADOW_MAP.fires && MEADOW_MAP.fires[o.mi] && MEADOW_MAP.fires[o.mi][3] === 'cook' ? 'костёр с котлом' : 'костёр') : o.kind === 'cows' ? 'корова' : o.kind === 'toads' ? (MEADOW_MAP.toads[o.mi][2] === 'frog' ? 'лягушка' : 'жаба') : o.kind === 'events' ? 'птицы' : on || hov ? ({ tree: 'дерево ', dead: 'сухое ', bush: 'куст ', stone: 'камень ', tent: 'палатка ', fence: 'забор ' }[o.f.v.type] || '') + (variantsOf(o.f.v.type).indexOf(o.f.v) + 1) : '';
+    const label = o.kind === 'start' ? 'старт' : o.kind === 'fires' ? (MEADOW_MAP.fires && MEADOW_MAP.fires[o.mi] && MEADOW_MAP.fires[o.mi][3] === 'cook' ? 'костёр с котлом' : 'костёр') : o.kind === 'cows' ? 'корова' : o.kind === 'toads' ? (MEADOW_MAP.toads[o.mi][2] === 'frog' ? 'лягушка' : 'жаба') : o.kind === 'events' ? 'птицы' : o.kind === 'actors' ? (MEADOW_MAP.actors?.[o.mi]?.[1] || 'NPC') : on || hov ? ({ tree: 'дерево ', dead: 'сухое ', bush: 'куст ', stone: 'камень ', tent: 'палатка ', fence: 'забор ' }[o.f.v.type] || '') + (variantsOf(o.f.v.type).indexOf(o.f.v) + 1) : '';
     if (label) { g.fillStyle = on ? 'rgba(255,214,120,.95)' : 'rgba(250,250,250,.7)'; g.fillText(label, o.sx + 6, o.sy - 4); }
   }
   if (ED.drag && ED.drag.moved) {   // where the dragged object will land
