@@ -78,6 +78,9 @@ function drawTag(e, gx, gy) {
 // Other walkers (none at the moment): wander, stop to talk when the knight comes close.
 function updateNpcs(dt) {
   for (const n of npcs) {
+    // Catalog actors use the extensible behavior contract. Legacy entities
+    // retain exactly their old update path until explicitly migrated.
+    if (n.actorType) { updateRegisteredNpc(n, dt); continue; }
     const px = player.x - n.x, py = (player.y - n.y) * (CH / CW), pd = Math.hypot(px, py);
     n.sayCd -= dt; n.sayT -= dt;
     if (pd < 14 && n.sayCd <= 0) { n.say = n.lines[(Math.random() * n.lines.length) | 0]; n.sayT = 3; n.sayCd = 10; n.tx = n.x; n.ty = n.y; n.wait = 3; }
