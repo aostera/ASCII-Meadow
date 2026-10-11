@@ -109,7 +109,9 @@ function build() {
   // castle model unit → px; gate ≈ 3.3 knights tall. On a narrow upright screen (a phone held upright) the
   // castle would be ten screens wide: it is drawn smaller there, the map's distances kept (WS).
   MS = WS * (W < H * 0.95 ? Math.max(0.55, Math.pow(W / (H * 0.95), 0.75)) : 1);
-  COLS = Math.ceil(Math.max(VC * 2.2, (1800 * WS + W) / CW, 2320 * WS / CW));   // never narrower than the map is wide (±1160 units)
+  // Authored objects extend to ±1157 map units. Give their full silhouettes a safe margin at every
+  // aspect ratio; previously a narrow grid discarded plants near the edge during placeFlora().
+  COLS = Math.ceil(Math.max(VC * 2.2, (1800 * WS + W) / CW, 2500 * WS / CW));   // ±1250 map units
   ROWS = Math.ceil((2180 * WS + 60 + H * 5) / CH); N = COLS * ROWS;   // castle far north, a long walk up to it; room for the whole map
   ang = new Float32Array(N); vel = new Float32Array(N); flat = new Float32Array(N);
   bshade = new Float32Array(N); bmask = new Uint8Array(N); FR = new Float32Array(N);
