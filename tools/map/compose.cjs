@@ -1,10 +1,19 @@
-// Composes src/data/map.js from the generated world plus the set pieces below, through the editor's own
-// functions (the same file «Сохранить» writes). usage: node tools/map/compose.cjs [out]
-// A one-off authoring script: rerun it only to rebuild the starting map from scratch.
+// REGENERATES an example map from the generated world. NOT a way to import a designer's map.
+// To preserve editor exports exactly, use node tools/map/import.cjs <map.js> --apply.
+// Default output goes into ignored dist/ instead of overwriting src/data/map.js.
+// For an explicit destructive overwrite, pass --allow-overwrite-map.
 const path = require('path'), fs = require('fs');
 const { launch, openGame } = require('../check/common.cjs');
 (async () => {
-  const out = process.argv[2] || path.join(__dirname, '../../src/data/map.js');
+  const flags = process.argv.slice(2), allowOverwrite = flags.includes('--allow-overwrite-map');
+  if (flags.some(a => a.startsWith('--') && a !== '--allow-overwrite-map')) throw new Error('Unknown flag');
+  const positional = flags.filter(a => !a.startsWith('--'));
+  if (positional.length > 1) throw new Error('Usage: node tools/map/compose.cjs [output] [--allow-overwrite-map]');
+  const out = path.resolve(positional[0] || path.join(__dirname, '../../dist/generated-map.js'));
+  const live = path.resolve(__dirname, '../../src/data/map.js');
+  if (out === live && !allowOverwrite) {
+    throw new Error('Refusing to regenerate src/data/map.js! To import a designer export without changes, use: node tools/map/import.cjs <file> --apply');
+  }
   const b = await launch();
   // always from the generated world, whatever map.js holds now
   const empty = 'const MEADOW_MAP = { "v": 1, "res": 4, "castle": null, "start": null, "fires": null, "trail": null, "cows": null, "toads": null, "events": null, "flora": null, "paint": {}, "fog": {} };';
