@@ -120,6 +120,10 @@ function syncMapActors() {
   rows.forEach(([id, type, x, z], mi) => {
     const actor = spawnActor(type, { id, world: [x, z] });
     actor.fromMap = true; actor.mi = mi;
+    // The game simulates 50 warm-up frames before the first visible frame.
+    // Keep map-authored NPCs at their EXACT edited spawn position during that
+    // warm-up; wandering begins only after the scene is visible.
+    actor.wait = 3; actor.aiState = 'idle';
   });
 }
 
