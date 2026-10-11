@@ -45,4 +45,4 @@ function drawPrompt() {
   ctx.fillStyle = '#fafafa'; ctx.textBaseline = 'top'; ctx.fillText(txt, x + pad, y + pad);
   activeSpot.box = [x, y, tw + pad * 2, fs + pad * 2];
 }
-function useSpot() { if (activeSpot) activeSpot.use(); }
+function useSpot() { return performInteraction(activeSpot); }
