@@ -117,10 +117,10 @@ function syncMapActors() {
   for (const n of [...npcs]) if (n.fromMap) despawnActor(n.actorId);
   const rows = MEADOW_MAP.actors;
   if (!rows) return; // v1 map: no actors; original game is unchanged
-  for (const [id, type, x, z] of rows) {
+  rows.forEach(([id, type, x, z], mi) => {
     const actor = spawnActor(type, { id, world: [x, z] });
-    actor.fromMap = true;
-  }
+    actor.fromMap = true; actor.mi = mi;
+  });
 }
 
 // Sample archetype; it is deliberately NOT spawned in the shipped world.
