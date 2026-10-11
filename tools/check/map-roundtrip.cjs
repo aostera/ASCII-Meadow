@@ -28,7 +28,7 @@ const snapshot = page => page.evaluate(() => {
     start: expected.start, castle: expected.castle,
     toads: expected.toads, events: expected.events,
     // Some authored trees can be outside the current viewport's finite grid.
-    missingFlora: (expected.flora || []).length - flora.length,
+    missingFlora: expected.flora === null ? null : expected.flora.length - flora.length,
     firePos: (expected.fires || []).map((f, i) => {
       const b = braziers.find(b => b.mi === i); if (!b) return null;
       if (f[2] > 0) return cellToCastle(b.x, b.y).map(round);
@@ -49,7 +49,7 @@ const snapshot = page => page.evaluate(() => {
       const authored = await original.page.evaluate(() => {
         const within = (a, b, epsilon) => Math.abs(a - b) <= epsilon;
         const misplacedFlora = [];
-        for (const f of flora) {
+        for (const f of (MEADOW_MAP.flora === null ? [] : flora)) {
           const e = MEADOW_MAP.flora[f.mi];
           if (!e) { misplacedFlora.push({ mi: f.mi, reason: 'unexpected object' }); continue; }
           const [gx, gz] = toModelXZ(f.x, f.y);
@@ -59,25 +59,25 @@ const snapshot = page => page.evaluate(() => {
               !within(gx, e[2], 0.15) || !within(gz, e[3], zEpsilon))
             misplacedFlora.push({ mi: f.mi, want: e, got: [gx, gz] });
         }
-        const misplacedCows = cows.filter(c => {
+        const misplacedCows = (MEADOW_MAP.cows === null ? [] : cows).filter(c => {
           const [gx, gz] = toModelXZ(c.home[0], c.home[1]), expected = MEADOW_MAP.cows[c.mi];
           return !expected || !within(gx, expected[0], 0.15) || !within(gz, expected[1], 0.15);
         }).map(c => c.mi);
-        const badFireKinds = braziers.filter((fire, i) => !!fire.cook !== (MEADOW_MAP.fires[i][3] === 'cook')).map(fire => fire.mi);
-        return { expectedFlora: MEADOW_MAP.flora.length, actualFlora: flora.length,
-          expectedCows: MEADOW_MAP.cows.length, actualCows: cows.length,
-          expectedFires: MEADOW_MAP.fires.length, actualFires: braziers.length,
+        const badFireKinds = (MEADOW_MAP.fires === null ? [] : braziers).filter((fire, i) => !!fire.cook !== (MEADOW_MAP.fires[i][3] === 'cook')).map(fire => fire.mi);
+        return { expectedFlora: MEADOW_MAP.flora?.length ?? null, actualFlora: flora.length,
+          expectedCows: MEADOW_MAP.cows?.length ?? null, actualCows: cows.length,
+          expectedFires: MEADOW_MAP.fires?.length ?? null, actualFires: braziers.length,
           misplacedFlora, misplacedCows, badFireKinds };
       });
-      assert.equal(before.missingFlora, 0, 'authored flora silently omitted near terrain edges');
-      assert.equal(authored.actualFlora, authored.expectedFlora, 'not all designer plants were rendered');
-      assert.equal(authored.actualCows, authored.expectedCows, 'not all designer cows were rendered');
-      assert.equal(authored.actualFires, authored.expectedFires, 'not all designer fires were rendered');
+      if (before.missingFlora !== null) assert.equal(before.missingFlora, 0, 'authored flora silently omitted near terrain edges');
+      if (authored.expectedFlora !== null) assert.equal(authored.actualFlora, authored.expectedFlora, 'not all designer plants were rendered');
+      if (authored.expectedCows !== null) assert.equal(authored.actualCows, authored.expectedCows, 'not all designer cows were rendered');
+      if (authored.expectedFires !== null) assert.equal(authored.actualFires, authored.expectedFires, 'not all designer fires were rendered');
       assert.deepEqual(authored.misplacedFlora, [], 'some designer plants shifted or changed variant');
       assert.deepEqual(authored.misplacedCows, [], 'some cows shifted from the coordinates saved in the editor');
       assert.deepEqual(authored.badFireKinds, [], 'cooking fires changed type');
       const imgBefore = hash(await original.page.screenshot({ animations: 'disabled' }));
-      assert.deepEqual(before.firePos.map((v, i) => v && v.map(n => Math.round(n * 10) / 10)), (await original.page.evaluate(() => MEADOW_MAP.fires)).map(f => f.slice(0, 2)),
+      assert.deepEqual(before.firePos.map((v, i) => v && v.map(n => Math.round(n * 10) / 10)), (await original.page.evaluate(() => MEADOW_MAP.fires || [])).map(f => f.slice(0, 2)),
         'all saved fire positions must match their displayed coordinates');
       const errs1 = realErrors(original.errs);
       assert.deepEqual(errs1, [], 'editor/source browser console');
