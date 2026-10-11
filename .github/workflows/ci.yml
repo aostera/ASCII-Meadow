@@ -32,6 +32,8 @@ jobs:
         run: node tools/check/syntax.cjs
       - name: Actor catalog contract (types, IDs, behaviors, state and resize)
         run: node tools/check/actors.cjs
+      - name: Interaction registry (range, actions, NPC talk, stale references)
+        run: node tools/check/interactions.cjs
       - name: Validate map import, round-trip integrity and RLE chunks
         run: node tools/check/map-import.cjs
       - name: ESLint (the scripts linted in load order, as one global scope)
@@ -65,6 +67,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Actor catalog in WebGL2 and Canvas 2D (create, render, resize, remove)
         run: node tools/check/actors-browser.cjs
+      - name: E interactions and NPC dialogues in WebGL2 and Canvas 2D
+        run: node tools/check/interactions-browser.cjs
       - name: Road and castle-front fire coordinates (desktop/mobile)
         run: node tools/check/map-placement.cjs
       - name: Editor export/import reproduces entire map and pixels
