@@ -85,7 +85,9 @@ function edMoveCastle(gx, gz) {
   const [px, pz] = castleOff();
   MEADOW_MAP.castle = Math.abs(dx) < 0.5 && Math.abs(dz) < 0.5 ? null : [edR1(dx), edR1(dz)];
   const [nx, nz] = castleOff();
-  if (MEADOW_MAP.fires) for (const f of MEADOW_MAP.fires) if (f[2] > 0) { f[0] = edR1(f[0] + nx - px); f[1] = edR1(f[1] + nz - pz); }   // braziers on its terrace go with it
+  if (MEADOW_MAP.fires) for (const f of MEADOW_MAP.fires) if (f[2] > 0 || castleFrontFire(f[0], f[1], [px, pz])) {
+    f[0] = edR1(f[0] + nx - px); f[1] = edR1(f[1] + nz - pz);
+  }   // terrace braziers and the fires at the castle entrance go with it
   edRebuildCastle(); rebuildMap(); applyObjects({ fires: 1, cows: 1, start: 1 });
 }
 function edChanged() {
@@ -104,7 +106,8 @@ function edUndoRedo(from, to) {
       if (L === fogChunks) fogTouch();
     }
     to.push({ paint: back });
-    for (const k of e.paint.keys()) if (!k.startsWith('f:')) edRepaintChunk(k);
+    const reroute = [...e.paint].some(([k, old]) => !k.startsWith('f:') && (old && old.includes(7) || (paintChunks.get(k) || []).includes(7)));
+    if (reroute) rebuildMap(); else for (const k of e.paint.keys()) if (!k.startsWith('f:')) edRepaintChunk(k);
     edChanged();
   } else if (e.map) {
     to.push({ map: mapSnapshot() });
@@ -195,7 +198,15 @@ function edPick(sx, sy) {   // the frontmost object whose body covers the point
   return best;
 }
 // A fire set on the castle's terrace or stair stands at its height: [x, z, h].
-function edFirePoint(gx, gz) { const [x, y] = mapToCell(gx, gz), h = surfAt(x, y); return isFinite(h) && h > 1 ? [...cellToCastle(x, y).map(edR1), Math.round(h)] : [edR1(gx), edR1(gz)]; }   // on the castle: in its frame
+function edFirePoint(gx, gz) {
+  const [x, y] = mapToCell(gx, gz), h = surfAt(x, y);
+  const [cx, cz] = cellToCastle(x, y), [dx, dz] = castleOff();
+  if (isFinite(h) && h > 1) return [edR1(cx), edR1(cz), Math.round(h)];
+  // Convert a screen point near the castle back into its model frame before saving.
+  // On a phone WS differs from MS, so saving the clicked world point would move the fire.
+  if (castleFrontFire(cx + dx, cz + dz)) return [edR1(cx + dx), edR1(cz + dz)];
+  return [edR1(gx), edR1(gz)];
+}
 // Every object edit: remember the map as it was (generated lists still null), then make the lists explicit.
 function edBeginObjectEdit() { edRecord({ map: mapSnapshot() }); edBake(); }
 function edTallAt(gx, gz) { const [x, y] = mapToCell(gx, gz); return birdTall(Math.round(y + 0.7) * COLS + Math.round(x)); }
@@ -496,7 +507,13 @@ function edPointer(e) {
     return;
   }
   // pointerup / pointercancel
-  if (ED.stroke) { if (ED.stroke.size) edRecord({ paint: ED.stroke }); ED.stroke = null; edChanged(); FG.tick = 0; }
+  if (ED.stroke) {
+    const reroute = !edIsFog(ED.tool) && (ED.tool === 'p' || [...ED.stroke].some(([k, old]) => !k.startsWith('f:') && old && old.includes(7)));
+    if (ED.stroke.size) edRecord({ paint: ED.stroke });
+    ED.stroke = null;
+    if (reroute) rebuildMap(); // new/deleted painted road sections move the automatic connecting gaps
+    edChanged(); FG.tick = 0;
+  }
   if (ED.drag) { if (ED.drag.moved && ED.sel) edMoveSelected(ED.drag.gx, ED.drag.gz); ED.drag = null; }
   ED.pan = null;
 }
