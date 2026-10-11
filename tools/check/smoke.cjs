@@ -175,6 +175,11 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       await page.evaluate(() => rebuildMap());
       const rebuilt = await count();
       console.log('EDITOR map ground vs canonical rebuild:', JSON.stringify({ before: c3, rebuilt, delta: rebuilt.earth - c3.earth }));
+      const compareLive = await page.evaluate(() => ({
+        flora: flora.map(f => [f.mi, f.v.type, variantsOf(f.v.type).indexOf(f.v), +f.x.toFixed(3), f.br]),
+        kindBaseEarth: kindBase.reduce((n, k) => n + (k === 2), 0),
+        paintKeys: Object.keys(savePaint()), trail: MEADOW_MAP.trail, start: MEADOW_MAP.start
+      }));
       check('editor: «Сохранить» downloads the map file', /const MEADOW_MAP = \{/.test(saved) && !/<\/script/i.test(saved), saved.length + ' bytes');
       await shot(page, 'editor');
       // fog: dense fog where it is brushed, none where it is cleared
@@ -265,6 +270,21 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
         await g.step(5);
         const r = await g.page.evaluate(() => { let n = 0; for (let i = 0; i < N; i++) if (kind[i] === 2) n++; return { earth: n, flora: flora.length, cows: cows.map(c => toModelXZ(c.home[0], c.home[1]).map(Math.round)), editor: editing }; });
         const sameCows = r.cows.length === 4 && r.cows.every((p, k) => Math.abs(p[0] - c3.cows[k][0]) <= 1 && Math.abs(p[1] - c3.cows[k][1]) <= 1);
+        if (w === 1100) {
+          const replayState = await g.page.evaluate(() => ({
+            flora: flora.map(f => [f.mi, f.v.type, variantsOf(f.v.type).indexOf(f.v), +f.x.toFixed(3), f.br]),
+            kindBaseEarth: kindBase.reduce((n, k) => n + (k === 2), 0),
+            paintKeys: Object.keys(savePaint()), trail: MEADOW_MAP.trail, start: MEADOW_MAP.start
+          }));
+          const diffs = compareLive.flora.map((f, i) => ({ from: f, to: replayState.flora[i] }))
+            .filter(e => JSON.stringify(e.from) !== JSON.stringify(e.to));
+          console.log('EDITOR/RELOAD comparison:', JSON.stringify({
+            floraPositionDifferences: diffs.length, sample: diffs.slice(0, 12),
+            kindBaseEarth: [compareLive.kindBaseEarth, replayState.kindBaseEarth],
+            paintKeys: [compareLive.paintKeys.length, replayState.paintKeys.length],
+            trail: [compareLive.trail, replayState.trail], start: [compareLive.start, replayState.start]
+          }));
+        }
         if (w === 1100) check('saved map loads back the same', r.earth === c3.earth && r.flora === c3.flora && sameCows && !r.editor, JSON.stringify({ before: c3, after: r, earthDelta: r.earth - c3.earth, floraDelta: r.flora - c3.flora, sameCows }));
         else check('saved map stays put on another screen size', sameCows && r.flora > c3.flora * 0.8, `cows ${JSON.stringify(r.cows)}, flora ${r.flora}`);
         const re2 = realErrors(g.errs); if (re2.length) check('no console errors (saved map)', false, re2.slice(0, 3).join(' | '));
