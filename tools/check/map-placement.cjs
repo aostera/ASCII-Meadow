@@ -32,7 +32,18 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
             const [x, y] = mapToCell(gx, gz), ix = Math.round(x), iy = Math.round(y + 0.7);
             if (ix < 0 || ix >= COLS || iy < 0 || iy >= ROWS) { lost++; continue; }
             const idx = iy * COLS + ix;
-            if (!bmask[idx] && kindBase[idx] !== 7) lost++;
+            if (!bmask[idx] && kindBase[idx] !== 7) {
+              // The ASCII raster's world-space glyph cell is larger than a painted 4-unit
+              // cell on some screens. A paint cell can land between glyph centres;
+              // accept its nearest rendered neighbour rather than losing the entire route.
+              let adjacent = false;
+              for (let dy = -1; dy <= 1 && !adjacent; dy++) for (let dx = -1; dx <= 1; dx++) {
+                const x2 = ix + dx, y2 = iy + dy;
+                if (x2 >= 0 && y2 >= 0 && x2 < COLS && y2 < ROWS &&
+                    kindBase[y2 * COLS + x2] === 7) { adjacent = true; break; }
+              }
+              if (!adjacent) lost++;
+            }
           }
         }
         const endpoints = roadBridges.map(([a, b]) =>
