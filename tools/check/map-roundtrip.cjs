@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { launch, openGame, realErrors } = require('./common.cjs');
 const URL = 'file://' + path.resolve(__dirname, '../../index.html');
-const viewports = [{ width: 960, height: 600 }, { width: 390, height: 844 }];
+const viewports = [{ width: 960, height: 600 }, { width: 390, height: 844 }, { width: 640, height: 400 }];
 
 function hash(bytes) { return crypto.createHash('sha256').update(bytes).digest('hex'); }
 const snapshot = page => page.evaluate(() => {
