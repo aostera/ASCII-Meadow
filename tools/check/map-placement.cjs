@@ -7,7 +7,7 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
   const browser = await launch();
   let first = null;
   try {
-    for (const [w, h] of [[960, 600], [390, 844]]) {
+    for (const [w, h] of [[960, 600], [390, 844], [640, 400]]) {
       const { ctx, page, step, errs } = await openGame(browser, url, { mode: 'gl', viewport: { width: w, height: h } });
       await step(3);
       const actual = await page.evaluate(() => {
