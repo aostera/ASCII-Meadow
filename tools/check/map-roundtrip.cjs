@@ -46,6 +46,36 @@ const snapshot = page => page.evaluate(() => {
       await original.step(5);
       const source = await original.page.evaluate(() => mapFileText());
       const before = await snapshot(original.page);
+      const authored = await original.page.evaluate(() => {
+        const within = (a, b, epsilon) => Math.abs(a - b) <= epsilon;
+        const misplacedFlora = [];
+        for (const f of flora) {
+          const e = MEADOW_MAP.flora[f.mi];
+          if (!e) { misplacedFlora.push({ mi: f.mi, reason: 'unexpected object' }); continue; }
+          const [gx, gz] = toModelXZ(f.x, f.y);
+          // The grass-grid y coordinate is rounded to the nearest cell when placing a tree.
+          const zEpsilon = CH / (2 * SINP * WS) + 0.15;
+          if (e[0] !== f.v.type || e[1] !== variantsOf(f.v.type).indexOf(f.v) ||
+              !within(gx, e[2], 0.15) || !within(gz, e[3], zEpsilon))
+            misplacedFlora.push({ mi: f.mi, want: e, got: [gx, gz] });
+        }
+        const misplacedCows = cows.filter(c => {
+          const [gx, gz] = toModelXZ(c.home[0], c.home[1]), expected = MEADOW_MAP.cows[c.mi];
+          return !expected || !within(gx, expected[0], 0.15) || !within(gz, expected[1], 0.15);
+        }).map(c => c.mi);
+        const badFireKinds = braziers.filter((b, i) => b.cook !== (MEADOW_MAP.fires[i][3] === 'cook')).map(b => b.mi);
+        return { expectedFlora: MEADOW_MAP.flora.length, actualFlora: flora.length,
+          expectedCows: MEADOW_MAP.cows.length, actualCows: cows.length,
+          expectedFires: MEADOW_MAP.fires.length, actualFires: braziers.length,
+          misplacedFlora, misplacedCows, badFireKinds };
+      });
+      assert.equal(before.missingFlora, 0, 'authored flora silently omitted near terrain edges');
+      assert.equal(authored.actualFlora, authored.expectedFlora, 'not all designer plants were rendered');
+      assert.equal(authored.actualCows, authored.expectedCows, 'not all designer cows were rendered');
+      assert.equal(authored.actualFires, authored.expectedFires, 'not all designer fires were rendered');
+      assert.deepEqual(authored.misplacedFlora, [], 'some designer plants shifted or changed variant');
+      assert.deepEqual(authored.misplacedCows, [], 'some cows shifted from the coordinates saved in the editor');
+      assert.deepEqual(authored.badFireKinds, [], 'cooking fires changed type');
       const imgBefore = hash(await original.page.screenshot({ animations: 'disabled' }));
       assert.deepEqual(before.firePos.map((v, i) => v && v.map(n => Math.round(n * 10) / 10)), (await original.page.evaluate(() => MEADOW_MAP.fires)).map(f => f.slice(0, 2)),
         'all saved fire positions must match their displayed coordinates');
