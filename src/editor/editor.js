@@ -3,19 +3,19 @@
 // and is seen at once, with the wind, shadows and fog. «Сохранить» downloads src/data/map.js for the repository.
 
 const ED = {
-  tool: 'g', size: 6, variant: { tree: 0, dead: 0, bush: 0, stone: 2, tent: 0, fence: 0, fire: 0 },
+  tool: 'g', size: 6, variant: { tree: 0, dead: 0, bush: 0, stone: 2, tent: 0, fence: 0, fire: 0, npc: 0 },
   sel: null, hover: null, drag: null, pan: null, stroke: null, space: false,
   undo: [], redo: [], keys: new Set(), mx: -1, my: -1, inView: false,
   ui: null, mini: null, miniKey: '', draftTimer: 0,
 };
 const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['w', 'Вода', '9'], ['m', 'Болото', 'P'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
-const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['stone', 'Камень', 'Z'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['tent', 'Палатка', 'Y'], ['fence', 'Забор', 'I'], ['toad', 'Жаба', 'G'], ['frog', 'Лягушка', 'X'], ['birds', 'Птицы в траве', 'O'], ['castle', 'Замок', 'L'], ['select', 'Выбрать и двигать', 'V']];
+const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['stone', 'Камень', 'Z'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['tent', 'Палатка', 'Y'], ['fence', 'Забор', 'I'], ['toad', 'Жаба', 'G'], ['frog', 'Лягушка', 'X'], ['birds', 'Птицы в траве', 'O'], ['castle', 'Замок', 'L'], ['npc', 'NPC', 'N'], ['select', 'Выбрать и двигать', 'V']];
 const ED_FOG = [['fogl', 'Лёгкий туман', 'H'], ['fogd', 'Густой туман', 'J'], ['fogc', 'Убрать туман', 'N']];
 const ED_FOGCODE = { fogl: 2, fogd: 3, fogc: 1 };
 const ED_DRAFT = 'ascii-meadow-map-draft';
 const edIsBrush = tool => tool.length === 1 && PCODES.includes(tool);
 const edIsFog = tool => tool in ED_FOGCODE;
-const edVariants = type => type === 'fire' ? 2 : variantsOf(type).length;   // a fire: plain, or cooking
+const edVariants = type => type === 'npc' ? ACTOR_TYPES.size : type === 'fire' ? 2 : variantsOf(type).length;   // a fire: plain, or cooking
 const edR1 = v => Math.round(v * 10) / 10;
 const edXZ = (x, y) => toModelXZ(x, y).map(edR1);
 
@@ -30,8 +30,8 @@ function mapFileText() {
     '// null: generated as before (trail false: no generated trail). fires: [x, z] on the ground, [x, z, h] raised h units.\n' +
     '// paint: brush strokes over the generated ground, run-length coded per 32×32 chunk; fog: the same for fog\n' +
     '// (c clear, l light, d dense; 16-unit cells).\n' +
-    'const MEADOW_MAP = {\n  "v": 1, "res": ' + PAINT_RES + ',\n  "castle": ' + JSON.stringify(m.castle || null) + ',\n  "start": ' + JSON.stringify(m.start) + ',\n  "fires": ' + rows(m.fires) +
-    ',\n  "trail": ' + JSON.stringify(m.trail === false ? false : null) + ',\n  "cows": ' + rows(m.cows) + ',\n  "toads": ' + rows(m.toads || null) + ',\n  "events": ' + rows(m.events || null) + ',\n  "flora": ' + rows(m.flora) + ',\n  "paint": ' +
+    'const MEADOW_MAP = {\n  "v": ' + (m.actors ? 2 : 1) + ', "res": ' + PAINT_RES + ',\n  "castle": ' + JSON.stringify(m.castle || null) + ',\n  "start": ' + JSON.stringify(m.start) + ',\n  "fires": ' + rows(m.fires) +
+    ',\n  "trail": ' + JSON.stringify(m.trail === false ? false : null) + ',\n  "cows": ' + rows(m.cows) + ',\n  "toads": ' + rows(m.toads || null) + ',\n  "events": ' + rows(m.events || null) + ',\n  "flora": ' + rows(m.flora) + (m.actors ? ',\n  "actors": ' + rows(m.actors) : '') + ',\n  "paint": ' +
     (keys.length ? '{\n' + keys.map(k => '    ' + JSON.stringify(k) + ': ' + JSON.stringify(paint[k])).join(',\n') + '\n  }' : '{}') + ',\n  "fog": ' +
     (fkeys.length ? '{\n' + fkeys.map(k => '    ' + JSON.stringify(k) + ': ' + JSON.stringify(fog[k])).join(',\n') + '\n  }' : '{}') + '\n};\n';
   return text.replace(/<\/script/gi, '<\\/script');   // the single-file bundle inlines it in a <script>
@@ -39,10 +39,19 @@ function mapFileText() {
 function parseMapText(text) {
   const a = text.indexOf('{', Math.max(0, text.indexOf('MEADOW_MAP'))), b = text.lastIndexOf('}');
   const m = JSON.parse(text.slice(a, b + 1));
-  if (typeof m !== 'object' || !m || m.v !== 1) throw new Error('not a map file');
+  if (typeof m !== 'object' || !m || (m.v !== 1 && m.v !== 2)) throw new Error('not a map file');
+  if (m.v === 2) {
+    if (!Array.isArray(m.actors)) throw new Error('v2 map requires actors array');
+    const ids = new Set();
+    for (const [id, type, x, z] of m.actors) {
+      if (typeof id !== 'string' || ids.has(id) || !ACTOR_TYPES.has(type) || !Number.isFinite(x) || !Number.isFinite(z))
+        throw new Error('invalid map actor: ' + id);
+      ids.add(id);
+    }
+  } else if (m.actors !== undefined) throw new Error('v1 map cannot contain actors');
   return m;
 }
-const mapSnapshot = () => JSON.parse(JSON.stringify({ castle: MEADOW_MAP.castle || null, start: MEADOW_MAP.start, trail: MEADOW_MAP.trail === false ? false : null, fires: MEADOW_MAP.fires, cows: MEADOW_MAP.cows, toads: MEADOW_MAP.toads || null, events: MEADOW_MAP.events || null, flora: MEADOW_MAP.flora, paint: savePaint(), fog: saveFog() }));   // a copy: edits must not reach it
+const mapSnapshot = () => JSON.parse(JSON.stringify({ v: MEADOW_MAP.v || 1, actors: MEADOW_MAP.actors || null, castle: MEADOW_MAP.castle || null, start: MEADOW_MAP.start, trail: MEADOW_MAP.trail === false ? false : null, fires: MEADOW_MAP.fires, cows: MEADOW_MAP.cows, toads: MEADOW_MAP.toads || null, events: MEADOW_MAP.events || null, flora: MEADOW_MAP.flora, paint: savePaint(), fog: saveFog() }));   // a copy: edits must not reach it
 
 // ---------- applying changes ----------
 // Generated objects become map objects the first time one is moved, added or deleted.
@@ -62,16 +71,17 @@ function applyObjects(which) {
   if (which.start && MEADOW_MAP.start) { [player.x, player.y] = mapToCell(MEADOW_MAP.start[0], MEADOW_MAP.start[1]); const h = surfAt(player.x, player.y); player.hT = player.h = isFinite(h) ? h : 0; }
   if (which.cows) placeCows();
   if (which.toads) resetMapToads();
+  if (which.actors) syncMapActors();
   if (which.events) resetBirds();
   edChanged();
 }
 function applyWholeMap(src) {
   const m = JSON.parse(JSON.stringify(src));   // undo entries and drafts stay as they were
   if (JSON.stringify(m.castle || null) !== JSON.stringify(MEADOW_MAP.castle || null)) { MEADOW_MAP.castle = m.castle || null; edRebuildCastle(); }
-  Object.assign(MEADOW_MAP, { start: m.start || null, trail: m.trail === false ? false : null, fires: m.fires || null, cows: m.cows || null, toads: m.toads || null, events: m.events || null, flora: m.flora || null });
+  Object.assign(MEADOW_MAP, { v: m.v === 2 ? 2 : 1, actors: m.v === 2 ? (m.actors || []) : null, start: m.start || null, trail: m.trail === false ? false : null, fires: m.fires || null, cows: m.cows || null, toads: m.toads || null, events: m.events || null, flora: m.flora || null });
   loadPaint(m.paint); loadFog(m.fog); rebuildMap();
   if (!MEADOW_MAP.start) { const sy = ROWS - VR * 0.3; player.y = sy; player.x = pathX(sy) - 3; }   // the generated herd stands by the start
-  applyObjects({ fires: 1, start: 1, cows: 1, toads: 1, events: 1 });
+  applyObjects({ fires: 1, start: 1, cows: 1, toads: 1, events: 1, actors: 1 });
 }
 // The castle again, where the map puts it: its rays, footprint and shade, the fires at its gate, the fog
 // banks round its mound; the ground and the trees are re-laid over it by rebuildMap.
@@ -189,6 +199,10 @@ function edObjects() {
   braziers.forEach((b, k) => { const [sx, sy] = edScreen(b.x, b.y); out.push({ kind: 'fires', mi: b.mi ?? k, sx, sy: sy - b.lift * z, r: Math.max(8, 3 * CW * z), top: 4 * CH * z }); });
   (MEADOW_MAP.events || []).forEach(([, gx, gz], mi) => { const [x, y] = mapToCell(gx, gz), [sx, sy] = edScreen(x, y); out.push({ kind: 'events', mi, sx, sy, r: Math.max(8, 3 * CW * z), top: CH * 2 * z, area: BIRD_R * CW * z }); });
   (MEADOW_MAP.toads || []).forEach(([gx, gz], mi) => { const [x, y] = mapToCell(gx, gz), [sx, sy] = edScreen(x, y); out.push({ kind: 'toads', mi, sx, sy, r: Math.max(7, 2.5 * CW * z), top: CH * 2 * z }); });
+  for (const a of npcs) if (a.fromMap) {
+    const [sx, sy] = edScreen(a.x, a.y);
+    out.push({ kind: 'actors', mi: a.mi, sx, sy, r: Math.max(9, CW * 3 * z), top: knightPx() * 0.55 * z });
+  }
   const st = MEADOW_MAP.start ? mapToCell(MEADOW_MAP.start[0], MEADOW_MAP.start[1]) : [pathX(ROWS - VR * 0.3) - 3, ROWS - VR * 0.3], [sx, sy] = edScreen(st[0], st[1]);
   out.push({ kind: 'start', mi: 0, sx, sy, r: Math.max(8, 3 * CW * z), top: knightPx() * 0.9 * z });
   return out;
@@ -220,6 +234,17 @@ function edPlace(tool, gx, gz) {
   if (tool === 'birds') { (MEADOW_MAP.events = MEADOW_MAP.events || []).push(['birds', edR1(gx), edR1(gz)]); applyObjects({ events: 1 }); ED.sel = { kind: 'events', mi: MEADOW_MAP.events.length - 1 }; edStatus('Птицы вылетят, когда рыцарь зайдёт в эту траву.'); return; }
   const p = [edR1(gx), edR1(gz)];
   if (tool === 'start') { MEADOW_MAP.start = p; applyObjects({ start: 1 }); ED.sel = { kind: 'start', mi: 0 }; return; }
+  if (tool === 'npc') {
+    const types = [...ACTOR_TYPES.keys()], type = types[ED.variant.npc % types.length];
+    if (!type) { edStatus('Нет зарегистрированных типов NPC.'); return; }
+    if (!MEADOW_MAP.actors) MEADOW_MAP.actors = [];
+    MEADOW_MAP.v = 2;
+    const ids = new Set([...MEADOW_MAP.actors.map(e => e[0]), ...npcs.map(n => n.actorId)]);
+    let number = 1, id = type + '-' + number;
+    while (ids.has(id)) id = type + '-' + (++number);
+    MEADOW_MAP.actors.push([id, type, ...p]);
+    applyObjects({ actors: 1 }); ED.sel = { kind: 'actors', mi: MEADOW_MAP.actors.length - 1 }; return;
+  }
   if (tool === 'cow') { MEADOW_MAP.cows.push(p); applyObjects({ cows: 1 }); ED.sel = { kind: 'cows', mi: MEADOW_MAP.cows.length - 1 }; return; }
   if (tool === 'toad' || tool === 'frog') { (MEADOW_MAP.toads = MEADOW_MAP.toads || []).push(tool === 'frog' ? [...p, 'frog'] : p); applyObjects({ toads: 1 }); ED.sel = { kind: 'toads', mi: MEADOW_MAP.toads.length - 1 }; return; }
   if (tool === 'fire') { const fp = edFirePoint(gx, gz); MEADOW_MAP.fires.push(ED.variant.fire === 1 && fp.length === 2 ? [...fp, 0, 'cook'] : fp); applyObjects({ fires: 1 }); ED.sel = { kind: 'fires', mi: MEADOW_MAP.fires.length - 1 }; return; }
@@ -233,6 +258,7 @@ function edMoveSelected(gx, gz) {
   if (s.kind === 'start') MEADOW_MAP.start = p;
   else if (s.kind === 'flora') { const e = MEADOW_MAP.flora[s.mi]; e[2] = p[0]; e[3] = p[1]; }
   else if (s.kind === 'events') { const e = MEADOW_MAP.events[s.mi]; e[1] = p[0]; e[2] = p[1]; }
+  else if (s.kind === 'actors') { const e = MEADOW_MAP.actors[s.mi]; e[2] = p[0]; e[3] = p[1]; }
   else if (s.kind === 'toads') { const e = MEADOW_MAP.toads[s.mi]; e[0] = p[0]; e[1] = p[1]; }
   else if (s.kind === 'fires') { const old = MEADOW_MAP.fires[s.mi], fp = edFirePoint(gx, gz); MEADOW_MAP.fires[s.mi] = old[3] === 'cook' && fp.length === 2 ? [...fp, 0, 'cook'] : fp; }   // a cooking fire stays one
   else MEADOW_MAP[s.kind][s.mi] = p;
@@ -247,6 +273,14 @@ function edDeleteSelected() {
 }
 function edStepVariant(d) {
   const s = ED.sel;
+  if (s && s.kind === 'actors') {
+    const types = [...ACTOR_TYPES.keys()];
+    if (!types.length) return;
+    edBeginObjectEdit();
+    const e = MEADOW_MAP.actors[s.mi], i = types.indexOf(e[1]);
+    e[1] = types[(i + d + types.length) % types.length];
+    ED.variant.npc = types.indexOf(e[1]); applyObjects({ actors: 1 }); edSyncUI(); return;
+  }
   if (s && s.kind === 'flora') {
     edBeginObjectEdit();
     const e = MEADOW_MAP.flora[s.mi], n = edVariants(e[0]);
@@ -309,7 +343,7 @@ function drawEditor() {
     if (on || hov) g.strokeRect(o.sx - o.r, o.sy - o.top, o.r * 2, o.top + CH * 1.5 * VZ);
     g.beginPath(); g.ellipse(o.sx, o.sy, Math.min(o.r, 8), Math.min(o.r, 8) * 0.45, 0, 0, Math.PI * 2); g.stroke();
     if (o.area) { g.setLineDash([2, 4]); g.beginPath(); g.ellipse(o.sx, o.sy, o.area, o.area * 0.5 * CH / CW, 0, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); }   // where the knight sets them off
-    const label = o.kind === 'start' ? 'старт' : o.kind === 'fires' ? (MEADOW_MAP.fires && MEADOW_MAP.fires[o.mi] && MEADOW_MAP.fires[o.mi][3] === 'cook' ? 'костёр с котлом' : 'костёр') : o.kind === 'cows' ? 'корова' : o.kind === 'toads' ? (MEADOW_MAP.toads[o.mi][2] === 'frog' ? 'лягушка' : 'жаба') : o.kind === 'events' ? 'птицы' : on || hov ? ({ tree: 'дерево ', dead: 'сухое ', bush: 'куст ', stone: 'камень ', tent: 'палатка ', fence: 'забор ' }[o.f.v.type] || '') + (variantsOf(o.f.v.type).indexOf(o.f.v) + 1) : '';
+    const label = o.kind === 'start' ? 'старт' : o.kind === 'fires' ? (MEADOW_MAP.fires && MEADOW_MAP.fires[o.mi] && MEADOW_MAP.fires[o.mi][3] === 'cook' ? 'костёр с котлом' : 'костёр') : o.kind === 'cows' ? 'корова' : o.kind === 'toads' ? (MEADOW_MAP.toads[o.mi][2] === 'frog' ? 'лягушка' : 'жаба') : o.kind === 'events' ? 'птицы' : o.kind === 'actors' ? (MEADOW_MAP.actors?.[o.mi]?.[1] || 'NPC') : on || hov ? ({ tree: 'дерево ', dead: 'сухое ', bush: 'куст ', stone: 'камень ', tent: 'палатка ', fence: 'забор ' }[o.f.v.type] || '') + (variantsOf(o.f.v.type).indexOf(o.f.v) + 1) : '';
     if (label) { g.fillStyle = on ? 'rgba(255,214,120,.95)' : 'rgba(250,250,250,.7)'; g.fillText(label, o.sx + 6, o.sy - 4); }
   }
   if (ED.drag && ED.drag.moved) {   // where the dragged object will land
@@ -364,6 +398,7 @@ function edDrawMini() {
   g.drawImage(ED.miniImg, 0, 0);
   g.fillStyle = '#f2efe6'; for (const cw of cows) g.fillRect(cw.x * sx - 1.5, cw.y * sy - 1.5, 3, 3);
   g.fillStyle = '#e0803a'; for (const b of braziers) g.fillRect(b.x * sx - 1.5, b.y * sy - 1.5, 3, 3);
+  g.fillStyle = '#b3b3b3'; for (const npc of npcs) if (npc.fromMap) g.fillRect(npc.x * sx - 1.5, npc.y * sy - 1.5, 3, 3);
   g.fillStyle = '#d04b3c'; g.beginPath(); g.arc(player.x * sx, player.y * sy, 2.5, 0, Math.PI * 2); g.fill();
   g.strokeStyle = 'rgba(250,250,250,.9)'; g.lineWidth = 1; g.strokeRect(camX * sx + 0.5, camY * sy + 0.5, VC / VZ * sx, VR / VZ * sy);
 }
@@ -385,9 +420,14 @@ function edSyncUI() {
   if (!ED.ui) return;
   for (const b of ED.ui.root.querySelectorAll('[data-tool]')) b.classList.toggle('on', b.dataset.tool === ED.tool);
   ED.ui.size.value = ED.size; ED.ui.sizeOut.textContent = ED.size; ED.ui.trail.checked = trailOn();
-  const fe = ED.sel && ED.sel.kind === 'flora' ? edFloraEntry(ED.sel.mi) : null, vt = fe ? fe[0] : ED.variant[ED.tool] !== undefined ? ED.tool : null;
+  const fe = ED.sel && ED.sel.kind === 'flora' ? edFloraEntry(ED.sel.mi) : null;
+  const selectedActor = ED.sel && ED.sel.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi] : null;
+  const vt = selectedActor ? 'npc' : fe ? fe[0] : ED.variant[ED.tool] !== undefined ? ED.tool : null;
   ED.ui.variant.hidden = !vt;
-  if (vt) ED.ui.variantOut.textContent = (fe ? fe[1] : ED.variant[vt]) + 1 + ' из ' + edVariants(vt);
+  if (vt === 'npc') {
+    const types = [...ACTOR_TYPES.keys()], selected = selectedActor ? types.indexOf(selectedActor[1]) : ED.variant.npc;
+    ED.ui.variantOut.textContent = (selected + 1) + ' из ' + types.length + (types[selected] ? ' · ' + ACTOR_TYPES.get(types[selected]).name : '');
+  } else if (vt) ED.ui.variantOut.textContent = (fe ? fe[1] : ED.variant[vt]) + 1 + ' из ' + edVariants(vt);
   ED.ui.undo.disabled = !ED.undo.length; ED.ui.redo.disabled = !ED.redo.length;
   ED.ui.zoomPct.firstChild.textContent = Math.round(VZ * 100) + '%'; ED.ui.zoomOut.disabled = VZ <= ED_ZOOMS[0]; ED.ui.zoomIn.disabled = VZ >= ED_ZOOMS[ED_ZOOMS.length - 1];
 }

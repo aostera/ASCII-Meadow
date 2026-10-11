@@ -111,6 +111,22 @@ function updateRegisteredNpc(n, dt) {
   }
 }
 
+// Only map-authored NPCs are recreated when the editor loads a new map.
+// Programmatically spawned NPCs remain independent (not accidentally erased).
+function syncMapActors() {
+  for (const n of [...npcs]) if (n.fromMap) despawnActor(n.actorId);
+  const rows = MEADOW_MAP.actors;
+  if (!rows) return; // v1 map: no actors; original game is unchanged
+  rows.forEach(([id, type, x, z], mi) => {
+    const actor = spawnActor(type, { id, world: [x, z] });
+    actor.fromMap = true; actor.mi = mi;
+    // The game simulates 50 warm-up frames before the first visible frame.
+    // Keep map-authored NPCs at their EXACT edited spawn position during that
+    // warm-up; wandering begins only after the scene is visible.
+    actor.wait = 3; actor.aiState = 'idle';
+  });
+}
+
 // Sample archetype; it is deliberately NOT spawned in the shipped world.
 // A designer can register additional types and call spawnActor(type, { world: [x,z] }).
 registerActorType('villager', {

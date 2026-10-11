@@ -15,6 +15,7 @@ function placeEntities() {
   [player.x, player.y] = dryNear(player.x, player.y);
   player.dir = 'up'; player.d8 = 4;
   placeCows();
+  syncMapActors(); // v2 maps only; the original v1 map keeps its empty NPC list
   updateCamera(0, true);
 }
 // The nearest point out of water, marsh and the castle's walls: a stroke or the moved castle may cover the start.
@@ -78,6 +79,9 @@ function drawTag(e, gx, gy) {
 // Other walkers (none at the moment): wander, stop to talk when the knight comes close.
 function updateNpcs(dt) {
   for (const n of npcs) {
+    // Authored NPCs are placement markers while the editor is open: do not let
+    // their wander AI move them away from the precise saved map coordinates.
+    if (editing && n.fromMap) { n.moving = false; continue; }
     // Catalog actors use the extensible behavior contract. Legacy entities
     // retain exactly their old update path until explicitly migrated.
     if (n.actorType) { updateRegisteredNpc(n, dt); continue; }
