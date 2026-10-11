@@ -398,6 +398,7 @@ function edDrawMini() {
   g.drawImage(ED.miniImg, 0, 0);
   g.fillStyle = '#f2efe6'; for (const cw of cows) g.fillRect(cw.x * sx - 1.5, cw.y * sy - 1.5, 3, 3);
   g.fillStyle = '#e0803a'; for (const b of braziers) g.fillRect(b.x * sx - 1.5, b.y * sy - 1.5, 3, 3);
+  g.fillStyle = '#b3b3b3'; for (const npc of npcs) if (npc.fromMap) g.fillRect(npc.x * sx - 1.5, npc.y * sy - 1.5, 3, 3);
   g.fillStyle = '#d04b3c'; g.beginPath(); g.arc(player.x * sx, player.y * sy, 2.5, 0, Math.PI * 2); g.fill();
   g.strokeStyle = 'rgba(250,250,250,.9)'; g.lineWidth = 1; g.strokeRect(camX * sx + 0.5, camY * sy + 0.5, VC / VZ * sx, VR / VZ * sy);
 }
@@ -419,9 +420,14 @@ function edSyncUI() {
   if (!ED.ui) return;
   for (const b of ED.ui.root.querySelectorAll('[data-tool]')) b.classList.toggle('on', b.dataset.tool === ED.tool);
   ED.ui.size.value = ED.size; ED.ui.sizeOut.textContent = ED.size; ED.ui.trail.checked = trailOn();
-  const fe = ED.sel && ED.sel.kind === 'flora' ? edFloraEntry(ED.sel.mi) : null, vt = fe ? fe[0] : ED.variant[ED.tool] !== undefined ? ED.tool : null;
+  const fe = ED.sel && ED.sel.kind === 'flora' ? edFloraEntry(ED.sel.mi) : null;
+  const selectedActor = ED.sel && ED.sel.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi] : null;
+  const vt = selectedActor ? 'npc' : fe ? fe[0] : ED.variant[ED.tool] !== undefined ? ED.tool : null;
   ED.ui.variant.hidden = !vt;
-  if (vt) ED.ui.variantOut.textContent = (fe ? fe[1] : ED.variant[vt]) + 1 + ' из ' + edVariants(vt);
+  if (vt === 'npc') {
+    const types = [...ACTOR_TYPES.keys()], selected = selectedActor ? types.indexOf(selectedActor[1]) : ED.variant.npc;
+    ED.ui.variantOut.textContent = (selected + 1) + ' из ' + types.length + (types[selected] ? ' · ' + ACTOR_TYPES.get(types[selected]).name : '');
+  } else if (vt) ED.ui.variantOut.textContent = (fe ? fe[1] : ED.variant[vt]) + 1 + ' из ' + edVariants(vt);
   ED.ui.undo.disabled = !ED.undo.length; ED.ui.redo.disabled = !ED.redo.length;
   ED.ui.zoomPct.firstChild.textContent = Math.round(VZ * 100) + '%'; ED.ui.zoomOut.disabled = VZ <= ED_ZOOMS[0]; ED.ui.zoomIn.disabled = VZ >= ED_ZOOMS[ED_ZOOMS.length - 1];
 }
