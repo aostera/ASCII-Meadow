@@ -66,12 +66,12 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
         const seen = new Set(), phases = new Set();
         const rec = () => page.evaluate(() => cows.map(c => [c.state, c.gp || '', c.d8]));
         await page.evaluate(() => { window.__noGPU = true; });
-        for (let k = 0; k < 60; k++) { await step(25); for (const [st, gp] of await rec()) { seen.add(st); if (st === 'graze') phases.add(gp); } }
+        for (let k = 0; k < 200 && !(['idle', 'walk', 'graze'].every(s => seen.has(s)) && ['down', 'loop', 'up'].every(s => phases.has(s))); k++) { await step(25); for (const [st, gp] of await rec()) { seen.add(st); if (st === 'graze') phases.add(gp); } }   // until every calm state has shown (a cow may stand a long while before it strolls)
         // run at the nearest calm cow until the herd has bolted (and, with luck, hopped); from beside the
         // herd, so tents and fences on the way (the start is in the camp) don't stand in for the cows' reaction
         await page.evaluate(() => {
           const c = cows.reduce((a, k) => Math.hypot(k.x - player.x, k.y - player.y) < Math.hypot(a.x - player.x, a.y - player.y) ? k : a);
-          const clear = (x, y) => { for (let t = 0; t <= 1; t += 0.02) if (blocked(x + (c.x - x) * t * 0.8, y + (c.y - y) * t * 0.8, player)) return false; return true; };   // a straight run up to it
+          const clear = (x, y) => { for (let t = 0; t <= 1; t += 0.02) if (blocked(x + (c.x - x) * t * 0.6, y + (c.y - y) * t * 0.6, null)) return false; return true; };   // a straight run up to it (the cows themselves aside)
           for (const d of [30, 25, 35, 20, 40, 45]) for (const sd of [-1, 1]) if (clear(c.x + sd * d, c.y)) { player.x = c.x + sd * d; player.y = c.y; updateCamera(0, true); return; }
         });
         const toward = () => page.evaluate(() => {
