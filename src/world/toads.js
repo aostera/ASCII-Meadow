@@ -33,7 +33,7 @@ function toadRnd(td) { td.s = (td.s * 1103515245 + 12345) >>> 0; return (td.s >>
 
 // ---------- pictures: sitting, croaking, mid-leap; seen from the side, facing right (mirrored to the left) ----------
 // Built from their parts as they are: a toad squat and heavy, broad round snout, short legs, a warty dry
-// back, the two swollen glands behind its eyes, eyes on top with a copper iris and a level pupil, a pale
+// back, the two swollen glands behind its eyes, eyes on top with a bright iris and a level pupil, a pale
 // belly, the throat puffing as it calls. A frog slim and smooth, a pointed snout, the eardrum behind the
 // eye, pale ridges down its back, dark spots, its long hind leg folded in a zigzag, sacs at the mouth.
 const CRF = {};   // kind → frames, rebuilt with the atlas
@@ -72,7 +72,7 @@ function creatureFrames(kind) {
       // light from the upper left and a little in front, as on everything else
       const nz = Math.sqrt(Math.max(0, 1 - Math.min(1, u * u + w * w))), lam = Math.max(0, -0.35 * u + 0.75 * w + 0.55 * nz);
       let v = (frog ? 0.4 : 0.36) + lam * 0.45, c = null, b = blk, a = 1;
-      if (part === 'eye') { v = u * u + w * w > 0.75 ? 0.3 : 0.95; c = '@'; }   // a dark rim round the bright iris                                         // copper (toad) or yellowish (frog), wet
+      if (part === 'eye') { v = u * u + w * w > 0.75 ? 0.3 : 0.95; c = '@'; }   // a dark rim round the bright iris, wet
       else if (part === 'pupil') { v = 0; c = '-'; b = 0; a = 1; }
       else if (part === 'sac') { v = 0.6 + 0.1 * nz; c = '@'; b = 0; }
       else if (part === 'drum') { v = 0.22; c = '%'; }
@@ -85,7 +85,7 @@ function creatureFrames(kind) {
           if (w > 0.55 && w < 0.78 && part === 'body') v += 0.16;                            // the ridge along its back
           if (vnoise(X * 0.35 + 3, Y * 0.35) > 0.64) v -= 0.12;                              // dark spots
           if (lam > 0.8) { c = '*'; v += 0.1; }                                              // a wet sheen
-        } else if (hash(cx * 7 + 3, cy * 5 + 1) > 0.74 && w > -0.3) { c = '*'; v = Math.min(0.62, v + 0.12); }  // warts (never the eye's copper)
+        } else if (hash(cx * 7 + 3, cy * 5 + 1) > 0.74 && w > -0.3) { c = '*'; v = Math.min(0.62, v + 0.12); }  // warts (never as bright as the eye)
         else if (vnoise(X * 0.4 + 7, Y * 0.4) > 0.66) v -= 0.08;                             // mottling
       }
       // the outline: a little darker where the shape turns away
