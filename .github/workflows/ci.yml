@@ -69,6 +69,8 @@ jobs:
         run: node tools/check/map-placement.cjs
       - name: Editor export/import reproduces entire map and pixels
         run: node tools/check/map-roundtrip.cjs
+      - name: NPC v2 map placement, editing, version migration and lossless reload
+        run: node tools/check/map-npcs.cjs
       - name: Smoke test from file://
         run: node tools/check/smoke.cjs "file://$GITHUB_WORKSPACE/index.html" --out shots/file
       - name: Smoke test over HTTP from a sub-folder, /ASCII-Meadow/ (relative paths only)
