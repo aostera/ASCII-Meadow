@@ -30,6 +30,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Syntax of every script
         run: node tools/check/syntax.cjs
+      - name: Validate map import, round-trip integrity and RLE chunks
+        run: node tools/check/map-import.cjs
       - name: ESLint (the scripts linted in load order, as one global scope)
         run: node tools/check/lint.cjs --warnings
       - name: Page resources (exist, relative, all loaded, no inline code)
