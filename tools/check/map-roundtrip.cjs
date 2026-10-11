@@ -63,7 +63,7 @@ const snapshot = page => page.evaluate(() => {
           const [gx, gz] = toModelXZ(c.home[0], c.home[1]), expected = MEADOW_MAP.cows[c.mi];
           return !expected || !within(gx, expected[0], 0.15) || !within(gz, expected[1], 0.15);
         }).map(c => c.mi);
-        const badFireKinds = braziers.filter((b, i) => b.cook !== (MEADOW_MAP.fires[i][3] === 'cook')).map(b => b.mi);
+        const badFireKinds = braziers.filter((fire, i) => !!fire.cook !== (MEADOW_MAP.fires[i][3] === 'cook')).map(fire => fire.mi);
         return { expectedFlora: MEADOW_MAP.flora.length, actualFlora: flora.length,
           expectedCows: MEADOW_MAP.cows.length, actualCows: cows.length,
           expectedFires: MEADOW_MAP.fires.length, actualFires: braziers.length,
