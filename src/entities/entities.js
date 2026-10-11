@@ -79,6 +79,9 @@ function drawTag(e, gx, gy) {
 // Other walkers (none at the moment): wander, stop to talk when the knight comes close.
 function updateNpcs(dt) {
   for (const n of npcs) {
+    // Authored NPCs are placement markers while the editor is open: do not let
+    // their wander AI move them away from the precise saved map coordinates.
+    if (editing && n.fromMap) { n.moving = false; continue; }
     // Catalog actors use the extensible behavior contract. Legacy entities
     // retain exactly their old update path until explicitly migrated.
     if (n.actorType) { updateRegisteredNpc(n, dt); continue; }
