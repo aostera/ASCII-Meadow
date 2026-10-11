@@ -9,11 +9,60 @@ function pathX(row) {
   const sw = sm(d);
   return COLS * 0.5 + (Math.sin(row * 0.019 + 1.3) * 0.26 + Math.sin(row * 0.047) * 0.09) * VC * sw;
 }
+// The editor paints the trail in world coordinates, while the old automatic path meandered
+// in screen-grid coordinates. Showing both made duplicate roads and a wandering approach to
+// the castle, especially after resizing. Keep the painter's trail verbatim and automatically
+// join only the *unpainted gaps* between consecutive painted sections.
+let authoredRoad = false, roadBridges = [];
+function rebuildRoadBridges() {
+  const rows = new Map();
+  for (const [key, a] of paintChunks) {
+    const [bx, bz] = key.split(',').map(Number);
+    for (let i = 0; i < a.length; i++) if (a[i] === 7) {
+      const z = bz * PCH + (i >> 5), x = bx * PCH + (i & 31);
+      const e = rows.get(z);
+      if (!e) rows.set(z, [x, x]); else { e[0] = Math.min(e[0], x); e[1] = Math.max(e[1], x); }
+    }
+  }
+  authoredRoad = rows.size > 0; roadBridges = [];
+  if (!authoredRoad) return;
+  const zs = [...rows.keys()].sort((a, b) => a - b), sections = [];
+  let lo = zs[0], hi = lo;
+  for (let i = 1; i < zs.length; i++) {
+    if (zs[i] === hi + 1) { hi = zs[i]; continue; }
+    sections.push([lo, hi]); lo = hi = zs[i];
+  }
+  sections.push([lo, hi]);
+  const edge = z => {
+    const e = rows.get(z);
+    return { z: (z + 0.5) * PAINT_RES, x: (e[0] + e[1] + 1) * PAINT_RES * 0.5, width: Math.max(8, Math.min(20, (e[1] - e[0] + 1) * PAINT_RES * 0.5)) };
+  };
+  for (let i = 1; i < sections.length; i++) {
+    const from = edge(sections[i - 1][1]), to = edge(sections[i][0]);
+    // Do not connect independent faraway roads across the whole world.
+    if (to.z - from.z > PAINT_RES && to.z - from.z <= 900) roadBridges.push([from, to]);
+  }
+}
+function guidedRoadAt(row) {
+  if (!authoredRoad || !trailOn()) return null;
+  const z = -((row + 0.7) * CH - cathedral.oy) / (SINP * WS);
+  for (const [a, b] of roadBridges) {
+    if (z <= a.z || z >= b.z) continue;
+    const t = (z - a.z) / (b.z - a.z), smooth = t * t * (3 - 2 * t);
+    const gx = a.x + (b.x - a.x) * smooth, width = a.width + (b.width - a.width) * smooth;
+    return [(cathedral.ox + gx * WS) / CW, width * WS / CW];
+  }
+  return null;
+}
 function carvePath() {
-  if (!trailOn()) return;   // world/map.js: the map can do without the generated trail
+  rebuildRoadBridges();
+  if (!trailOn()) return;   // false: only the exact hand-painted road
   const g = Math.floor(cathedral.trailRow || ROWS * 0.45);
-  for (let y = g; y < ROWS; y++) {
-    const cx = pathX(y), hw = pathHalfWidth(y, g);
+  for (let y = 0; y < ROWS; y++) {
+    const guide = guidedRoadAt(y);
+    if (authoredRoad && !guide) continue; // no second automatic road over the designer's paint
+    if (!authoredRoad && y < g) continue;
+    const cx = guide ? guide[0] : pathX(y), hw = guide ? guide[1] : pathHalfWidth(y, g);
     for (let x = Math.max(0, Math.floor(cx - hw - 4)); x <= Math.min(COLS - 1, Math.ceil(cx + hw + 4)); x++) carveCell(x, y, cx, hw);
   }
 }
