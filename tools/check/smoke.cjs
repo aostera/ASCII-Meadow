@@ -262,7 +262,7 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
         await g.step(5);
         const r = await g.page.evaluate(() => { let n = 0; for (let i = 0; i < N; i++) if (kind[i] === 2) n++; return { earth: n, flora: flora.length, cows: cows.map(c => toModelXZ(c.home[0], c.home[1]).map(Math.round)), editor: editing }; });
         const sameCows = r.cows.length === 4 && r.cows.every((p, k) => Math.abs(p[0] - c3.cows[k][0]) <= 1 && Math.abs(p[1] - c3.cows[k][1]) <= 1);
-        if (w === 1100) check('saved map loads back the same', r.earth === c3.earth && r.flora === c3.flora && sameCows && !r.editor, JSON.stringify({ earth: r.earth, flora: r.flora }));
+        if (w === 1100) check('saved map loads back the same', r.earth === c3.earth && r.flora === c3.flora && sameCows && !r.editor, JSON.stringify({ before: c3, after: r, earthDelta: r.earth - c3.earth, floraDelta: r.flora - c3.flora, sameCows }));
         else check('saved map stays put on another screen size', sameCows && r.flora > c3.flora * 0.8, `cows ${JSON.stringify(r.cows)}, flora ${r.flora}`);
         const re2 = realErrors(g.errs); if (re2.length) check('no console errors (saved map)', false, re2.slice(0, 3).join(' | '));
         await g.ctx.close();
