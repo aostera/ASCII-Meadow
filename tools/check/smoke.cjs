@@ -67,7 +67,13 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
         const rec = () => page.evaluate(() => cows.map(c => [c.state, c.gp || '', c.d8]));
         await page.evaluate(() => { window.__noGPU = true; });
         for (let k = 0; k < 60; k++) { await step(25); for (const [st, gp] of await rec()) { seen.add(st); if (st === 'graze') phases.add(gp); } }
-        // run at the nearest calm cow until the herd has bolted (and, with luck, hopped)
+        // run at the nearest calm cow until the herd has bolted (and, with luck, hopped); from beside the
+        // herd, so tents and fences on the way (the start is in the camp) don't stand in for the cows' reaction
+        await page.evaluate(() => {
+          const c = cows.reduce((a, k) => Math.hypot(k.x - player.x, k.y - player.y) < Math.hypot(a.x - player.x, a.y - player.y) ? k : a);
+          const clear = (x, y) => { for (let t = 0; t <= 1; t += 0.02) if (blocked(x + (c.x - x) * t * 0.8, y + (c.y - y) * t * 0.8, player)) return false; return true; };   // a straight run up to it
+          for (const d of [30, 25, 35, 20, 40, 45]) for (const sd of [-1, 1]) if (clear(c.x + sd * d, c.y)) { player.x = c.x + sd * d; player.y = c.y; updateCamera(0, true); return; }
+        });
         const toward = () => page.evaluate(() => {
           let best = null, bd = 1e9; for (const c of cows) { if (c.state === 'run' || c.state === 'hop') continue; const d = Math.hypot(c.x - player.x, (c.y - player.y) * CH / CW); if (d < bd) { bd = d; best = c; } }
           if (!best) return [];
@@ -133,7 +139,7 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       await step(20); await page.keyboard.press('KeyM'); await step(2);
       check('editor: M opens the panel', await page.evaluate(() => editing && !document.querySelector('.ed').hidden));
       // the checks below start from the generated world: the editor's own «Сбросить», whatever the shipped map holds
-      await page.evaluate(() => { applyWholeMap({}); ED.undo.length = ED.redo.length = 0; ED.sel = null; edSyncUI(); }); await step(2);
+      await page.evaluate(() => { applyWholeMap({}); ED.undo.length = ED.redo.length = 0; ED.sel = null; edSyncUI(); camX = player.x - VC / VZ / 2; camY = player.y - VR / VZ * 0.72; updateCamera(0, true); }); await step(2);   // the camera along to the generated start: the map's own start (the camp) is elsewhere
       // selecting a generated tree changes nothing; stones and flowers paint what they say
       const fp = await page.evaluate(() => { const f = flora.find(f => f.br > VY0 + 12 && f.br < VY1 - 8 && f.x > VX0 + 12 && f.x < VX0 + VC * 0.6); return f ? [(f.x - camX) * CW, (f.br - camY) * CH - 4] : null; });
       if (fp) { await page.keyboard.press('KeyV'); await page.mouse.click(fp[0], fp[1]); await step(1); }
