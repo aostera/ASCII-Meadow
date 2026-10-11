@@ -27,11 +27,7 @@ function updateWorld(dt) {
   flash *= Math.exp(-dt * 7);
   if ((nextFlash -= dt) <= 0) { flash = 1; nextFlash = 8 + Math.random() * 14; flashAng = nextFlash * 2.39; setTimeout(() => (flash = Math.max(flash, 0.7)), 140); }
   for (const f of fogs) { f.x += f.sp * dt; if (f.x - f.r > COLS) f.x = -f.r; }
-  activeSpot = null; let best = 1e9;
-  for (const p of props) for (const sp of p.spots || []) {
-    const d = Math.hypot(sp.x - player.x, (sp.y - player.y) * CH / CW);
-    if (d < sp.r && d < best && (!sp.need || sp.need())) { best = d; activeSpot = sp; }
-  }
+  activeSpot = pickInteraction();
   player.sayT -= dt;
 }
 
@@ -49,4 +45,4 @@ function drawPrompt() {
   ctx.fillStyle = '#fafafa'; ctx.textBaseline = 'top'; ctx.fillText(txt, x + pad, y + pad);
   activeSpot.box = [x, y, tw + pad * 2, fs + pad * 2];
 }
-function useSpot() { if (activeSpot) activeSpot.use(); }
+function useSpot() { return performInteraction(activeSpot); }
