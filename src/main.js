@@ -8,7 +8,11 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   // panels can open at zero size and grow later; rebuild once they have room
   if (innerWidth < 2 || innerHeight < 2) return;
-  if (innerWidth !== builtW || innerHeight !== builtH) { builtW = innerWidth; builtH = innerHeight; build(); placeEntities(); seedLife(); }
+  if (innerWidth !== builtW || innerHeight !== builtH) {
+    const actors = snapshotActorWorld(); // rebuild reallocates the glyph grid
+    builtW = innerWidth; builtH = innerHeight;
+    build(); placeEntities(); restoreActorWorld(actors); seedLife();
+  }
   try { simulate(dt); render(); } catch (err) { console.error(err); }
   frameCount++; acc += dt;
   if (acc > 0.5) {
