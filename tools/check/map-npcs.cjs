@@ -48,6 +48,9 @@ const ok = (value, detail) => assert(value, detail);
       assert.deepEqual(editing.redo, editing.moved.map, 'redo restores moved NPC position');
       // The editing overlay draws highlighted NPC markers and labels every frame.
       // World NPCs must not wander away from their authored positions while editing.
+      // Undo/Redo intentionally clears the current selection. Select the NPC
+      // again to exercise the actual selected-label render path.
+      await original.page.evaluate(() => { ED.sel = { kind: 'actors', mi: 0 }; edSyncUI(); });
       await original.step(220);
       const stable = await original.page.evaluate(() => {
         const n = npcs.find(a => a.fromMap && a.mi === 0), m = MEADOW_MAP.actors[0];
