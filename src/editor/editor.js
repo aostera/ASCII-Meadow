@@ -48,10 +48,13 @@ const mapSnapshot = () => JSON.parse(JSON.stringify({ castle: MEADOW_MAP.castle 
 // Generated objects become map objects the first time one is moved, added or deleted.
 function edBake() {
   const M = MEADOW_MAP;
-  if (!M.flora) { M.flora = flora.map(f => [f.v.type, variantsOf(f.v.type).indexOf(f.v), ...edXZ(f.x, f.br - 0.7)]); flora.forEach((f, k) => { f.mi = k; }); }
-  if (!M.cows) { M.cows = cows.map(c => edXZ(c.home[0], c.home[1])); cows.forEach((c, k) => { c.mi = k; }); }
-  if (!M.fires) { M.fires = braziers.map(b => b.ground ? edXZ(b.x, b.y) : [...cellToCastle(b.x, b.y).map(edR1), edR1(b.lift / (COSP * MS))]); braziers.forEach((b, k) => { b.mi = k; }); }
-  if (!M.start) { const sy = ROWS - VR * 0.3; M.start = edXZ(pathX(sy) - 3, sy); }
+  // Converting generated objects to explicit map entries must not round their ground
+  // coordinates. Rounding to tenths of a world unit can shift a tree across a glyph
+  // cell boundary on reimport and alter hundreds of hidden-grass pixels.
+  if (!M.flora) { M.flora = flora.map(f => [f.v.type, variantsOf(f.v.type).indexOf(f.v), ...toModelXZ(f.x, f.br - 0.7)]); flora.forEach((f, k) => { f.mi = k; }); }
+  if (!M.cows) { M.cows = cows.map(c => toModelXZ(c.home[0], c.home[1])); cows.forEach((c, k) => { c.mi = k; }); }
+  if (!M.fires) { M.fires = braziers.map(b => b.ground ? toModelXZ(b.x, b.y) : [...cellToCastle(b.x, b.y), b.lift / (COSP * MS)]); braziers.forEach((b, k) => { b.mi = k; }); }
+  if (!M.start) { const sy = ROWS - VR * 0.3; M.start = toModelXZ(pathX(sy) - 3, sy); }
 }
 function applyObjects(which) {
   if (which.flora) rebuildFlora();
