@@ -106,8 +106,9 @@ function edUndoRedo(from, to) {
       if (L === fogChunks) fogTouch();
     }
     to.push({ paint: back });
-    const reroute = [...e.paint].some(([k, old]) => !k.startsWith('f:') && (old && old.includes(7) || (paintChunks.get(k) || []).includes(7)));
-    if (reroute) rebuildMap(); else for (const k of e.paint.keys()) if (!k.startsWith('f:')) edRepaintChunk(k);
+    // Incremental repaint is only a stroke preview. Undo must reproduce exactly
+    // the full terrain that will be rebuilt when the exported map is loaded.
+    if ([...e.paint.keys()].some(k => !k.startsWith('f:'))) rebuildMap();
     edChanged();
   } else if (e.map) {
     to.push({ map: mapSnapshot() });
@@ -508,10 +509,13 @@ function edPointer(e) {
   }
   // pointerup / pointercancel
   if (ED.stroke) {
-    const reroute = !edIsFog(ED.tool) && (ED.tool === 'p' || [...ED.stroke].some(([k, old]) => !k.startsWith('f:') && old && old.includes(7)));
+    const changedGround = [...ED.stroke.keys()].some(k => !k.startsWith('f:'));
     if (ED.stroke.size) edRecord({ paint: ED.stroke });
     ED.stroke = null;
-    if (reroute) rebuildMap(); // new/deleted painted road sections move the automatic connecting gaps
+    // The live stamp is cheap and immediate, but a full ground pass on pointerup
+    // ensures that *all* paints (not only the road) render as they will after
+    // exporting and loading map.js. Otherwise cells can differ silently.
+    if (changedGround) rebuildMap();
     edChanged(); FG.tick = 0;
   }
   if (ED.drag) { if (ED.drag.moved && ED.sel) edMoveSelected(ED.drag.gx, ED.drag.gz); ED.drag = null; }
