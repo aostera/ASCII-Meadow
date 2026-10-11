@@ -46,6 +46,20 @@ const ok = (value, detail) => assert(value, detail);
       assert.equal(editing.moved.npcs, 1);
       assert.deepEqual(editing.undo, editing.placed.map, 'undo restores original NPC position');
       assert.deepEqual(editing.redo, editing.moved.map, 'redo restores moved NPC position');
+      // The editing overlay draws highlighted NPC markers and labels every frame.
+      // World NPCs must not wander away from their authored positions while editing.
+      await original.step(220);
+      const stable = await original.page.evaluate(() => {
+        const n = npcs.find(a => a.fromMap && a.mi === 0), m = MEADOW_MAP.actors[0];
+        return { error: !n, world: n ? toModelXZ(n.x, n.y) : null, entry: m.slice(),
+          editing, selected: ED.sel?.kind };
+      });
+      assert.equal(stable.error, false, 'editor NPC remains in runtime');
+      assert.equal(stable.editing, true);
+      assert.equal(stable.selected, 'actors');
+      for (let k = 0; k < 2; k++)
+        ok(Math.abs(stable.world[k] - stable.entry[k + 2]) < 0.05,
+          'NPC drifted from edited position while editor stayed open');
       assert.equal(editing.parsed.v, 2);
       assert.deepEqual(editing.parsed.actors, [editing.moved.map]);
       ok(editing.source.includes('"actors"'), 'v2 export contains NPC array');
