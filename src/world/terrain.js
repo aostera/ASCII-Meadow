@@ -112,14 +112,12 @@ function build() {
   // Authored objects extend to ±1157 map units. Give their full silhouettes a safe margin at every
   // aspect ratio; previously a narrow grid discarded plants near the edge during placeFlora().
   COLS = Math.ceil(Math.max(VC * 2.2, (1800 * WS + W) / CW, 2500 * WS / CW));   // ±1250 map units
-  // Preserve every edited object down to the southern edge. Short landscape screens previously
-  // cut off authored shrubs and trees near z=-2180 despite their presence in the exported file.
-  const southernmost = Math.min(-2150, ...(MEADOW_MAP.flora || []).map(f => f[3]),
-    ...(MEADOW_MAP.cows || []).map(c => c[1]), ...(MEADOW_MAP.fires || []).map(f => f[1]),
-    ...(MEADOW_MAP.toads || []).map(f => f[1]), ...((MEADOW_MAP.events || []).map(f => f[2])),
-    MEADOW_MAP.start ? MEADOW_MAP.start[1] : 0);
-  const authoredSouthPx = (2150 - southernmost * SINP) * WS + 40 + 80 * WS;
-  ROWS = Math.ceil(Math.max(2180 * WS + 60 + H * 5, authoredSouthPx) / CH); N = COLS * ROWS;
+  // A FIXED southern extent, independent of the current exported list of objects.
+  // Resizing ROWS from the content made the editor's world have a different number of
+  // ground cells after export/reload (up to 470 extra earth cells in the smoke test).
+  // The south edge is past every authored tree and camp object, with room to paint.
+  const fixedSouthPx = (2150 + 2400 * SINP + 80) * WS + 40;
+  ROWS = Math.ceil(Math.max(2180 * WS + 60 + H * 5, fixedSouthPx) / CH); N = COLS * ROWS;
   ang = new Float32Array(N); vel = new Float32Array(N); flat = new Float32Array(N);
   bshade = new Float32Array(N); bmask = new Uint8Array(N); FR = new Float32Array(N);
   TA = new Float32Array(COLS * 6);
