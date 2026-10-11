@@ -48,10 +48,13 @@ const mapSnapshot = () => JSON.parse(JSON.stringify({ castle: MEADOW_MAP.castle 
 // Generated objects become map objects the first time one is moved, added or deleted.
 function edBake() {
   const M = MEADOW_MAP;
-  if (!M.flora) { M.flora = flora.map(f => [f.v.type, variantsOf(f.v.type).indexOf(f.v), ...edXZ(f.x, f.br - 0.7)]); flora.forEach((f, k) => { f.mi = k; }); }
-  if (!M.cows) { M.cows = cows.map(c => edXZ(c.home[0], c.home[1])); cows.forEach((c, k) => { c.mi = k; }); }
-  if (!M.fires) { M.fires = braziers.map(b => b.ground ? edXZ(b.x, b.y) : [...cellToCastle(b.x, b.y).map(edR1), edR1(b.lift / (COSP * MS))]); braziers.forEach((b, k) => { b.mi = k; }); }
-  if (!M.start) { const sy = ROWS - VR * 0.3; M.start = edXZ(pathX(sy) - 3, sy); }
+  // Converting generated objects to explicit map entries must not round their ground
+  // coordinates. Rounding to tenths of a world unit can shift a tree across a glyph
+  // cell boundary on reimport and alter hundreds of hidden-grass pixels.
+  if (!M.flora) { M.flora = flora.map(f => [f.v.type, variantsOf(f.v.type).indexOf(f.v), ...toModelXZ(f.x, f.br - 0.7)]); flora.forEach((f, k) => { f.mi = k; }); }
+  if (!M.cows) { M.cows = cows.map(c => toModelXZ(c.home[0], c.home[1])); cows.forEach((c, k) => { c.mi = k; }); }
+  if (!M.fires) { M.fires = braziers.map(b => b.ground ? toModelXZ(b.x, b.y) : [...cellToCastle(b.x, b.y), b.lift / (COSP * MS)]); braziers.forEach((b, k) => { b.mi = k; }); }
+  if (!M.start) { const sy = ROWS - VR * 0.3; M.start = toModelXZ(pathX(sy) - 3, sy); }
 }
 function applyObjects(which) {
   if (which.flora) rebuildFlora();
@@ -85,7 +88,9 @@ function edMoveCastle(gx, gz) {
   const [px, pz] = castleOff();
   MEADOW_MAP.castle = Math.abs(dx) < 0.5 && Math.abs(dz) < 0.5 ? null : [edR1(dx), edR1(dz)];
   const [nx, nz] = castleOff();
-  if (MEADOW_MAP.fires) for (const f of MEADOW_MAP.fires) if (f[2] > 0) { f[0] = edR1(f[0] + nx - px); f[1] = edR1(f[1] + nz - pz); }   // braziers on its terrace go with it
+  if (MEADOW_MAP.fires) for (const f of MEADOW_MAP.fires) if (f[2] > 0 || castleFrontFire(f[0], f[1], [px, pz])) {
+    f[0] = edR1(f[0] + nx - px); f[1] = edR1(f[1] + nz - pz);
+  }   // terrace braziers and the fires at the castle entrance go with it
   edRebuildCastle(); rebuildMap(); applyObjects({ fires: 1, cows: 1, start: 1 });
 }
 function edChanged() {
@@ -104,7 +109,9 @@ function edUndoRedo(from, to) {
       if (L === fogChunks) fogTouch();
     }
     to.push({ paint: back });
-    for (const k of e.paint.keys()) if (!k.startsWith('f:')) edRepaintChunk(k);
+    // Incremental repaint is only a stroke preview. Undo must reproduce exactly
+    // the full terrain that will be rebuilt when the exported map is loaded.
+    if ([...e.paint.keys()].some(k => !k.startsWith('f:'))) rebuildMap();
     edChanged();
   } else if (e.map) {
     to.push({ map: mapSnapshot() });
@@ -195,7 +202,15 @@ function edPick(sx, sy) {   // the frontmost object whose body covers the point
   return best;
 }
 // A fire set on the castle's terrace or stair stands at its height: [x, z, h].
-function edFirePoint(gx, gz) { const [x, y] = mapToCell(gx, gz), h = surfAt(x, y); return isFinite(h) && h > 1 ? [...cellToCastle(x, y).map(edR1), Math.round(h)] : [edR1(gx), edR1(gz)]; }   // on the castle: in its frame
+function edFirePoint(gx, gz) {
+  const [x, y] = mapToCell(gx, gz), h = surfAt(x, y);
+  const [cx, cz] = cellToCastle(x, y), [dx, dz] = castleOff();
+  if (isFinite(h) && h > 1) return [edR1(cx), edR1(cz), Math.round(h)];
+  // Convert a screen point near the castle back into its model frame before saving.
+  // On a phone WS differs from MS, so saving the clicked world point would move the fire.
+  if (castleFrontFire(cx + dx, cz + dz)) return [edR1(cx + dx), edR1(cz + dz)];
+  return [edR1(gx), edR1(gz)];
+}
 // Every object edit: remember the map as it was (generated lists still null), then make the lists explicit.
 function edBeginObjectEdit() { edRecord({ map: mapSnapshot() }); edBake(); }
 function edTallAt(gx, gz) { const [x, y] = mapToCell(gx, gz); return birdTall(Math.round(y + 0.7) * COLS + Math.round(x)); }
@@ -496,7 +511,16 @@ function edPointer(e) {
     return;
   }
   // pointerup / pointercancel
-  if (ED.stroke) { if (ED.stroke.size) edRecord({ paint: ED.stroke }); ED.stroke = null; edChanged(); FG.tick = 0; }
+  if (ED.stroke) {
+    const changedGround = [...ED.stroke.keys()].some(k => !k.startsWith('f:'));
+    if (ED.stroke.size) edRecord({ paint: ED.stroke });
+    ED.stroke = null;
+    // The live stamp is cheap and immediate, but a full ground pass on pointerup
+    // ensures that *all* paints (not only the road) render as they will after
+    // exporting and loading map.js. Otherwise cells can differ silently.
+    if (changedGround) rebuildMap();
+    edChanged(); FG.tick = 0;
+  }
   if (ED.drag) { if (ED.drag.moved && ED.sel) edMoveSelected(ED.drag.gx, ED.drag.gz); ED.drag = null; }
   ED.pan = null;
 }

@@ -11,8 +11,9 @@ function fogDensity(x, y) {
   const C = cathedral;
   let m = 0;
   if (C.cv) { const dx = (x - C.kx) / (1500 * MS), dy = (y - (C.ky - 120 * MS)) / (900 * MS); m = Math.max(0, 1 - (dx * dx + dy * dy)); }
-  const qx = vnoise(x * 0.0021 + t * 0.03, y * 0.004) * 2.2, qy = vnoise(x * 0.0021 + 5.2, y * 0.004 - t * 0.025) * 2.2;   // warp
-  const u = x * 0.0032 + qx - t * 0.06, v = y * 0.0058 + qy + t * 0.012;
+  const wx = x - terrainSeedOffset * CW; // the map's original procedural-noise X after symmetric padding
+  const qx = vnoise(wx * 0.0021 + t * 0.03, y * 0.004) * 2.2, qy = vnoise(wx * 0.0021 + 5.2, y * 0.004 - t * 0.025) * 2.2;   // warp
+  const u = wx * 0.0032 + qx - t * 0.06, v = y * 0.0058 + qy + t * 0.012;
   const n = vnoise(u, v) * 0.6 + vnoise(u * 2.3 - t * 0.09, v * 2.3) * 0.28 + vnoise(u * 5.1, v * 5.1 + t * 0.05) * 0.12;
   const thick = 0.28 + 0.72 * Math.min(1, m * 1.5);
   return Math.max(0, Math.min(1, (n - 0.56 + thick * 0.42) * 2.4)) * thick;
@@ -49,7 +50,7 @@ function castleFogGlyphs() {  // grain of the fog, in the glyph batch on top of 
   for (let y = VY0; y <= VY1; y += 2) for (let x = VX0 + ((y >> 1) & 1); x <= VX1; x += 2) {
     const px = x * CW, py = y * CH, d = fogAt((px - ox) * VZ, (py - oy) * VZ);
     if (d < 0.12) continue;
-    const h = hash(x + ((t * 3) | 0), y);   // reshuffles a few times a second, so the grain seethes
+    const h = hash(x - terrainSeedOffset + ((t * 3) | 0), y);   // keep grain fixed in world space after adding border
     if (h > d * 1.3) continue;
     const sh = shadow[y * COLS + x];   // the ground fog lying in a body's shadow is a little dimmer
     blit(FOGCH[(h * 47 | 0) % FOGCH.length], C_WHITE, px + Math.sin(t * 0.7 + y * 0.3) * 3, py, Math.min(0.5, 0.08 + d * 0.4 + flash * 0.2) * (1 - 0.3 * sh));

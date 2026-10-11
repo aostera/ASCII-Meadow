@@ -75,7 +75,9 @@ function updateGrass(dt) {
   const k = 42, damp = Math.exp(-5.5 * dt);
   // the wind waves are sines of (x + y + t): split them with the angle-sum rule so each cell costs a few multiplies
   for (let x = VX0; x <= VX1; x++) {
-    const a = x * 0.06 - t * 1.5, b = x * 0.17 - t * 2.3, c = x * 0.028 - t * 0.55, o = x * 6;
+    // Keep wind phase fixed in world space when extra edge cells are added.
+    const wx = x - terrainSeedOffset;
+    const a = wx * 0.06 - t * 1.5, b = wx * 0.17 - t * 2.3, c = wx * 0.028 - t * 0.55, o = x * 6;
     TA[o] = Math.sin(a); TA[o + 1] = Math.cos(a); TA[o + 2] = Math.sin(b); TA[o + 3] = Math.cos(b); TA[o + 4] = Math.sin(c); TA[o + 5] = Math.cos(c);
   }
   const KD = kind, SD = seed, HT = height, FL = flat, AN = ang, VL = vel, PU = push, FRT = FR, T6 = TA;   // locals: see render()

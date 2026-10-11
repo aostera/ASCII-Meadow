@@ -212,11 +212,15 @@ function placeFlora() {
   else {   // generated: a jittered grid, thick where the forest noise is high
     const K = knightPx(), C = cathedral;
     const gx = K * 0.8 / CW, gy = K * 0.55 / CH;           // placement grid, in cells
+    // Reserve stable world-space margin: generated plants are often baked into
+    // the map, and one planted on the final glyph column vanishes on resize.
+    const safeX = Math.max(4, Math.ceil(40 * WS / CW));
+    const safeY = Math.max(3, Math.ceil(40 * SINP * WS / CH));
     const startY = ROWS - VR * 0.3;
     const pathNear = (x, y, r) => { for (let dy = -2; dy <= 2; dy++) for (let dx = -r; dx <= r; dx += 2) { const i = (Math.round(y) + dy) * COLS + Math.round(x) + dx; if (i >= 0 && i < N && (kind[i] === 7 || bmask[i])) return true; } return false; };
     for (let j = 2; j * gy < ROWS - 2; j++) for (let i = 0; i * gx < COLS; i++) {
       const x = (i + hash(i, j * 3) * 0.8 + 0.1) * gx, y = (j + hash(i * 5, j) * 0.8 + 0.1) * gy;
-      if (x < 3 || x > COLS - 4 || y > ROWS - 2) continue;
+      if (x < safeX || x > COLS - 1 - safeX || y < safeY || y > ROWS - 1 - safeY) continue;
       const forest = vnoise(x * 0.013 + 3, y * 0.021) * 0.75 + vnoise(x * 0.05, y * 0.07) * 0.25, r = hash(i * 17, j * 29);
       const px = x * CW, py = y * CH, v0R = K * 0.9;
       if (C.cv && py < C.ky + 30 * MS && px > C.cx0 * CW - K * 0.6 && px < (C.cx0 + C.BW) * CW + K * 0.6) continue; // never behind the castle

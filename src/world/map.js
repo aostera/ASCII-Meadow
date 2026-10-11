@@ -121,7 +121,10 @@ function paintRect(gx0, gz0, gx1, gz1, fresh) {
   const y0 = Math.max(0, Math.floor((C.oy - gz1 * SINP * WS) / CH - 1)), y1 = Math.min(ROWS - 1, Math.ceil((C.oy - gz0 * SINP * WS) / CH));
   const g = Math.floor(C.trailRow || ROWS * 0.45);
   for (let y = y0; y <= y1; y++) {
-    const cx = y >= g ? pathX(y) : 0, hw = y >= g ? pathHalfWidth(y, g) : 0;
+    const guide = guidedRoadAt(y);
+    const generated = trailOn() && (authoredRoad ? !!guide : y >= g);
+    const cx = generated ? (guide ? guide[0] : pathX(y)) : 0;
+    const hw = generated ? (guide ? guide[1] : pathHalfWidth(y, g)) : 0;
     for (let x = x0; x <= x1; x++) {
       const [gx, gz] = cellXZ(x, y);
       if (gx < gx0 || gx >= gx1 || gz < gz0 || gz >= gz1) continue;
@@ -140,8 +143,13 @@ function paintRect(gx0, gz0, gx1, gz1, fresh) {
 }
 
 // ---------- objects: fires, cows and the knight's start ----------
-// Fires: from the map ([x, z] on the ground, [x, z, h] raised h units, a brazier on the terrace), or the
-// generated ones: two on the terrace either side of the gate and a campfire by the trail where he starts.
+// Castle-front ground fires are part of the entrance layout, as are the raised terrace braziers.
+// A narrow screen scales the castle with MS but keeps the world map at WS. Without anchoring
+// these three fires to the castle, they drift far from the stairs while all other map objects stay put.
+const castleFrontFire = (gx, gz, [dx, dz] = castleOff()) =>
+  Math.abs(gx - dx) <= 280 && gz - dz >= -350 && gz - dz <= -110;
+// Fires: [x,z] on the ground, [x,z,h] raised on the castle; ground fires beside its
+// entrance use the castle's coordinate scale rather than the map's independent scale.
 function placeFires() {
   braziers.length = 0;
   if (!MEADOW_MAP.fires) {
@@ -151,7 +159,8 @@ function placeFires() {
     return;
   }
   MEADOW_MAP.fires.forEach(([gx, gz, h, kd], mi) => {
-    const [x, y] = h > 0 ? castleToCell(gx, gz) : mapToCell(gx, gz);
+    const anchored = h > 0 || castleFrontFire(gx, gz);
+    const [x, y] = anchored ? castleToCell(gx, gz) : mapToCell(gx, gz);
     braziers.push(h > 0 ? { isFire: true, x, y, lift: h * COSP * MS, parts: [], seed: 3 + mi, mi } : { isFire: true, ground: true, cook: kd === 'cook', steam: [], x, y, lift: 0, parts: [], seed: 3 + mi, mi });   // 'cook': a pot over it
   });
 }
