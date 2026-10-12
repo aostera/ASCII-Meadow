@@ -81,3 +81,8 @@ body.editing .stats { display: none; }
 .ed-npc-frame-controls { display: grid; grid-template-columns: 30px minmax(0,1fr) 30px; align-items: center; gap: 6px; }
 .ed-npc-frame-controls input[type="range"] { width: 100%; min-width: 0; accent-color: #c9a45c; }
 .ed-npc-frame-controls .ed-btn { min-height: 28px; justify-content: center; padding: 4px; font-size: 16px; }
+
+/* Explicit, read-only NPC atlas diagnostics. No permanent error toast and no oversized output. */
+.ed-atlas-report { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 210px; overflow-y: auto;
+  padding: 8px; border: 1px solid var(--line); background: #111; color: #d0c8b8;
+  font: 11px/1.45 var(--mono); }

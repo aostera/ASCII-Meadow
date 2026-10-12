@@ -44,3 +44,5 @@ python3 tools/check/diff.py /tmp/shots/b /tmp/shots/a --out /tmp/shots/diff   # 
 
 | `npc-atlas.cjs` | Спецификация PNG: размеры, ≤60 кадров, FPS, 1/8 ракурсов, безопасные пути, fallback |
 | `npc-atlas-browser.cjs` | Синтетический PNG через реальный UI редактора, `idle/walk/talk`, runtime rendering WebGL2 / Canvas 2D и проверка неизменности `map.js` |
+
+| `npc-atlas-audit.cjs` | Unit: пустые/дублирующиеся кадры, одинаковые 8 направлений, скачки силуэта, валидные кадры |

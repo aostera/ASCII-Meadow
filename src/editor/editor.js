@@ -674,7 +674,11 @@ function edBuildUI() {
   const atlasUpload = btn('Выбрать PNG-атлас', '', { act: 'npc-atlas-open' });
   const atlasFile = el('input'); atlasFile.type = 'file'; atlasFile.accept = '.png,image/png';
   atlasFile.hidden = true; atlasFile.setAttribute('aria-label', 'PNG-атлас NPC');
-  npcAtlasTools.append(atlasHint, atlasGrid, atlasEightLabel, atlasUpload, atlasFile); sOb.append(npcAtlasTools);
+  const atlasAudit = btn('Проверить качество PNG', '', { act: 'npc-atlas-audit' });
+  const atlasAuditResult = el('div', 'ed-atlas-report'); atlasAuditResult.hidden = true;
+  atlasAuditResult.setAttribute('role', 'status'); atlasAuditResult.setAttribute('aria-live', 'polite');
+  npcAtlasTools.append(atlasHint, atlasGrid, atlasEightLabel, atlasUpload, atlasFile,
+    atlasAudit, atlasAuditResult); sOb.append(npcAtlasTools);
   const sMap = el('section', 'ed-sec', '<h3>Карта</h3>'); const mini = el('canvas', 'ed-mini'); mini.width = 216; mini.height = 300;
   const zoomRow = el('div', 'ed-zoom', 'Масштаб'); const zoomOut = btn('−', 'Q', { act: 'zoom-' }), zoomPct = btn('100%', '', { act: 'zoom1' }), zoomIn = btn('+', 'E', { act: 'zoom+' });
   zoomPct.title = 'Вернуть 100% (R)'; zoomRow.append(zoomOut, zoomPct, zoomIn); sMap.append(zoomRow, mini);
@@ -686,7 +690,7 @@ function edBuildUI() {
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
-  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcDirections, npcPlay, npcAnimationTools, npcAnimName, npcFrames, npcFps, npcFrameSlider, npcFrameReadout, npcSettingsFile, npcPhase, npcAtlasTools, atlasW, atlasH, atlasEight, atlasFile, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
+  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcDirections, npcPlay, npcAnimationTools, npcAnimName, npcFrames, npcFps, npcFrameSlider, npcFrameReadout, npcSettingsFile, npcPhase, npcAtlasTools, atlasW, atlasH, atlasEight, atlasAuditResult, atlasFile, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) ED.previewAuto = false;
   ED.mini = mini;
 
@@ -709,6 +713,25 @@ function edBuildUI() {
       if (info) edNpcSeekFrame(info.frame + (a === 'npc-frame-next' ? 1 : -1));
     }
     else if (a === 'npc-atlas-open') atlasFile.click();
+    else if (a === 'npc-atlas-audit') {
+      const selected = ED.sel?.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi]?.[1] : null;
+      const type = selected || [...ACTOR_TYPES.keys()][ED.variant.npc];
+      try {
+        const report = npcAtlasAudit(type);
+        const lines = report.findings.slice(0, 25).map(f =>
+          (f.severity === 'error' ? 'Ошибка' : 'Внимание') + ': ' +
+          f.state + ' / ' + f.direction + (f.frame ? ' / кадр ' + f.frame : '') +
+          ' — ' + f.detail);
+        atlasAuditResult.textContent =
+          'PNG ' + type + ': ' + report.inspected + ' кадров; ' + report.errors +
+          ' ошибок, ' + report.warnings + ' предупреждений.' +
+          (lines.length ? '\n' + lines.join('\n') : '\nПроверка не нашла проблем.') +
+          (report.findings.length > 25 ? '\n… и ещё ' + (report.findings.length - 25) + ' замечаний' : '');
+        atlasAuditResult.hidden = false;
+        edStatus(report.errors ? 'В атласе найдены пустые кадры или направления.' :
+          'Проверка завершена: ' + report.warnings + ' предупреждений.');
+      } catch (err) { atlasAuditResult.hidden = true; edStatus(String(err.message)); }
+    }
     else if (a === 'npc-json-open') npcSettingsFile.click();
     else if (a === 'npc-json-export') {
       const selected = ED.sel?.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi]?.[1] : null;
@@ -754,6 +777,7 @@ function edBuildUI() {
         frameWidth: item.layout.frameWidth, frameHeight: item.layout.frameHeight, states
       } });
       ED.previewClock = 0; edSyncUI();
+      atlasAuditResult.hidden = true;
       edStatus(state + ': ' + frames + ' кадров · ' + fps + ' FPS. PNG и карта не изменены.');
     } catch (err) { edSyncUI(); edStatus(String(err.message)); }
   }
@@ -771,6 +795,7 @@ function edBuildUI() {
     const type = selected || [...ACTOR_TYPES.keys()][ED.variant.npc];
     try {
       npcAtlasImportSettings(type, await file.text());
+      atlasAuditResult.hidden = true;
       edSyncUI();
       edStatus('Настройки анимации ' + type + ' восстановлены из JSON.');
     } catch (err) { edStatus('Импорт JSON: ' + String(err.message)); }
@@ -779,6 +804,7 @@ function edBuildUI() {
   atlasFile.addEventListener('change', () => {
     const file = atlasFile.files && atlasFile.files[0];
     atlasFile.value = '';
+    atlasAuditResult.hidden = true; atlasAuditResult.textContent = '';
     if (!file) return;
     if (!/\.png$/i.test(file.name) || file.type && file.type !== 'image/png' ||
         file.size > 16 * 1024 * 1024) { edStatus('Нужен PNG не больше 16 МБ.'); return; }
