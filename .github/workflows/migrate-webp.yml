@@ -1,0 +1,38 @@
+# One-time binary migration on the trusted in-repository conversion PR.
+# The normal CI uses read-only permissions. This job can write ONLY our exact
+# migration branch after verifying same-repository origin; never fork PRs.
+name: Convert non-knight sprites to WebP
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+permissions:
+  contents: write
+jobs:
+  generate:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/lossless-webp-non-knight-20261012' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install 'Pillow==12.0.0'
+      - name: Convert and verify all non-knight assets
+        run: |
+          python3 tools/migrate_webp.py --apply
+          python3 tools/migrate_webp.py --check
+      - name: Commit generated lossless images
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- assets
+          if git diff --cached --quiet; then
+            echo "WebP already up to date"
+          else
+            git commit -m "assets: convert all eight non-knight PNG atlases to exact lossless WebP"
+            git push origin HEAD:feat/lossless-webp-non-knight-20261012
+          fi
