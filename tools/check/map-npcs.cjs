@@ -78,6 +78,22 @@ const ok = (value, detail) => assert(value, detail);
       for (let k = 0; k < 2; k++)
         ok(Math.abs(stable.world[k] - stable.entry[k + 2]) < 0.05,
           'NPC drifted from edited position while editor stayed open');
+      // Inspect the selected authored NPC after move/undo/redo without changing v2 export.
+      const selectedPreview = await original.page.evaluate(() => {
+        const before = mapFileText();
+        ED.sel = { kind: 'actors', mi: 0 };
+        ED.tool = 'select';
+        ED.previewState = 'walk'; ED.previewPhase = 1.57;
+        edSyncUI();
+        const visible = !ED.ui.npcCanvas.hidden;
+        const type = MEADOW_MAP.actors[0][1];
+        const details = ED.ui.npcLibrary.textContent;
+        const after = mapFileText();
+        return { visible, type, details, unchanged: before === after };
+      });
+      ok(selectedPreview.visible && selectedPreview.unchanged &&
+        selectedPreview.details.includes(selectedPreview.type),
+        'selected NPC preview must be visible and preserve v2 export');
       assert.equal(editing.parsed.v, 2);
       assert.deepEqual(editing.parsed.actors, [editing.moved.map]);
       ok(editing.source.includes('"actors"'), 'v2 export contains NPC array');
