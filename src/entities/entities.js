@@ -44,7 +44,7 @@ function charDims(e) {
     // reach farther than the sampled frame and previously made NPCs giants.
     // Identical fine-glyph pitch keeps them coherent on desktop and phones.
     const knight = charDims(player);
-    const u = KG.art * knight.fch * 0.88 / BOX_H;
+    const u = KG.art * knight.fch * 0.72 / BOX_H;
     return { ...knight, u };
   }
   const ffs = Math.max(3.8, FS * 0.42);
