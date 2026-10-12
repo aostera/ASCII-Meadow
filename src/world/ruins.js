@@ -129,11 +129,11 @@ function buildRuins() {
     const x1 = Math.min(COLS - 1, Math.ceil((cx + (site.width / 2 + 35) * WS) / CW));
     const y0 = Math.max(0, Math.floor((cy - (halfD * SINP + maxH * COSP) * WS - 16) / CH));
     const y1 = Math.min(ROWS - 1, Math.ceil((cy + halfD * SINP * WS + 16) / CH));
-    const width = x1 - x0 + 1, height = y1 - y0 + 1;
-    const lum = new Float32Array(width * height).fill(-1);
-    const dep = new Float32Array(width * height);
-    const glyph = new Int16Array(width * height).fill(-1);
-    const lev = new Uint8Array(width * height);
+    const gridW = x1 - x0 + 1, gridH = y1 - y0 + 1;
+    const lum = new Float32Array(gridW * gridH).fill(-1);
+    const dep = new Float32Array(gridW * gridH);
+    const glyph = new Int16Array(gridW * gridH).fill(-1);
+    const lev = new Uint8Array(gridW * gridH);
     const dir = RUIN_DIR;
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const px = ((x + .5) * CW - cx) / WS;
@@ -150,7 +150,7 @@ function buildRuins() {
       let shade = ornament(hx, hy, hz, n, hit.so,
         (hit.kind === 'spire' ? .69 : .76) * (.24 + .96 * diff));
       shade *= .88 + .19 * vnoise(hx * .031 + hz * .021, hy * .035);
-      const k = (y - y0) * width + x;
+      const k = (y - y0) * gridW + x;
       lum[k] = Math.max(.02, Math.min(.999, shade));
       dep[k] = cy - hz * SINP * WS;
       const set = FACESETS[shade < .1 ? 4 : hit.kind === 'spire' ? 3 : n[2] < -.65 ? 0 : 1];
@@ -160,7 +160,7 @@ function buildRuins() {
           (Math.pow(Math.min(1, shade * 1.15), .72) * BLN) | 0);
       }
     }
-    ruins.push({ ...site, cx, cy, x0, x1, y0, y1, width, height,
+    ruins.push({ ...site, cx, cy, x0, x1, y0, y1, gridW, gridH,
       lum, dep, glyph, lev, walls: ruinWallRectangles(site) });
   }
 }
@@ -171,7 +171,7 @@ function drawRuins() {
     const ya = Math.max(r.y0, VY0), yb = Math.min(r.y1, VY1);
     if (xa > xb || ya > yb) continue;
     for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) {
-      const k = (y - r.y0) * r.width + x;
+      const k = (y - r.y0) * r.gridW + x;
       if (r.lum[k] < 0) continue;
       const px = x * CW, py = y * CH;
       grect(px - .4, py - .4, CW + .8, CH + .8, .92);
@@ -183,7 +183,7 @@ function drawRuins() {
 function ruinCellCovered(x, y, baseY) {
   for (const r of ruins) {
     if (x < r.x0 || x > r.x1 || y < r.y0 || y > r.y1) continue;
-    const k = (y - r.y0) * r.width + x;
+    const k = (y - r.y0) * r.gridW + x;
     if (r.lum[k] >= 0 && r.dep[k] > baseY) return true;
   }
   return false;
@@ -203,7 +203,7 @@ function occludeRuins(e) {
     const y1 = Math.min(r.y1, Math.ceil(e.y + 1 - liftPx(e) / CH));
     if (left > right || y0 > y1) continue;
     for (let y = y0; y <= y1; y++) for (let x = left; x <= right; x++) {
-      const k = (y - r.y0) * r.width + x;
+      const k = (y - r.y0) * r.gridW + x;
       if (r.lum[k] < 0 || r.dep[k] <= feet + 1.5) continue;
       gput(SOLID_CELL, x * CW, y * CH, 1);
       if (r.glyph[k] >= 0) blit(r.glyph[k], r.lev[k], x * CW, y * CH);
