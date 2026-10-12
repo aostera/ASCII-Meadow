@@ -28,6 +28,7 @@ assert(Object.isFrozen(layout) && Object.isFrozen(layout.states.walk.rows));
 assert.equal(layout.states.walk.rows.length, 8);
 spec.states.idle.rows[0] = 100;
 assert.equal(layout.states.idle.rows[0], 0, 'mutating user input cannot modify library');
+spec.states.idle.rows[0] = 0; // restore fixture before attach; normalized layout above remains frozen
 const reject = (text, fn) => assert.throws(fn, /Invalid|Unknown/, text);
 reject('unknown state', () => npcAtlasLayout({ ...spec, states: { attack: spec.states.idle } }));
 reject('fractional frame size', () => npcAtlasLayout({ ...spec, frameWidth: 32.5 }));
