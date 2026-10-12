@@ -7,7 +7,7 @@ const ED = {
   sel: null, hover: null, drag: null, pan: null, stroke: null, space: false,
   undo: [], redo: [], keys: new Set(), mx: -1, my: -1, inView: false,
   ui: null, mini: null, miniKey: '', draftTimer: 0,
-  previewAuto: true, previewClock: 0, previewPhase: 0, previewState: 'idle', previewDirection: 0, atlasUrls: {}, auditType: null, galleryOpen: false,
+  previewAuto: true, previewClock: 0, previewPhase: 0, previewState: 'idle', previewDirection: 0, atlasUrls: {}, auditType: null, auditReport: null, galleryOpen: false,
 };
 const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['w', 'Вода', '9'], ['m', 'Болото', 'P'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
 const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['stone', 'Камень', 'Z'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['tent', 'Палатка', 'Y'], ['fence', 'Забор', 'I'], ['toad', 'Жаба', 'G'], ['frog', 'Лягушка', 'X'], ['birds', 'Птицы в траве', 'O'], ['castle', 'Замок', 'L'], ['npc', 'NPC', 'N'], ['select', 'Выбрать и двигать', 'V']];
@@ -449,6 +449,34 @@ function edNpcFrameDetails() {
   return { row, state, fallback: !atlas.layout.states[state],
     frame: npcAtlasFrameIndex(row.frames, ED.previewPhase) };
 }
+function edNpcAuditJSON(type, report) {
+  if (!ACTOR_TYPES.has(type) || !report) throw new Error('Сначала запустите проверку PNG');
+  return JSON.stringify({ version: 1, type,
+    inspected: report.inspected, empty: report.empty,
+    errors: report.errors, warnings: report.warnings,
+    findings: report.findings.map(f => ({ code: f.code, severity: f.severity,
+      state: f.state, direction: f.direction, frame: f.frame, detail: f.detail })) }, null, 2);
+}
+function edNpcAuditSeek(index) {
+  const type = ED.auditType, report = ED.auditReport;
+  if (!ED.ui || !report || !ACTOR_TYPES.has(type) ||
+      !Number.isInteger(index) || index < 0 || index >= report.findings.length) return false;
+  const finding = report.findings[index], entry = NPC_ATLASES.get(type);
+  if (!entry || entry.status !== 'ready') return false;
+  const state = entry.layout.states[finding.state] ? finding.state : 'idle';
+  const track = entry.layout.states[state];
+  const directions = ['S','SW','W','NW','N','NE','E','SE'];
+  const d = directions.indexOf(finding.direction);
+  const direction = track.rows.length === 8 && d >= 0 ? d : 0;
+  const frame = finding.frame === null ? 0 : Math.max(0, Math.min(track.frames - 1, finding.frame - 1));
+  ED.tool = 'npc'; ED.sel = null;
+  ED.variant.npc = [...ACTOR_TYPES.keys()].indexOf(type);
+  ED.previewState = state; ED.previewDirection = direction;
+  ED.previewPhase = edNpcGalleryPhase(frame, track.frames);
+  ED.previewAuto = false; ED.previewClock = 0;
+  edSyncUI();
+  return true;
+}
 function edNpcSeekFrame(frame) {
   const info = edNpcFrameDetails();
   if (!info) return;
@@ -709,6 +737,10 @@ function edBuildUI() {
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return; b.blur();
     if (b.dataset.galleryFrame !== undefined) { edNpcGallerySelect(b); return; }
+    if (b.dataset.auditIndex !== undefined) {
+      if (edNpcAuditSeek(Number(b.dataset.auditIndex))) edStatus('Открыт кадр из отчёта качества PNG.');
+      return;
+    }
     if (b.dataset.preview) { ED.previewState = b.dataset.preview; ED.previewPhase = 0; ED.previewClock = 0; edSyncUI(); return; }
     if (b.dataset.npcDir !== undefined) { ED.previewDirection = Number(b.dataset.npcDir); edSyncUI(); return; }
     if (b.dataset.npcType) {
@@ -731,20 +763,52 @@ function edBuildUI() {
       const type = selected || [...ACTOR_TYPES.keys()][ED.variant.npc];
       try {
         const report = npcAtlasAudit(type);
-        const lines = report.findings.slice(0, 25).map(f =>
-          (f.severity === 'error' ? 'Ошибка' : 'Внимание') + ': ' +
-          f.state + ' / ' + f.direction + (f.frame ? ' / кадр ' + f.frame : '') +
-          ' — ' + f.detail);
-        atlasAuditResult.textContent =
-          'PNG ' + type + ': ' + report.inspected + ' кадров; ' + report.errors +
-          ' ошибок, ' + report.warnings + ' предупреждений.' +
-          (lines.length ? '\n' + lines.join('\n') : '\nПроверка не нашла проблем.') +
-          (report.findings.length > 25 ? '\n… и ещё ' + (report.findings.length - 25) + ' замечаний' : '');
+        ED.auditType = type; ED.auditReport = report;
+        atlasAuditResult.replaceChildren();
+        const summary = document.createElement('p');
+        summary.textContent = 'PNG ' + type + ': ' + report.inspected + ' кадров; ' +
+          report.errors + ' ошибок, ' + report.warnings + ' предупреждений.';
+        atlasAuditResult.append(summary);
+        for (const [i, f] of report.findings.slice(0, 25).entries()) {
+          const finding = document.createElement('button');
+          finding.type = 'button'; finding.className = 'ed-audit-finding';
+          finding.dataset.auditIndex = String(i);
+          finding.textContent = (f.severity === 'error' ? 'Ошибка' : 'Внимание') +
+            ': ' + f.state + ' / ' + f.direction +
+            (f.frame ? ' / кадр ' + f.frame : '') + ' — ' + f.detail;
+          finding.title = 'Перейти к этому кадру';
+          atlasAuditResult.append(finding);
+        }
+        if (report.findings.length > 25) {
+          const more = document.createElement('p');
+          more.textContent = '… ещё ' + (report.findings.length - 25) +
+            ' замечаний доступны в JSON-отчёте.';
+          atlasAuditResult.append(more);
+        }
+        if (!report.findings.length) {
+          const clear = document.createElement('p'); clear.textContent = 'Проверка не нашла проблем.';
+          atlasAuditResult.append(clear);
+        }
+        const exportButton = document.createElement('button');
+        exportButton.type = 'button'; exportButton.className = 'ed-btn';
+        exportButton.dataset.act = 'npc-audit-json-export';
+        exportButton.textContent = 'Скачать отчёт JSON';
+        atlasAuditResult.append(exportButton);
         atlasAuditResult.hidden = false;
-        ED.auditType = type;
         edStatus(report.errors ? 'В атласе найдены пустые кадры или направления.' :
           'Проверка завершена: ' + report.warnings + ' предупреждений.');
       } catch (err) { atlasAuditResult.hidden = true; edStatus(String(err.message)); }
+    }
+    else if (a === 'npc-audit-json-export') {
+      try {
+        const json = edNpcAuditJSON(ED.auditType, ED.auditReport);
+        const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+        const link = document.createElement('a');
+        link.href = url; link.download = 'npc-' + ED.auditType + '-quality.json';
+        document.body.appendChild(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        edStatus('Отчёт качества PNG скачан отдельно от карты и изображения.');
+      } catch (err) { edStatus(String(err.message)); }
     }
     else if (a === 'npc-json-open') npcSettingsFile.click();
     else if (a === 'npc-json-export') {
@@ -791,7 +855,7 @@ function edBuildUI() {
         frameWidth: item.layout.frameWidth, frameHeight: item.layout.frameHeight, states
       } });
       ED.previewClock = 0; edSyncUI();
-      atlasAuditResult.hidden = true;
+      atlasAuditResult.hidden = true; ED.auditReport = null; ED.auditType = null;
       edStatus(state + ': ' + frames + ' кадров · ' + fps + ' FPS. PNG и карта не изменены.');
     } catch (err) { edSyncUI(); edStatus(String(err.message)); }
   }
@@ -809,7 +873,7 @@ function edBuildUI() {
     const type = selected || [...ACTOR_TYPES.keys()][ED.variant.npc];
     try {
       npcAtlasImportSettings(type, await file.text());
-      atlasAuditResult.hidden = true;
+      atlasAuditResult.hidden = true; ED.auditReport = null; ED.auditType = null;
       edSyncUI();
       edStatus('Настройки анимации ' + type + ' восстановлены из JSON.');
     } catch (err) { edStatus('Импорт JSON: ' + String(err.message)); }
@@ -818,7 +882,7 @@ function edBuildUI() {
   atlasFile.addEventListener('change', () => {
     const file = atlasFile.files && atlasFile.files[0];
     atlasFile.value = '';
-    atlasAuditResult.hidden = true; atlasAuditResult.textContent = ''; ED.auditType = null;
+    atlasAuditResult.hidden = true; atlasAuditResult.replaceChildren(); ED.auditType = null; ED.auditReport = null;
     if (!file) return;
     if (!/\.png$/i.test(file.name) || file.type && file.type !== 'image/png' ||
         file.size > 16 * 1024 * 1024) { edStatus('Нужен PNG не больше 16 МБ.'); return; }

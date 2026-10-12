@@ -102,3 +102,10 @@ body.editing .stats { display: none; }
 .ed-gallery-frame.on, .ed-gallery-frame[aria-pressed="true"] { border-color: #c9a45c; color: var(--ink); background: #292117; }
 .ed-gallery-frame:hover { border-color: #ad976d; }
 .ed-gallery-frame:focus-visible { outline: 2px solid #c9a45c; outline-offset: 2px; }
+
+/* Actionable NPC asset audit findings: keyboard-accessible frame links and separate JSON export. */
+.ed-atlas-report { display: grid; gap: 5px; }
+.ed-atlas-report p { margin: 0; }
+.ed-audit-finding { color: inherit; background: #1a1a1a; border: 1px solid #424242;
+  padding: 5px; text-align: left; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.ed-audit-finding:hover, .ed-audit-finding:focus-visible { outline: 1px solid #c9a45c; border-color: #c9a45c; }
