@@ -416,7 +416,8 @@ function edCheckDraft() {
   ED.draftData = d;
 }
 function edStatus(text) { ED.ui.status.textContent = text; }
-// Pure, isolated skeleton preview: no NPC spawn, map writes, rig canvas or game RNG.
+// Isolated ASCII preview of the actual production procedural rig, rather than a stick figure.
+// A fixed 30x27 glyph grid is intentionally separate from the game renderer and its state.
 function edPreviewNpc() {
   const canvas = ED.ui?.npcCanvas;
   if (!canvas || canvas.hidden) return;
@@ -430,14 +431,26 @@ function edPreviewNpc() {
   const phase = ED.previewPhase || 0;
   const sample = { cls: spec.renderClass, rigMotion: spec.rigMotion, aiState: state,
     walk: state === 'walk' ? 1 : 0, step: state === 'walk' ? phase : 0, x: 0 };
-  const q = pose(sample);
-  ctx.save(); ctx.translate(canvas.width / 2, 8); ctx.scale(1.55, 1.55);
-  ctx.lineWidth = 3; ctx.strokeStyle = '#b4c8b4'; ctx.fillStyle = '#e0e9db';
-  const joint = (a, b) => { ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); };
-  joint(q.hip, q.neck);
-  for (const leg of q.legs) { joint(q.hip, leg.knee); joint(leg.knee, leg.ankle); }
-  for (const arm of q.arms) { joint(q.sh, arm.elbow); joint(arm.elbow, arm.hand); }
-  ctx.beginPath(); ctx.arc(...q.head, spec.renderClass === 'dwarf' ? 7 : 8, 0, Math.PI * 2); ctx.fill();
+  const image = npcRigPreviewImage(sample);
+  const cols = 30, rows = 27, cw = image.width / cols, ch = image.height / rows;
+  ctx.save();
+  ctx.fillStyle = '#c4c4c4';
+  ctx.font = '600 9px monospace';
+  ctx.textBaseline = 'top';
+  const ramp = ' .:-=+*#%@';
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    let value = 0, weight = 0;
+    const x0 = Math.floor(x * cw), x1 = Math.floor((x + 1) * cw);
+    const y0 = Math.floor(y * ch), y1 = Math.floor((y + 1) * ch);
+    for (let py = y0; py < y1; py++) for (let px = x0; px < x1; px++) {
+      const i = (py * image.width + px) * 4, alpha = image.data[i + 3] / 255;
+      value += image.data[i] * alpha; weight += alpha;
+    }
+    if (weight < 1) continue;
+    const brightness = value / (weight * 255);
+    const rank = Math.max(1, Math.min(ramp.length - 1, Math.floor(brightness * (ramp.length - 1))));
+    ctx.fillText(ramp[rank], x * 6, y * 6.5);
+  }
   ctx.restore();
 }
 function edSyncUI() {
@@ -497,7 +510,7 @@ function edBuildUI() {
   const npcLibrary = el('p', 'ed-help'); npcLibrary.setAttribute('aria-label', 'Библиотека NPC');
   npcLibrary.hidden = true; sOb.append(npcLibrary);
   const npcCanvas = el('canvas', 'ed-mini'); npcCanvas.width = 180; npcCanvas.height = 180;
-  npcCanvas.hidden = true; npcCanvas.setAttribute('aria-label', 'Схема позы NPC'); sOb.append(npcCanvas);
+  npcCanvas.hidden = true; npcCanvas.setAttribute('aria-label', 'ASCII-предпросмотр NPC'); sOb.append(npcCanvas);
   const npcStates = el('div', 'ed-grid'); npcStates.hidden = true;
   for (const state of ['idle', 'walk', 'talk']) npcStates.append(btn(state, '', { preview: state }));
   sOb.append(npcStates);
