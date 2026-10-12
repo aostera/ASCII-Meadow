@@ -56,6 +56,14 @@ function campTent(kind, sd) {
     dag: h => h[1] < Hh * (0.13 + 0.07 * Math.abs(Math.sin(h[2] / L * Math.PI * (big ? 9 : 7)))) && h[1] > Hh * 0.04,   // a dagged valance along the eaves
     band: h => h[1] > Hh * (0.8 + 0.04 * Math.sin(h[2] / L * 6.2832 * (big ? 6 : 5) * 2)),           // the ridge band, dagged
     H: Hh });
+  // Three-dimensional ridge binding and canvas edge battens catch the same
+  // grazing light as the fabric. They are well ABOVE the collision footprint.
+  S.push(campBox([0, Hh - K * .012, 0], [K * .014, K * .016, L * .48],
+    [1, 0, 0], [0, 1, 0], [0, 0, 1], 'trim'));
+  for (const side of [-1, 1]) for (const z of [-L * .38, 0, L * .38]) {
+    S.push(campBox([side * W * .46, K * .055, z],
+      [K * .035, K * .016, K * .022], [1, 0, 0], [0, 1, 0], [0, 0, 1], 'trim'));
+  }
   const lean = torn ? (rnd(4) - 0.5) * 0.25 : 0;
   for (const z of [-L / 2 - K * 0.02, L / 2 + K * 0.02]) S.push(campBox([0, (Hh + (z < 0 ? K * 0.3 : K * 0.06)) / 2, z], [K * 0.02, (Hh + (z < 0 ? K * 0.3 : K * 0.06)) / 2, K * 0.02], [1, 0, 0], campRot([0, 1, 0], [0, 0, 1], z < 0 ? lean : 0), campRot([0, 0, 1], [0, 0, 1], 0), 'wood'));
   // the pennant: a thin cloth tongue off the front pole's top, streaming downwind; a rag on a torn tent
@@ -65,7 +73,13 @@ function campTent(kind, sd) {
   for (const z of [-L / 2, L / 2]) { ropes.push([[0, Hh + K * 0.08, z], [0, 0, z + Math.sign(z) * K * 0.45]]); }
   for (const s of [-1, 1]) for (const z of [-L * 0.3, L * 0.3]) ropes.push([[s * W * 0.36, Hh * 0.28, z], [s * W * 0.8, 0, z]]);
   for (const r of ropes) { const [x, , z] = r[1]; S.push(campBox([x, K * 0.03, z], [K * 0.012, K * 0.03, K * 0.012], [1, 0, 0], [0, 1, 0], [0, 0, 1], 'wood')); }   // the pegs
-  return { S, ropes, foot: (x, z) => Math.abs(x) < W / 2 && Math.abs(z) < L / 2, R: W / 2, H: Hh };
+  return { S, ropes, foot: (x, z) => Math.abs(x) < W / 2 && Math.abs(z) < L / 2,
+    // The tent's footprint and guy ropes sit in grass, not on an opaque shadow decal.
+    grass: (x, z) => {
+      const edge = Math.max(Math.abs(x) - W * .49, Math.abs(z) - L * .49);
+      return Math.max(0, Math.min(1, .62 - edge / (K * .17)));
+    },
+    R: W / 2, depth: L / 2 + K * .5, H: Hh + K * .3 };
 }
 // A stretch of fence turned by ang (radians, 0: running left to right): weathered posts and two rails,
 // one sagging or gone; or a palisade of pointed stakes.
@@ -73,15 +87,18 @@ function campFence(ang, stakes, sd) {
   const rnd = k => hash(sd * 41 + k, 389), K = knightPx(), S = [], up = [0, 1, 0];
   const ex = [Math.cos(ang), 0, Math.sin(ang)], ez = [-Math.sin(ang), 0, Math.cos(ang)], len = K * 1.7, h = K * (stakes ? 0.7 : 0.6);
   const at = (u, y) => [ex[0] * u, y, ex[2] * u];
+  const posts = [];
   if (stakes) {
     for (let u = -len / 2; u <= len / 2 + 1; u += K * 0.085) {
       const k = Math.round(u * 10), hh = h * (0.8 + rnd(k) * 0.3), tilt = (rnd(k + 5) - 0.5) * 0.12, ey = campRot(up, ex, tilt), exx = campRot(ex, ex, 0), ezz = campRot(ez, ex, tilt);
+      posts.push(at(u, 0));
       S.push(campBox(at(u, hh / 2), [K * 0.03, hh / 2, K * 0.03], exx, ey, ezz, 'wood', K * 0.07));
     }
   } else {
     const n = 4, gap = len / (n - 1), broken = (rnd(1) * 3) | 0;
     for (let k = 0; k < n; k++) {
       const u = -len / 2 + k * gap, hh = h * (0.92 + rnd(k + 2) * 0.16), tilt = (rnd(k + 7) - 0.5) * 0.16;
+      posts.push(at(u, 0));
       S.push(campBox(at(u, hh / 2), [K * 0.032, hh / 2, K * 0.032], ex, campRot(up, ex, tilt), campRot(ez, ex, tilt), 'wood'));
     }
     for (let k = 0; k < n - 1; k++) for (const [y, j] of [[h * 0.45, 0], [h * 0.8, 1]]) {
@@ -92,7 +109,16 @@ function campFence(ang, stakes, sd) {
     }
   }
   const foot = (x, z) => Math.abs(x * ez[0] + z * ez[2]) < K * 0.07 && Math.abs(x * ex[0] + z * ex[2]) < len / 2 + K * 0.05;
-  return { S, ropes: [], foot, R: len / 2, H: h };
+  // Flatten close to the timber only; long grass survives beside and partly in
+  // front of each rail. Posts alone pierce the ground, the rail stays above it.
+  const grass = (x, z) => {
+    const along = x * ex[0] + z * ex[2], across = x * ez[0] + z * ez[2];
+    if (Math.abs(along) > len / 2 + K * .12) return 0;
+    const rim = K * .17;
+    return Math.max(0, (1 - Math.abs(across) / rim) * .82);
+  };
+  return { S, ropes: [], foot, posts, grass, R: len / 2,
+    depth: len / 2, H: h + K * .07 };
 }
 
 // A cooking fire's gear: three poles leaning together over the flames, a chain from where they cross, and a
@@ -118,9 +144,40 @@ function campCook() {
 }
 let COOKV = null;   // its baked picture
 
+// Ground shadows are sampled from the SAME convex 3D solids and LGT as the
+// objects' lit faces. Once per variant/resize, not once per frame. These cells
+// shade the terrain, including grass moving around a fence's actual posts.
+// Coarse cell offsets use the same ground projection as bakeTree3D.gshadow.
+function bakeCampGround(type, model) {
+  const { S, R, H, depth = R, foot, posts = [], grass } = model;
+  const ex = Math.ceil((R + H * Math.abs(LGT[0]) / LGT[1] + CW * 3) / CW);
+  const ez = Math.ceil((depth + H * Math.abs(LGT[2]) / LGT[1] + CH * 3 / SINP) * SINP / CH);
+  const gshadow = [], grounding = [], hide = [], postKeys = new Set();
+  if (type === 'fence') for (const p of posts) {
+    const dx = Math.round(p[0] / CW), dy = Math.round(-p[2] * SINP / CH);
+    postKeys.add(dy * 8192 + dx);
+  }
+  for (let dy = -ez; dy <= ez; dy++) for (let dx = -ex; dx <= ex; dx++) {
+    const x = dx * CW, z = -dy * CH / SINP;
+    // Contact is nonzero only under the true model footprint, not a huge oval.
+    const contact = foot(x, z) ? (type === 'fence' ? .31 : .28) : 0;
+    const hit = campHit(S, [x, .35, z], LGT);
+    const cast = hit ? (type === 'fence' ? .24 : .33) : 0;
+    const strength = Math.max(contact, cast);
+    if (strength > 0) gshadow.push(dx, dy, Math.round(strength * 100));
+    if (grass) {
+      const value = grass(x, z);
+      if (value > .025) grounding.push(dx, dy, Math.round(value * 100));
+    }
+    if (type === 'fence' && postKeys.has(dy * 8192 + dx)) hide.push(dx, dy);
+  }
+  return { gshadow: Int16Array.from(gshadow), grounding: Int16Array.from(grounding), postHide: Int16Array.from(hide) };
+}
+
 // ---------- baking: the model into fine glyphs ----------
 function bakeCamp(type, model, sd) {
   const fd = charDims(player), fw = fd.fcw, fh = fd.fch, D = [0, -SINP, COSP], { S, ropes, R, H } = model;
+  const ground = type === 'tent' || type === 'fence' ? bakeCampGround(type, model) : null;
   const list = [], runs = [], shade = [], half = R * 1.75;
   const y0 = Math.floor(-(H + 0.1 * knightPx()) * COSP / fh - R * 1.2 * SINP / fh) - 2, y1 = Math.ceil(R * 1.2 * SINP / fh) + 2;
   for (let cy = y0; cy <= y1; cy++) {
@@ -140,15 +197,23 @@ function bakeCamp(type, model, sd) {
       const diff = Math.max(0, campDot(n, LGT)), lit = diff > 0 && campHit(s.others || (s.others = S.filter(o => o !== s)), [p[0] + n[0] * 0.6, p[1] + n[1] * 0.6, p[2] + n[2] * 0.6], LGT) ? 0.45 : 1;
       let alb, c = null;
       if (s.mat === 'cloth') {
-        alb = 0.52 * (0.78 + 0.34 * vnoise(p[0] * 0.07 + sd * 3, p[2] * 0.035 + p[1] * 0.02));      // folds and sag
+        alb = 0.52 * (0.78 + 0.34 * vnoise(p[0] * 0.07 + sd * 3, p[2] * 0.035 + p[1] * 0.02));
+        // Long woven creases taper towards the eaves and break up smooth 3D
+        // slopes. Fold troughs darken; ridges catch the same directional key.
+        const fold = Math.sin(p[2] * .09 + p[0] * .045 + sd * .2) *
+          Math.sin(Math.PI * Math.min(1, Math.max(0, p[1] / s.H)));
+        alb *= .88 + .26 * Math.max(-1, Math.min(1, fold));
         if (vnoise(p[0] * 0.21 + 9, p[1] * 0.19 + p[2] * 0.11) > 0.7) alb *= 0.68;                // stains, patches
         if (p[1] < s.H * 0.14) alb *= 0.62;                                                        // mud along the hem
-        if (s.seam && s.seam(p)) alb *= 0.5;
+        if (s.seam && s.seam(p)) { alb *= .52; if (hash(cx + sd, cy) > .77) c = ':'; }
         if (s.dag && s.dag(p)) alb *= 1.35;
         if (s.band && s.band(p)) alb *= 0.6;
         if (s.door && s.door(p)) { alb = 0.04; c = ' '; }                                          // the dark inside
         else if (s.flap && s.flap(p)) alb *= 1.25;                                                 // the flap tied back
         else if (Math.abs(n[1]) < 0.95 && Math.abs(n[2]) < 0.5 && hash(cx * 3 + 1, cy * 5) < 0.45) c = n[0] < 0 ? '/' : '\\';   // slopes run in strokes
+      } else if (s.mat === 'trim') {
+        alb = n[1] > .45 ? .65 : .34; // raised canvas binding and reinforced eyelets
+        if (hash(cx + sd, cy * 7) > .74) c = n[1] > .5 ? '=' : ':';
       } else if (s.mat === 'iron') {
         alb = n[1] > 0.9 ? 0.16 + (hash(cx, cy) > 0.8 ? 0.2 : 0) : 0.3 * (0.8 + 0.3 * vnoise(p[0] * 0.4, p[1] * 0.5));   // sooty iron; the stew a dark sheen on top
         if (n[1] <= 0.9) alb += 0.42 * Math.max(0, Math.min(1, (knightPx() * 0.52 - p[1]) / (knightPx() * 0.2)));   // its sides lit from below by the flames, brightest low down
@@ -178,7 +243,14 @@ function bakeCamp(type, model, sd) {
   for (let dy = -Math.ceil(R * 1.1 * SINP / CH) - 1; dy <= Math.ceil(R * 1.1 * SINP / CH) + 1; dy++) for (let dx = -Math.ceil(R / CW) - 1; dx <= Math.ceil(R / CW) + 1; dx++)
     if (model.foot(dx * CW, -dy * CH / SINP)) block.push(dx, dy);
   let minY = 0; for (let k = 1; k < list.length; k += 4) minY = Math.min(minY, list[k]);
-  return { type, list: Int32Array.from(list), runs: Int16Array.from(runs), shade: Int16Array.from(shade), hide: Int16Array.from(block), block: Int16Array.from(block), fw, fh, minY, R, Hc: H, crownH: Math.max(1, -minY * fh), solid: true };
+  // Geometry still blocks movement exactly as before. Only wood posts suppress
+  // grass completely; the fence's rails allow shorter grass under them.
+  const hide = type === 'fence' ? ground.postHide : Int16Array.from(block);
+  return { type, list: Int32Array.from(list), runs: Int16Array.from(runs),
+    shade: type === 'cook' ? Int16Array.from(shade) : new Int16Array(0),
+    hide, block: Int16Array.from(block),
+    gshadow: ground?.gshadow || null, grounding: ground?.grounding || null,
+    fw, fh, minY, R, Hc: H, crownH: Math.max(1, -minY * fh), solid: true };
 }
 // The camp's variants: four tents (two whole, two torn), six stretches of fence (rails at four turns, stakes at two).
 function bakeCampVariants(out) {

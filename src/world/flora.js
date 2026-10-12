@@ -6,7 +6,7 @@
 // branches through; bare trees are nets of thin crooked branches. Each variant is baked once.
 const fid = (c, l) => KN0 + FCI[c] * KLV + Math.max(0, Math.min(KLV - 1, l));
 const VARS = [], flora = [], LILIES = [];   // LILIES: three pads, then two in flower (bakeLily)
-let tmask = null, fmask = null, FLMAXR = 0;   // tmask: trunks and tents; fmask: fences, which a jump clears
+let tmask = null, fmask = null, campGround = null, FLMAXR = 0;   // tmask: trunks and tents; fmask: fences, which a jump clears
 const fbm3 = (x, y) => vnoise(x, y) * 0.55 + vnoise(x * 2.1 + 3.7, y * 2.1) * 0.3 + vnoise(x * 4.3, y * 4.3 + 1.3) * 0.15;
 function bakeVariant(type, sd) {
   const rnd = (k) => hash(sd * 31 + k, 977);
@@ -203,6 +203,7 @@ function placeFlora() {
   flora.length = 0;
   const trees = variantsOf('tree'), dead = variantsOf('dead'), bush = variantsOf('bush');
   tmask = new Uint8Array(N); fmask = new Uint8Array(N);
+  campGround = new Float32Array(N); // rebuilt every time; never mutates the designer's ground map
   if (MEADOW_MAP.flora) MEADOW_MAP.flora.forEach(([type, k, gx, gz], mi) => {
     if (ruinClearing(gx, gz, RUIN_FLORA_BUFFER)) return; // clear the actual 3D silhouette, not only arch feet
     const own = variantsOf(type), set = own.length ? own : trees, v = set[Math.max(0, Math.min(set.length - 1, k | 0))];
@@ -244,7 +245,27 @@ function placeFlora() {
   for (const f of flora) {
     const v = f.v, bx = Math.round(f.x), br = f.br;
     for (let k = 0; k < v.hide.length; k += 2) { const cx = bx + v.hide[k], cy = br + v.hide[k + 1]; if (cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS) kind[cy * COLS + cx] = 0; }
-    if (v.block) { const M = v.type === 'fence' ? fmask : tmask; for (let k = 0; k < v.block.length; k += 2) { const cx = bx + v.block[k], cy = br + v.block[k + 1]; if (cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS) M[cy * COLS + cx] = 1; } continue; }   // tents and fences: their footprint; their shadow is in the picture
+    if (v.block) { // tents/fences are solid, but their shadows belong to the GROUND
+      const M = v.type === 'fence' ? fmask : tmask;
+      for (let k = 0; k < v.block.length; k += 2) {
+        const cx = bx + v.block[k], cy = br + v.block[k + 1];
+        if (cx >= 0 && cy >= 0 && cx < COLS && cy < ROWS) M[cy * COLS + cx] = 1;
+      }
+      if (v.grounding) for (let k = 0; k < v.grounding.length; k += 3) {
+        const cx = bx + v.grounding[k], cy = br + v.grounding[k + 1];
+        if (cx < 0 || cy < 0 || cx >= COLS || cy >= ROWS) continue;
+        const i = cy * COLS + cx;
+        campGround[i] = Math.max(campGround[i], v.grounding[k + 2] * .01);
+      }
+      if (v.gshadow) for (let k = 0; k < v.gshadow.length; k += 3) {
+        const cx = bx + v.gshadow[k], cy = br + v.gshadow[k + 1];
+        if (cx < 0 || cy < 0 || cx >= COLS || cy >= ROWS) continue;
+        const i = cy * COLS + cx;
+        // Same additive bshade as tree and ruin contact/cast shadows.
+        bshade[i] = Math.min(.7, bshade[i] + v.gshadow[k + 2] * .01);
+      }
+      continue;
+    }
     if (v.type !== 'bush') for (let dx = -1; dx <= 1; dx++) { const i = br * COLS + bx + dx; if (i >= 0 && i < N) tmask[i] = 1; }
     if (v.gshadow) {   // world/trees3d.js: the crown's own shadow, cast along the castle's light
       const G = v.gshadow;

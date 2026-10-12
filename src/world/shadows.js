@@ -1,4 +1,4 @@
-// Shadows of the knight and the cows on the grass, written into `shadow`: the share of light a cell loses
+// Shadows of the knight, NPCs and cows on the grass, written into `shadow`: the share of light a cell loses
 // (grass multiplies its light by 1 − shadow, the fog grain over it dims too). The night has no moon:
 //  - a dense contact patch under the body (along it for a cow), shrinking and paling in a jump;
 //  - near a fire, a long shadow thrown straight away from the flame, as strong as its light there;
@@ -46,6 +46,14 @@ function castShadow(e) {
   // contact: dense and flat under the whole body; in the air it shrinks and pales
   const cr = (cow ? 2.6 : 6) * CW * (1 - 0.45 * k);
   shadeCapsule(fx - tx, fy - ty, fx + tx, fy + ty, cr, cr, CONTACT_S * (1 - 0.65 * k), 0, cr / ((cow ? 1.6 : 2) * CH * (1 - 0.45 * k)));
+  // Ambient key light shares LGT with every 3D ruin, tree and tent. The
+  // light comes from above/left/front in MODEL coordinates; the cast lies in
+  // the opposite direction projected onto the sloping ground camera.
+  // Static objects bake this direction; bodies animate it in the view band.
+  const sunX = -LGT[0] / LGT[1], sunY = LGT[2] * SINP / LGT[1];
+  const bodyHeight = e.actorType ? Math.max(10, geomOf(e).h) : h;
+  castAlong(fx, fy, tx, ty, sunX, sunY, air, bodyHeight * .65,
+    Math.max(CW * 1.4, w * .75), .19 * (1 - .4 * k), .65, cow);
   // the fire nearest in light, as fireLightAt sees it: a low flame throws a long, deep shadow that only
   // gives out near the edge of its light
   let fI = 0, gx = 0, gy = 0;

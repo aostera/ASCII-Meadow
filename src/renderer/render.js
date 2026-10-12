@@ -40,7 +40,7 @@ function render() {
     blit(ci, lv, px, py);
   };
   // the per-cell arrays as locals: a script-level binding costs a context load and a hole check on every read
-  const KD = kind, SD = seed, HT = height, FL = flat, AN = ang, SG = segs, SHD = shadow, BS = bshade, FRT = FR, CB = cloudBuf;
+  const KD = kind, SD = seed, HT = height, FL = flat, AN = ang, SG = segs, SHD = shadow, BS = bshade, FRT = FR, CB = cloudBuf, CG = campGround;
   for (let y = VY0; y <= VY1 + 4 && y < ROWS; y++) {
     while (oi < order.length && (order[oi].y + 0.7) * CH < (y + 1) * CH) {
       const e = order[oi++];
@@ -100,7 +100,10 @@ function render() {
       }
       if (kd >= 3) { P(FL[i] > 0.5 ? CI['.'] : (kd === 3 ? CI['*'] : kd === 4 ? CI['o'] : CI['"']), kd === 3 ? C_WHITE : kd === 4 ? C_YEL : C_LAV, px + AN[i] * 1.5, py, x, y, baseY); continue; }
       // a blade: stem at its cell, then up to three more glyphs climbing and bending further with the wind
-      const h = HT[i], f = FL[i], a = AN[i], front = FRT[i];
+      // The grass by a fence is shortened, not erased into a sterile strip.
+      // Its posts conceal only their own cells; blades remain at the outer edge.
+      const grounding = CG ? CG[i] : 0;
+      const h = HT[i] * (1 - grounding * .52), f = Math.max(FL[i], grounding * .78), a = AN[i], front = FRT[i];
       // its light: height, lean, a passing wind front; flattening, cloud and shade take from it, and a body's
       // shadow takes a share, so it shows even on grass lit to the full. Shades below 4 vanish into the ground
       let l = 0.24 + h * 0.52 + Math.max(0, a) * 0.16 + (front > 0.55 ? (front - 0.55) * 0.55 : 0) - f * 0.38 - cloud * 0.75 - BS[i] + (s - 0.5) * 0.16;
@@ -108,7 +111,7 @@ function render() {
       const lt = l < 0 ? 0 : (l * SH) | 0;
       if (lt > 6) P(stemGlyph(a * 0.65, s, h, f), lt - 3, px + a * 0.8, py, x, y, baseY);
       if (f > 0.4 || h < 0.3) continue;
-      const n = SG[i];
+      const n = grounding > .28 ? Math.max(1, Math.round(SG[i] * (1 - grounding * .82))) : SG[i];
       for (let k = 1; k <= n && y - k >= 0; k++) {
         const bend = a * (0.6 + k * 0.45);
         const r = (s * 7.31 + k * 0.618) % 1;
