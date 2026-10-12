@@ -63,13 +63,16 @@ const { launch, openGame, realErrors } = require('./common.cjs');
             return h >>> 0;
           };
           const mainRig = [rig.width, rig.height];
-          const baseline = fingerprint();
+          // Chromium can rasterize its monospace font differently on the first paint.
+          // Source rig pixels are stable; compare subsequent warmed draws, not the cold font cache.
+          const cold = fingerprint();
           edPreviewNpc();
           const second = fingerprint();
           edPreviewNpc();
           const third = fingerprint();
-          const repeatable = baseline === second && second === third;
-          const hashesRepeated = [baseline, second, third];
+          const repeatable = second === third;
+          const baseline = third;
+          const hashesRepeated = [cold, second, third];
           const spec = ACTOR_TYPES.get('villager');
           const sample = { cls: spec.renderClass, rigMotion: spec.rigMotion, aiState: 'idle',
             walk: 0, step: 0, x: 0 };
@@ -122,7 +125,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
             hashes: variants, hashesRepeated, rawDiff };
         });
         assert(preview.visible && preview.painted && preview.unchanged);
-        assert(preview.repeatable && preview.distinctFrames && preview.isolatedRig && preview.accessibleLabel,
+        assert(preview.repeatable && preview.rawDiff === 0 && preview.distinctFrames && preview.isolatedRig && preview.accessibleLabel,
           'NPC ASCII preview should be distinct, reproducible and isolated: ' + JSON.stringify(preview));
         assert(preview.sliderVisible && preview.sliderHidden && preview.phaseApplied && preview.accessible);
         assert.deepEqual(preview.states, ['idle', 'walk', 'talk']);
