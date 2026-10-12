@@ -90,6 +90,8 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
         camX=Math.max(0,Math.min(COLS-VC,gx-VC/2));
         camY=Math.max(0,Math.min(ROWS-VR,
           gy-(r.height*COSP*WS/CH)/2-VR/2));
+        player.say = ''; player.sayT = 0; // do not label unrelated screenshots with the last inspected ruin
+        updateWorld(0); // recompute the E prompt after each test teleport
         setView(); render();
       },site);
       await page.screenshot({path:path.join(out, mode+'-'+viewport.width+'-'+site+'.png')});
