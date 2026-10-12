@@ -18,6 +18,22 @@ const { launch, openGame, realErrors } = require('./common.cjs');
       try {
         await step(3);
         const original = await page.evaluate(() => mapFileText());
+        const shipped = await page.evaluate(() => ({
+          status: NPC_ATLASES.get('villager')?.status,
+          src: NPC_ATLASES.get('villager')?.source,
+          ready: NPC_ATLASES.get('villager')?.image.naturalWidth,
+          rows: NPC_ATLASES.get('villager')?.layout.states.walk.rows.length,
+          frames: NPC_ATLASES.get('villager')?.layout.states.walk.frames,
+          loadedTypes: NPC_SHIPPED_ATLASES.map(a => a.type),
+          map: mapFileText()
+        }));
+        assert.equal(shipped.status, 'ready', 'shipped villager art must load from file://');
+        assert.equal(shipped.ready, 480);
+        assert.equal(shipped.src, 'assets/npc/villager-starter.png');
+        assert.equal(shipped.rows, 8);
+        assert.equal(shipped.frames, 12);
+        assert.deepEqual(shipped.loadedTypes, ['villager']);
+        assert.equal(shipped.map, original);
         await page.evaluate(() => {
           openEditor(); ED.tool = 'npc'; ED.previewAuto = false;
           ED.previewState = 'walk'; ED.previewPhase = Math.PI / 2;
@@ -46,11 +62,22 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         assert(catalog.initial.open && catalog.initial.expanded === 'true');
         assert.equal(catalog.initial.cards, 6);
         assert.equal(catalog.initial.thumbs, 24);
-        assert.equal(catalog.initial.directions, 0);
-        assert(catalog.initial.hasCaveat && catalog.initial.names.some(n => n.includes('Отшельник')));
+        assert.equal(catalog.initial.directions, 8,
+          'published starter art should provide eight real directions in the gallery');
+        assert(!catalog.initial.hasCaveat && catalog.initial.names.some(n => n.includes('Отшельник')));
         assert.deepEqual(catalog.selected, { type: 1, state: 'talk', paused: true,
           frame: 6, tool: 'npc', mapUnchanged: true, actorsUnchanged: true });
         assert(catalog.closed, 'animation library should collapse without touching the map');
+        const fallbackGallery = await page.evaluate(() => {
+          ED.variant.npc = 1; ED.previewState = 'walk'; ED.previewDirection = 0; edSyncUI();
+          ED.ui.npcGalleryToggle.click();
+          const result = { dirs: ED.ui.npcGallery.querySelectorAll('.ed-gallery-direction').length,
+            hasCaveat: ED.ui.npcGallery.textContent.includes('не подменяется поворотами'),
+            procedurallyRendered: !NPC_ATLASES.has('hermit') };
+          ED.ui.npcGalleryToggle.click();
+          return result;
+        });
+        assert.deepEqual(fallbackGallery, { dirs: 0, hasCaveat: true, procedurallyRendered: true });
         await page.evaluate(() => { ED.variant.npc = 0; ED.previewState = 'walk'; edSyncUI(); });
         await page.screenshot({ path: path.join(gallery, mode + '-villager-procedural.png') });
         await page.evaluate(() => { ED.variant.npc = 1; edSyncUI(); });

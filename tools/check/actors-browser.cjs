@@ -127,7 +127,8 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         assert(preview.visible && preview.painted && preview.unchanged);
         assert(preview.repeatable && preview.rawDiff === 0 && preview.distinctFrames && preview.isolatedRig && preview.accessibleLabel,
           'NPC ASCII preview should be distinct, reproducible and isolated: ' + JSON.stringify(preview));
-        assert(preview.sliderVisible && preview.sliderHidden && preview.phaseApplied && preview.accessible);
+        assert(!preview.sliderVisible && preview.sliderHidden && preview.phaseApplied && preview.accessible,
+          'shipped sprite atlas uses its frame timeline, not the procedural-phase slider');
         assert.deepEqual(preview.states, ['idle', 'walk', 'talk']);
         assert.deepEqual(preview.catalog, ['villager', 'hermit']);
         assert(preview.choseHermit && preview.catalogIsReadOnly && preview.manualPause, 'NPC catalog browsing must not edit map');
