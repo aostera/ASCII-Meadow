@@ -93,6 +93,66 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         await page.screenshot({ path: path.join(gallery, mode + '-synthetic-png.png') });
         await page.evaluate(() => { ED.variant.npc = 1; ED.previewState = 'idle'; edSyncUI(); });
         await page.screenshot({ path: path.join(gallery, mode + '-hermit-fallback.png') });
+        // Permanent-manifest geometry: verify each authored d8 direction is exposed in
+        // the editor; this test PNG is in-memory only (never part of the shipped map).
+        await page.evaluate(() => {
+          const sheet = document.createElement('canvas');
+          sheet.width = 4 * 32; sheet.height = 8 * 32;
+          const draw = sheet.getContext('2d');
+          for (let d = 0; d < 8; d++) for (let frame = 0; frame < 4; frame++) {
+            const x = frame * 32, y = d * 32, tone = 38 + d * 25;
+            draw.fillStyle = 'rgb(' + tone + ',' + tone + ',' + tone + ')';
+            draw.fillRect(x + 4, y + 3, 24, 26);
+            draw.clearRect(x + 6 + d % 6, y + 10, 4, 12);
+          }
+          const rows = [0,1,2,3,4,5,6,7];
+          npcAtlasAttach('villager', {
+            frameWidth: 32, frameHeight: 32,
+            states: { idle: { frames: 4, fps: 6, rows },
+              walk: { frames: 4, fps: 10, rows } }
+          }, sheet.toDataURL('image/png'));
+        });
+        let directionalStatus = 'loading';
+        for (let i = 0; i < 60; i++) {
+          directionalStatus = await page.evaluate(() => NPC_ATLASES.get('villager').status);
+          if (directionalStatus !== 'loading') break;
+          await step(1);
+          await page.waitForTimeout(40);
+        }
+        assert.equal(directionalStatus, 'ready', '8-view NPC fixture failed to load');
+        const directions = await page.evaluate(() => {
+          ED.variant.npc = 0; ED.sel = null; ED.tool = 'npc'; ED.previewState = 'walk';
+          ED.previewPhase = Math.PI / 2; ED.previewAuto = false;
+          edSyncUI();
+          const source = mapFileText();
+          const buttons = [...ED.ui.npcDirections.querySelectorAll('[data-npc-dir]')];
+          const captures = [];
+          const sample = { actorType: 'villager', actorAnimTime: 0, d8: 0 };
+          for (const button of buttons) {
+            button.click();
+            sample.d8 = Number(button.dataset.npcDir);
+            const frame = npcAtlasFrame(sample, 'walk', Math.PI / 2);
+            edPreviewNpc(); // warm font-cache before computing visual fingerprint
+            const pixels = ED.ui.npcCanvas.getContext('2d', { willReadFrequently: true })
+              .getImageData(0, 0, 180, 180).data;
+            let h = 2166136261;
+            for (const value of pixels) { h ^= value; h = Math.imul(h, 16777619); }
+            captures.push({ selected: ED.previewDirection, row: frame.y, hash: h >>> 0,
+              pressed: button.getAttribute('aria-pressed') });
+          }
+          const eightVisible = !ED.ui.npcDirections.hidden;
+          ED.variant.npc = 1; edSyncUI(); // hermit has no authored eight-direction PNG
+          const proceduralHidden = ED.ui.npcDirections.hidden;
+          return { count: buttons.length, captures, eightVisible, proceduralHidden,
+            mapUnchanged: source === mapFileText() };
+        });
+        assert.equal(directions.count, 8);
+        assert(directions.eightVisible && directions.proceduralHidden && directions.mapUnchanged);
+        assert.deepEqual(directions.captures.map(v => v.row), [0,32,64,96,128,160,192,224]);
+        assert.deepEqual(directions.captures.map(v => v.selected), [0,1,2,3,4,5,6,7]);
+        assert(directions.captures.every(v => v.pressed === 'true'));
+        assert(new Set(directions.captures.map(v => v.hash)).size >= 3,
+          'authored directions must display visually distinct glyph previews');
         const cleanup = await page.evaluate(() => {
           const removed = despawnActor('test-atlas-npc');
           closeEditor();
