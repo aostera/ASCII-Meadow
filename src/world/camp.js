@@ -56,6 +56,14 @@ function campTent(kind, sd) {
     dag: h => h[1] < Hh * (0.13 + 0.07 * Math.abs(Math.sin(h[2] / L * Math.PI * (big ? 9 : 7)))) && h[1] > Hh * 0.04,   // a dagged valance along the eaves
     band: h => h[1] > Hh * (0.8 + 0.04 * Math.sin(h[2] / L * 6.2832 * (big ? 6 : 5) * 2)),           // the ridge band, dagged
     H: Hh });
+  // Three-dimensional ridge binding and canvas edge battens catch the same
+  // grazing light as the fabric. They are well ABOVE the collision footprint.
+  S.push(campBox([0, Hh - K * .012, 0], [K * .014, K * .016, L * .48],
+    [1, 0, 0], [0, 1, 0], [0, 0, 1], 'trim'));
+  for (const side of [-1, 1]) for (const z of [-L * .38, 0, L * .38]) {
+    S.push(campBox([side * W * .46, K * .055, z],
+      [K * .035, K * .016, K * .022], [1, 0, 0], [0, 1, 0], [0, 0, 1], 'trim'));
+  }
   const lean = torn ? (rnd(4) - 0.5) * 0.25 : 0;
   for (const z of [-L / 2 - K * 0.02, L / 2 + K * 0.02]) S.push(campBox([0, (Hh + (z < 0 ? K * 0.3 : K * 0.06)) / 2, z], [K * 0.02, (Hh + (z < 0 ? K * 0.3 : K * 0.06)) / 2, K * 0.02], [1, 0, 0], campRot([0, 1, 0], [0, 0, 1], z < 0 ? lean : 0), campRot([0, 0, 1], [0, 0, 1], 0), 'wood'));
   // the pennant: a thin cloth tongue off the front pole's top, streaming downwind; a rag on a torn tent
@@ -189,15 +197,23 @@ function bakeCamp(type, model, sd) {
       const diff = Math.max(0, campDot(n, LGT)), lit = diff > 0 && campHit(s.others || (s.others = S.filter(o => o !== s)), [p[0] + n[0] * 0.6, p[1] + n[1] * 0.6, p[2] + n[2] * 0.6], LGT) ? 0.45 : 1;
       let alb, c = null;
       if (s.mat === 'cloth') {
-        alb = 0.52 * (0.78 + 0.34 * vnoise(p[0] * 0.07 + sd * 3, p[2] * 0.035 + p[1] * 0.02));      // folds and sag
+        alb = 0.52 * (0.78 + 0.34 * vnoise(p[0] * 0.07 + sd * 3, p[2] * 0.035 + p[1] * 0.02));
+        // Long woven creases taper towards the eaves and break up smooth 3D
+        // slopes. Fold troughs darken; ridges catch the same directional key.
+        const fold = Math.sin(p[2] * .09 + p[0] * .045 + sd * .2) *
+          Math.sin(Math.PI * Math.min(1, Math.max(0, p[1] / s.H)));
+        alb *= .88 + .26 * Math.max(-1, Math.min(1, fold));
         if (vnoise(p[0] * 0.21 + 9, p[1] * 0.19 + p[2] * 0.11) > 0.7) alb *= 0.68;                // stains, patches
         if (p[1] < s.H * 0.14) alb *= 0.62;                                                        // mud along the hem
-        if (s.seam && s.seam(p)) alb *= 0.5;
+        if (s.seam && s.seam(p)) { alb *= .52; if (hash(cx + sd, cy) > .77) c = ':'; }
         if (s.dag && s.dag(p)) alb *= 1.35;
         if (s.band && s.band(p)) alb *= 0.6;
         if (s.door && s.door(p)) { alb = 0.04; c = ' '; }                                          // the dark inside
         else if (s.flap && s.flap(p)) alb *= 1.25;                                                 // the flap tied back
         else if (Math.abs(n[1]) < 0.95 && Math.abs(n[2]) < 0.5 && hash(cx * 3 + 1, cy * 5) < 0.45) c = n[0] < 0 ? '/' : '\\';   // slopes run in strokes
+      } else if (s.mat === 'trim') {
+        alb = n[1] > .45 ? .65 : .34; // raised canvas binding and reinforced eyelets
+        if (hash(cx + sd, cy * 7) > .74) c = n[1] > .5 ? '=' : ':';
       } else if (s.mat === 'iron') {
         alb = n[1] > 0.9 ? 0.16 + (hash(cx, cy) > 0.8 ? 0.2 : 0) : 0.3 * (0.8 + 0.3 * vnoise(p[0] * 0.4, p[1] * 0.5));   // sooty iron; the stew a dark sheen on top
         if (n[1] <= 0.9) alb += 0.42 * Math.max(0, Math.min(1, (knightPx() * 0.52 - p[1]) / (knightPx() * 0.2)));   // its sides lit from below by the flames, brightest low down
