@@ -50,7 +50,7 @@ for (let i = 0; i < sites.length; i++) {
   const site = sites[i], p = world.props[i];
   assert.equal(p.ruinId, site.id);
   assert.equal(p.spots.length, 2);
-  assert.deepEqual(p.spots.map(s => s.action), ['inspect','inspect']);
+  assert.deepEqual(Array.from(p.spots, s => s.action), ['inspect','inspect']);
   for (const spot of p.spots) {
     const side = spot.id.endsWith('-south') ? -1 : 1;
     world.player.x = site.x;
