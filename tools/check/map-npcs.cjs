@@ -22,6 +22,21 @@ const ok = (value, detail) => assert(value, detail);
       ok(!before.exported.includes('"actors"'), 'v1 export must not be rewritten as v2');
       ok(before.widget, 'map editor must have NPC placement tool');
 
+      // Preview is read-only, including across export/import and viewport sizes.
+      const previewIsolation = await original.page.evaluate(() => {
+        const before = mapFileText();
+        openEditor();
+        ED.tool = 'npc'; ED.variant.npc = 1;
+        ED.previewState = 'walk'; ED.previewPhase = 3.14;
+        edSyncUI();
+        const previewed = !ED.ui.npcCanvas.hidden;
+        const after = mapFileText();
+        closeEditor();
+        return { previewed, identical: before === after, actors: npcs.filter(n => n.fromMap).length };
+      });
+      ok(previewIsolation.previewed && previewIsolation.identical && previewIsolation.actors === 0,
+        'preview must not alter v1 export or place actors');
+
       const editing = await original.page.evaluate(() => {
         openEditor();
         const [x, z] = toModelXZ(player.x + 5, player.y + 3);
