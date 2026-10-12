@@ -16,6 +16,9 @@ function placeEntities() {
   player.dir = 'up'; player.d8 = 4;
   placeCows();
   syncMapActors(); // v2 maps only; the original v1 map keeps its empty NPC list
+  // One authored camp resident, independent of editor map export.
+  if (!npcs.some(n => n.actorId === 'camp-villager'))
+    spawnActor('villager', { id: 'camp-villager', world: [-356.4, -1916], behavior: 'idle' });
   updateCamera(0, true);
 }
 // The nearest point out of water, marsh and the castle's walls: a stroke or the moved castle may cover the start.
