@@ -38,8 +38,16 @@ function charDims(e) {
     if (W < 640 || H < 560) ffs = Math.max(2, Math.min(4.8, H * (W < H ? 0.175 : 0.16) / 40));
     return { ffs, fcw: ffs * 0.6, fch: ffs * 0.9, u: Math.max(1, Math.min(2, H * 0.16 / 92)) };
   }
+  if (e && e.actorType) {
+    // Match the visible height of the 40x56 authored NPC sprite to the knight.
+    // The current sheets use roughly 48 of their 56 rows for the character.
+    // Reusing the knight's glyph pitch also prevents a giant/coarse NPC on phones.
+    const knight = charDims(player);
+    const u = (KG.art * knight.fch) / (BOX_H * (48 / 56));
+    return { ...knight, u };
+  }
   const ffs = Math.max(3.8, FS * 0.42);
-  const u = Math.max(1.25, Math.min(2.3, H / 400)); // px per model unit
+  const u = Math.max(1.25, Math.min(2.3, H / 400)); // legacy procedural figures
   return { ffs, fcw: ffs * 0.6, fch: ffs * 0.9, u };
 }
 const boxH = e => BOX_H;
