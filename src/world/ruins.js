@@ -215,11 +215,15 @@ function ruinArchitecturalRelief(site) {
 }
 // Keep all authored scenery unchanged on disk; suppress only rendered plants that
 // would occupy the interior, arch thresholds or a wall's footings.
-function ruinClearing(x, z) {
+// Extra vegetation clearance protects the visible 3D side faces and absorbs
+// pixel->world rounding at authored flora placements. The authored map stays
+// completely unchanged; only nearby rendered plants are filtered.
+const RUIN_FLORA_BUFFER = 72;
+function ruinClearing(x, z, pad = 0) {
   return RUIN_SITES.some(r => {
     const [lx, lz] = ruinLocalXZ(r, x, z);
-    return Math.abs(lx) < r.width / 2 + 20 &&
-      Math.abs(lz) < r.depth / 2 + 26;
+    return Math.abs(lx) < r.width / 2 + 20 + pad &&
+      Math.abs(lz) < r.depth / 2 + 26 + pad;
   });
 }
 function ruinWallRectangles(site) {
