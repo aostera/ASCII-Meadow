@@ -7,7 +7,7 @@ const ED = {
   sel: null, hover: null, drag: null, pan: null, stroke: null, space: false,
   undo: [], redo: [], keys: new Set(), mx: -1, my: -1, inView: false,
   ui: null, mini: null, miniKey: '', draftTimer: 0,
-  previewAuto: true, previewClock: 0, previewPhase: 0, previewState: 'idle', previewDirection: 0, atlasUrls: {}, auditType: null,
+  previewAuto: true, previewClock: 0, previewPhase: 0, previewState: 'idle', previewDirection: 0, atlasUrls: {}, auditType: null, galleryOpen: false,
 };
 const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['w', 'Вода', '9'], ['m', 'Болото', 'P'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
 const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['stone', 'Камень', 'Z'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['tent', 'Палатка', 'Y'], ['fence', 'Забор', 'I'], ['toad', 'Жаба', 'G'], ['frog', 'Лягушка', 'X'], ['birds', 'Птицы в траве', 'O'], ['castle', 'Замок', 'L'], ['npc', 'NPC', 'N'], ['select', 'Выбрать и двигать', 'V']];
@@ -521,6 +521,10 @@ function edSyncUI() {
     ED.ui.npcCatalog.hidden = ED.ui.npcLibrary.hidden;
     ED.ui.npcPlay.hidden = ED.ui.npcLibrary.hidden;
     ED.ui.npcAtlasTools.hidden = ED.ui.npcLibrary.hidden;
+    ED.ui.npcGalleryToggle.hidden = ED.ui.npcLibrary.hidden;
+    ED.ui.npcGallery.hidden = ED.ui.npcLibrary.hidden || !ED.galleryOpen;
+    ED.ui.npcGalleryToggle.firstChild.textContent = ED.galleryOpen ? 'Скрыть библиотеку анимаций' : 'Библиотека анимаций';
+    ED.ui.npcGalleryToggle.setAttribute('aria-expanded', String(ED.galleryOpen));
     ED.ui.npcCanvas.hidden = ED.ui.npcLibrary.hidden;
     ED.ui.npcStates.hidden = ED.ui.npcLibrary.hidden;
     if (!ED.ui.npcLibrary.hidden) {
@@ -571,6 +575,7 @@ function edSyncUI() {
     ED.ui.npcPhase.value = String(Math.round(ED.previewPhase * 100));
   }
   edPreviewNpc();
+  if (ED.galleryOpen) edNpcGalleryRender();
   ED.ui.undo.disabled = !ED.undo.length; ED.ui.redo.disabled = !ED.redo.length;
   ED.ui.zoomPct.firstChild.textContent = Math.round(VZ * 100) + '%'; ED.ui.zoomOut.disabled = VZ <= ED_ZOOMS[0]; ED.ui.zoomIn.disabled = VZ >= ED_ZOOMS[ED_ZOOMS.length - 1];
 }
@@ -680,6 +685,11 @@ function edBuildUI() {
   atlasAuditResult.setAttribute('role', 'status'); atlasAuditResult.setAttribute('aria-live', 'polite');
   npcAtlasTools.append(atlasHint, atlasGrid, atlasEightLabel, atlasUpload, atlasFile,
     atlasAudit, atlasAuditResult); sOb.append(npcAtlasTools);
+  const npcGalleryToggle = btn('Библиотека анимаций', '', { act: 'npc-gallery-toggle' });
+  npcGalleryToggle.hidden = true; npcGalleryToggle.setAttribute('aria-expanded', 'false');
+  const npcGallery = el('div', 'ed-npc-gallery'); npcGallery.hidden = true;
+  npcGallery.setAttribute('aria-label', 'Визуальная библиотека анимаций NPC');
+  sOb.append(npcGalleryToggle, npcGallery);
   const sMap = el('section', 'ed-sec', '<h3>Карта</h3>'); const mini = el('canvas', 'ed-mini'); mini.width = 216; mini.height = 300;
   const zoomRow = el('div', 'ed-zoom', 'Масштаб'); const zoomOut = btn('−', 'Q', { act: 'zoom-' }), zoomPct = btn('100%', '', { act: 'zoom1' }), zoomIn = btn('+', 'E', { act: 'zoom+' });
   zoomPct.title = 'Вернуть 100% (R)'; zoomRow.append(zoomOut, zoomPct, zoomIn); sMap.append(zoomRow, mini);
@@ -691,13 +701,14 @@ function edBuildUI() {
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
-  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcDirections, npcPlay, npcAnimationTools, npcAnimName, npcFrames, npcFps, npcFrameSlider, npcFrameReadout, npcSettingsFile, npcPhase, npcAtlasTools, atlasW, atlasH, atlasEight, atlasAuditResult, atlasFile, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
+  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcDirections, npcPlay, npcAnimationTools, npcAnimName, npcFrames, npcFps, npcFrameSlider, npcFrameReadout, npcSettingsFile, npcPhase, npcAtlasTools, atlasW, atlasH, atlasEight, atlasAuditResult, atlasFile, npcGalleryToggle, npcGallery, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) ED.previewAuto = false;
   ED.mini = mini;
 
   open.addEventListener('click', () => { open.blur(); openEditor(); });
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return; b.blur();
+    if (b.dataset.galleryFrame !== undefined) { edNpcGallerySelect(b); return; }
     if (b.dataset.preview) { ED.previewState = b.dataset.preview; ED.previewPhase = 0; ED.previewClock = 0; edSyncUI(); return; }
     if (b.dataset.npcDir !== undefined) { ED.previewDirection = Number(b.dataset.npcDir); edSyncUI(); return; }
     if (b.dataset.npcType) {
@@ -714,6 +725,7 @@ function edBuildUI() {
       if (info) edNpcSeekFrame(info.frame + (a === 'npc-frame-next' ? 1 : -1));
     }
     else if (a === 'npc-atlas-open') atlasFile.click();
+    else if (a === 'npc-gallery-toggle') { ED.galleryOpen = !ED.galleryOpen; ED.previewClock = 0; }
     else if (a === 'npc-atlas-audit') {
       const selected = ED.sel?.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi]?.[1] : null;
       const type = selected || [...ACTOR_TYPES.keys()][ED.variant.npc];

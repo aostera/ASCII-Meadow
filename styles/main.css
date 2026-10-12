@@ -86,3 +86,19 @@ body.editing .stats { display: none; }
 .ed-atlas-report { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 210px; overflow-y: auto;
   padding: 8px; border: 1px solid var(--line); background: #111; color: #d0c8b8;
   font: 11px/1.45 var(--mono); }
+
+/* Compact read-only ASCII contact sheet. Rendered on demand; never updated each game tick. */
+.ed [data-act="npc-gallery-toggle"] { margin: 8px 0 4px; width: 100%; justify-content: center; }
+.ed-npc-gallery { display: grid; gap: 8px; margin: 2px 0 8px; }
+.ed-gallery-help { margin: 0; font: 11px/1.4 var(--ui); color: var(--dim); }
+.ed-gallery-groups, .ed-gallery-directions { display: grid; gap: 7px; }
+.ed-gallery-card, .ed-gallery-direction { display: grid; gap: 4px; padding: 6px; border: 1px solid var(--line); background: #131313; min-width: 0; }
+.ed-gallery-heading { margin: 0; font: 500 11px/1.4 var(--mono); color: var(--ink); }
+.ed-gallery-strip { display: flex; gap: 4px; flex-wrap: wrap; }
+.ed-gallery-frame { display: grid; gap: 2px; justify-items: center; min-width: 48px;
+  padding: 3px; border: 1px solid #323232; background: #181818; color: var(--dim);
+  font: 10px/1.2 var(--mono); cursor: pointer; }
+.ed-gallery-frame canvas { width: 48px; height: 70px; }
+.ed-gallery-frame.on, .ed-gallery-frame[aria-pressed="true"] { border-color: #c9a45c; color: var(--ink); background: #292117; }
+.ed-gallery-frame:hover { border-color: #ad976d; }
+.ed-gallery-frame:focus-visible { outline: 2px solid #c9a45c; outline-offset: 2px; }

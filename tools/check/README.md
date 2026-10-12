@@ -46,3 +46,5 @@ python3 tools/check/diff.py /tmp/shots/b /tmp/shots/a --out /tmp/shots/diff   # 
 | `npc-atlas-browser.cjs` | Синтетический PNG через реальный UI редактора, `idle/walk/talk`, runtime rendering WebGL2 / Canvas 2D и проверка неизменности `map.js` |
 
 | `npc-atlas-audit.cjs` | Unit: пустые/дублирующиеся кадры, одинаковые 8 направлений, скачки силуэта, валидные кадры |
+
+| `npc-gallery.cjs` | Узловые правила выборки кадров для contact sheet, лимиты 4/2 и гарантированный выбор последнего сегмента |
