@@ -7,13 +7,14 @@ const ED = {
   sel: null, hover: null, drag: null, pan: null, stroke: null, space: false,
   undo: [], redo: [], keys: new Set(), mx: -1, my: -1, inView: false,
   ui: null, mini: null, miniKey: '', draftTimer: 0,
-  previewAuto: true, previewClock: 0, previewPhase: 0, previewState: 'idle', atlasUrls: {},
+  previewAuto: true, previewClock: 0, previewPhase: 0, previewState: 'idle', previewDirection: 0, atlasUrls: {},
 };
 const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['w', 'Вода', '9'], ['m', 'Болото', 'P'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
 const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['stone', 'Камень', 'Z'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['tent', 'Палатка', 'Y'], ['fence', 'Забор', 'I'], ['toad', 'Жаба', 'G'], ['frog', 'Лягушка', 'X'], ['birds', 'Птицы в траве', 'O'], ['castle', 'Замок', 'L'], ['npc', 'NPC', 'N'], ['select', 'Выбрать и двигать', 'V']];
 const ED_FOG = [['fogl', 'Лёгкий туман', 'H'], ['fogd', 'Густой туман', 'J'], ['fogc', 'Убрать туман', 'N']];
 const ED_FOGCODE = { fogl: 2, fogd: 3, fogc: 1 };
 const ED_DRAFT = 'ascii-meadow-map-draft';
+const ED_NPC_DIRECTIONS = ['Ю', 'ЮЗ', 'З', 'СЗ', 'С', 'СВ', 'В', 'ЮВ']; // d8: S, SW, W, NW, N, NE, E, SE
 const edIsBrush = tool => tool.length === 1 && PCODES.includes(tool);
 const edIsFog = tool => tool in ED_FOGCODE;
 const edVariants = type => type === 'npc' ? ACTOR_TYPES.size : type === 'fire' ? 2 : variantsOf(type).length;   // a fire: plain, or cooking
@@ -445,7 +446,7 @@ function edPreviewNpc() {
   if (!spec) return;
   const state = ED.previewState || 'idle';
   const phase = ED.previewPhase || 0;
-  const sample = { cls: spec.renderClass, actorType: type, d8: 0, rigMotion: spec.rigMotion, aiState: state,
+  const sample = { cls: spec.renderClass, actorType: type, d8: ED.previewDirection, rigMotion: spec.rigMotion, aiState: state,
     walk: state === 'walk' ? 1 : 0, step: state === 'walk' ? phase : 0, x: 0 };
   const image = npcAtlasPreviewImage(sample, state, phase) || npcRigPreviewImage(sample);
   const cols = 30, rows = 27, cw = image.width / cols, ch = image.height / rows;
@@ -498,6 +499,16 @@ function edSyncUI() {
     }
   }
   const shownType = selectedActor ? selectedActor[1] : [...ACTOR_TYPES.keys()][ED.variant.npc];
+  const atlas = NPC_ATLASES.get(shownType);
+  const state = ED.previewState || 'idle';
+  const atlasState = atlas && (atlas.layout.states[state] || atlas.layout.states.idle);
+  // A procedural rig and a single-view atlas cannot truthfully preview eight authored angles.
+  ED.ui.npcDirections.hidden = ED.ui.npcLibrary.hidden || !atlas || atlas.status !== 'ready' || !atlasState || atlasState.rows.length !== 8;
+  for (const b of ED.ui.npcDirections.querySelectorAll('[data-npc-dir]')) {
+    const active = Number(b.dataset.npcDir) === ED.previewDirection;
+    b.classList.toggle('on', active);
+    b.setAttribute('aria-pressed', String(active));
+  }
   for (const b of ED.ui.npcCatalog.querySelectorAll('[data-npc-type]')) {
     const active = b.dataset.npcType === shownType;
     b.classList.toggle('on', active);
@@ -556,6 +567,15 @@ function edBuildUI() {
   const npcStates = el('div', 'ed-grid'); npcStates.hidden = true;
   for (const state of ['idle', 'walk', 'talk']) npcStates.append(btn(state, '', { preview: state }));
   sOb.append(npcStates);
+  const npcDirections = el('div', 'ed-npc-directions'); npcDirections.hidden = true;
+  npcDirections.setAttribute('role', 'group'); npcDirections.setAttribute('aria-label', 'Ракурс NPC, восемь направлений');
+  for (let d = 0; d < ED_NPC_DIRECTIONS.length; d++) {
+    const button = btn(ED_NPC_DIRECTIONS[d], '', { npcDir: String(d) });
+    button.setAttribute('aria-pressed', 'false');
+    button.title = ['South', 'Southwest', 'West', 'Northwest', 'North', 'Northeast', 'East', 'Southeast'][d];
+    npcDirections.append(button);
+  }
+  sOb.append(npcDirections);
   const npcPlay = btn('Пауза', '', { act: 'preview-play' });
   npcPlay.hidden = true; npcPlay.setAttribute('aria-label', 'Воспроизведение предпросмотра NPC');
   sOb.append(npcPlay);
@@ -586,7 +606,7 @@ function edBuildUI() {
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
-  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcPlay, npcPhase, npcAtlasTools, atlasW, atlasH, atlasFile, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
+  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcDirections, npcPlay, npcPhase, npcAtlasTools, atlasW, atlasH, atlasFile, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) ED.previewAuto = false;
   ED.mini = mini;
 
@@ -594,6 +614,7 @@ function edBuildUI() {
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return; b.blur();
     if (b.dataset.preview) { ED.previewState = b.dataset.preview; ED.previewClock = 0; edSyncUI(); return; }
+    if (b.dataset.npcDir !== undefined) { ED.previewDirection = Number(b.dataset.npcDir); edSyncUI(); return; }
     if (b.dataset.npcType) {
       const types = [...ACTOR_TYPES.keys()];
       ED.tool = 'npc'; ED.sel = null; ED.variant.npc = types.indexOf(b.dataset.npcType);

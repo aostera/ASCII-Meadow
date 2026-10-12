@@ -63,3 +63,7 @@ body.editing .stats { display: none; }
 .ed-atlas-tools input[type="number"] { min-width: 0; width: 100%; box-sizing: border-box;
   color: var(--ink); background: #161616; border: 1px solid var(--line); padding: 5px; font: 12px var(--mono); }
 .ed-atlas-tools .ed-btn { justify-content: center; }
+
+/* Eight authored NPC views; visible only for a ready 8-direction PNG manifest. */
+.ed-npc-directions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.ed-npc-directions .ed-btn { justify-content: center; min-width: 0; font: 500 11px/1.2 var(--mono); }
