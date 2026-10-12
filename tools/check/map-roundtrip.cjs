@@ -30,7 +30,7 @@ const snapshot = page => page.evaluate(() => {
     // The authored map is lossless; trees under permanent ruin foundations are
     // intentionally hidden at runtime, not removed from the saved map.
     missingFlora: expected.flora === null ? null :
-      expected.flora.filter(p => !ruinClearing(p[2], p[3])).length - flora.length,
+      expected.flora.filter(p => !ruinClearing(p[2], p[3], RUIN_FLORA_BUFFER)).length - flora.length,
     firePos: (expected.fires || []).map((f, i) => {
       const b = braziers.find(b => b.mi === i); if (!b) return null;
       if (f[2] > 0) return cellToCastle(b.x, b.y).map(round);
@@ -66,7 +66,7 @@ const snapshot = page => page.evaluate(() => {
           return !expected || !within(gx, expected[0], 0.15) || !within(gz, expected[1], 0.15);
         }).map(c => c.mi);
         const badFireKinds = (MEADOW_MAP.fires === null ? [] : braziers).filter((fire, i) => !!fire.cook !== (MEADOW_MAP.fires[i][3] === 'cook')).map(fire => fire.mi);
-        return { expectedFlora: MEADOW_MAP.flora?.filter(p => !ruinClearing(p[2], p[3])).length ?? null,
+        return { expectedFlora: MEADOW_MAP.flora?.filter(p => !ruinClearing(p[2], p[3], RUIN_FLORA_BUFFER)).length ?? null,
           preservedMapFlora: MEADOW_MAP.flora?.length ?? null,
           actualFlora: flora.length,
           expectedCows: MEADOW_MAP.cows?.length ?? null, actualCows: cows.length,
