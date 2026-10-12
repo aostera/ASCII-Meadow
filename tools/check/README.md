@@ -51,3 +51,5 @@ python3 tools/check/diff.py /tmp/shots/b /tmp/shots/a --out /tmp/shots/diff   # 
 
 | `npc-hermit-art.cjs` | Проверка 288 кадров, 8 ракурсов, прозрачности и регенерации PNG Отшельника |
 | `npc-readability.cjs` | Два постоянных NPC: занятость мелкой 12×14 ASCII-сетки и тональный диапазон во всех 576 кадрах |
+
+| `standalone-npc.cjs` | Встроенные villager/hermit PNG в автономной HTML и body-сборке, побайтовая сверка, отсутствие внешних путей |

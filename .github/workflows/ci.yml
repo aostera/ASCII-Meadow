@@ -54,6 +54,8 @@ jobs:
         run: node tools/check/lint.cjs --warnings
       - name: Page resources (exist, relative, all loaded, no inline code)
         run: node tools/check/resources.cjs
+      - name: Verify standalone HTML embeds both NPC PNG atlases
+        run: node tools/check/standalone-npc.cjs
       - name: Standalone HTML (tools/bundle.py)
         run: |
           python3 tools/bundle.py dist/ascii-meadow.html
