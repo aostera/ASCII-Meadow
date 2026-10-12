@@ -14,7 +14,7 @@ function buildHermitPng() {
  for(let state=0;state<3;state++)for(let dir=0;dir<8;dir++){
   row=state*8+dir;const theta=dir*TWO/8,s=Math.sin(theta),f=Math.cos(theta),face=f>=0,view=Math.abs(s);
   for(frame=0;frame<FRAMES;frame++){
-   const ph=frame*TWO/FRAMES,walking=state===1,talking=state===2,walk=walking?Math.sin(ph):0,talk=talking?Math.sin(ph*2):0;
+   const ph=frame*TWO/FRAMES,walking=state===1,talking=state===2,walk=walking?Math.sin(ph):0,talk=talking?Math.sin(ph):0;
    const bob=walking?Math.round(Math.abs(Math.sin(ph))*1.6):Math.round(Math.sin(ph)*.35);
    const cx=20+s*1.3,bodyX=cx+s*1.2,headX=cx+s*2.1,foot=51-bob,robeShift=Math.sin(ph+(s+.2))*(walking?1.25:.35),narrow=8.3-view*2;
    // Short, heavy boots and cloak are separate from the taller villager silhouette.
@@ -32,7 +32,7 @@ function buildHermitPng() {
       [bodyX+8+robeShift,42-bob],[bodyX+1,43-bob],[bodyX-8,42-bob]],6);
    // Shoulder collar and characteristic broad sleeves, contrasting light hands.
    ellipse(bodyX,26-bob,11,5,3);ellipse(bodyX,24-bob,8,3,7);
-   const armWave=walking?walk*2.6:talk*.7;
+   const armWave=walking?walk*2.6:talk*2;
    line(bodyX-8,27-bob,bodyX-11+armWave,39-bob,6,3);
    line(bodyX+8,27-bob,bodyX+12-armWave,39-bob,6,4);
    ellipse(bodyX-11+armWave,40-bob,2.2,2.5,9);
