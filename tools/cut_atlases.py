@@ -88,6 +88,6 @@ if __name__ == '__main__':
     R = {}
     for name, (nr, nc) in spec.items():
         who = name.split('_')[0]
-        R[name] = cut('%s/%s/%s_atlas.png' % (base, who, name), nr, nc)
+        R[name] = cut('%s/%s/%s_atlas.%s' % (base, who, name, 'png' if who == 'knight' else 'webp'), nr, nc)
         print(name, [[(f['parts'] if f else 'X') for f in row] for row in R[name]])
     pickle.dump(R, open(out, 'wb'))

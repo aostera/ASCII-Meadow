@@ -1,4 +1,4 @@
-# usage: python3 tools/cow/key_black.py assets/cow_v2/cow_eat_atlas.png out_rgba.png
+# usage: python3 tools/cow/key_black.py assets/cow_v2/cow_eat_atlas.webp out_rgba.png
 # The eat atlas came as RGB on black: the background (large connected areas of near-black) becomes
 # transparent, the rim fades with its brightness; dark outlines inside the cow stay opaque.
 import sys, numpy as np, cv2

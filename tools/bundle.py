@@ -12,22 +12,22 @@ def script(m):
     filename = m.group(1)
     src = open(os.path.join(root, filename), encoding='utf-8').read()
     if filename == 'src/data/npc-atlases.js':
-        # A real standalone HTML must carry both NPC PNGs: relative URLs cannot
+        # A real standalone HTML must carry both NPC WebP images: relative URLs cannot
         # resolve after dist/ascii-meadow.html is copied anywhere on its own.
         # Replace manifest path literals only; the normal web build is untouched.
-        def inline_png(match):
+        def inline_webp(match):
             relative = match.group(2)
-            if not re.fullmatch(r'assets/npc/[A-Za-z0-9_-]+\.png', relative):
+            if not re.fullmatch(r'assets/npc/[A-Za-z0-9_-]+\.webp', relative):
                 sys.exit('unsafe NPC atlas path in manifest: ' + relative)
             path = os.path.join(root, relative)
             with open(path, 'rb') as file:
                 data = file.read()
-            if not data.startswith(b'\x89PNG\r\n\x1a\n'):
-                sys.exit('invalid NPC atlas PNG: ' + relative)
-            return match.group(1) + 'data:image/png;base64,' + base64.b64encode(data).decode('ascii') + match.group(3)
-        src, count = re.subn(r"(source:\s*['\"])(assets/npc/[^'\"\n]+)(['\"])", inline_png, src)
+            if not (data.startswith(b'RIFF') and data[8:12] == b'WEBP'):
+                sys.exit('invalid NPC atlas WebP: ' + relative)
+            return match.group(1) + 'data:image/webp;base64,' + base64.b64encode(data).decode('ascii') + match.group(3)
+        src, count = re.subn(r"(source:\s*['\"])(assets/npc/[^'\"\n]+)(['\"])", inline_webp, src)
         if count != 2:
-            sys.exit('standalone bundle expected exactly 2 NPC PNG atlases, found ' + str(count))
+            sys.exit('standalone bundle expected exactly 2 NPC WebP atlases, found ' + str(count))
     if re.search(r'</script', src, re.I): sys.exit('cannot inline %s: it contains </script' % filename)
     return '<script>\n' + src + '</script>'
 page = page.replace('<link rel="stylesheet" href="styles/main.css">', '<style>\n' + css + '</style>')

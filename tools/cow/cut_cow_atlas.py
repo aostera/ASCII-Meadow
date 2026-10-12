@@ -1,4 +1,4 @@
-# usage: python3 tools/cow/cut_cow_atlas.py assets/cow/cow_animation_atlas.png raw.pkl sheet.png
+# usage: python3 tools/cow/cut_cow_atlas.py assets/cow/cow_animation_atlas.webp raw.pkl sheet.png
 # Cut the cow atlas (RGBA, transparent background) into frames: rows of animations, one frame per cow.
 # Row labels (dark boxes at the left of each row) are dropped; stray bits (tail tips, tufts of grass)
 # join the cow whose box they fall in.

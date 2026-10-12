@@ -2,12 +2,21 @@
 // This catches invisible/overcropped/low-contrast sprites, not subjective art quality.
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
 const zlib = require('node:zlib');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
 const FRAME_W=40, FRAME_H=56, COLS=12, ROWS=14;
+const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'meadow-readable-'));
 function decode(name) {
-  const file=fs.readFileSync(path.join(root,'assets/npc',name+'-starter.png'));
+  const filename = path.join(temp, name + '-source.png');
+  const generated = spawnSync(process.execPath,
+    ['tools/npc/generate-' + name + '.cjs', filename],
+    {cwd: root, encoding: 'utf8'});
+  assert.equal(generated.status, 0, generated.stderr || 'NPC sprite generator failed');
+  // The shipped WebP is pixel-compared with this exact source in migrate_webp.py --check.
+  const file=fs.readFileSync(filename);
   const width=file.readUInt32BE(16),height=file.readUInt32BE(20);
   assert.equal(width,480);assert.equal(height,1344);
   let pos=8,palette=null,alpha=null,parts=[];
@@ -57,3 +66,5 @@ for(const name of ['villager','hermit']){
   console.log('PASS tiny 12x14 preview '+name+': 288 sprite frames; cell occupancy '+
     minOccupied+'–'+maxOccupied+' / 168, tonal span >= '+minSpan);
 }
+
+fs.rmSync(temp, { recursive: true, force: true });

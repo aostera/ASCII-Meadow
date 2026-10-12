@@ -1,9 +1,9 @@
-// Reviewed source-of-truth animation manifest. Only catalog NPCs use these PNGs.
+// Reviewed source-of-truth animation manifest. Only catalog NPCs use these lossless WebP sheets.
 // Both shipped NPC sheets are grayscale pixel-art PROTOTYPES, not final hand-painted art.
 // Map v1, the player's knight and cows continue using their original assets.
 const NPC_SHIPPED_ATLASES = Object.freeze([{
   type: 'villager',
-  source: 'assets/npc/villager-starter.png',
+  source: 'assets/npc/villager-starter.webp',
   layout: {
     frameWidth: 40, frameHeight: 56,
     states: {
@@ -14,7 +14,7 @@ const NPC_SHIPPED_ATLASES = Object.freeze([{
   }
 }, {
   type: 'hermit',
-  source: 'assets/npc/hermit-starter.png',
+  source: 'assets/npc/hermit-starter.webp',
   layout: {
     frameWidth: 40, frameHeight: 56,
     states: {
