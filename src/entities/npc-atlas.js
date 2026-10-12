@@ -84,3 +84,31 @@ function npcAtlasPreviewImage(actor, state, phase) {
     0, 0, BOX_W, BOX_H);
   return c.getImageData(0, 0, BOX_W, BOX_H);
 }
+
+// JSON metadata is deliberately separate from the image. Export never serializes
+// a blob: URL, raw PNG bytes or anything from the map.
+function npcAtlasExportSettings(type) {
+  const entry = NPC_ATLASES.get(type);
+  if (!entry || entry.status !== 'ready') throw new Error('Load a PNG atlas before exporting animation settings');
+  return JSON.stringify({ version: 1, type, layout: entry.layout }, null, 2);
+}
+function npcAtlasImportSettings(type, raw) {
+  const entry = NPC_ATLASES.get(type);
+  if (!entry || entry.status !== 'ready') throw new Error('Load a PNG atlas before importing animation settings');
+  const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (!data || typeof data !== 'object' || Array.isArray(data) ||
+      Object.keys(data).length !== 3 ||
+      Object.keys(data).some(k => !['version', 'type', 'layout'].includes(k)) ||
+      data.version !== 1 || data.type !== type)
+    throw new Error('Invalid animation settings file or NPC type');
+  const layout = npcAtlasLayout(data.layout);
+  const { naturalWidth: width, naturalHeight: height } = entry.image;
+  const maxRow = Math.max(...Object.values(layout.states).flatMap(s => s.rows));
+  const maxFrames = Math.max(...Object.values(layout.states).map(s => s.frames));
+  // Ensure a valid schema is also physically compatible with the *current* PNG.
+  if (width % layout.frameWidth || height % layout.frameHeight ||
+      width < maxFrames * layout.frameWidth || height < (maxRow + 1) * layout.frameHeight)
+    throw new Error('Animation settings exceed the loaded PNG dimensions');
+  entry.layout = layout; // commit only after all checks; no partially applied settings
+  return layout;
+}

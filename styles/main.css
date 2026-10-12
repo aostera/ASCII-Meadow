@@ -67,3 +67,10 @@ body.editing .stats { display: none; }
 /* Eight authored NPC views; visible only for a ready 8-direction PNG manifest. */
 .ed-npc-directions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
 .ed-npc-directions .ed-btn { justify-content: center; min-width: 0; font: 500 11px/1.2 var(--mono); }
+
+/* Per-state FPS/frames settings and JSON-only animation preset export. */
+.ed-animation-tools { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; }
+.ed-animation-tools label { display: grid; gap: 4px; min-width: 0; font-size: 11px; }
+.ed-animation-tools input[type="number"] { min-width: 0; width: 100%; box-sizing: border-box;
+  background: #161616; border: 1px solid var(--line); color: var(--ink); padding: 5px; font: 12px var(--mono); }
+.ed-animation-tools .ed-btn { justify-content: center; }

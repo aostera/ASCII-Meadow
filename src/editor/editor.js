@@ -516,13 +516,22 @@ function edSyncUI() {
   }
   ED.ui.npcPlay.setAttribute('aria-pressed', String(ED.previewAuto));
   ED.ui.npcPlay.firstChild.textContent = ED.previewAuto ? 'Пауза' : 'Воспроизвести';
+  const loaded = !!atlas && atlas.status === 'ready';
+  ED.ui.npcAnimationTools.hidden = ED.ui.npcLibrary.hidden || !loaded;
+  if (loaded) {
+    const current = atlas.layout.states[state] || atlas.layout.states.idle;
+    ED.ui.npcFrames.value = String(current.frames);
+    ED.ui.npcFps.value = String(current.fps);
+    ED.ui.npcFrames.max = String(atlas.image.naturalWidth / atlas.layout.frameWidth);
+    ED.ui.npcAnimName.textContent = state + (atlas.layout.states[state] ? '' : ' (idle fallback)');
+  }
   if (ED.ui.npcStates) for (const b of ED.ui.npcStates.querySelectorAll('[data-preview]')) {
     const active = b.dataset.preview === (ED.previewState || 'idle');
     b.classList.toggle('on', active);
     b.setAttribute('aria-pressed', String(active));
   }
   if (ED.ui.npcPhase) {
-    ED.ui.npcPhase.hidden = ED.ui.npcLibrary.hidden || (ED.previewState || 'idle') !== 'walk';
+    ED.ui.npcPhase.hidden = ED.ui.npcLibrary.hidden || (!loaded && (ED.previewState || 'idle') !== 'walk');
     ED.ui.npcPhase.value = String(Math.round(ED.previewPhase * 100));
   }
   edPreviewNpc();
@@ -579,6 +588,26 @@ function edBuildUI() {
   const npcPlay = btn('Пауза', '', { act: 'preview-play' });
   npcPlay.hidden = true; npcPlay.setAttribute('aria-label', 'Воспроизведение предпросмотра NPC');
   sOb.append(npcPlay);
+  const npcAnimationTools = el('div', 'ed-animation-tools'); npcAnimationTools.hidden = true;
+  const npcAnimName = el('p', 'ed-help', 'idle');
+  const npcFrameRow = el('div', 'ed-grid');
+  const npcFramesLabel = el('label', '', 'Кадры');
+  const npcFrames = el('input'); npcFrames.type = 'number'; npcFrames.min = '1'; npcFrames.max = '60';
+  npcFrames.setAttribute('aria-label', 'Количество кадров анимации NPC');
+  npcFramesLabel.append(npcFrames);
+  const npcFpsLabel = el('label', '', 'FPS');
+  const npcFps = el('input'); npcFps.type = 'number'; npcFps.min = '1'; npcFps.max = '60';
+  npcFps.setAttribute('aria-label', 'Частота кадров анимации NPC');
+  npcFpsLabel.append(npcFps);
+  npcFrameRow.append(npcFramesLabel, npcFpsLabel);
+  const npcSettingsActions = el('div', 'ed-grid');
+  npcSettingsActions.append(btn('Экспорт JSON', '', { act: 'npc-json-export' }),
+    btn('Импорт JSON', '', { act: 'npc-json-open' }));
+  const npcSettingsFile = el('input');
+  npcSettingsFile.type = 'file'; npcSettingsFile.accept = '.json,application/json';
+  npcSettingsFile.hidden = true;
+  npcAnimationTools.append(npcAnimName, npcFrameRow, npcSettingsActions, npcSettingsFile);
+  sOb.append(npcAnimationTools);
   const npcPhase = el('input'); npcPhase.type = 'range'; npcPhase.min = '0'; npcPhase.max = '628'; npcPhase.value = '0';
   npcPhase.setAttribute('aria-label', 'Фаза шага NPC'); npcPhase.hidden = true; sOb.append(npcPhase);
   // Local atlas import is explicitly temporary: the map export never embeds binary image data.
@@ -610,7 +639,7 @@ function edBuildUI() {
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
-  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcDirections, npcPlay, npcPhase, npcAtlasTools, atlasW, atlasH, atlasEight, atlasFile, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
+  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcDirections, npcPlay, npcAnimationTools, npcAnimName, npcFrames, npcFps, npcSettingsFile, npcPhase, npcAtlasTools, atlasW, atlasH, atlasEight, atlasFile, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) ED.previewAuto = false;
   ED.mini = mini;
 
@@ -629,6 +658,20 @@ function edBuildUI() {
     if (a === 'close') closeEditor();
     else if (a === 'preview-play') { ED.previewAuto = !ED.previewAuto; ED.previewClock = 0; }
     else if (a === 'npc-atlas-open') atlasFile.click();
+    else if (a === 'npc-json-open') npcSettingsFile.click();
+    else if (a === 'npc-json-export') {
+      const selected = ED.sel?.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi]?.[1] : null;
+      const type = selected || [...ACTOR_TYPES.keys()][ED.variant.npc];
+      try {
+        const json = npcAtlasExportSettings(type);
+        const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+        const link = document.createElement('a');
+        link.href = url; link.download = 'npc-' + type + '-animation.json';
+        document.body.appendChild(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        edStatus('JSON настроек скачан. PNG сохраняется отдельно.');
+      } catch (err) { edStatus(String(err.message)); }
+    }
     else if (a === 'undo') edUndo();
     else if (a === 'redo') edRedo();
     else if (a === 'var-' || a === 'var+') edStepVariant(a === 'var+' ? 1 : -1);
@@ -643,6 +686,42 @@ function edBuildUI() {
     } else if (a === 'draft-load' && ED.draftData) { edRecord({ map: mapSnapshot() }); applyWholeMap(ED.draftData.map); draft.hidden = true; edStatus('Черновик восстановлен.'); }
     else if (a === 'draft-drop') { try { localStorage.removeItem(ED_DRAFT); } catch { /* nothing to drop */ } draft.hidden = true; }
     edSyncUI();
+  });
+  function edTuneNpcAnimation() {
+    const selected = ED.sel?.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi]?.[1] : null;
+    const type = selected || [...ACTOR_TYPES.keys()][ED.variant.npc];
+    const item = NPC_ATLASES.get(type);
+    if (!item || item.status !== 'ready') return;
+    const state = ED.previewState || 'idle', fallback = item.layout.states[state] || item.layout.states.idle;
+    const frames = +npcFrames.value, fps = +npcFps.value;
+    try {
+      const states = {};
+      for (const [key, value] of Object.entries(item.layout.states))
+        states[key] = { frames: value.frames, fps: value.fps, rows: [...value.rows] };
+      states[state] = { frames, fps, rows: [...fallback.rows] };
+      npcAtlasImportSettings(type, { version: 1, type, layout: {
+        frameWidth: item.layout.frameWidth, frameHeight: item.layout.frameHeight, states
+      } });
+      ED.previewClock = 0; edSyncUI();
+      edStatus(state + ': ' + frames + ' кадров · ' + fps + ' FPS. PNG и карта не изменены.');
+    } catch (err) { edStatus(String(err.message)); }
+  }
+  npcFrames.addEventListener('change', edTuneNpcAnimation);
+  npcFps.addEventListener('change', edTuneNpcAnimation);
+  npcSettingsFile.addEventListener('change', async () => {
+    const file = npcSettingsFile.files && npcSettingsFile.files[0];
+    npcSettingsFile.value = '';
+    if (!file) return;
+    if (!/\\.json$/i.test(file.name) || file.size > 64 * 1024) {
+      edStatus('Нужен JSON настроек до 64 КБ.'); return;
+    }
+    const selected = ED.sel?.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi]?.[1] : null;
+    const type = selected || [...ACTOR_TYPES.keys()][ED.variant.npc];
+    try {
+      npcAtlasImportSettings(type, await file.text());
+      edSyncUI();
+      edStatus('Настройки анимации ' + type + ' восстановлены из JSON.');
+    } catch (err) { edStatus('Импорт JSON: ' + String(err.message)); }
   });
   npcPhase.addEventListener('input', () => { ED.previewPhase = +npcPhase.value / 100; ED.previewClock = 0; edPreviewNpc(); });
   atlasFile.addEventListener('change', () => {
