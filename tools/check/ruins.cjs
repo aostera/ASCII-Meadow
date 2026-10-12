@@ -11,13 +11,16 @@ const world = { Math, Number, SINP: Math.sin(.87), COSP: Math.cos(.87),
   CW: 5, WS: 2, toModelXZ: (x,z) => [x,z] };
 vm.createContext(world);
 vm.runInContext(config + '\n' + source +
-  '\nthis.api = { sites: RUIN_SITES, ruinWallRectangles, ruinsBlockMove, ruinClearing, ruinSegmentRect };' +
+  '\nthis.api = { sites: RUIN_SITES, ruinWallRectangles, ruinsBlockMove, ruinClearing, ruinSegmentRect, ruinWorldXZ, ruinLocalXZ };' +
   '\nruins.push(...RUIN_SITES.map(site => ({ ...site, walls: ruinWallRectangles(site) })));', world);
 const { sites, ruinWallRectangles, ruinsBlockMove, ruinClearing } = world.api;
 assert.deepEqual(Array.from(sites, s => s.type), ['gate','abbey','cloister']);
 assert.equal(sites.length, 3);
-const move = (s, x0, z0, x1, z1, cls='knight') => ruinsBlockMove(s.x+x1,s.z+z1,
-  { x:s.x+x0, y:s.z+z0, cls, hT:10000, jump:1 });
+const move = (s, x0, z0, x1, z1, cls='knight') => {
+  const [px,pz]=world.api.ruinWorldXZ(s,x0,z0);
+  const [tx,tz]=world.api.ruinWorldXZ(s,x1,z1);
+  return ruinsBlockMove(tx,tz,{x:px,y:pz,cls,hT:10000,jump:1});
+};
 for(const s of sites) {
   const outer=s.depth/2+25, safe=s.arch/2-14, stone=s.arch/2+12;
   for(const cls of ['knight','human','dwarf','cow']) {
@@ -53,13 +56,13 @@ for (let i = 0; i < sites.length; i++) {
   assert.deepEqual(Array.from(p.spots, s => s.action), ['inspect','inspect']);
   for (const spot of p.spots) {
     const side = spot.id.endsWith('-south') ? -1 : 1;
-    world.player.x = site.x;
-    world.player.y = site.z + side * (site.depth / 2 + 18);
+    [world.player.x, world.player.y] =
+      world.api.ruinWorldXZ(site, 0, side * (site.depth / 2 + 18));
     assert(spot.need(), site.id + ': inspection through open arch');
     spot.onUse();
     assert(world.player.say.length > 30, site.id + ': unique inspect description');
-    world.player.x = site.x + site.width / 2 + 35;
-    world.player.y = site.z;
+    [world.player.x, world.player.y] =
+      world.api.ruinWorldXZ(site, site.width / 2 + 35, 0);
     assert(!spot.need(), site.id + ': do not inspect through a side wall');
   }
 }
