@@ -51,6 +51,18 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           };
         });
         const a = await read();
+        // The fast viewport culling path must return precisely the same
+        // first sprite as the old linear scan, including empty viewports.
+        const search = await page.evaluate(() => {
+          const rows = [0, VY0 - 40, VY0 - 2, VY0, VY1, VY1 + FLMAXR + 40, ROWS + 1];
+          return rows.map(row => {
+            const fast = floraLowerBound(row);
+            const slow = flora.findIndex(f => f.br >= row);
+            return [row, fast, slow < 0 ? flora.length : slow];
+          });
+        });
+        assert(search.every(([, fast, slow]) => fast === slow),
+          'viewport flora binary search differs from the original linear scan');
         assert.equal(a.fences.length, 6);
         assert.equal(a.tents.length, 4);
         assert(a.live[0] > 0 && a.live[1] > 0, 'authored camp remains populated');

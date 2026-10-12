@@ -19,7 +19,6 @@ const edIsBrush = tool => tool.length === 1 && PCODES.includes(tool);
 const edIsFog = tool => tool in ED_FOGCODE;
 const edVariants = type => type === 'npc' ? ACTOR_TYPES.size : type === 'fire' ? 2 : variantsOf(type).length;   // a fire: plain, or cooking
 const edR1 = v => Math.round(v * 10) / 10;
-const edXZ = (x, y) => toModelXZ(x, y).map(edR1);
 
 // ---------- the map as a file ----------
 function mapFileText() {
@@ -154,7 +153,6 @@ function edRepaintRect(gx0, gz0, gx1, gz1) {
   const C = cathedral;
   edRehide((gx0 * WS + C.ox) / CW, (C.oy - gz1 * SINP * WS) / CH, (gx1 * WS + C.ox) / CW, (C.oy - gz0 * SINP * WS) / CH);
 }
-function edRepaintChunk(key) { const [kx, kz] = key.split(',').map(Number), s = PCH * PAINT_RES; edRepaintRect(kx * s, kz * s, (kx + 1) * s, (kz + 1) * s); }
 function edStamp(gx, gz) {
   const r = ED.size * PAINT_RES, code = Math.max(0, PCODES.indexOf(ED.tool));
   for (let pz = Math.floor((gz - r) / PAINT_RES); pz <= Math.floor((gz + r) / PAINT_RES); pz++) for (let px = Math.floor((gx - r) / PAINT_RES); px <= Math.floor((gx + r) / PAINT_RES); px++) {
