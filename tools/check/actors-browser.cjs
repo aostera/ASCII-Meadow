@@ -9,7 +9,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
   try {
     for (const mode of ['gl', '2d']) {
       const { page, ctx, step, errs } = await openGame(browser,
-        'file://' + path.resolve(__dirname, '../../index.html'), { mode, viewport: { width: 960, height: 600 } });
+        'file://' + path.resolve(__dirname, '../../index.html') + '?edit', { mode, viewport: { width: 960, height: 600 } });
       try {
         await step(3);
         const created = await page.evaluate(() => {
@@ -47,6 +47,27 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         assert.equal(cleanup.second, true);
         assert.equal(cleanup.npcs, 0);
         assert.equal(cleanup.onlyPlayerAndCows, true);
+        const preview = await page.evaluate(() => {
+          const original = JSON.stringify(MEADOW_MAP);
+          openEditor();
+          ED.tool = 'npc';
+          edSyncUI();
+          const visible = !ED.ui.npcCanvas.hidden;
+          const canvas = ED.ui.npcCanvas.getContext('2d');
+          const pixels = canvas.getImageData(0, 0, 180, 180).data;
+          const painted = pixels.some((value, index) => index % 4 === 3 && value > 0);
+          const states = [];
+          for (const state of ['idle', 'walk', 'talk']) {
+            ED.previewState = state;
+            edSyncUI();
+            states.push(ED.previewState);
+          }
+          const unchanged = original === JSON.stringify(MEADOW_MAP) && npcs.length === 0;
+          closeEditor();
+          return { visible, painted, states, unchanged };
+        });
+        assert(preview.visible && preview.painted && preview.unchanged);
+        assert.deepEqual(preview.states, ['idle', 'walk', 'talk']);
         await step(3);
         assert.deepEqual(realErrors(errs), [], 'browser console: ' + realErrors(errs).slice(0,3).join('; '));
         console.log('PASS actor catalog ' + mode + ': create, simulate, render, resize and remove');
