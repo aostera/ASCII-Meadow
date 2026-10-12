@@ -85,6 +85,13 @@ function ruinDetail(site) {
     addGableZ(-w * .35, w * .35, d / 2 - th, d / 2, h * .54, h * .81, 'wall');
   }
 }
+// Keep all authored scenery unchanged on disk; suppress only rendered plants that
+// would occupy the interior, arch thresholds or a wall's footings.
+function ruinClearing(x, z) {
+  return RUIN_SITES.some(r =>
+    Math.abs(x - r.x) < r.width / 2 + 20 &&
+    Math.abs(z - r.z) < r.depth / 2 + 26);
+}
 function ruinWallRectangles(site) {
   const w = site.width, d = site.depth, a = site.arch / 2, t = 14;
   const segments = [];

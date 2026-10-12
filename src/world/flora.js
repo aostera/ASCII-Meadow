@@ -204,6 +204,7 @@ function placeFlora() {
   const trees = variantsOf('tree'), dead = variantsOf('dead'), bush = variantsOf('bush');
   tmask = new Uint8Array(N); fmask = new Uint8Array(N);
   if (MEADOW_MAP.flora) MEADOW_MAP.flora.forEach(([type, k, gx, gz], mi) => {
+    if (ruinClearing(gx, gz)) return; // arches and courtyards stay free of rooted objects
     const own = variantsOf(type), set = own.length ? own : trees, v = set[Math.max(0, Math.min(set.length - 1, k | 0))];
     const [x, y] = mapToCell(gx, gz), br = Math.round(y + 0.7);
     if (x < 3 || x > COLS - 4 || br < 2 || br > ROWS - 2) return;
@@ -230,6 +231,7 @@ function placeFlora() {
       if (forest > 0.52 && r < (forest - 0.4) * 1.35) v = r < 0.16 ? dead[(r * 97 | 0) % dead.length] : trees[(r * 131 | 0) % trees.length];
       else if (r < 0.12 + forest * 0.25) v = bush[(r * 211 | 0) % bush.length];
       if (!v) continue;
+      if (ruinClearing(...toModelXZ(x, y))) continue;
       if (pathNear(x, y, Math.ceil((v.type === 'bush' ? v.R * 0.7 : v.R * 0.45) / CW))) continue;
       flora.push({ isFlora: true, v, x, y: Math.floor(y) - 0.7, br: Math.floor(y), ph: hash(i, j) * 6.28, rust: 0 });
     }
