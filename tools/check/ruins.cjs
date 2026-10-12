@@ -7,7 +7,8 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '../..');
 const source = fs.readFileSync(path.join(root, 'src/world/ruins.js'), 'utf8');
 const config = fs.readFileSync(path.join(root, 'src/data/ruins.js'), 'utf8');
-const world = { Math, Number, CW: 5, WS: 2, toModelXZ: (x,z) => [x,z] };
+const world = { Math, Number, SINP: Math.sin(.87), COSP: Math.cos(.87),
+  CW: 5, WS: 2, toModelXZ: (x,z) => [x,z] };
 vm.createContext(world);
 vm.runInContext(config + '\n' + source +
   '\nthis.api = { sites: RUIN_SITES, ruinWallRectangles, ruinsBlockMove, ruinClearing, ruinSegmentRect };' +
