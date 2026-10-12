@@ -30,7 +30,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         assert.equal(shipped.status, 'error',
           'file:// cross-origin sprite pixels should be rejected safely and the rig should be used');
         assert.equal(shipped.ready, 480);
-        assert.equal(shipped.src, 'assets/npc/villager-starter.png');
+        assert.equal(shipped.src, 'assets/npc/villager-starter.webp');
         assert.equal(shipped.rows, 8);
         assert.equal(shipped.frames, 12);
         assert.deepEqual(shipped.loadedTypes, ['villager', 'hermit']);
@@ -42,7 +42,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           views: NPC_ATLASES.get('hermit')?.layout.states.walk.rows.length
         }));
         assert.equal(shippedHermit.status, 'error', 'file:// hermit must use safe fallback');
-        assert.equal(shippedHermit.source, 'assets/npc/hermit-starter.png');
+        assert.equal(shippedHermit.source, 'assets/npc/hermit-starter.webp');
         assert.deepEqual(shippedHermit.size, [480, 1344]);
         assert.equal(shippedHermit.views, 8);
         assert.equal(shipped.map, original);
@@ -442,7 +442,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
       const target = path.resolve(root, relative);
       if (!target.startsWith(root + path.sep)) { response.writeHead(403); response.end(); return; }
       const ext = path.extname(target);
-      const type = ext === '.png' ? 'image/png' : ext === '.html' ? 'text/html' :
+      const type = ext === '.webp' ? 'image/webp' : ext === '.png' ? 'image/png' : ext === '.html' ? 'text/html' :
         ext === '.css' ? 'text/css' : 'text/javascript';
       const stream = fs.createReadStream(target);
       stream.on('error', () => { if (!response.headersSent) response.writeHead(404); response.end(); });
