@@ -13,8 +13,8 @@ class FakeImage {
 }
 const context = { document: { createElement: () => new FakeImage() }, ACTOR_TYPES: new Map([['villager', {}]]), Math, Object };
 vm.createContext(context);
-vm.runInContext(script + '\nthis.api = { npcAtlasLayout, npcAtlasAttach, npcAtlasFrame, NPC_ATLASES };', context);
-const { npcAtlasLayout, npcAtlasAttach, npcAtlasFrame, NPC_ATLASES } = context.api;
+vm.runInContext(script + '\nthis.api = { npcAtlasLayout, npcAtlasAttach, npcAtlasFrame, npcAtlasExportSettings, npcAtlasImportSettings, NPC_ATLASES };', context);
+const { npcAtlasLayout, npcAtlasAttach, npcAtlasFrame, npcAtlasExportSettings, npcAtlasImportSettings, NPC_ATLASES } = context.api;
 const spec = {
   frameWidth: 32, frameHeight: 32,
   states: {
