@@ -591,10 +591,14 @@ function edBuildUI() {
   const atlasLabelW = el('label', '', 'Кадр ширина'); atlasLabelW.append(atlasW);
   const atlasLabelH = el('label', '', 'Кадр высота'); atlasLabelH.append(atlasH);
   atlasGrid.append(atlasLabelW, atlasLabelH);
+  const atlasEightLabel = el('label', 'ed-check');
+  const atlasEight = el('input'); atlasEight.type = 'checkbox';
+  atlasEight.setAttribute('aria-label', 'Атлас NPC с восемью ракурсами');
+  atlasEightLabel.append(atlasEight, '8 ракурсов (по 8 строк на состояние)');
   const atlasUpload = btn('Выбрать PNG-атлас', '', { act: 'npc-atlas-open' });
   const atlasFile = el('input'); atlasFile.type = 'file'; atlasFile.accept = '.png,image/png';
   atlasFile.hidden = true; atlasFile.setAttribute('aria-label', 'PNG-атлас NPC');
-  npcAtlasTools.append(atlasHint, atlasGrid, atlasUpload, atlasFile); sOb.append(npcAtlasTools);
+  npcAtlasTools.append(atlasHint, atlasGrid, atlasEightLabel, atlasUpload, atlasFile); sOb.append(npcAtlasTools);
   const sMap = el('section', 'ed-sec', '<h3>Карта</h3>'); const mini = el('canvas', 'ed-mini'); mini.width = 216; mini.height = 300;
   const zoomRow = el('div', 'ed-zoom', 'Масштаб'); const zoomOut = btn('−', 'Q', { act: 'zoom-' }), zoomPct = btn('100%', '', { act: 'zoom1' }), zoomIn = btn('+', 'E', { act: 'zoom+' });
   zoomPct.title = 'Вернуть 100% (R)'; zoomRow.append(zoomOut, zoomPct, zoomIn); sMap.append(zoomRow, mini);
@@ -606,7 +610,7 @@ function edBuildUI() {
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
-  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcDirections, npcPlay, npcPhase, npcAtlasTools, atlasW, atlasH, atlasFile, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
+  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcDirections, npcPlay, npcPhase, npcAtlasTools, atlasW, atlasH, atlasEight, atlasFile, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) ED.previewAuto = false;
   ED.mini = mini;
 
@@ -649,7 +653,8 @@ function edBuildUI() {
         file.size > 16 * 1024 * 1024) { edStatus('Нужен PNG не больше 16 МБ.'); return; }
     const chosen = ED.sel?.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi]?.[1] : null;
     const type = chosen || [...ACTOR_TYPES.keys()][ED.variant.npc];
-    const w = +atlasW.value, h = +atlasH.value, source = URL.createObjectURL(file);
+    const w = +atlasW.value, h = +atlasH.value, eight = atlasEight.checked;
+    const source = URL.createObjectURL(file);
     const probe = document.createElement('img');
     probe.onload = () => {
       const columns = probe.naturalWidth / w, rows = probe.naturalHeight / h;
@@ -658,12 +663,22 @@ function edBuildUI() {
         URL.revokeObjectURL(source);
         edStatus('Проверьте размер кадра: PNG должен делиться на ширину и высоту без остатка (1–60 колонок).'); return;
       }
+      if (eight && rows < 8) {
+        URL.revokeObjectURL(source);
+        edStatus('Для восьми ракурсов нужно минимум 8 строк (S, SW, W, NW, N, NE, E, SE).');
+        return;
+      }
       try {
-        const layout = { frameWidth: w, frameHeight: h, states: {
-          idle: { rows: [0], frames: columns, fps: 6 },
-          walk: { rows: [rows > 1 ? 1 : 0], frames: columns, fps: 10 },
-          talk: { rows: [rows > 2 ? 2 : 0], frames: columns, fps: 6 } } };
-        const entry = npcAtlasAttach(type, layout, source);
+        // Eight rows per available state. In a 1x layout, rows 0/1/2 are idle/walk/talk.
+        const eightRows = offset => Array.from({ length: 8 }, (_, direction) => offset + direction);
+        const states = eight
+          ? { idle: { rows: eightRows(0), frames: columns, fps: 6 } }
+          : { idle: { rows: [0], frames: columns, fps: 6 },
+            walk: { rows: [rows > 1 ? 1 : 0], frames: columns, fps: 10 },
+            talk: { rows: [rows > 2 ? 2 : 0], frames: columns, fps: 6 } };
+        if (eight && rows >= 16) states.walk = { rows: eightRows(8), frames: columns, fps: 10 };
+        if (eight && rows >= 24) states.talk = { rows: eightRows(16), frames: columns, fps: 6 };
+        const entry = npcAtlasAttach(type, { frameWidth: w, frameHeight: h, states }, source);
         entry.image.addEventListener('load', () => {
           if (entry.status !== 'ready') {
             edStatus(entry.error); URL.revokeObjectURL(source); return;
@@ -672,7 +687,8 @@ function edBuildUI() {
           ED.atlasUrls[type] = source;
           if (previous && previous !== source) URL.revokeObjectURL(previous);
           edStatus('PNG-атлас ' + type + ' загружен: ' + columns + ' × ' + rows +
-            ' кадров/строк. Для постоянного использования добавьте PNG в assets/npc/ и подключите npcAtlasAttach().');
+            ' кадров/строк' + (eight ? ' · 8 ракурсов' : '') +
+            '. Постоянные атласы добавляются в assets/npc/ и src/data/npc-atlases.js.');
           edSyncUI();
         });
         entry.image.addEventListener('error', () => {

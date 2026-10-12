@@ -105,12 +105,15 @@ const { launch, openGame, realErrors } = require('./common.cjs');
             draw.fillRect(x + 4, y + 3, 24, 26);
             draw.clearRect(x + 6 + d % 6, y + 10, 4, 12);
           }
-          const rows = [0,1,2,3,4,5,6,7];
-          npcAtlasAttach('villager', {
-            frameWidth: 32, frameHeight: 32,
-            states: { idle: { frames: 4, fps: 6, rows },
-              walk: { frames: 4, fps: 10, rows } }
-          }, sheet.toDataURL('image/png'));
+          // Exercise the real 8-direction upload control, not a direct loader shortcut.
+          const data = sheet.toDataURL('image/png').split(',')[1];
+          const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+          const asset = new File([bytes], 'eight-direction-fixture.png', { type: 'image/png' });
+          ED.variant.npc = 0; ED.sel = null; ED.tool = 'npc'; edSyncUI();
+          ED.ui.atlasW.value = '32'; ED.ui.atlasH.value = '32'; ED.ui.atlasEight.checked = true;
+          const transfer = new DataTransfer(); transfer.items.add(asset);
+          ED.ui.atlasFile.files = transfer.files;
+          ED.ui.atlasFile.dispatchEvent(new Event('change', { bubbles: true }));
         });
         let directionalStatus = 'loading';
         for (let i = 0; i < 60; i++) {
