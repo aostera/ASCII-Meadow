@@ -205,8 +205,9 @@ function bakeCampGround(type, model) {
 function bakeCamp(type, model, sd) {
   const fd = charDims(player), fw = fd.fcw, fh = fd.fch, D = [0, -SINP, COSP], { S, ropes, R, H } = model;
   const ground = type === 'tent' || type === 'fence' ? bakeCampGround(type, model) : null;
-  const list = [], runs = [], shade = [], half = R * 1.75;
-  const y0 = Math.floor(-(H + 0.1 * knightPx()) * COSP / fh - R * 1.2 * SINP / fh) - 2, y1 = Math.ceil(R * 1.2 * SINP / fh) + 2;
+  const extent = Math.max(R, model.depth || R);
+  const list = [], runs = [], shade = [], half = extent * 1.75;
+  const y0 = Math.floor(-(H + 0.1 * knightPx()) * COSP / fh - extent * 1.2 * SINP / fh) - 2, y1 = Math.ceil(extent * 1.2 * SINP / fh) + 2;
   for (let cy = y0; cy <= y1; cy++) {
     let s0 = 1e9, s1 = -1e9, seg = 1e9, segEnd = -1e9;   // backing in runs of cells actually covered: gaps (between poles, holes) stay open
     for (let cx = Math.floor(-half / fw); cx <= Math.ceil(half / fw); cx++) {
@@ -267,7 +268,7 @@ function bakeCamp(type, model, sd) {
   }
   // the coarse cells it stands on: they stop the knight, and their grass is not drawn
   const block = [];
-  for (let dy = -Math.ceil(R * 1.1 * SINP / CH) - 1; dy <= Math.ceil(R * 1.1 * SINP / CH) + 1; dy++) for (let dx = -Math.ceil(R / CW) - 1; dx <= Math.ceil(R / CW) + 1; dx++)
+  for (let dy = -Math.ceil((model.depth || R) * 1.1 * SINP / CH) - 1; dy <= Math.ceil((model.depth || R) * 1.1 * SINP / CH) + 1; dy++) for (let dx = -Math.ceil(R / CW) - 1; dx <= Math.ceil(R / CW) + 1; dx++)
     if (model.foot(dx * CW, -dy * CH / SINP)) block.push(dx, dy);
   let minY = 0; for (let k = 1; k < list.length; k += 4) minY = Math.min(minY, list[k]);
   // Geometry still blocks movement exactly as before. Only wood posts suppress
