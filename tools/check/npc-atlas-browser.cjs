@@ -422,7 +422,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           closeEditor();
           return { removed, map: mapFileText(), remaining: npcs.length };
         });
-        assert(cleanup.removed && cleanup.remaining === 0);
+        assert(cleanup.removed && cleanup.remaining === 1, 'only the shipped camp resident remains');
         assert.equal(cleanup.map, original);
         assert.deepEqual(realErrors(errs), [], 'browser errors: ' + realErrors(errs).join('; '));
         console.log('PASS NPC atlas upload, preview, runtime render and map isolation: ' + mode);
@@ -539,7 +539,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
             closeEditor();
             return { was, hermit, remaining: npcs.length };
           });
-          assert(cleanup.was && cleanup.hermit && cleanup.remaining === 0);
+          assert(cleanup.was && cleanup.hermit && cleanup.remaining === 1, 'only the shipped camp resident remains');
           assert.deepEqual(realErrors(errs), [], 'HTTP PNG errors: ' + realErrors(errs).join('; '));
           console.log('PASS real shipped villager PNG via HTTP ' + mode +
             ': atlas, 8 views, quality scan, ASCII and world draw');
