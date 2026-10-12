@@ -159,9 +159,11 @@ function ruinArchitecturalRelief(site) {
     const ribs = site.type === 'cloister' ?
       [-d * .28, d * .04, d * .34] : [-d * .14, d * .28];
     for (const z of ribs) {
-      const top = h * .69, edge = w * .44;
-      addBeam(-edge, -10, z - 4, z + 4, top * .67, top, 5, 'wall');
-      addBeam(10, edge, z - 4, z + 4, top, top * .67, 5, 'wall');
+      const top = Math.max(ah + 52, h * .72), edge = w * .44;
+      const shoulder = Math.max(ah + 14, top * .84);
+      // Beam undersides stay ABOVE the standing height at the portal.
+      addBeam(-edge, -10, z - 4, z + 4, shoulder, top, 5, 'wall');
+      addBeam(10, edge, z - 4, z + 4, top, shoulder, 5, 'wall');
       addBox(-11, 11, top - 3, top + 6, z - 6, z + 6, 'wall');
     }
   }
@@ -257,8 +259,10 @@ function buildRuins() {
       }
     }
     ruins.push({ ...site, cx, cy, x0, x1, y0, y1, gridW, gridH,
-      lum, dep, glyph, lev, walls: ruinWallRectangles(site) });
+      lum, dep, glyph, lev, walls: ruinWallRectangles(site),
+      meshPieces: mesh.length });
   }
+  paintRuinGroundShadows();
 }
 function drawRuins() {
   const up = Math.round(flash * 3);
@@ -303,6 +307,46 @@ function occludeRuins(e) {
       if (r.lum[k] < 0 || r.dep[k] <= feet + 1.5) continue;
       gput(SOLID_CELL, x * CW, y * CH, 1);
       if (r.glyph[k] >= 0) blit(r.glyph[k], r.lev[k], x * CW, y * CH);
+    }
+  }
+}
+
+ // Grounding: actual wall footprints project low-frequency stone shadows away
+ // from the light (same world coordinate basis as the grass), including deep
+ // contact shadow at their feet. Baked once on world build / resize.
+function paintRuinGroundShadows() {
+  if (!bshade || !bshade.length) return;
+  for (const r of ruins) {
+    const height = r.height * .62;
+    const sx = -LGT[0] / LGT[1] * height;
+    const sz = -LGT[2] / LGT[1] * height;
+    const corners = [
+      mapToCell(r.x - r.width / 2 - 20, r.z - r.depth / 2 - 20),
+      mapToCell(r.x + r.width / 2 + sx + 20, r.z + r.depth / 2 + sz + 20)
+    ];
+    const x0 = Math.max(1, Math.floor(Math.min(corners[0][0], corners[1][0])));
+    const x1 = Math.min(COLS - 2, Math.ceil(Math.max(corners[0][0], corners[1][0])));
+    const y0 = Math.max(1, Math.floor(Math.min(corners[0][1], corners[1][1])));
+    const y1 = Math.min(ROWS - 2, Math.ceil(Math.max(corners[0][1], corners[1][1])));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const [mx, mz] = toModelXZ(x, y);
+      const px = mx - r.x, pz = mz - r.z;
+      let shadow = 0;
+      for (const w of r.walls) for (let step = 0; step <= 4; step++) {
+        const t = step / 4;
+        const wx = px - sx * t, wz = pz - sz * t;
+        const dx = Math.max(0, w[0] - wx, wx - w[1]);
+        const dz = Math.max(0, w[2] - wz, wz - w[3]);
+        const dist = Math.hypot(dx, dz);
+        if (dist >= 15) continue;
+        const strength = (step === 0 ? .32 : .37 * (1 - t)) *
+          Math.max(0, 1 - dist / 15);
+        shadow = Math.max(shadow, strength);
+      }
+      if (shadow > 0) {
+        const i = y * COLS + x;
+        bshade[i] = Math.min(.7, bshade[i] + shadow);
+      }
     }
   }
 }
