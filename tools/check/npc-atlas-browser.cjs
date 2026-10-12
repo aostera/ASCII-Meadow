@@ -205,11 +205,15 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           const before = mapFileText();
           ED.ui.root.querySelector('[data-act="npc-atlas-audit"]').click();
           const report = npcAtlasAudit('villager');
-          return { before: before === mapFileText(), report,
-            visible: !ED.ui.atlasAuditResult.hidden,
-            text: ED.ui.atlasAuditResult.textContent };
+          const visible = !ED.ui.atlasAuditResult.hidden;
+          const text = ED.ui.atlasAuditResult.textContent;
+          ED.variant.npc = 1; edSyncUI();
+          const hiddenForOtherType = ED.ui.atlasAuditResult.hidden;
+          ED.variant.npc = 0; edSyncUI();
+          return { before: before === mapFileText(), report, visible, text, hiddenForOtherType };
         });
-        assert(quality.before && quality.visible, 'quality audit must be UI-triggered and map-read-only');
+        assert(quality.before && quality.visible && quality.hiddenForOtherType,
+          'quality audit must be map-read-only and never show another archetype\'s report');
         assert.equal(quality.report.inspected, 32, 'audit should scan every frame in all 8 directions');
         assert.equal(quality.report.errors, 0, 'synthetic all-direction PNG must contain no transparent frames');
         assert(quality.text.includes('32 кадров') && quality.text.includes('0 ошибок'),
