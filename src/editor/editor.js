@@ -624,7 +624,7 @@ function edBuildUI() {
     const file = atlasFile.files && atlasFile.files[0];
     atlasFile.value = '';
     if (!file) return;
-    if (!/\\.png$/i.test(file.name) || file.type && file.type !== 'image/png' ||
+    if (!/\.png$/i.test(file.name) || file.type && file.type !== 'image/png' ||
         file.size > 16 * 1024 * 1024) { edStatus('Нужен PNG не больше 16 МБ.'); return; }
     const w = +atlasW.value, h = +atlasH.value, source = URL.createObjectURL(file);
     const probe = new Image();
