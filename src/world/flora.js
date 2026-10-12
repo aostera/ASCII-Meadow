@@ -283,12 +283,22 @@ function placeFlora() {
   build.flora = flora.length;
 }
 
-function visibleFlora(out) {
+// Flora stays sorted by its grounded row. Binary search the first visible
+// item, avoiding a full walk over distant trees on every animation frame.
+function floraLowerBound(row) {
   let lo = 0, hi = flora.length;
-  const y0 = VY0 - 2;
-  while (lo < hi) { const m = (lo + hi) >> 1; if (flora[m].br < y0) lo = m + 1; else hi = m; }
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (flora[mid].br < row) lo = mid + 1; else hi = mid;
+  }
+  return lo;
+}
+function visibleFlora(out) {
   const y1 = VY1 + FLMAXR, xa = VX0 - 60, xb = VX1 + 60;
-  for (let k = lo; k < flora.length && flora[k].br <= y1; k++) { const f = flora[k]; if (f.x > xa && f.x < xb) out.push(f); }
+  for (let k = floraLowerBound(VY0 - 2); k < flora.length && flora[k].br <= y1; k++) {
+    const f = flora[k];
+    if (f.x > xa && f.x < xb) out.push(f);
+  }
   return out;
 }
 // The same wind field the grass feels, sampled at the tree's foot. Trees are heavy: they only follow
@@ -300,8 +310,9 @@ function windAt(x, y) {
 }
 function updateFlora(dt) {
   const k = 1 - Math.exp(-dt * 1.6), d = Math.exp(-dt * 2.2);
-  for (const f of flora) {
-    if (f.br < VY0 - 40 || f.br > VY1 + FLMAXR + 40) continue;   // off screen: nothing to animate
+  const maxRow = VY1 + FLMAXR + 40;
+  for (let i = floraLowerBound(VY0 - 40); i < flora.length && flora[i].br <= maxRow; i++) {
+    const f = flora[i]; // exact same in-view set; no off-screen sprite updates
     const w = windAt(f.x, f.br);
     f.vw = ((f.vw || 0) + (w.lean - (f.sw || 0)) * k * 6) * d;    // damped spring: heavy, a little overshoot
     f.sw = (f.sw || 0) + f.vw * dt;
