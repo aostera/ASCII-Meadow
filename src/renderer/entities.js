@@ -38,7 +38,7 @@ function drawEntity(e) {
     e.glowM = null;
     // The atlas frame is portrait (40x56). Previously drawing it into a 120x106
     // box stretched its width by ~59%, making a knight-height NPC seem huge.
-    // Keep full sprite inside the conservative 88%-of-knight silhouette bound;
+    // Keep full sprite inside the conservative 72%-of-knight silhouette bound;
     // preserve portrait proportions and anchor feet to the ground.
     const rect = npcAtlasRect(frame);
     rg.drawImage(frame.image, frame.x, frame.y, frame.width, frame.height,
