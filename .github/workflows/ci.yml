@@ -28,6 +28,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install WebP validator (CI-only)
+        run: python3 -m pip install 'Pillow==12.0.0'
+      - name: Check lossless WebP source assets and generated NPC pixels
+        run: python3 tools/migrate_webp.py --check
       - name: Syntax of every script
         run: node tools/check/syntax.cjs
       - name: Actor catalog contract (types, IDs, behaviors, state and resize)
