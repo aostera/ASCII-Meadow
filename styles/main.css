@@ -27,6 +27,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .ed h3 { margin: 0 0 6px; font: 500 11px/1.2 var(--ui); color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
 .ed-head { display: flex; align-items: center; justify-content: space-between; }
 .ed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.ed-npc-catalog { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 8px; }
+.ed-npc-catalog .ed-btn { min-height: 34px; justify-content: center; text-align: center; }
+.ed-npc-catalog .ed-btn[aria-pressed="true"] { border-color: #b0b0b0; background: #272727; }
+.ed [data-act="preview-play"] { margin: 6px 0; justify-content: center; width: 100%; }
+.ed [data-act="preview-play"][aria-pressed="false"] { border-style: dashed; }
+.ed [aria-label="Фаза шага NPC"] { box-sizing: border-box; width: 100%; accent-color: #bdbdbd; }
 .ed-btn { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 26px; padding: 4px 8px; background: #141414; border: 1px solid var(--line); color: #d6d6d6; font: 400 12px/1.2 var(--ui); text-align: left; cursor: pointer; }
 .ed-btn:hover:not(:disabled) { border-color: #3a3a3a; color: var(--ink); }
 .ed-btn.on { border-color: #c9a45c; color: var(--ink); background: #1d1a14; }
