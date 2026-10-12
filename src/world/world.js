@@ -11,6 +11,7 @@ function buildWorld() {
   props.length = 0; cathedral.cv = null;
   buildCathedral();
   buildRuins(); // three independent raycast meshes, isolated from the castle's cast bins
+  registerRuinInspections(); // two arch-side inspect spots per ruin, no map mutation
   fogs.length = 0;
   // fog banks that lie round the castle mound and roll slowly east
   fogBanks.length = 0;
