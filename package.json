@@ -5,7 +5,7 @@
   "scripts": {
     "prepare": "sh tools/build_site.sh dist",
     "check": "npm run check:static && npm run check:browser",
-    "check:static": "node tools/check/syntax.cjs && node tools/check/lint.cjs && node tools/check/resources.cjs",
+    "check:static": "node tools/check/syntax.cjs && node tools/check/lint.cjs && node tools/check/resources.cjs && node tools/check/repo-hygiene.cjs",
     "check:browser": "node tools/check/smoke.cjs \"file://$PWD/index.html\" --out shots/smoke",
     "serve": "python3 -m http.server 8080"
   },
