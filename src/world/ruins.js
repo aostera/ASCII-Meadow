@@ -206,6 +206,31 @@ function ruinArchitecturalRelief(site) {
       addBox(-11, 11, top - 3, top + 6, z - 6, z + 6, 'wall');
     }
   }
+  // Individual fallen ashlar blocks and cracked courses make the stone
+  // meet the ground. Keep rubble on the existing side-wall footprints, far
+  // from the central clear arch, so the swept collision path is unchanged.
+  const salt = site.type === 'gate' ? 5 : site.type === 'abbey' ? 13 : 23;
+  for (const side of [-1, 1]) for (let k = 0; k < 9; k++) {
+    const jitter = (k * 7 + salt + (side + 1) * 3) % 11;
+    const z = -d * .43 + (k + .3) * d * .105;
+    const x = side * (w / 2 - 10 - (jitter % 3) * 3);
+    const wd = 6 + (jitter % 4) * 2, hd = 6 + (jitter % 5) * 2;
+    addBox(x - wd, x + wd, 0, hd, z - wd * .8, z + wd,
+      'wall', { courses: [hd * .55] });
+    if (k % 3 === 0) addBox(x - wd * .6, x + wd * .9,
+      hd, hd + 4, z - wd, z + wd * .55, 'wall');
+  }
+  // Small irregular joints at the lower gate piers. Solid decorative
+  // fragments stay outside the passage clearance at every yaw angle.
+  for (const side of [-1, 1]) for (const face of [-1, 1]) {
+    const z = face * (d / 2 - 7);
+    for (let k = 0; k < 4; k++) {
+      const x = side * (a / 2 + 19 + k * 11);
+      if (Math.abs(x) >= w / 2 - 7) continue;
+      const base = k * 13 + ((salt + k * 3) % 7);
+      addBox(x - 5, x + 6, base, base + 5, z - 8, z + 8, 'wall');
+    }
+  }
   // Chipped crenellations / missing wall courses, no full opaque roof.
   for (const side of [-1, 1]) for (let k = 0; k < 4; k++) {
     const z = -d * .37 + k * d * .24, x = side * (w / 2 - 8);
