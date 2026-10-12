@@ -63,22 +63,6 @@ function drawFogField() {  // screen space, on the overlay
   ctx.drawImage(FG.cv, 0, 0, W, H);
   ctx.globalAlpha = 1;
 }
-function castleFogBanks(dt) {  // on the overlay, in world space
-  const C = cathedral;
-  if (!C.cv) return;
-  const vx0 = camX * CW, vy0 = camY * CH;
-  for (const b of fogBanks) {
-    b.x += b.sp * dt;
-    if (b.x - b.rx > C.kx + 1200 * MS) b.x = C.kx - 1200 * MS - b.rx;
-    if (b.x + b.rx < vx0 || b.x - b.rx > vx0 + W / VZ || b.y + b.ry < vy0 || b.y - b.ry > vy0 + H / VZ) continue;
-    const a = b.a * (0.8 + 0.2 * Math.sin(t * 0.4 + b.ph)) + flash * 0.05;
-    ctx.save(); ctx.translate(b.x, b.y); ctx.scale(1, b.ry / b.rx);
-    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, b.rx);
-    g.addColorStop(0, `rgba(205,205,205,${a})`); g.addColorStop(0.55, `rgba(205,205,205,${a * 0.5})`); g.addColorStop(1, 'rgba(205,205,205,0)');
-    ctx.fillStyle = g; ctx.fillRect(-b.rx, -b.rx, b.rx * 2, b.rx * 2);
-    ctx.restore();
-  }
-}
 function drawFog() {
   for (const f of fogs) {
     const x = f.x * CW, y = f.y * CH, r = f.r * CW;
