@@ -231,7 +231,11 @@ function placeFlora() {
       if (forest > 0.52 && r < (forest - 0.4) * 1.35) v = r < 0.16 ? dead[(r * 97 | 0) % dead.length] : trees[(r * 131 | 0) % trees.length];
       else if (r < 0.12 + forest * 0.25) v = bush[(r * 211 | 0) % bush.length];
       if (!v) continue;
-      if (ruinClearing(...toModelXZ(x, y), RUIN_FLORA_BUFFER)) continue;
+      // Generated trees persist as their grounded, snapped foot position
+      // when the editor first bakes them into explicit map objects. Test the
+      // SAME world coordinate here, or a tree at the clearing boundary can
+      // disappear on first edit/undo even without moving its saved location.
+      if (ruinClearing(...toModelXZ(x, Math.floor(y) - 0.7), RUIN_FLORA_BUFFER)) continue;
       if (pathNear(x, y, Math.ceil((v.type === 'bush' ? v.R * 0.7 : v.R * 0.45) / CW))) continue;
       flora.push({ isFlora: true, v, x, y: Math.floor(y) - 0.7, br: Math.floor(y), ph: hash(i, j) * 6.28, rust: 0 });
     }
