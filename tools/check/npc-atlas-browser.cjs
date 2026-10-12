@@ -107,7 +107,10 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         // rather than relying on waitForFunction's browser-side polling clock.
         let status = '';
         for (let i = 0; i < 60; i++) {
-          status = await page.evaluate(() => NPC_ATLASES.get('villager')?.status || 'loading');
+          status = await page.evaluate(() => {
+            const entry = NPC_ATLASES.get('villager');
+            return entry?.source.startsWith('blob:') ? entry.status : 'loading';
+          });
           if (status !== 'loading') break;
           await step(1);
           await page.waitForTimeout(50);
@@ -373,6 +376,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
       let pathname;
       try { pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname); }
       catch { response.writeHead(400); response.end(); return; }
+      if (pathname === '/favicon.ico') { response.writeHead(204); response.end(); return; }
       if (!pathname.startsWith('/ASCII-Meadow/')) { response.writeHead(404); response.end(); return; }
       const relative = pathname.slice('/ASCII-Meadow/'.length) || 'index.html';
       const target = path.resolve(root, relative);
