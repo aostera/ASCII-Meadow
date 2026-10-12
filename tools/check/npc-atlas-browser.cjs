@@ -117,7 +117,13 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         });
         let directionalStatus = 'loading';
         for (let i = 0; i < 60; i++) {
-          directionalStatus = await page.evaluate(() => NPC_ATLASES.get('villager').status);
+          directionalStatus = await page.evaluate(() => {
+            const entry = NPC_ATLASES.get('villager');
+            // Do not mistake the previous three-row atlas for the replacement:
+            // the editor first decodes the uploaded PNG, then attaches a new entry.
+            return entry && entry.layout.states.idle.rows.length === 8
+              ? entry.status : 'loading';
+          });
           if (directionalStatus !== 'loading') break;
           await step(1);
           await page.waitForTimeout(40);
