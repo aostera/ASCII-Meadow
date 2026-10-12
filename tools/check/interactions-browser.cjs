@@ -13,7 +13,8 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
       try {
         await step(3);
         const intro = await page.evaluate(() => {
-          if (npcs.length) throw Error('NPCs must not be spawned on game start');
+          if (npcs.length !== 1 || npcs[0].actorId !== 'camp-villager')
+            throw Error('expected the single stationary camp resident');
           const [x, z] = toModelXZ(player.x + 1, player.y);
           const npc = spawnActor('villager', { id: 'qa-dialogue', world: [x, z],
             behavior: 'idle', lines: ['Первая реплика', 'Вторая реплика'] });
@@ -33,12 +34,15 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
         assert.equal(first.state, 'talk');
         assert(first.text.includes('Странник'));
         await page.keyboard.press('KeyE');
-        const second = await page.evaluate(() => ({ line: npcs[0].say, index: npcs[0].dialogIndex }));
+        const second = await page.evaluate(() => {
+          const npc = npcs.find(n => n.actorId === 'qa-dialogue');
+          return { line: npc.say, index: npc.dialogIndex };
+        });
         assert.equal(second.line, 'Вторая реплика');
         assert.equal(second.index, 2);
         const far = await page.evaluate(() => {
           const old = activeSpot;
-          npcs[0].x += 100;
+          npcs.find(n => n.actorId === 'qa-dialogue').x += 100;
           return performInteraction(old);
         });
         assert.equal(far, false, 'cannot talk to actor after it moves out of range');
@@ -48,8 +52,8 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           return { used: performInteraction(old), n: npcs.length, ents: ents.length };
         });
         assert.equal(removed.used, false);
-        assert.equal(removed.n, 0);
-        assert.equal(removed.ents, 4); // player and three cows
+        assert.equal(removed.n, 1);
+        assert.equal(removed.ents, 5); // player, three cows and the camp resident
         const gate = await page.evaluate(() => {
           const spot = props[0].spots[0];
           player.x = spot.x; player.y = spot.y;

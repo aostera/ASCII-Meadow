@@ -3,14 +3,32 @@
 # Each src file becomes its own inline <script>, in the same order, so the scripts share the global scope
 # exactly as the <script src> tags do.
 # usage: python3 tools/bundle.py out.html [--body]   (--body: no <html>/<head>/<body> wrapper, artifact style)
-import re, sys, os
+import base64, re, sys, os
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 out, body_only = sys.argv[1], '--body' in sys.argv
 page = open(os.path.join(root, 'index.html'), encoding='utf-8').read()
 css = open(os.path.join(root, 'styles/main.css'), encoding='utf-8').read()
 def script(m):
-    src = open(os.path.join(root, m.group(1)), encoding='utf-8').read()
-    if re.search(r'</script', src, re.I): sys.exit('cannot inline %s: it contains </script' % m.group(1))
+    filename = m.group(1)
+    src = open(os.path.join(root, filename), encoding='utf-8').read()
+    if filename == 'src/data/npc-atlases.js':
+        # A real standalone HTML must carry both NPC PNGs: relative URLs cannot
+        # resolve after dist/ascii-meadow.html is copied anywhere on its own.
+        # Replace manifest path literals only; the normal web build is untouched.
+        def inline_png(match):
+            relative = match.group(2)
+            if not re.fullmatch(r'assets/npc/[A-Za-z0-9_-]+\.png', relative):
+                sys.exit('unsafe NPC atlas path in manifest: ' + relative)
+            path = os.path.join(root, relative)
+            with open(path, 'rb') as file:
+                data = file.read()
+            if not data.startswith(b'\x89PNG\r\n\x1a\n'):
+                sys.exit('invalid NPC atlas PNG: ' + relative)
+            return match.group(1) + 'data:image/png;base64,' + base64.b64encode(data).decode('ascii') + match.group(3)
+        src, count = re.subn(r"(source:\s*['\"])(assets/npc/[^'\"\n]+)(['\"])", inline_png, src)
+        if count != 2:
+            sys.exit('standalone bundle expected exactly 2 NPC PNG atlases, found ' + str(count))
+    if re.search(r'</script', src, re.I): sys.exit('cannot inline %s: it contains </script' % filename)
     return '<script>\n' + src + '</script>'
 page = page.replace('<link rel="stylesheet" href="styles/main.css">', '<style>\n' + css + '</style>')
 page = re.sub(r'<script src="([^"]+)"></script>', script, page)

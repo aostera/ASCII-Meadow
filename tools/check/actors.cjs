@@ -21,6 +21,14 @@ const count = (title, value) => { assert(value, title); console.log('PASS ' + ti
 const reject = (title, fn, expression) => { assert.throws(fn, expression); console.log('PASS ' + title); };
 count('no NPC spawned by catalog script', npcs.length === 0 && ents.length === 1);
 count('built-in archetype registered', api.ACTOR_TYPES.get('villager').name === 'Странник');
+count('hermit is registered but not spawned', api.ACTOR_TYPES.get('hermit').renderClass === 'dwarf' && npcs.length === 0);
+count('default motion profile is frozen', Object.isFrozen(api.ACTOR_TYPES.get('villager').rigMotion));
+reject('invalid stride rejected', () => api.registerActorType('bad-stride', { name: 'bad', rigMotion: { walk: { stride: -1 } } }), /Invalid rig motion/);
+reject('unknown motion state rejected', () => api.registerActorType('bad-motion-state', { name: 'bad', rigMotion: { attack: {} } }), /Invalid rig motion/);
+const hermit = api.spawnActor('hermit', { id: 'hermit-test', world: [0, 0] });
+count('hermit motion profile inherited', hermit.rigMotion.walk.stride === 0.8 && hermit.rigMotion.idle.breath === 0.65);
+api.despawnActor(hermit.actorId);
+
 reject('duplicate archetype denied', () => api.registerActorType('villager', { name: 'duplicate' }), /Duplicate/);
 reject('invalid archetype denied', () => api.registerActorType('../bad', { name: 'bad' }), /Invalid actor type/);
 reject('unsupported render rejected', () => api.registerActorType('bad-render', { name: 'bad', renderClass: 'cow' }), /supported rig/);

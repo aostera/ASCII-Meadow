@@ -27,6 +27,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .ed h3 { margin: 0 0 6px; font: 500 11px/1.2 var(--ui); color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
 .ed-head { display: flex; align-items: center; justify-content: space-between; }
 .ed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.ed-npc-catalog { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 8px; }
+.ed-npc-catalog .ed-btn { min-height: 34px; justify-content: center; text-align: center; }
+.ed-npc-catalog .ed-btn[aria-pressed="true"] { border-color: #b0b0b0; background: #272727; }
+.ed [data-act="preview-play"] { margin: 6px 0; justify-content: center; width: 100%; }
+.ed [data-act="preview-play"][aria-pressed="false"] { border-style: dashed; }
+.ed [aria-label="Фаза шага NPC"] { box-sizing: border-box; width: 100%; accent-color: #bdbdbd; }
 .ed-btn { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 26px; padding: 4px 8px; background: #141414; border: 1px solid var(--line); color: #d6d6d6; font: 400 12px/1.2 var(--ui); text-align: left; cursor: pointer; }
 .ed-btn:hover:not(:disabled) { border-color: #3a3a3a; color: var(--ink); }
 .ed-btn.on { border-color: #c9a45c; color: var(--ink); background: #1d1a14; }
@@ -50,3 +56,56 @@ body.editing .stats { display: none; }
 }
 .ed-zoom { display: grid; grid-template-columns: auto 1fr 2fr 1fr; align-items: center; gap: 4px; margin-bottom: 8px; }
 .ed-zoom .ed-btn { justify-content: center; min-height: 24px; }
+
+/* NPC atlas import remains inside ?edit, never part of the ordinary game HUD. */
+.ed-atlas-tools { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.ed-atlas-tools label { display: grid; gap: 4px; font-size: 11px; }
+.ed-atlas-tools input[type="number"] { min-width: 0; width: 100%; box-sizing: border-box;
+  color: var(--ink); background: #161616; border: 1px solid var(--line); padding: 5px; font: 12px var(--mono); }
+.ed-atlas-tools .ed-btn { justify-content: center; }
+
+/* Eight authored NPC views; visible only for a ready 8-direction PNG manifest. */
+.ed-npc-directions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.ed-npc-directions .ed-btn { justify-content: center; min-width: 0; font: 500 11px/1.2 var(--mono); }
+
+/* Per-state FPS/frames settings and JSON-only animation preset export. */
+.ed-animation-tools { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; }
+.ed-animation-tools label { display: grid; gap: 4px; min-width: 0; font-size: 11px; }
+.ed-animation-tools input[type="number"] { min-width: 0; width: 100%; box-sizing: border-box;
+  background: #161616; border: 1px solid var(--line); color: var(--ink); padding: 5px; font: 12px var(--mono); }
+.ed-animation-tools .ed-btn { justify-content: center; }
+
+/* Frame-accurate NPC scrubber: 1–60 authored frames, responsive in the existing editor. */
+.ed-npc-timeline { display: grid; gap: 6px; margin: 5px 0; }
+.ed-npc-timeline output { min-width: 0; text-align: left; font: 500 11px/1.3 var(--mono); }
+.ed-npc-frame-controls { display: grid; grid-template-columns: 30px minmax(0,1fr) 30px; align-items: center; gap: 6px; }
+.ed-npc-frame-controls input[type="range"] { width: 100%; min-width: 0; accent-color: #c9a45c; }
+.ed-npc-frame-controls .ed-btn { min-height: 28px; justify-content: center; padding: 4px; font-size: 16px; }
+
+/* Explicit, read-only NPC atlas diagnostics. No permanent error toast and no oversized output. */
+.ed-atlas-report { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 210px; overflow-y: auto;
+  padding: 8px; border: 1px solid var(--line); background: #111; color: #d0c8b8;
+  font: 11px/1.45 var(--mono); }
+
+/* Compact read-only ASCII contact sheet. Rendered on demand; never updated each game tick. */
+.ed [data-act="npc-gallery-toggle"] { margin: 8px 0 4px; width: 100%; justify-content: center; }
+.ed-npc-gallery { display: grid; gap: 8px; margin: 2px 0 8px; }
+.ed-gallery-help { margin: 0; font: 11px/1.4 var(--ui); color: var(--dim); }
+.ed-gallery-groups, .ed-gallery-directions { display: grid; gap: 7px; }
+.ed-gallery-card, .ed-gallery-direction { display: grid; gap: 4px; padding: 6px; border: 1px solid var(--line); background: #131313; min-width: 0; }
+.ed-gallery-heading { margin: 0; font: 500 11px/1.4 var(--mono); color: var(--ink); }
+.ed-gallery-strip { display: flex; gap: 4px; flex-wrap: wrap; }
+.ed-gallery-frame { display: grid; gap: 2px; justify-items: center; min-width: 48px;
+  padding: 3px; border: 1px solid #323232; background: #181818; color: var(--dim);
+  font: 10px/1.2 var(--mono); cursor: pointer; }
+.ed-gallery-frame canvas { width: 48px; height: 70px; }
+.ed-gallery-frame.on, .ed-gallery-frame[aria-pressed="true"] { border-color: #c9a45c; color: var(--ink); background: #292117; }
+.ed-gallery-frame:hover { border-color: #ad976d; }
+.ed-gallery-frame:focus-visible { outline: 2px solid #c9a45c; outline-offset: 2px; }
+
+/* Actionable NPC asset audit findings: keyboard-accessible frame links and separate JSON export. */
+.ed-atlas-report { display: grid; gap: 5px; }
+.ed-atlas-report p { margin: 0; }
+.ed-audit-finding { color: inherit; background: #1a1a1a; border: 1px solid #424242;
+  padding: 5px; text-align: left; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.ed-audit-finding:hover, .ed-audit-finding:focus-visible { outline: 1px solid #c9a45c; border-color: #c9a45c; }

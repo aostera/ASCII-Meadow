@@ -1,6 +1,33 @@
 // Stage 1: data-driven NPC catalog. No NPC is spawned just by loading this file.
 // Coordinates supplied to spawnActor are world units (the same as exported map.js),
 // while an active entity lives in the render/physics glyph grid. No new rendering path.
+// Motion tuning is only for procedural human/dwarf rigs. It does not load sprite atlases.
+const RIG_MOTION_DEFAULT = Object.freeze({
+  idle: Object.freeze({ breath: 1 }),
+  walk: Object.freeze({ stride: 1 }),
+  talk: Object.freeze({ breath: 1 })
+});
+
+function normalizeRigMotion(value) {
+  if (value === undefined) return RIG_MOTION_DEFAULT;
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      Object.keys(value).some(k => !['idle', 'walk', 'talk'].includes(k)))
+    throw new Error('Invalid rig motion profile');
+  const result = {};
+  for (const state of ['idle', 'walk', 'talk']) {
+    const part = value[state] === undefined ? {} : value[state];
+    const key = state === 'walk' ? 'stride' : 'breath';
+    if (!part || typeof part !== 'object' || Array.isArray(part) ||
+        Object.keys(part).some(k => k !== key))
+      throw new Error('Invalid rig motion state: ' + state);
+    const amount = part[key] === undefined ? 1 : part[key];
+    if (!Number.isFinite(amount) || amount > 2 || amount < (state === 'walk' ? 0.25 : 0))
+      throw new Error('Invalid rig motion ' + state + '.' + key);
+    result[state] = Object.freeze({ [key]: amount });
+  }
+  return Object.freeze(result);
+}
+
 const ACTOR_TYPES = new Map();
 let actorSerial = 0;
 
@@ -20,6 +47,7 @@ function registerActorType(id, spec) {
     renderClass: spec.renderClass || 'human', // 'human' / 'dwarf' use the existing ASCII rig
     tint: Object.freeze(tint.slice()),
     lines: Object.freeze(lines.slice()),
+    rigMotion: normalizeRigMotion(spec.rigMotion),
     behavior,
     speed: spec.speed === undefined ? 8 : spec.speed,
     talkRadius: spec.talkRadius === undefined ? 14 : spec.talkRadius,
@@ -45,7 +73,7 @@ function spawnActor(type, options = {}) {
   if (!Array.isArray(lines) || lines.some(line => typeof line !== 'string')) throw new Error('Invalid actor lines');
   const actor = mk(options.name || def.name, def.renderClass, def.tint.slice(), {
     actorId: id, actorType: type, x, y, tx: x, ty: y,
-    lines: lines.slice(), aiState: 'idle', behavior: options.behavior || def.behavior,
+    lines: lines.slice(), rigMotion: def.rigMotion, aiState: 'idle', actorAnimTime: 0, behavior: options.behavior || def.behavior,
     speed: options.speed === undefined ? def.speed : options.speed, talkRadius: def.talkRadius,
     wanderRadius: def.wanderRadius, origin: world.slice(), sayT: 0, sayCd: 0
   });
@@ -80,6 +108,7 @@ function restoreActorWorld(snapshot) {
 
 function updateRegisteredNpc(n, dt) {
   if (!(dt >= 0) || !Number.isFinite(dt)) return;
+  n.actorAnimTime = (n.actorAnimTime || 0) + dt;
   const px = player.x - n.x, py = (player.y - n.y) * (CH / CW), distance = Math.hypot(px, py);
   n.sayCd -= dt; n.sayT -= dt;
   if (n.lines.length && distance < n.talkRadius && n.sayCd <= 0) {
@@ -132,4 +161,12 @@ function syncMapActors() {
 registerActorType('villager', {
   name: 'Странник', renderClass: 'human', tint: [154, 154, 154],
   behavior: 'wander', speed: 8, lines: ['Доброй дороги.']
+});
+
+// Second editor-selectable archetype, deliberately not spawned on the designer's v1 map.
+// Both archetypes still use the existing procedural rig, not new authored sprite frames.
+registerActorType('hermit', {
+  name: 'Отшельник', renderClass: 'dwarf', tint: [132, 132, 132],
+  behavior: 'idle', speed: 4, lines: ['Тише.'],
+  rigMotion: { idle: { breath: 0.65 }, walk: { stride: 0.8 }, talk: { breath: 1.1 } }
 });

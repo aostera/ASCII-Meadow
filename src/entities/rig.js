@@ -3,7 +3,7 @@
 
 // ---------- rig ----------
 const rig = document.createElement('canvas');
-const rg = rig.getContext('2d', { willReadFrequently: true });
+let rg = rig.getContext('2d', { willReadFrequently: true });
 const EMIT = 'rgb(255,0,255)';           // marker colour for emissive parts (orb, lantern flame)
 const grey = v => { const c = Math.max(0, Math.min(255, v * 255)) | 0; return `rgb(${c},${c},${c})`; };
 const LX = -0.6, LY = -0.8;              // light from the upper left
@@ -40,7 +40,11 @@ const P = (o, a, len) => [o[0] + Math.sin(a) * len, o[1] + Math.cos(a) * len]; /
 
 // pose in model units: ground at y=100, body faces +x
 function pose(e) {
-  const m = e.walk, ph = e.step, stout = e.cls === 'dwarf';
+  const motion = e.rigMotion;
+  const state = e.aiState === 'talk' ? 'talk' : e.walk > 0 ? 'walk' : 'idle';
+  const stride = motion && motion.walk ? motion.walk.stride : 1;
+  const breath = motion && motion[state] && motion[state].breath !== undefined ? motion[state].breath : 1;
+  const m = Math.max(0, Math.min(1, e.walk * stride)), ph = e.step, stout = e.cls === 'dwarf';
   const thigh = stout ? 20 : 24, shin = stout ? 19 : 23;
   const legs = [0, 1].map(k => {
     const p = ph + k * Math.PI;
@@ -51,7 +55,7 @@ function pose(e) {
     return { knee, ankle, a };
   });
   const hipY = 97 - Math.max(legs[0].ankle[1], legs[1].ankle[1]);
-  const breathe = Math.sin(t * 2.2 + e.x) * 0.7 * (1 - m);
+  const breathe = Math.sin(t * 2.2 + e.x) * 0.7 * breath * (1 - m);
   const lean = 3 * m + (e.cls === 'knight' ? 2 * (1 - m) : 0);
   const torsoLen = stout ? 24 : 30;
   const hip = [0, hipY], neck = [lean, hipY - torsoLen + breathe];
@@ -133,6 +137,24 @@ function drawRig(e, q) {
     const b1 = [hand[0] - 10 + Math.cos(-1) * 22, hand[1] + Math.sin(-1) * 22], b2 = [hand[0] - 10 + Math.cos(1) * 22, hand[1] + Math.sin(1) * 22];
     line(b1[0], b1[1], b2[0], b2[1], 0.7, 0.9); // string
     blob(hand[0], hand[1], 2.5, 2.5, 0.8);
+  } else if (e.cls === 'human') { // wandering villager: travel cloak, simple tunic and hood
+    const fold = Math.sin(t * 1.4 + e.x) * 1.5 + Math.sin(q.ph) * q.m * 2;
+    leg(legs[0], far);
+    arm(arms[0], far, 0.55);
+    // Back cloak peeks out from behind the silhouette when walking.
+    poly([[neck[0] - 7, neck[1] + 1], [neck[0] + 5, neck[1] + 2],
+      [hip[0] + 13 + fold, hip[1] + 15], [hip[0] - 13 + fold, hip[1] + 15]], 0.26);
+    poly([[neck[0] - 6, neck[1] + 3], [neck[0] + 7, neck[1] + 3],
+      [hip[0] + 9, hip[1] + 4], [hip[0] - 8, hip[1] + 4]], 0.58); // tunic
+    line(hip[0] - 8, hip[1] - 4, hip[0] + 9, hip[1] - 4, 2.3, 0.8); // belt
+    leg(legs[1], 1);
+    arm(arms[1], 1, 0.65);
+    blob(head[0], head[1], 7, 8, 0.72);
+    poly([[head[0] - 10, head[1] + 7], [head[0] - 8, head[1] - 7],
+      [head[0] - 1, head[1] - 12], [head[0] + 8, head[1] - 5],
+      [head[0] + 8, head[1] + 8], [head[0] + 4, head[1] + 6],
+      [head[0] + 2, head[1] - 3], [head[0] - 4, head[1] - 3]], 0.42); // hood
+    line(neck[0] + 5, neck[1] + 4, hip[0] + 3, hip[1] - 5, 1.2, 0.95); // tunic seam
   } else { // dwarf
     leg(legs[0], far); arm(arms[0], far, 0.55);
     line(neck[0] - 8, neck[1] - 2, neck[0] - 4, hip[1] + 4, 2, 0.5); // axe haft on the back
@@ -152,5 +174,26 @@ function drawRig(e, q) {
     rg.fillStyle = EMIT; rg.beginPath(); rg.arc(hand[0] + 2, hand[1] + 10.5, 2.6, 0, Math.PI * 2); rg.fill();
     e.glowM = [hand[0] + 2, hand[1] + 10.5];
   }
+}
+// Render the *same* production NPC rig on a private canvas for the editor.
+// No game rig pixels/size, gameplay entities, camera, map or RNG are changed.
+// The context swap is synchronous and restored even if drawing throws.
+function npcRigPreviewImage(e) {
+  const surface = document.createElement('canvas');
+  surface.width = BOX_W; surface.height = BOX_H;
+  const local = surface.getContext('2d', { willReadFrequently: true });
+  const old = rg;
+  try {
+    rg = local;
+    local.setTransform(1, 0, 0, 1, 0, 0);
+    local.translate(-BOX_X0, 0);
+    if (e.cls === 'dwarf') {
+      local.translate(0, 100);
+      local.scale(1.12, 0.8);
+      local.translate(0, -100);
+    }
+    drawRig(e, pose(e));
+    return local.getImageData(0, 0, surface.width, surface.height);
+  } finally { rg = old; }
 }
 const BOX_X0 = -60, BOX_W = 120, BOX_H = 106; // model box: x -60..60, y 0..106

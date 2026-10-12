@@ -22,6 +22,21 @@ const ok = (value, detail) => assert(value, detail);
       ok(!before.exported.includes('"actors"'), 'v1 export must not be rewritten as v2');
       ok(before.widget, 'map editor must have NPC placement tool');
 
+      // Preview is read-only, including across export/import and viewport sizes.
+      const previewIsolation = await original.page.evaluate(() => {
+        const before = mapFileText();
+        openEditor();
+        ED.tool = 'npc'; ED.variant.npc = 1;
+        ED.previewState = 'walk'; ED.previewPhase = 3.14;
+        edSyncUI();
+        const previewed = !ED.ui.npcCanvas.hidden;
+        const after = mapFileText();
+        closeEditor();
+        return { previewed, identical: before === after, actors: npcs.filter(n => n.fromMap).length };
+      });
+      ok(previewIsolation.previewed && previewIsolation.identical && previewIsolation.actors === 0,
+        'preview must not alter v1 export or place actors');
+
       const editing = await original.page.evaluate(() => {
         openEditor();
         const [x, z] = toModelXZ(player.x + 5, player.y + 3);
@@ -63,6 +78,22 @@ const ok = (value, detail) => assert(value, detail);
       for (let k = 0; k < 2; k++)
         ok(Math.abs(stable.world[k] - stable.entry[k + 2]) < 0.05,
           'NPC drifted from edited position while editor stayed open');
+      // Inspect the selected authored NPC after move/undo/redo without changing v2 export.
+      const selectedPreview = await original.page.evaluate(() => {
+        const before = mapFileText();
+        ED.sel = { kind: 'actors', mi: 0 };
+        ED.tool = 'select';
+        ED.previewState = 'walk'; ED.previewPhase = 1.57;
+        edSyncUI();
+        const visible = !ED.ui.npcCanvas.hidden;
+        const type = MEADOW_MAP.actors[0][1];
+        const details = ED.ui.npcLibrary.textContent;
+        const after = mapFileText();
+        return { visible, type, details, unchanged: before === after };
+      });
+      ok(selectedPreview.visible && selectedPreview.unchanged &&
+        selectedPreview.details.includes(selectedPreview.type),
+        'selected NPC preview must be visible and preserve v2 export');
       assert.equal(editing.parsed.v, 2);
       assert.deepEqual(editing.parsed.actors, [editing.moved.map]);
       ok(editing.source.includes('"actors"'), 'v2 export contains NPC array');
@@ -88,6 +119,25 @@ const ok = (value, detail) => assert(value, detail);
       assert.equal(restored.runtime[0].index, 0);
       for (let n = 0; n < 2; n++)
         ok(Math.abs(restored.runtime[0].map[n] - editing.moved.map[n + 2]) < 0.05, 'NPC drift after map re-import');
+
+      // Re-import must preserve NPC type while a read-only preview is opened.
+      const importedPreview = await replay.page.evaluate(() => {
+        const before = mapFileText();
+        openEditor();
+        ED.sel = { kind: 'actors', mi: 0 };
+        ED.tool = 'select';
+        ED.previewState = 'talk';
+        edSyncUI();
+        const label = ED.ui.npcLibrary.textContent;
+        const visible = !ED.ui.npcCanvas.hidden;
+        const pressed = ED.ui.npcStates.querySelector('[data-preview="talk"]').getAttribute('aria-pressed');
+        const unchanged = before === mapFileText();
+        closeEditor();
+        return { label, visible, pressed, unchanged };
+      });
+      ok(importedPreview.visible && importedPreview.unchanged && importedPreview.pressed === 'true' &&
+        importedPreview.label.includes(editing.moved.map[1]),
+        're-imported NPC preview must preserve actor type and v2 map');
 
       // Remove NPC via editor and restore a v1 map. No invisible NPC may survive.
       const cleaned = await replay.page.evaluate(() => {

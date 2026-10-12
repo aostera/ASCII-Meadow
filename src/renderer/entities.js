@@ -16,9 +16,21 @@ function drawEntity(e) {
   if (kn) { drawKnight(e, G, fcw, fch); return; }   // entities/knight.js
   {
   const sx = cols * SS / BOX_W, sy = rows * SS / BH;
-  rg.setTransform(sx * e.face, 0, 0, sy, (e.face > 0 ? -BOX_X0 : BOX_W + BOX_X0) * sx, 0);
+  const state = e.aiState === 'talk' ? 'talk' : e.walk > 0.15 ? 'walk' : 'idle';
+  const frame = e.actorType ? npcAtlasFrame(e, state) : null;
+  const atlas = frame && NPC_ATLASES.get(e.actorType);
+  const frameState = atlas && (atlas.layout.states[state] || atlas.layout.states.idle);
+  const authoredDirection = frameState && frameState.rows.length === 8;
+  // Eight authored angles already encode orientation; mirroring them would show the wrong view.
+  const facing = authoredDirection ? 1 : e.face;
+  rg.setTransform(sx * facing, 0, 0, sy,
+    (facing > 0 ? -BOX_X0 : BOX_W + BOX_X0) * sx, 0);
   if (e.cls === 'dwarf') { rg.translate(0, 100); rg.scale(1.12, 0.8); rg.translate(0, -100); }
-  drawRig(e, pose(e));
+  if (frame) {
+    e.glowM = null;
+    rg.drawImage(frame.image, frame.x, frame.y, frame.width, frame.height,
+      BOX_X0, 0, BOX_W, BOX_H);
+  } else drawRig(e, pose(e));
   if (e.cls === 'dwarf' && e.glowM) e.glowM = [e.glowM[0] * 1.12, 100 - (100 - e.glowM[1]) * 0.8];
   }
 

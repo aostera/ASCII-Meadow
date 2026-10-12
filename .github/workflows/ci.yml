@@ -32,6 +32,20 @@ jobs:
         run: node tools/check/syntax.cjs
       - name: Actor catalog contract (types, IDs, behaviors, state and resize)
         run: node tools/check/actors.cjs
+      - name: NPC animation atlas validation (frame geometry, rows and source restrictions)
+        run: node tools/check/npc-atlas.cjs
+      - name: Verify shipped 8-view NPC art, 288 frames and deterministic source
+        run: node tools/check/npc-starter-art.cjs
+      - name: Verify hermit sprite 8-view art, 288 frames and deterministic source
+        run: node tools/check/npc-hermit-art.cjs
+      - name: Check NPC sprite legibility at compact ASCII glyph scale
+        run: node tools/check/npc-readability.cjs
+      - name: NPC frame quality rules (transparency, duplicates and silhouette continuity)
+        run: node tools/check/npc-atlas-audit.cjs
+      - name: NPC gallery frame selection (sampling up to 60 frames)
+        run: node tools/check/npc-gallery.cjs
+      - name: NPC atlas publish path and manifest contract
+        run: node tools/check/npc-asset-build.cjs
       - name: Interaction registry (range, actions, NPC talk, stale references)
         run: node tools/check/interactions.cjs
       - name: Validate map import, round-trip integrity and RLE chunks
@@ -40,6 +54,8 @@ jobs:
         run: node tools/check/lint.cjs --warnings
       - name: Page resources (exist, relative, all loaded, no inline code)
         run: node tools/check/resources.cjs
+      - name: Verify standalone HTML embeds both NPC PNG atlases
+        run: node tools/check/standalone-npc.cjs
       - name: Standalone HTML (tools/bundle.py)
         run: |
           python3 tools/bundle.py dist/ascii-meadow.html
@@ -65,8 +81,19 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
+      - name: Exactly one resident in camp (idle, resize and E interaction, both renderers)
+        run: node tools/check/camp-resident-browser.cjs
       - name: Actor catalog in WebGL2 and Canvas 2D (create, render, resize, remove)
         run: node tools/check/actors-browser.cjs
+      - name: NPC PNG atlas upload, live preview and draw in WebGL2/Canvas 2D
+        run: node tools/check/npc-atlas-browser.cjs
+      - name: NPC editor visual gallery (both renderers)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npc-preview-gallery
+          path: shots/npc-preview/
+          if-no-files-found: warn
       - name: E interactions and NPC dialogues in WebGL2 and Canvas 2D
         run: node tools/check/interactions-browser.cjs
       - name: Road and castle-front fire coordinates (desktop/mobile)
