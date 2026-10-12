@@ -157,7 +157,19 @@ const state = page => page.evaluate(() => ({ x: player.x, y: player.y, run: play
       await page.mouse.up(); await step(2);
       const c1 = await count();
       check('editor: an earth stroke paints the ground', c1.earth > c0.earth + 200, `${c0.earth} → ${c1.earth} earth cells`);
-      await page.keyboard.press('KeyT'); await page.mouse.click(700, 300); await step(2);
+      // The rotated ruin courtyards have a larger vegetation exclusion zone.
+      // Pick a visible tree placement outside it rather than testing a tree
+      // intentionally hidden under stone; keep the actual pointer/tool path.
+      const treePoint = await page.evaluate(() => {
+        const candidates = [[700, 300], [540, 300], [300, 430], [580, 520],
+          [220, 520], [440, 510], [690, 180], [210, 220], [600, 400]];
+        return candidates.find(([sx, sy]) => {
+          const [wx, wz] = edGround(sx, sy);
+          return !ruinClearing(wx, wz, RUIN_FLORA_BUFFER);
+        }) || null;
+      });
+      if (!treePoint) throw Error('No valid visible tree position outside the Gothic ruin clearing');
+      await page.keyboard.press('KeyT'); await page.mouse.click(...treePoint); await step(2);
       await page.keyboard.press('KeyC'); await page.mouse.click(650, 450); await step(2);
       const c2 = await count();
       check('editor: a tree and a cow placed', c2.flora === c0.flora + 1 && c2.cows.length === 4, `flora ${c0.flora} → ${c2.flora}, cows ${c2.cows.length}`);

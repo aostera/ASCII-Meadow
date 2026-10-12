@@ -20,14 +20,17 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           const resident = npcs.find(n => n.actorId === 'camp-villager');
           if (!resident) throw Error('missing authored resident');
           const knight = charDims(player), npc = charDims(resident);
-          const visible = npc.u * BOX_H * (48 / 56);
+          const visible = npc.u * BOX_H;
           const knightHeight = knightPx();
           const atlas = NPC_SHIPPED_ATLASES.find(a => a.type === resident.actorType);
           const frame = atlas.layout;
           const rect = npcAtlasRect({ width: frame.frameWidth, height: frame.frameHeight });
+          const geometry = geomOf(resident);
           const sprite = { width: rect.w * npc.u, height: rect.h * npc.u,
             aspect: rect.w / rect.h, x: rect.x, y: rect.y,
-            bottom: rect.y + rect.h };
+            bottom: rect.y + rect.h,
+            grounded: Math.abs(geometry.top + geometry.h - geometry.gy) < .001,
+            hasOcclusionBounds: geometry.w > 0 && geometry.h > 0 && Number.isFinite(geometry.left) };
           const camp = braziers.find(b => b.ground && b.cook && b.mi === 2);
           if (!camp) throw Error('missing existing camp cooking fire');
           const tests = braziers.map(f => ({
@@ -50,16 +53,18 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
         });
         assert.equal(actual.npcCount, 1);
         assert.equal(actual.map[0], 1); assert.equal(actual.map[1], null);
-        assert(Math.abs(actual.visible - actual.knightHeight) < .001,
-          'NPC visible height must equal knight (not based on viewport H / 400)');
+        assert(Math.abs(actual.visible / actual.knightHeight - .72) < .001,
+          'Even the FULL NPC frame must be 72% of knight silhouette height');
         assert(Math.abs(actual.sprite.aspect - 40 / 56) < .000001,
           'NPC sprites must preserve original portrait proportions, not stretch to 120x106');
         assert(actual.sprite.width < actual.sprite.height * .75 &&
           actual.sprite.width > actual.sprite.height * .7,
           'resident image should have a knight-proportioned width');
+        assert(actual.sprite.grounded && actual.sprite.hasOcclusionBounds,
+          'NPC geometry must match its actual feet and have non-empty depth bounds');
         assert(Math.abs(actual.sprite.bottom - 106) < .000001 &&
-          Math.abs(actual.sprite.height * 48 / 56 - actual.knightHeight) < .001,
-          'portrait sprite is grounded and stays knight-height');
+          Math.abs(actual.sprite.height - actual.knightHeight * .72) < .001,
+          'full portrait frame remains below knight height even with tall hats');
         assert(Math.abs(actual.pitch[0] - actual.pitch[1]) < .00001 &&
           Math.abs(actual.pitch[2] - actual.pitch[3]) < .00001,
           'NPC and knight must have identical ASCII glyph pitch');
