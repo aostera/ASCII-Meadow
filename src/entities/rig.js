@@ -137,6 +137,24 @@ function drawRig(e, q) {
     const b1 = [hand[0] - 10 + Math.cos(-1) * 22, hand[1] + Math.sin(-1) * 22], b2 = [hand[0] - 10 + Math.cos(1) * 22, hand[1] + Math.sin(1) * 22];
     line(b1[0], b1[1], b2[0], b2[1], 0.7, 0.9); // string
     blob(hand[0], hand[1], 2.5, 2.5, 0.8);
+  } else if (e.cls === 'human') { // wandering villager: travel cloak, simple tunic and hood
+    const fold = Math.sin(t * 1.4 + e.x) * 1.5 + Math.sin(q.ph) * q.m * 2;
+    leg(legs[0], far);
+    arm(arms[0], far, 0.55);
+    // Back cloak peeks out from behind the silhouette when walking.
+    poly([[neck[0] - 7, neck[1] + 1], [neck[0] + 5, neck[1] + 2],
+      [hip[0] + 13 + fold, hip[1] + 15], [hip[0] - 13 + fold, hip[1] + 15]], 0.26);
+    poly([[neck[0] - 6, neck[1] + 3], [neck[0] + 7, neck[1] + 3],
+      [hip[0] + 9, hip[1] + 4], [hip[0] - 8, hip[1] + 4]], 0.58); // tunic
+    line(hip[0] - 8, hip[1] - 4, hip[0] + 9, hip[1] - 4, 2.3, 0.8); // belt
+    leg(legs[1], 1);
+    arm(arms[1], 1, 0.65);
+    blob(head[0], head[1], 7, 8, 0.72);
+    poly([[head[0] - 10, head[1] + 7], [head[0] - 8, head[1] - 7],
+      [head[0] - 1, head[1] - 12], [head[0] + 8, head[1] - 5],
+      [head[0] + 8, head[1] + 8], [head[0] + 4, head[1] + 6],
+      [head[0] + 2, head[1] - 3], [head[0] - 4, head[1] - 3]], 0.42); // hood
+    line(neck[0] + 5, neck[1] + 4, hip[0] + 3, hip[1] - 5, 1.2, 0.95); // tunic seam
   } else { // dwarf
     leg(legs[0], far); arm(arms[0], far, 0.55);
     line(neck[0] - 8, neck[1] - 2, neck[0] - 4, hip[1] + 4, 2, 0.5); // axe haft on the back
