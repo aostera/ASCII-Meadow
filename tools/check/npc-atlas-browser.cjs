@@ -23,6 +23,35 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           ED.previewState = 'walk'; ED.previewPhase = Math.PI / 2;
           ED.variant.npc = 0; edSyncUI();
         });
+        const catalog = await page.evaluate(() => {
+          const source = mapFileText(), originalActors = npcs.length;
+          const toggle = ED.ui.npcGalleryToggle;
+          toggle.click();
+          const sheet = ED.ui.npcGallery;
+          const thumbnails = [...sheet.querySelectorAll('.ed-gallery-frame')];
+          const cards = [...sheet.querySelectorAll('.ed-gallery-card')];
+          const hasCaveat = sheet.textContent.includes('не подменяется поворотами');
+          const initial = { open: ED.galleryOpen, expanded: toggle.getAttribute('aria-expanded'),
+            cards: cards.length, thumbs: thumbnails.length,
+            directions: sheet.querySelectorAll('.ed-gallery-direction').length,
+            names: cards.map(c => c.querySelector('.ed-gallery-heading').textContent),
+            hasCaveat };
+          sheet.querySelector('[data-gallery-type="hermit"][data-gallery-state="talk"][data-gallery-frame="6"]').click();
+          const selected = { type: ED.variant.npc, state: ED.previewState, paused: !ED.previewAuto,
+            frame: npcAtlasFrameIndex(8, ED.previewPhase), tool: ED.tool,
+            mapUnchanged: mapFileText() === source, actorsUnchanged: npcs.length === originalActors };
+          toggle.click();
+          return { initial, selected, closed: !ED.galleryOpen && sheet.hidden };
+        });
+        assert(catalog.initial.open && catalog.initial.expanded === 'true');
+        assert.equal(catalog.initial.cards, 6);
+        assert.equal(catalog.initial.thumbs, 24);
+        assert.equal(catalog.initial.directions, 0);
+        assert(catalog.initial.hasCaveat && catalog.initial.names.some(n => n.includes('Отшельник')));
+        assert.deepEqual(catalog.selected, { type: 1, state: 'talk', paused: true,
+          frame: 6, tool: 'npc', mapUnchanged: true, actorsUnchanged: true });
+        assert(catalog.closed, 'animation library should collapse without touching the map');
+        await page.evaluate(() => { ED.variant.npc = 0; ED.previewState = 'walk'; edSyncUI(); });
         await page.screenshot({ path: path.join(gallery, mode + '-villager-procedural.png') });
         await page.evaluate(() => { ED.variant.npc = 1; edSyncUI(); });
         await page.screenshot({ path: path.join(gallery, mode + '-hermit-procedural.png') });
@@ -200,6 +229,37 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         assert(directions.captures.every(v => v.pressed === 'true'));
         assert(new Set(directions.captures.map(v => v.hash)).size >= 3,
           'authored directions must display visually distinct glyph previews');
+        const multiView = await page.evaluate(() => {
+          ED.variant.npc = 0; ED.tool = 'npc'; ED.sel = null;
+          ED.previewState = 'walk'; ED.previewDirection = 0;
+          ED.previewAuto = false; ED.previewPhase = 0; edSyncUI();
+          const source = mapFileText(), actors = npcs.length;
+          ED.ui.npcGalleryToggle.click();
+          const sheet = ED.ui.npcGallery;
+          const before = { groups: sheet.querySelectorAll('.ed-gallery-card').length,
+            rows: sheet.querySelectorAll('.ed-gallery-direction').length,
+            directionFrames: sheet.querySelectorAll('.ed-gallery-direction .ed-gallery-frame').length };
+          const sample = sheet.querySelector('[data-gallery-type="villager"][data-gallery-state="walk"]' +
+            '[data-gallery-dir="7"][data-gallery-frame="2"]');
+          if (sample) sample.click();
+          const selected = { direction: ED.previewDirection, frame: edNpcFrameDetails()?.frame,
+            state: ED.previewState, paused: !ED.previewAuto, type: ED.variant.npc,
+            mapUnchanged: source === mapFileText(), actorsUnchanged: actors === npcs.length };
+          const active = !!sheet.querySelector('[data-gallery-type="villager"][data-gallery-state="walk"]' +
+            '[data-gallery-dir="7"][data-gallery-frame="2"][aria-pressed="true"]');
+          ED.ui.npcGalleryToggle.click();
+          return { before, found: !!sample, selected, active,
+            closed: !ED.galleryOpen && sheet.hidden };
+        });
+        assert.equal(multiView.before.groups, 6);
+        assert.equal(multiView.before.rows, 8);
+        assert.equal(multiView.before.directionFrames, 16);
+        assert(multiView.found && multiView.active && multiView.closed);
+        assert.deepEqual(multiView.selected, { direction: 7, frame: 2, state: 'walk',
+          paused: true, type: 0, mapUnchanged: true, actorsUnchanged: true });
+        await page.evaluate(() => ED.ui.npcGalleryToggle.click());
+        await page.screenshot({ path: path.join(gallery, mode + '-animation-gallery-8way.png') });
+        await page.evaluate(() => ED.ui.npcGalleryToggle.click());
         const quality = await page.evaluate(() => {
           ED.variant.npc = 0; ED.sel = null; ED.tool = 'npc'; edSyncUI();
           const before = mapFileText();
