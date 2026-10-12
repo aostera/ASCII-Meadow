@@ -254,3 +254,34 @@ function ruinsBlockMove(x, y, actor) {
   }
   return false;
 }
+
+ // The ruins are traversable world landmarks, not painted backdrops. Players
+ // can inspect them at either arch entrance, but never through solid masonry.
+ // Rebuild these spots from stable model coordinates on every resize.
+function registerRuinInspections() {
+  const text = {
+    gate: 'the watchtower is empty. its ancient arch still stands.',
+    abbey: 'no prayers remain here, only wind between the stones.',
+    cloister: 'the ruined gallery carries footsteps from arch to arch.'
+  };
+  const label = { gate: 'inspect the broken gate',
+    abbey: 'inspect the old abbey', cloister: 'inspect the gothic cloister' };
+  for (const site of RUIN_SITES) {
+    const spots = [];
+    for (const side of [-1, 1]) {
+      // The trigger is slightly INSIDE the clear arch footprint, so either
+      // approach is reachable without standing in a solid wall.
+      const [x, y] = mapToCell(site.x, site.z + side * (site.depth / 2 - 12));
+      const spot = {
+        id: site.id + (side < 0 ? '-south' : '-north'), x, y,
+        r: Math.max(10, Math.min(16, site.arch * WS / CW * .32)),
+        label: label[site.type], action: 'inspect',
+        // A stale E prompt cannot be used if the player moved behind a pier.
+        need: () => !ruinsBlockMove(spot.x, spot.y, player),
+        onUse: () => say(player, text[site.type])
+      };
+      spots.push(spot);
+    }
+    props.push({ ruinId: site.id, spots });
+  }
+}
