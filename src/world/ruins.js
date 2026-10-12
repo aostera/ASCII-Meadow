@@ -142,6 +142,7 @@ function ruinDetail(site) {
     addGableZ(-w * .35, w * .35, d / 2 - th, d / 2, h * .54, h * .81, 'wall');
   }
   ruinArchitecturalRelief(site);
+  ruinWeatheredStoneDetail(site);
 }
 
 function ruinArchitecturalRelief(site) {
@@ -238,6 +239,50 @@ function ruinArchitecturalRelief(site) {
     addBox(x - 7, x + 7, y, y + 9, z - 6, z + 8, 'wall');
   }
 }
+// Non-repeating architectural relief, 3D rather than painted noise:
+// hanging wall caps, broken stone bands, deep voussoir accents and carved ribs.
+// Everything below standing height stays within existing physical wall footprints.
+function ruinWeatheredStoneDetail(site) {
+  const { width: w, depth: d, height: h, arch: a, archHeight: ah } = site;
+  const salt = site.type === 'abbey' ? 7 : site.type === 'cloister' ? 17 : 29;
+  // Broken string courses on the *SIDE* walls. The gaps and stagger read as
+  // missing masonry, while the low parts remain within swept-wall collision.
+  for (const side of [-1, 1]) for (let bay = 0; bay < 11; bay++) {
+    const z = -d * .46 + bay * d * .087;
+    const x = side * (w / 2 - 7);
+    const s = (bay * 19 + salt + (side + 1) * 2) % 11;
+    const y = h * (.12 + .026 * (s % 4));
+    const width = 7 + s % 5;
+    addBox(x - width, x + width, y, y + 3 + s % 3,
+      z - d * .025, z + d * .025, 'wall');
+    if (bay % 3 === 1) {
+      const top = h * (.32 + .02 * (s % 4));
+      addBox(x - 9, x + 9, top, top + 5,
+        z - 4, z + d * .026, 'wall');
+    }
+  }
+  // Projecting detail above the portal's clear walkable arch; asymmetrical
+  // broken hood molding and partial tracery, unlike a flat continuous border.
+  for (const face of [-1, 1]) for (const side of [-1, 1]) {
+    const z = face * (d / 2 + 3);
+    for (let row = 0; row < 6; row++) {
+      if ((row + salt + (side > 0 ? 2 : 0)) % 5 === 0) continue;
+      const rise = row / 6, y = ah + 20 + row * Math.min(11, (h * .7 - ah - 24) / 7);
+      if (y + 7 > h * .7) continue;
+      const x = side * (a / 2 + 11 + (1 - rise) * 8);
+      addBox(x - 4, x + 4, y, y + 6, z - 4, z + 4, 'wall');
+    }
+  }
+  // High slender eroded window shafts: separate real geometry but no low
+  // passage obstruction (and one rib deliberately missing in each ruin).
+  const y0 = Math.max(ah + 26, h * .67), y1 = Math.min(h * .86, y0 + h * .12);
+  if (y1 > y0 + 8) for (const side of [-1, 1]) {
+    const x = side * (w * .34), z = -d / 2 + 6;
+    addBox(x - 2, x + 2, y0, y1, z - 4, z + 4, 'wall');
+    if (side < 0) addBox(x - 6, x + 6, y1 - 3, y1 + 3, z - 4, z + 4, 'wall');
+  }
+}
+
 // Keep all authored scenery unchanged on disk; suppress only rendered plants that
 // would occupy the interior, arch thresholds or a wall's footings.
 // Extra vegetation clearance protects the visible 3D side faces and absorbs

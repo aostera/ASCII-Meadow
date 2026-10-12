@@ -64,7 +64,7 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
         assert(search.every(([, fast, slow]) => fast === slow),
           'viewport flora binary search differs from the original linear scan');
         assert.equal(a.fences.length, 6);
-        assert.equal(a.tents.length, 4);
+        assert.equal(a.tents.length, 8);
         assert(a.live[0] > 0 && a.live[1] > 0, 'authored camp remains populated');
         assert(a.fences.every(v => v.shade > 15 && v.ground > 8 &&
           v.hide > 0 && v.hide <= v.blocks && v.sun),
@@ -73,6 +73,19 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           'rail fence hides only posts, never the entire under-rail strip');
         assert(a.tents.every(v => v.shade > 20 && v.ground > 15 && v.sun),
           'tent silhouettes cast 3D ground shadows with planted fabric hems');
+        const details = await page.evaluate(() => {
+          const angles = [.36, -.48, .78, -.69, 1.05, -1.03, 1.27, -.21];
+          return angles.map((angle, i) => {
+            const m = campTurn(campTent(i === 2 || i === 3 || i >= 6 ? 'torn' : 'ridge',
+              [101,104,103,107,109,112,115,119][i]), angle);
+            const front = [0, 0, -(m.depth || m.R) * .25];
+            return {rotated: Math.abs(m.ropes[0][0][0]) > .1,
+              restored: !!m.foot && !!m.grass, planes: m.S.length,
+              radial: m.R > 0 && m.depth > 0};
+          });
+        });
+        assert(details.length === 8 && details.every(v => v.rotated && v.restored && v.planes >= 8 && v.radial),
+          'all eight tents need physical angle, rotated guy ropes and coherent grounding');
         assert(a.mixedGrass > 5 && a.campShadeCells > 5,
           'live grass should still grow beside shaded fence and tent foundations');
         assert(a.sun[0] < 0 && a.sun[1] > 0 && a.sun[2] < 0);
@@ -84,7 +97,7 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           'rebaking the same map must restore identical terrain, shadow, grass and collision masks');
         assert.equal(b.map, a.map, 'world polish must never edit designer map.js');
         assert.deepEqual(realErrors(errs), [], 'browser errors');
-        console.log('PASS camp integration '+mode+' '+viewport.width+': 4 tents, 6 fences, rooted posts, directional shadows, deterministic rebuild');
+        console.log('PASS camp integration '+mode+' '+viewport.width+': 8 tent angles, 6 fences, rooted posts, directional shadows, deterministic rebuild');
       } finally { await ctx.close(); }
     }
   } finally { await browser.close(); }

@@ -196,6 +196,58 @@ function bakeVariants() {
   FLMAXR = Math.ceil(Math.max(...VARS.map(v => v.crownH / CH))) + 2;
   bakeFloraSprites();
 }
+// One deterministic grounding layer for camp, stone buildings and vegetation.
+// It affects only the live grass presentation; authored map/physics stay intact.
+// Stone foundations suppress blades narrowly INSIDE solid wall footprints,
+// and blend to shortened meadow at the edges without rectangular bald patches.
+function paintStoneGrassContact() {
+  const soft = (i, strength) => {
+    if (i >= 0 && i < N && kind[i] === 1 && strength > campGround[i])
+      campGround[i] = Math.min(1, strength);
+  };
+  // The castle's own geometry already creates bmask. Grow a soft two-cell
+  // fringe outside it instead of re-tracing the castle mesh per grass cell.
+  const C = cathedral;
+  if (C.cv) {
+    const x0 = Math.max(1, C.cx0 - 3), x1 = Math.min(COLS - 2, C.cx0 + C.BW + 3);
+    const y0 = Math.max(1, Math.floor((C.ky - 1100 * SINP * MS) / CH) - 3);
+    const y1 = Math.min(ROWS - 2, Math.ceil((C.ky + 145 * SINP * MS) / CH) + 3);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const i = y * COLS + x;
+      if (bmask[i] || kind[i] !== 1) continue;
+      let d = 4;
+      for (let sy = -2; sy <= 2; sy++) for (let sx = -2; sx <= 2; sx++)
+        if (bmask[i + sy * COLS + sx]) d = Math.min(d, Math.hypot(sx, sy));
+      if (d < 3) soft(i, Math.max(0, .74 - .25 * (d - 1)));
+    }
+  }
+  for (const r of ruins) {
+    const ext = 42, points = [];
+    for (const x of [-r.width / 2 - ext, r.width / 2 + ext])
+      for (const z of [-r.depth / 2 - ext, r.depth / 2 + ext])
+        points.push(mapToCell(...ruinWorldXZ(r, x, z)));
+    const x0 = Math.max(1, Math.floor(Math.min(...points.map(p => p[0]))));
+    const x1 = Math.min(COLS - 2, Math.ceil(Math.max(...points.map(p => p[0]))));
+    const y0 = Math.max(1, Math.floor(Math.min(...points.map(p => p[1]))));
+    const y1 = Math.min(ROWS - 2, Math.ceil(Math.max(...points.map(p => p[1]))));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const i = y * COLS + x;
+      if (kind[i] !== 1 && kind[i] !== 3 && kind[i] !== 4 && kind[i] !== 6) continue;
+      const [wx, wz] = toModelXZ(x, y);
+      const [lx, lz] = ruinLocalXZ(r, wx, wz);
+      let distance = Infinity, inside = false;
+      for (const wall of r.walls) {
+        const dx = Math.max(wall[0] - lx, 0, lx - wall[1]);
+        const dz = Math.max(wall[2] - lz, 0, lz - wall[3]);
+        distance = Math.min(distance, Math.hypot(dx, dz));
+        if (!dx && !dz) inside = true;
+      }
+      if (inside) kind[i] = 0;
+      else if (distance < 33) soft(i, Math.max(0, .84 * (1 - distance / 33)));
+    }
+  }
+}
+
 const variantsOf = type => VARS.filter(v => v.type === type);
 // Where the plants stand: from the edited map when it lists them, otherwise generated. Then each plant
 // hides the grass under its crown, blocks the way with its trunk and shades the ground.
@@ -280,6 +332,7 @@ function placeFlora() {
       if (s > 0) { const i = cy * COLS + cx; bshade[i] = Math.min(0.7, bshade[i] + s * (v.type === 'dead' ? 0.5 : 1.4)); }
     }
   }
+  paintStoneGrassContact();
   build.flora = flora.length;
 }
 
