@@ -16,12 +16,13 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           if (npcs.length) throw new Error('catalog spawned an NPC by default');
           const [wx, wz] = toModelXZ(player.x + 13, player.y);
           const a = spawnActor('villager', { id: 'qa-actor-a', world: [wx, wz], behavior: 'idle' });
-          const b = spawnActor('villager', { id: 'qa-actor-b', world: [wx + 15, wz + 15], behavior: 'idle', lines: ['Проверка NPC'] });
+          const b = spawnActor('hermit', { id: 'qa-actor-b', world: [wx + 15, wz + 15], behavior: 'idle', lines: ['Проверка NPC'] });
+          if (b.rigMotion.walk.stride !== 0.8 || b.rigMotion.idle.breath !== 0.65) throw new Error('NPC motion profile lost');
           return { count: npcs.length, entCount: ents.length, types: [a.actorType, b.actorType], model: toModelXZ(a.x, a.y) };
         });
         assert.equal(created.count, 2);
         assert.equal(created.entCount, 6); // player + 3 cows + 2 NPCs
-        assert.deepEqual(created.types, ['villager', 'villager']);
+        assert.deepEqual(created.types, ['villager', 'hermit']);
         await step(12); // NPCs are really simulated and rendered in the same depth queue as the knight
         const before = await page.evaluate(() => {
           const world = snapshotActorWorld();
