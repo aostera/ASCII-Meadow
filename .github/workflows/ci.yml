@@ -32,6 +32,8 @@ jobs:
         run: node tools/check/syntax.cjs
       - name: Actor catalog contract (types, IDs, behaviors, state and resize)
         run: node tools/check/actors.cjs
+      - name: NPC animation atlas validation (frame geometry, rows and source restrictions)
+        run: node tools/check/npc-atlas.cjs
       - name: Interaction registry (range, actions, NPC talk, stale references)
         run: node tools/check/interactions.cjs
       - name: Validate map import, round-trip integrity and RLE chunks
