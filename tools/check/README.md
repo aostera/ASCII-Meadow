@@ -39,3 +39,8 @@ python3 tools/check/diff.py /tmp/shots/b /tmp/shots/a --out /tmp/shots/diff   # 
   - `touch` — касания (вместе с `mob`).
 - **Режимы:** 2D-резерв удобнее гонять в окне 640×400; мобильный режим — `gl 0 0 mob`.
 - **`diff.py`:** падает на пустом наборе, на пропусках и на различиях. `--tolerance 1` гасит шум ±1 в тексте на мобильном: такой шум есть даже между двумя прогонами одной версии.
+
+
+
+| `npc-atlas.cjs` | Спецификация PNG: размеры, ≤60 кадров, FPS, 1/8 ракурсов, безопасные пути, fallback |
+| `npc-atlas-browser.cjs` | Синтетический PNG через реальный UI редактора, `idle/walk/talk`, runtime rendering WebGL2 / Canvas 2D и проверка неизменности `map.js` |
