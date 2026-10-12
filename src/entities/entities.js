@@ -39,11 +39,12 @@ function charDims(e) {
     return { ffs, fcw: ffs * 0.6, fch: ffs * 0.9, u: Math.max(1, Math.min(2, H * 0.16 / 92)) };
   }
   if (e && e.actorType) {
-    // Match the visible height of the 40x56 authored NPC sprite to the knight.
-    // The current sheets use roughly 48 of their 56 rows for the character.
-    // Reusing the knight's glyph pitch also prevents a giant/coarse NPC on phones.
+    // Bound the *entire* atlas frame below the knight's visible silhouette.
+    // Never estimate alpha occupancy (48/56): hats, capes and staff heads can
+    // reach farther than the sampled frame and previously made NPCs giants.
+    // Identical fine-glyph pitch keeps them coherent on desktop and phones.
     const knight = charDims(player);
-    const u = (KG.art * knight.fch) / (BOX_H * (48 / 56));
+    const u = KG.art * knight.fch * 0.88 / BOX_H;
     return { ...knight, u };
   }
   const ffs = Math.max(3.8, FS * 0.42);
@@ -62,12 +63,15 @@ function geomOf(e) {
     return { u, gx, gy, top: gy - CG.fy * fch * 0.75, left: gx - CG.fx * fcw * 0.6, w: CG.cols * fcw * 0.6, h: CG.rows * fch * 0.75 };
   }
   const gx = e.x * CW, gy = (e.y + 0.7) * CH;
-  return { u, gx, gy, top: gy - (boxH(e) - 6) * u };
+  if (e.actorType) return { u, gx, gy, top: gy - BOX_H * u,
+    left: gx + BOX_X0 * u, w: BOX_W * u, h: BOX_H * u };
+  return { u, gx, gy, top: gy - (boxH(e) - 6) * u,
+    left: gx + BOX_X0 * u, w: BOX_W * u, h: BOX_H * u };
 }
 function drawTag(e, gx, gy) {
   const kn = e.cls === 'knight', u = charDims(e).u;
   // name tag
-  const headTop = kn ? gy - knightPx() * 0.98 : gy - 96 * u * (e.cls === 'dwarf' ? 0.8 : 1);
+  const headTop = kn ? gy - knightPx() * 0.98 : gy - (e.actorType ? BOX_H : 96 * (e.cls === 'dwarf' ? 0.8 : 1)) * u;
   ctx.font = `${Math.max(9, FS)}px ${FONT}`;
   const lw = ctx.measureText(e.name).width;
   ctx.fillStyle = e.label;
