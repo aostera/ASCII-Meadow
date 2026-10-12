@@ -428,6 +428,16 @@ function edSyncUI() {
     const types = [...ACTOR_TYPES.keys()], selected = selectedActor ? types.indexOf(selectedActor[1]) : ED.variant.npc;
     ED.ui.variantOut.textContent = (selected + 1) + ' из ' + types.length + (types[selected] ? ' · ' + ACTOR_TYPES.get(types[selected]).name : '');
   } else if (vt) ED.ui.variantOut.textContent = (fe ? fe[1] : ED.variant[vt]) + 1 + ' из ' + edVariants(vt);
+  if (ED.ui.npcLibrary) {
+    ED.ui.npcLibrary.hidden = ED.tool !== 'npc' && !selectedActor;
+    if (!ED.ui.npcLibrary.hidden) {
+      const type = selectedActor ? selectedActor[1] : [...ACTOR_TYPES.keys()][ED.variant.npc];
+      const spec = ACTOR_TYPES.get(type);
+      ED.ui.npcLibrary.textContent = spec ? spec.name + ' · ' + type + ' · ' + spec.renderClass +
+        ' · ' + spec.behavior + ' · шаг ×' + spec.rigMotion.walk.stride +
+        ' · дыхание ×' + spec.rigMotion.idle.breath : 'Нет доступных NPC';
+    }
+  }
   ED.ui.undo.disabled = !ED.undo.length; ED.ui.redo.disabled = !ED.redo.length;
   ED.ui.zoomPct.firstChild.textContent = Math.round(VZ * 100) + '%'; ED.ui.zoomOut.disabled = VZ <= ED_ZOOMS[0]; ED.ui.zoomIn.disabled = VZ >= ED_ZOOMS[ED_ZOOMS.length - 1];
 }
@@ -450,6 +460,9 @@ function edBuildUI() {
   const sFog = el('section', 'ed-sec', '<h3>Туман</h3>'), gFog = el('div', 'ed-grid'); for (const [t, n, k] of ED_FOG) gFog.append(btn(n, k, { tool: t })); sFog.append(gFog);
   const sOb = el('section', 'ed-sec', '<h3>Объекты</h3>'), gOb = el('div', 'ed-grid'); for (const [t, n, k] of ED_OBJECTS) gOb.append(btn(n, k, { tool: t })); sOb.append(gOb);
   const variant = el('div', 'ed-variant', 'Вариант'); const variantOut = el('output'); variant.append(btn('‹', '[', { act: 'var-' }), variantOut, btn('›', ']', { act: 'var+' })); sOb.append(variant);
+  // Catalog-only preview: inspecting a type never creates an actor or modifies the map.
+  const npcLibrary = el('p', 'ed-help'); npcLibrary.setAttribute('aria-label', 'Библиотека NPC');
+  npcLibrary.hidden = true; sOb.append(npcLibrary);
   const sMap = el('section', 'ed-sec', '<h3>Карта</h3>'); const mini = el('canvas', 'ed-mini'); mini.width = 216; mini.height = 300;
   const zoomRow = el('div', 'ed-zoom', 'Масштаб'); const zoomOut = btn('−', 'Q', { act: 'zoom-' }), zoomPct = btn('100%', '', { act: 'zoom1' }), zoomIn = btn('+', 'E', { act: 'zoom+' });
   zoomPct.title = 'Вернуть 100% (R)'; zoomRow.append(zoomOut, zoomPct, zoomIn); sMap.append(zoomRow, mini);
@@ -461,7 +474,7 @@ function edBuildUI() {
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
-  ED.ui = { root, open, size, sizeOut, variant, variantOut, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
+  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcLibrary, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
   ED.mini = mini;
 
   open.addEventListener('click', () => { open.blur(); openEditor(); });
