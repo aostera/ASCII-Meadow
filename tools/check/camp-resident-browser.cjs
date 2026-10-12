@@ -7,13 +7,13 @@ const { launch, openGame, realErrors } = require('./common.cjs');
 
 (async () => {
   const mapText = fs.readFileSync(path.resolve(__dirname, '../../src/data/map.js'), 'utf8');
-  const campFire = JSON.parse(mapText.slice(mapText.indexOf('const MEADOW_MAP =') +
-    'const MEADOW_MAP ='.length).trim().replace(/;$/, '')).fires.find(f => f[3] === 'cook' &&
-      f[0] < -300 && f[1] < -1800);
-  assert(campFire, 'the established campfire should exist in the authored map');
-  const [cx, cz] = [-356.4, -1916];
-  assert(Math.hypot(cx - campFire[0], cz - campFire[1]) < 45,
-    'the resident must be beside the established campfire');
+  const map = JSON.parse(mapText.slice(mapText.indexOf('const MEADOW_MAP =') +
+    'const MEADOW_MAP ='.length).trim().replace(/;$/, ''));
+  const [cx, cz] = [0, 1450];
+  assert(map.castle === null, 'the default castle must remain in its original place');
+  assert(cz > 1040 + 200, 'NPC should be beyond the castle, not in the camp or wall');
+  assert(map.flora.every(f => !['tree', 'dead'].includes(f[0]) ||
+    Math.hypot(f[2] - cx, f[3] - cz) > 100), 'destination should be clear of trees');
   const browser = await launch();
   try {
     for (const mode of ['gl', '2d']) {

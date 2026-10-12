@@ -28,8 +28,14 @@ function drawEntity(e) {
   if (e.cls === 'dwarf') { rg.translate(0, 100); rg.scale(1.12, 0.8); rg.translate(0, -100); }
   if (frame) {
     e.glowM = null;
+    // The atlas frame is portrait (40x56). Previously drawing it into a 120x106
+    // box stretched its width by ~59%, making a knight-height NPC seem huge.
+    // Keep the existing knight-aligned height but preserve the original art
+    // aspect ratio and center it inside the legacy procedural rig canvas.
+    const spriteWidth = Math.min(BOX_W, BOX_H * frame.width / frame.height);
+    const spriteX = BOX_X0 + (BOX_W - spriteWidth) / 2;
     rg.drawImage(frame.image, frame.x, frame.y, frame.width, frame.height,
-      BOX_X0, 0, BOX_W, BOX_H);
+      spriteX, 0, spriteWidth, BOX_H);
   } else drawRig(e, pose(e));
   if (e.cls === 'dwarf' && e.glowM) e.glowM = [e.glowM[0] * 1.12, 100 - (100 - e.glowM[1]) * 0.8];
   }
