@@ -52,6 +52,33 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
       assert(!r.doorway&&r.blockedPier&&r.blockedSide,r.id+' arches must be sole entrances: '+JSON.stringify(r));
       assert(r.cleared,r.id+' corridors must be clear of trees: '+JSON.stringify(r));
     }
+
+    // Real E dispatch: both entrances to each ruin must be usable; nearby
+    // targets become unavailable behind stone without editing the map.
+    const inspections = await page.evaluate(() => {
+      return ruins.map(site => {
+        const prop = props.find(p => p.ruinId === site.id);
+        if (!prop || prop.spots.length !== 2) throw Error('Missing inspect spots ' + site.id);
+        const sides = prop.spots.map(spot => {
+          const side = spot.id.endsWith('-south') ? -1 : 1;
+          [player.x, player.y] = mapToCell(site.x,
+            site.z + side * (site.depth / 2 + 18));
+          player.hT = 0;
+          updateWorld(0);
+          const picked = activeSpot === spot;
+          const used = useSpot();
+          const message = player.say;
+          [player.x, player.y] = mapToCell(site.x + site.width / 2 + 35, site.z);
+          const throughWall = spot.need();
+          return { picked, used, message, throughWall };
+        });
+        return { id: site.id, sides };
+      });
+    });
+    for (const ruin of inspections) for (const s of ruin.sides) {
+      assert(s.picked && s.used && s.message.length > 30 && !s.throughWall,
+        ruin.id + ' E interaction must work from arch, never through a wall: ' + JSON.stringify(s));
+    }
     for (const site of ['broken-gate','abbey-front','cloister-walk']) {
       await page.evaluate(id=>{
         const r=ruins.find(item=>item.id===id);
