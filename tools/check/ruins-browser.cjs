@@ -49,8 +49,8 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
     assert.equal(report.result.length,3);
     for(const r of report.result){
       assert(r.covered>250&&r.glyphs>150, r.id+' must have substantial ASCII geometry');
-      assert(!r.doorway&&r.blockedPier&&r.blockedSide,r.id+' arches must be sole entrances');
-      assert(r.cleared,r.id+' corridors must be clear of trees');
+      assert(!r.doorway&&r.blockedPier&&r.blockedSide,r.id+' arches must be sole entrances: '+JSON.stringify(r));
+      assert(r.cleared,r.id+' corridors must be clear of trees: '+JSON.stringify(r));
     }
     for (const site of ['broken-gate','abbey-front','cloister-walk']) {
       await page.evaluate(id=>{
