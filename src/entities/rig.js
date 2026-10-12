@@ -3,7 +3,7 @@
 
 // ---------- rig ----------
 const rig = document.createElement('canvas');
-const rg = rig.getContext('2d', { willReadFrequently: true });
+let rg = rig.getContext('2d', { willReadFrequently: true });
 const EMIT = 'rgb(255,0,255)';           // marker colour for emissive parts (orb, lantern flame)
 const grey = v => { const c = Math.max(0, Math.min(255, v * 255)) | 0; return `rgb(${c},${c},${c})`; };
 const LX = -0.6, LY = -0.8;              // light from the upper left
@@ -156,5 +156,26 @@ function drawRig(e, q) {
     rg.fillStyle = EMIT; rg.beginPath(); rg.arc(hand[0] + 2, hand[1] + 10.5, 2.6, 0, Math.PI * 2); rg.fill();
     e.glowM = [hand[0] + 2, hand[1] + 10.5];
   }
+}
+// Render the *same* production NPC rig on a private canvas for the editor.
+// No game rig pixels/size, gameplay entities, camera, map or RNG are changed.
+// The context swap is synchronous and restored even if drawing throws.
+function npcRigPreviewImage(e) {
+  const surface = document.createElement('canvas');
+  surface.width = BOX_W; surface.height = BOX_H;
+  const local = surface.getContext('2d', { willReadFrequently: true });
+  const old = rg;
+  try {
+    rg = local;
+    local.setTransform(1, 0, 0, 1, 0, 0);
+    local.translate(-BOX_X0, 0);
+    if (e.cls === 'dwarf') {
+      local.translate(0, 100);
+      local.scale(1.12, 0.8);
+      local.translate(0, -100);
+    }
+    drawRig(e, pose(e));
+    return local.getImageData(0, 0, surface.width, surface.height);
+  } finally { rg = old; }
 }
 const BOX_X0 = -60, BOX_W = 120, BOX_H = 106; // model box: x -60..60, y 0..106
