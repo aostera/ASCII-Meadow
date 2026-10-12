@@ -44,7 +44,7 @@ world.props = [];
 world.player = { x: 0, y: 0, cls: 'knight' };
 world.mapToCell = (x, z) => [x, z]; // same identity transform as toModelXZ in this VM
 world.say = (actor, line) => { actor.say = line; };
-vm.runInContext('buildRuinInspections()', world);
+vm.runInContext('registerRuinInspections()', world);
 assert.equal(world.props.length, sites.length);
 for (let i = 0; i < sites.length; i++) {
   const site = sites[i], p = world.props[i];
