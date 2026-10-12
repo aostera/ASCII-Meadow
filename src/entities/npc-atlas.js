@@ -33,11 +33,11 @@ function npcAtlasAttach(type, raw, source) {
   if (!ACTOR_TYPES.has(type)) throw new Error('Unknown NPC atlas actor: ' + type);
   const layout = npcAtlasLayout(raw);
   // No external image hosts or SVG: explicit PNG files in the NPC directory,
-  // or locally chosen blob URLs. data:image/png is only useful for deterministic tests.
+  // or locally chosen blob URLs; both WebP and PNG uploads remain supported. data:image/png and data:image/webp are also accepted for tests.
   if (typeof source !== 'string' || !(
-    /^assets\/npc\/[a-zA-Z0-9_./-]+\.png$/.test(source) && !source.includes('..') ||
+    /^assets\/npc\/[a-zA-Z0-9_./-]+\.(?:png|webp)$/.test(source) && !source.includes('..') ||
     /^blob:https?:\/\//.test(source) || /^blob:null\//.test(source) ||
-    /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(source)))
+    /^data:image\/(?:png|webp);base64,[A-Za-z0-9+/=]+$/.test(source)))
     throw new Error('Invalid NPC atlas PNG source');
   const image = document.createElement('img');
   const entry = { layout, image, source, status: 'loading', error: '' };
