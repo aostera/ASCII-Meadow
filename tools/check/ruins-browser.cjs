@@ -55,10 +55,16 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
     for (const site of ['broken-gate','abbey-front','cloister-walk']) {
       await page.evaluate(id=>{
         const r=ruins.find(item=>item.id===id);
-        const [x,y]=mapToCell(r.x,r.z-r.depth/2-190);
+        const [x,y]=mapToCell(r.x,r.z-r.depth/2-45);
         player.x=x; player.y=y;
+        // Centre the whole building in the screenshot. The normal gameplay
+        // camera eases towards teleported test players and can crop the roof.
+        const [gx,gy]=mapToCell(r.x,r.z);
+        camX=Math.max(0,Math.min(COLS-VC,gx-VC/2));
+        camY=Math.max(0,Math.min(ROWS-VR,
+          gy-(r.height*COSP*WS/CH)/2-VR/2));
+        setView(); render();
       },site);
-      await step(12);
       await page.screenshot({path:path.join(out, mode+'-'+viewport.width+'-'+site+'.png')});
     }
     assert.deepEqual(realErrors(errs),[]);
