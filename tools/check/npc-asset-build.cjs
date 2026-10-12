@@ -20,6 +20,11 @@ try {
   const copied = path.join(temp, 'assets/npc/__check_atlas_copy__.png');
   assert(fs.existsSync(copied), 'Authored NPC PNG missing from built static site');
   assert.deepEqual(fs.readFileSync(copied), bytes);
+  const shipped = path.join(root, 'assets/npc/villager-starter.png');
+  const published = path.join(temp, 'assets/npc/villager-starter.png');
+  assert(fs.existsSync(published), 'Starter NPC asset missing from production site');
+  assert.deepEqual(fs.readFileSync(published), fs.readFileSync(shipped),
+    'Deployed NPC PNG must match committed artwork byte-for-byte');
   assert(!fs.existsSync(path.join(temp, 'assets/knight_idle_all_directions_atlas.png')),
     'Source concept art must not be copied wholesale into dist');
   assert(fs.existsSync(path.join(temp, 'src/data/npc-atlases.js')), 'Atlas startup manifest missing from dist');

@@ -34,6 +34,8 @@ jobs:
         run: node tools/check/actors.cjs
       - name: NPC animation atlas validation (frame geometry, rows and source restrictions)
         run: node tools/check/npc-atlas.cjs
+      - name: Verify shipped 8-view NPC art, 288 frames and deterministic source
+        run: node tools/check/npc-starter-art.cjs
       - name: NPC frame quality rules (transparency, duplicates and silhouette continuity)
         run: node tools/check/npc-atlas-audit.cjs
       - name: NPC gallery frame selection (sampling up to 60 frames)
