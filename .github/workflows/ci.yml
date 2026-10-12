@@ -36,6 +36,8 @@ jobs:
         run: node tools/check/npc-atlas.cjs
       - name: Verify shipped 8-view NPC art, 288 frames and deterministic source
         run: node tools/check/npc-starter-art.cjs
+      - name: Verify hermit sprite 8-view art, 288 frames and deterministic source
+        run: node tools/check/npc-hermit-art.cjs
       - name: NPC frame quality rules (transparency, duplicates and silhouette continuity)
         run: node tools/check/npc-atlas-audit.cjs
       - name: NPC gallery frame selection (sampling up to 60 frames)
