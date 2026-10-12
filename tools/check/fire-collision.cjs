@@ -9,7 +9,7 @@ const ground = { x: 40, y: 40, ground: true };
 const raised = { x: 65, y: 50, lift: 120 };
 const env = {
   COLS: 100, ROWS: 100, STEP_UP: 30, tmask: null, fmask: null, wet: null,
-  braziers: [ground, raised], player: { x: 5, y: 5 },
+  braziers: [ground, raised], player: { x: 5, y: 5 }, ruinsBlockMove: () => false,
   cows: [], inCow: () => false, jumpPx: () => 250, knightPx: () => 140,
   surfAt: () => 0, Math, Number, isFinite,
 };
