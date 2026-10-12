@@ -37,4 +37,30 @@ for(const s of sites) {
   assert.equal(walls.length,s.type==='cloister'?8:s.type==='gate'?8:8);
   assert(walls.every(w=>w[0]<w[1]&&w[2]<w[3]), 'collision footprints valid');
 }
+
+ // Landmark interactions are generated from the site list and remain safe
+ // behind walls, independent of any saved/edited map objects.
+world.props = [];
+world.player = { x: 0, y: 0, cls: 'knight' };
+world.mapToCell = (x, z) => [x, z]; // same identity transform as toModelXZ in this VM
+world.say = (actor, line) => { actor.say = line; };
+vm.runInContext('buildRuinInspections()', world);
+assert.equal(world.props.length, sites.length);
+for (let i = 0; i < sites.length; i++) {
+  const site = sites[i], p = world.props[i];
+  assert.equal(p.ruinId, site.id);
+  assert.equal(p.spots.length, 2);
+  assert.deepEqual(p.spots.map(s => s.action), ['inspect','inspect']);
+  for (const spot of p.spots) {
+    const side = spot.id.endsWith('-south') ? -1 : 1;
+    world.player.x = site.x;
+    world.player.y = site.z + side * (site.depth / 2 + 18);
+    assert(spot.need(), site.id + ': inspection through open arch');
+    spot.onUse();
+    assert(world.player.say.length > 30, site.id + ': unique inspect description');
+    world.player.x = site.x + site.width / 2 + 35;
+    world.player.y = site.z;
+    assert(!spot.need(), site.id + ': do not inspect through a side wall');
+  }
+}
 console.log('PASS 3 gothic ruins: stone barriers, 8+ arches, all four actors, high-speed swept collision and clearing');
