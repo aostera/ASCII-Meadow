@@ -4,6 +4,45 @@
 // spaces in the mesh and the ONLY traversable entries/exits.
 const ruins = [];
 const RUIN_DIR = [0, -SINP, COSP];
+
+ // The global game camera is fixed; turn each 3D building itself to expose
+ // walls, thickness and roof fragments in an oblique three-quarter view.
+ // Both physics and image use this SAME reversible world/model transform.
+function ruinWorldXZ(site, x, z) {
+  const c = Math.cos(site.yaw || 0), sn = Math.sin(site.yaw || 0);
+  return [site.x + x * c + z * sn, site.z - x * sn + z * c];
+}
+function ruinLocalXZ(site, x, z) {
+  const c = Math.cos(site.yaw || 0), sn = Math.sin(site.yaw || 0);
+  const dx = x - site.x, dz = z - site.z;
+  return [dx * c - dz * sn, dx * sn + dz * c];
+}
+function ruinRotateMesh(mesh, site) {
+  const c = Math.cos(site.yaw || 0), sn = Math.sin(site.yaw || 0);
+  const rot = (x, z) => [x * c + z * sn, -x * sn + z * c];
+  for (const so of mesh) {
+    // Rotating each convex halfspace preserves the actual 3D openings.
+    so.pl = so.pl.map(p => {
+      const [nx, nz] = rot(p[0], p[2]);
+      return [nx, p[1], nz, p[3]];
+    });
+    const b = so.bb, x = (b[0] + b[1]) / 2, z = (b[4] + b[5]) / 2;
+    const hx = (b[1] - b[0]) / 2, hz = (b[5] - b[4]) / 2;
+    const [cx, cz] = rot(x, z);
+    const rx = Math.abs(c) * hx + Math.abs(sn) * hz;
+    const rz = Math.abs(sn) * hx + Math.abs(c) * hz;
+    so.bb = [cx - rx, cx + rx, b[2], b[3], cz - rz, cz + rz];
+    // Ashlar, window recesses and spire ornament follow the stone normals.
+    const m = so.meta;
+    if (m.c) m.c = rot(m.c[0], m.c[1]);
+    if (m.prism) {
+      const [px, pz] = rot(m.prism[0], m.prism[1]);
+      m.prism = [px, pz, m.prism[2]];
+    }
+    if (m.axis) m.axis = rot(m.axis[0], m.axis[1]);
+  }
+}
+
 function ruinPortalWall(w, z, thickness, height, gateWidth, gateHeight) {
   const x0 = -w / 2, x1 = w / 2, a = gateWidth / 2;
   const zs = [z - thickness / 2, z + thickness / 2];
@@ -177,9 +216,11 @@ function ruinArchitecturalRelief(site) {
 // Keep all authored scenery unchanged on disk; suppress only rendered plants that
 // would occupy the interior, arch thresholds or a wall's footings.
 function ruinClearing(x, z) {
-  return RUIN_SITES.some(r =>
-    Math.abs(x - r.x) < r.width / 2 + 20 &&
-    Math.abs(z - r.z) < r.depth / 2 + 26);
+  return RUIN_SITES.some(r => {
+    const [lx, lz] = ruinLocalXZ(r, x, z);
+    return Math.abs(lx) < r.width / 2 + 20 &&
+      Math.abs(lz) < r.depth / 2 + 26;
+  });
 }
 function ruinWallRectangles(site) {
   const w = site.width, d = site.depth, a = site.arch / 2, t = 14;
@@ -209,13 +250,17 @@ function buildRuins() {
   for (const site of RUIN_SITES) {
     const before = solids.length;
     ruinDetail(site);              // borrow cathedral mesh builder
-    const mesh = solids.splice(before); // do NOT mutate its cast bins or height surface
+    const mesh = solids.splice(before); // isolate it from the castle's mesh/bins
+    ruinRotateMesh(mesh, site);
     mesh.forEach((so, i) => { so.id = 2000 + i; });
     const cx = cathedral.ox + site.x * WS;
     const cy = cathedral.oy - site.z * SINP * WS;
-    const maxH = site.height * 1.02, halfD = site.depth / 2 + 12;
-    const x0 = Math.max(0, Math.floor((cx - (site.width / 2 + 35) * WS) / CW));
-    const x1 = Math.min(COLS - 1, Math.ceil((cx + (site.width / 2 + 35) * WS) / CW));
+    const c = Math.cos(site.yaw || 0), sn = Math.sin(site.yaw || 0);
+    const halfW = Math.abs(c) * site.width / 2 + Math.abs(sn) * site.depth / 2 + 40;
+    const halfD = Math.abs(c) * site.depth / 2 + Math.abs(sn) * site.width / 2 + 18;
+    const maxH = site.height * 1.08;
+    const x0 = Math.max(0, Math.floor((cx - halfW * WS) / CW));
+    const x1 = Math.min(COLS - 1, Math.ceil((cx + halfW * WS) / CW));
     const y0 = Math.max(0, Math.floor((cy - (halfD * SINP + maxH * COSP) * WS - 16) / CH));
     const y1 = Math.min(ROWS - 1, Math.ceil((cy + halfD * SINP * WS + 16) / CH));
     const gridW = x1 - x0 + 1, gridH = y1 - y0 + 1;
@@ -320,21 +365,26 @@ function paintRuinGroundShadows() {
     const height = r.height * .62;
     const sx = -LGT[0] / LGT[1] * height;
     const sz = -LGT[2] / LGT[1] * height;
-    const corners = [
-      mapToCell(r.x - r.width / 2 - 20, r.z - r.depth / 2 - 20),
-      mapToCell(r.x + r.width / 2 + sx + 20, r.z + r.depth / 2 + sz + 20)
-    ];
-    const x0 = Math.max(1, Math.floor(Math.min(corners[0][0], corners[1][0])));
-    const x1 = Math.min(COLS - 2, Math.ceil(Math.max(corners[0][0], corners[1][0])));
-    const y0 = Math.max(1, Math.floor(Math.min(corners[0][1], corners[1][1])));
-    const y1 = Math.min(ROWS - 2, Math.ceil(Math.max(corners[0][1], corners[1][1])));
+    const footprint = [];
+    for (const x of [-r.width / 2 - 20, r.width / 2 + 20])
+      for (const z of [-r.depth / 2 - 20, r.depth / 2 + 20]) {
+        const [wx, wz] = ruinWorldXZ(r, x, z);
+        footprint.push(mapToCell(wx, wz));
+        footprint.push(mapToCell(wx + sx, wz + sz));
+      }
+    const x0 = Math.max(1, Math.floor(Math.min(...footprint.map(p => p[0]))));
+    const x1 = Math.min(COLS - 2, Math.ceil(Math.max(...footprint.map(p => p[0]))));
+    const y0 = Math.max(1, Math.floor(Math.min(...footprint.map(p => p[1]))));
+    const y1 = Math.min(ROWS - 2, Math.ceil(Math.max(...footprint.map(p => p[1]))));
+    const c = Math.cos(r.yaw || 0), sn = Math.sin(r.yaw || 0);
+    const dsx = sx * c - sz * sn, dsz = sx * sn + sz * c;
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const [mx, mz] = toModelXZ(x, y);
-      const px = mx - r.x, pz = mz - r.z;
+      const [px, pz] = ruinLocalXZ(r, mx, mz);
       let shadow = 0;
       for (const w of r.walls) for (let step = 0; step <= 4; step++) {
         const t = step / 4;
-        const wx = px - sx * t, wz = pz - sz * t;
+        const wx = px - dsx * t, wz = pz - dsz * t;
         const dx = Math.max(0, w[0] - wx, wx - w[1]);
         const dz = Math.max(0, w[2] - wz, wz - w[3]);
         const dist = Math.hypot(dx, dz);
@@ -389,8 +439,10 @@ function ruinsBlockMove(x, y, actor) {
       Math.max(mx, ex) < r.x - border ||
       Math.min(mz, ez) > r.z + border ||
       Math.max(mz, ez) < r.z - border) continue;
+    const [lx, lz] = ruinLocalXZ(r, ex, ez);
+    const [tx, tz] = ruinLocalXZ(r, mx, mz);
     for (const w of r.walls)
-      if (ruinSegmentRect(ex - r.x, ez - r.z, mx - r.x, mz - r.z, w, radius)) return true;
+      if (ruinSegmentRect(lx, lz, tx, tz, w, radius)) return true;
   }
   return false;
 }
@@ -411,7 +463,8 @@ function registerRuinInspections() {
     for (const side of [-1, 1]) {
       // The trigger is slightly INSIDE the clear arch footprint, so either
       // approach is reachable without standing in a solid wall.
-      const [x, y] = mapToCell(site.x, site.z + side * (site.depth / 2 - 12));
+      const [wx, wz] = ruinWorldXZ(site, 0, side * (site.depth / 2 - 12));
+      const [x, y] = mapToCell(wx, wz);
       const spot = {
         id: site.id + (side < 0 ? '-south' : '-north'), x, y,
         r: Math.max(10, Math.min(16, site.arch * WS / CW * .32)),
