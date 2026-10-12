@@ -50,6 +50,27 @@ assert.equal(walking.x, 96);
 assert.equal(npcAtlasFrame(a, 'idle').y, 0);
 assert.equal(npcAtlasFrame(a, 'talk', Math.PI).frame, 3);
 assert.equal(npcAtlasFrame(a, 'talk', Math.PI).y, 64);
+const exported = npcAtlasExportSettings('villager');
+assert.deepEqual(Object.keys(JSON.parse(exported)).sort(), ['layout', 'type', 'version']);
+assert(!exported.includes('assets/npc/') && !exported.includes('blob:') && !exported.includes('data:image/'),
+  'JSON preset must never contain PNG payload or URLs');
+const tuned = JSON.parse(exported);
+tuned.layout.states.walk.frames = 2;
+tuned.layout.states.walk.fps = 15;
+npcAtlasImportSettings('villager', JSON.stringify(tuned));
+assert.equal(npcAtlasFrame({ actorType: 'villager', d8: 3, actorAnimTime: 0.2 }, 'walk').frame, 1);
+assert.equal(NPC_ATLASES.get('villager').layout.states.walk.fps, 15);
+const saved = npcAtlasExportSettings('villager');
+const rejectSettings = (why, value) => {
+  assert.throws(() => npcAtlasImportSettings('villager', value), /Invalid|exceed|frame|JSON/, why);
+  assert.equal(npcAtlasExportSettings('villager'), saved, why + ': invalid data must not partially apply');
+};
+rejectSettings('wrong NPC identity', { ...tuned, type: 'hermit' });
+rejectSettings('unsupported version', { ...tuned, version: 2 });
+rejectSettings('too many frames for image', { ...tuned, layout: {
+  ...tuned.layout, states: { ...tuned.layout.states, walk: { ...tuned.layout.states.walk, frames: 9 } }
+} });
+rejectSettings('invalid JSON syntax', '{ invalid');
 const incompatible = npcAtlasAttach('villager', spec, 'assets/npc/invalid.png');
 incompatible.image.naturalWidth = 100;
 incompatible.image.onload();

@@ -89,6 +89,44 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           'the uploaded atlas must enter both the editor and runtime NPC path');
         assert.notEqual(result.idle, result.walking, 'sprite state/frame changes ASCII preview');
         assert.equal(result.map, original, 'preview imports never rewrite map.js');
+        const settings = await page.evaluate(() => {
+          ED.previewState = 'walk'; edSyncUI();
+          ED.ui.npcFrames.value = '2';
+          ED.ui.npcFps.value = '15';
+          ED.ui.npcFps.dispatchEvent(new Event('change', { bubbles: true }));
+          const before = npcAtlasExportSettings('villager');
+          const tuned = JSON.parse(before);
+          const valid = tuned.layout.states.walk.frames === 2 && tuned.layout.states.walk.fps === 15;
+          const frame = npcAtlasFrame({ actorType: 'villager', d8: 0, actorAnimTime: .1 }, 'walk');
+          ED.ui.npcFrames.value = '99';
+          ED.ui.npcFrames.dispatchEvent(new Event('change', { bubbles: true }));
+          const rollback = npcAtlasExportSettings('villager') === before &&
+            ED.ui.npcFrames.value === '2';
+          ED.ui.npcFrames.value = '3';
+          ED.ui.npcFrames.dispatchEvent(new Event('change', { bubbles: true }));
+          const modified = npcAtlasExportSettings('villager') !== before;
+          const file = new File([before], 'villager-animation.json', { type: 'application/json' });
+          const dt = new DataTransfer(); dt.items.add(file);
+          ED.ui.npcSettingsFile.files = dt.files;
+          ED.ui.npcSettingsFile.dispatchEvent(new Event('change', { bubbles: true }));
+          return { valid, rollback, modified, frame: frame.frame,
+            before, map: mapFileText() };
+        });
+        assert(settings.valid && settings.rollback && settings.modified);
+        assert.equal(settings.frame, 1);
+        assert.equal(settings.map, original);
+        // File.text() in the editor is asynchronous; yield to Chromium once.
+        await page.waitForTimeout(80);
+        const restored = await page.evaluate(() => ({
+          json: npcAtlasExportSettings('villager'),
+          fps: +ED.ui.npcFps.value, frames: +ED.ui.npcFrames.value,
+          map: mapFileText(), status: ED.ui.status.textContent
+        }));
+        assert.equal(restored.json, settings.before);
+        assert.equal(restored.fps, 15);
+        assert.equal(restored.frames, 2);
+        assert.equal(restored.map, original);
+        assert(restored.status.includes('восстановлены'), 'JSON import should confirm restoration');
         await step(10); // the actual world renderer draws the new atlas-backed actor
         await page.screenshot({ path: path.join(gallery, mode + '-synthetic-png.png') });
         await page.evaluate(() => { ED.variant.npc = 1; ED.previewState = 'idle'; edSyncUI(); });

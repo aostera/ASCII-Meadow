@@ -704,7 +704,7 @@ function edBuildUI() {
       } });
       ED.previewClock = 0; edSyncUI();
       edStatus(state + ': ' + frames + ' кадров · ' + fps + ' FPS. PNG и карта не изменены.');
-    } catch (err) { edStatus(String(err.message)); }
+    } catch (err) { edSyncUI(); edStatus(String(err.message)); }
   }
   npcFrames.addEventListener('change', edTuneNpcAnimation);
   npcFps.addEventListener('change', edTuneNpcAnimation);
@@ -712,7 +712,7 @@ function edBuildUI() {
     const file = npcSettingsFile.files && npcSettingsFile.files[0];
     npcSettingsFile.value = '';
     if (!file) return;
-    if (!/\\.json$/i.test(file.name) || file.size > 64 * 1024) {
+    if (!/\.json$/i.test(file.name) || file.size > 64 * 1024) {
       edStatus('Нужен JSON настроек до 64 КБ.'); return;
     }
     const selected = ED.sel?.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi]?.[1] : null;
