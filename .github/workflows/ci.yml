@@ -36,6 +36,8 @@ jobs:
         run: node tools/check/npc-atlas.cjs
       - name: NPC frame quality rules (transparency, duplicates and silhouette continuity)
         run: node tools/check/npc-atlas-audit.cjs
+      - name: NPC gallery frame selection (sampling up to 60 frames)
+        run: node tools/check/npc-gallery.cjs
       - name: NPC atlas publish path and manifest contract
         run: node tools/check/npc-asset-build.cjs
       - name: Interaction registry (range, actions, NPC talk, stale references)
