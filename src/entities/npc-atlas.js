@@ -51,7 +51,22 @@ function npcAtlasAttach(type, raw, source) {
         image.naturalWidth % w || image.naturalHeight % h ||
         image.naturalWidth < maxFrames * w || image.naturalHeight < (maxRows + 1) * h) {
       entry.status = 'error'; entry.error = 'PNG dimensions do not match atlas layout';
-    } else entry.status = 'ready';
+    } else {
+      // Loading an image from file:// may succeed while reading its pixels is
+      // prohibited by the browser's opaque origin policy. Probe before enabling
+      // the atlas, otherwise the rig's getImageData would throw and halt the game.
+      const probe = document.createElement('canvas');
+      probe.width = probe.height = 1;
+      try {
+        const context = probe.getContext('2d', { willReadFrequently: true });
+        context.drawImage(image, 0, 0, 1, 1);
+        context.getImageData(0, 0, 1, 1);
+        entry.status = 'ready';
+      } catch {
+        entry.status = 'error';
+        entry.error = 'PNG pixels unavailable (file:// security). Use HTTP or import PNG inside ?edit.';
+      }
+    }
   };
   image.onerror = () => { if (NPC_ATLASES.get(type) === entry) {
     entry.status = 'error'; entry.error = 'Unable to load NPC atlas PNG';

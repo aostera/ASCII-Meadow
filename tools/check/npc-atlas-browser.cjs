@@ -27,7 +27,8 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           loadedTypes: NPC_SHIPPED_ATLASES.map(a => a.type),
           map: mapFileText()
         }));
-        assert.equal(shipped.status, 'ready', 'shipped villager art must load from file://');
+        assert.equal(shipped.status, 'error',
+          'file:// cross-origin sprite pixels should be rejected safely and the rig should be used');
         assert.equal(shipped.ready, 480);
         assert.equal(shipped.src, 'assets/npc/villager-starter.png');
         assert.equal(shipped.rows, 8);
@@ -62,9 +63,8 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         assert(catalog.initial.open && catalog.initial.expanded === 'true');
         assert.equal(catalog.initial.cards, 6);
         assert.equal(catalog.initial.thumbs, 24);
-        assert.equal(catalog.initial.directions, 8,
-          'published starter art should provide eight real directions in the gallery');
-        assert(!catalog.initial.hasCaveat && catalog.initial.names.some(n => n.includes('Отшельник')));
+        assert.equal(catalog.initial.directions, 0, 'file:// safely uses a procedural fallback');
+        assert(catalog.initial.hasCaveat && catalog.initial.names.some(n => n.includes('Отшельник')));
         assert.deepEqual(catalog.selected, { type: 1, state: 'talk', paused: true,
           frame: 6, tool: 'npc', mapUnchanged: true, actorsUnchanged: true });
         assert(catalog.closed, 'animation library should collapse without touching the map');
