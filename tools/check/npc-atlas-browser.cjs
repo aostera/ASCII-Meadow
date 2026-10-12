@@ -422,7 +422,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
               mapUnchanged: initial === mapFileText() };
           });
           assert.deepEqual(actual.dimensions, [480, 1344]);
-          assert.equal(actual.y, 23 * 56);
+          assert.equal(actual.y, 15 * 56, 'walk SE frame must select row 15');
           assert(actual.alpha > 60, 'ASCII preview should contain opaque sprite pixels');
           assert.equal(actual.scanned, 288);
           assert.equal(actual.errors, 0);
