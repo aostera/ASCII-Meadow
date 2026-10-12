@@ -11,7 +11,11 @@ class FakeImage {
   onerror = null;
   set src(value) { this.source = value; }
 }
-const context = { document: { createElement: () => new FakeImage() }, ACTOR_TYPES: new Map([['villager', {}]]), Math, Object };
+let denyPixelRead = false;
+const context = { document: { createElement: tag => tag === 'canvas'
+  ? { getContext: () => ({ drawImage() {},
+      getImageData() { if (denyPixelRead) throw new Error('SecurityError: canvas tainted'); return { data: new Uint8ClampedArray(4) }; } }) }
+  : new FakeImage() }, ACTOR_TYPES: new Map([['villager', {}]]), Math, Object };
 vm.createContext(context);
 vm.runInContext(script + '\nthis.api = { npcAtlasLayout, npcAtlasAttach, npcAtlasFrame, npcAtlasFrameIndex, npcAtlasExportSettings, npcAtlasImportSettings, NPC_ATLASES };', context);
 const { npcAtlasLayout, npcAtlasAttach, npcAtlasFrame, npcAtlasFrameIndex, npcAtlasExportSettings, npcAtlasImportSettings, NPC_ATLASES } = context.api;
@@ -81,6 +85,12 @@ incompatible.image.naturalWidth = 100;
 incompatible.image.onload();
 assert.equal(incompatible.status, 'error');
 assert.equal(npcAtlasFrame(a, 'walk'), null, 'rig fallback for missing/corrupt atlas');
+denyPixelRead = true;
+const tainted = npcAtlasAttach('villager', spec, 'assets/npc/tainted.png');
+tainted.image.onload();
+assert.equal(tainted.status, 'error', 'an unreadable file:// image must never enter the ASCII renderer');
+assert.equal(npcAtlasFrame(a, 'idle'), null, 'tainted source must safely use procedural rig');
+denyPixelRead = false;
 const latest = npcAtlasAttach('villager', spec, 'assets/npc/latest.png');
 attached.image.onerror();
 assert.equal(NPC_ATLASES.get('villager'), latest, 'stale async load must not replace a newer atlas');
