@@ -7,6 +7,7 @@ const ED = {
   sel: null, hover: null, drag: null, pan: null, stroke: null, space: false,
   undo: [], redo: [], keys: new Set(), mx: -1, my: -1, inView: false,
   ui: null, mini: null, miniKey: '', draftTimer: 0,
+  previewAuto: true, previewClock: 0, previewPhase: 0, previewState: 'idle',
 };
 const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['w', 'Вода', '9'], ['m', 'Болото', 'P'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
 const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['stone', 'Камень', 'Z'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['tent', 'Палатка', 'Y'], ['fence', 'Забор', 'I'], ['toad', 'Жаба', 'G'], ['frog', 'Лягушка', 'X'], ['birds', 'Птицы в траве', 'O'], ['castle', 'Замок', 'L'], ['npc', 'NPC', 'N'], ['select', 'Выбрать и двигать', 'V']];
@@ -296,11 +297,12 @@ function openEditor() {
   if (!EDIT || !COLS) return;
   editing = true; ED.keys.clear(); keys.clear(); mouse.on = false;
   document.body.classList.add('editing'); ED.ui.root.hidden = false; ED.ui.open.hidden = true;
+  ED.previewClock = 0;
   edCheckDraft(); edSyncUI();
 }
 function closeEditor() {
   VZ = 1;   // the game is always seen at its own scale
-  editing = false; ED.keys.clear(); ED.drag = ED.pan = ED.stroke = null;
+  editing = false; ED.previewClock = 0; ED.keys.clear(); ED.drag = ED.pan = ED.stroke = null;
   document.body.classList.remove('editing'); ED.ui.root.hidden = true; ED.ui.open.hidden = false;
   [player.x, player.y] = dryNear(player.x, player.y);   // water painted over the knight: he steps out onto the nearest dry ground
 }
@@ -331,6 +333,20 @@ function updateEditor(dt) {
   const mx = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
   const my = (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0) - (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0);
   camX += mx * VC / VZ * 0.8 * fast * dt; camY += my * VR / VZ * 0.8 * fast * dt;
+  // Preview playback is driven by the existing simulation, never by an orphaned timer.
+  // Limit work to 12 FPS and only when the catalog is actually visible.
+  if (ED.previewAuto && ED.ui && !ED.ui.npcCanvas.hidden) {
+    ED.previewClock += dt;
+    if (ED.previewClock >= 1 / 12) {
+      const elapsed = ED.previewClock;
+      ED.previewClock = 0;
+      if (ED.previewState === 'walk') {
+        ED.previewPhase = (ED.previewPhase + elapsed * 3.2) % (Math.PI * 2);
+        ED.ui.npcPhase.value = String(Math.round(ED.previewPhase * 100));
+      }
+      edPreviewNpc();
+    }
+  }
 }
 function drawEditor() {
   const g = ctx;
@@ -467,6 +483,8 @@ function edSyncUI() {
   } else if (vt) ED.ui.variantOut.textContent = (fe ? fe[1] : ED.variant[vt]) + 1 + ' из ' + edVariants(vt);
   if (ED.ui.npcLibrary) {
     ED.ui.npcLibrary.hidden = ED.tool !== 'npc' && !selectedActor;
+    ED.ui.npcCatalog.hidden = ED.ui.npcLibrary.hidden;
+    ED.ui.npcPlay.hidden = ED.ui.npcLibrary.hidden;
     ED.ui.npcCanvas.hidden = ED.ui.npcLibrary.hidden;
     ED.ui.npcStates.hidden = ED.ui.npcLibrary.hidden;
     if (!ED.ui.npcLibrary.hidden) {
@@ -477,12 +495,23 @@ function edSyncUI() {
         ' · дыхание ×' + spec.rigMotion.idle.breath : 'Нет доступных NPC';
     }
   }
+  const shownType = selectedActor ? selectedActor[1] : [...ACTOR_TYPES.keys()][ED.variant.npc];
+  for (const b of ED.ui.npcCatalog.querySelectorAll('[data-npc-type]')) {
+    const active = b.dataset.npcType === shownType;
+    b.classList.toggle('on', active);
+    b.setAttribute('aria-pressed', String(active));
+  }
+  ED.ui.npcPlay.setAttribute('aria-pressed', String(ED.previewAuto));
+  ED.ui.npcPlay.firstChild.textContent = ED.previewAuto ? 'Пауза' : 'Воспроизвести';
   if (ED.ui.npcStates) for (const b of ED.ui.npcStates.querySelectorAll('[data-preview]')) {
     const active = b.dataset.preview === (ED.previewState || 'idle');
     b.classList.toggle('on', active);
     b.setAttribute('aria-pressed', String(active));
   }
-  if (ED.ui.npcPhase) ED.ui.npcPhase.hidden = ED.ui.npcLibrary.hidden || (ED.previewState || 'idle') !== 'walk';
+  if (ED.ui.npcPhase) {
+    ED.ui.npcPhase.hidden = ED.ui.npcLibrary.hidden || (ED.previewState || 'idle') !== 'walk';
+    ED.ui.npcPhase.value = String(Math.round(ED.previewPhase * 100));
+  }
   edPreviewNpc();
   ED.ui.undo.disabled = !ED.undo.length; ED.ui.redo.disabled = !ED.redo.length;
   ED.ui.zoomPct.firstChild.textContent = Math.round(VZ * 100) + '%'; ED.ui.zoomOut.disabled = VZ <= ED_ZOOMS[0]; ED.ui.zoomIn.disabled = VZ >= ED_ZOOMS[ED_ZOOMS.length - 1];
@@ -506,7 +535,18 @@ function edBuildUI() {
   const sFog = el('section', 'ed-sec', '<h3>Туман</h3>'), gFog = el('div', 'ed-grid'); for (const [t, n, k] of ED_FOG) gFog.append(btn(n, k, { tool: t })); sFog.append(gFog);
   const sOb = el('section', 'ed-sec', '<h3>Объекты</h3>'), gOb = el('div', 'ed-grid'); for (const [t, n, k] of ED_OBJECTS) gOb.append(btn(n, k, { tool: t })); sOb.append(gOb);
   const variant = el('div', 'ed-variant', 'Вариант'); const variantOut = el('output'); variant.append(btn('‹', '[', { act: 'var-' }), variantOut, btn('›', ']', { act: 'var+' })); sOb.append(variant);
-  // Catalog-only preview: inspecting a type never creates an actor or modifies the map.
+  // Inspecting a catalog archetype switches the placement tool, never edits the authored map.
+  const npcCatalog = el('div', 'ed-npc-catalog');
+  npcCatalog.hidden = true; npcCatalog.setAttribute('role', 'group');
+  npcCatalog.setAttribute('aria-label', 'Архетипы NPC');
+  for (const [type, spec] of ACTOR_TYPES) {
+    const choose = btn('', '', { npcType: type });
+    choose.firstChild.textContent = spec.name;
+    choose.title = type + ' · ' + spec.renderClass;
+    choose.setAttribute('aria-pressed', 'false');
+    npcCatalog.append(choose);
+  }
+  sOb.append(npcCatalog);
   const npcLibrary = el('p', 'ed-help'); npcLibrary.setAttribute('aria-label', 'Библиотека NPC');
   npcLibrary.hidden = true; sOb.append(npcLibrary);
   const npcCanvas = el('canvas', 'ed-mini'); npcCanvas.width = 180; npcCanvas.height = 180;
@@ -514,6 +554,9 @@ function edBuildUI() {
   const npcStates = el('div', 'ed-grid'); npcStates.hidden = true;
   for (const state of ['idle', 'walk', 'talk']) npcStates.append(btn(state, '', { preview: state }));
   sOb.append(npcStates);
+  const npcPlay = btn('Пауза', '', { act: 'preview-play' });
+  npcPlay.hidden = true; npcPlay.setAttribute('aria-label', 'Воспроизведение предпросмотра NPC');
+  sOb.append(npcPlay);
   const npcPhase = el('input'); npcPhase.type = 'range'; npcPhase.min = '0'; npcPhase.max = '628'; npcPhase.value = '0';
   npcPhase.setAttribute('aria-label', 'Фаза шага NPC'); npcPhase.hidden = true; sOb.append(npcPhase);
   const sMap = el('section', 'ed-sec', '<h3>Карта</h3>'); const mini = el('canvas', 'ed-mini'); mini.width = 216; mini.height = 300;
@@ -527,16 +570,23 @@ function edBuildUI() {
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
-  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcLibrary, npcCanvas, npcStates, npcPhase, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
+  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcPlay, npcPhase, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) ED.previewAuto = false;
   ED.mini = mini;
 
   open.addEventListener('click', () => { open.blur(); openEditor(); });
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return; b.blur();
-    if (b.dataset.preview) { ED.previewState = b.dataset.preview; edSyncUI(); return; }
+    if (b.dataset.preview) { ED.previewState = b.dataset.preview; ED.previewClock = 0; edSyncUI(); return; }
+    if (b.dataset.npcType) {
+      const types = [...ACTOR_TYPES.keys()];
+      ED.tool = 'npc'; ED.sel = null; ED.variant.npc = types.indexOf(b.dataset.npcType);
+      ED.previewClock = 0; edSyncUI(); return;
+    }
     if (b.dataset.tool) { ED.tool = b.dataset.tool; if (!edIsBrush(ED.tool) && ED.tool !== 'select') ED.sel = null; edSyncUI(); return; }
     const a = b.dataset.act;
     if (a === 'close') closeEditor();
+    else if (a === 'preview-play') { ED.previewAuto = !ED.previewAuto; ED.previewClock = 0; }
     else if (a === 'undo') edUndo();
     else if (a === 'redo') edRedo();
     else if (a === 'var-' || a === 'var+') edStepVariant(a === 'var+' ? 1 : -1);
@@ -552,7 +602,7 @@ function edBuildUI() {
     else if (a === 'draft-drop') { try { localStorage.removeItem(ED_DRAFT); } catch { /* nothing to drop */ } draft.hidden = true; }
     edSyncUI();
   });
-  npcPhase.addEventListener('input', () => { ED.previewPhase = +npcPhase.value / 100; edPreviewNpc(); });
+  npcPhase.addEventListener('input', () => { ED.previewPhase = +npcPhase.value / 100; ED.previewClock = 0; edPreviewNpc(); });
   size.addEventListener('input', () => { ED.size = +size.value; edSyncUI(); });
   trail.addEventListener('change', () => {   // the whole generated trail on or off at once
     const on = trail.checked;   // read it first: edRecord re-syncs the box
