@@ -7,7 +7,7 @@ const ED = {
   sel: null, hover: null, drag: null, pan: null, stroke: null, space: false,
   undo: [], redo: [], keys: new Set(), mx: -1, my: -1, inView: false,
   ui: null, mini: null, miniKey: '', draftTimer: 0,
-  previewAuto: true, previewClock: 0, previewPhase: 0, previewState: 'idle', previewDirection: 0, atlasUrls: {},
+  previewAuto: true, previewClock: 0, previewPhase: 0, previewState: 'idle', previewDirection: 0, atlasUrls: {}, auditType: null,
 };
 const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['w', 'Вода', '9'], ['m', 'Болото', 'P'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
 const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['stone', 'Камень', 'Z'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['tent', 'Палатка', 'Y'], ['fence', 'Забор', 'I'], ['toad', 'Жаба', 'G'], ['frog', 'Лягушка', 'X'], ['birds', 'Птицы в траве', 'O'], ['castle', 'Замок', 'L'], ['npc', 'NPC', 'N'], ['select', 'Выбрать и двигать', 'V']];
@@ -533,6 +533,7 @@ function edSyncUI() {
     }
   }
   const shownType = selectedActor ? selectedActor[1] : [...ACTOR_TYPES.keys()][ED.variant.npc];
+  if (ED.auditType !== shownType) ED.ui.atlasAuditResult.hidden = true;
   const atlas = NPC_ATLASES.get(shownType);
   const state = ED.previewState || 'idle';
   const atlasState = atlas && (atlas.layout.states[state] || atlas.layout.states.idle);
@@ -728,6 +729,7 @@ function edBuildUI() {
           (lines.length ? '\n' + lines.join('\n') : '\nПроверка не нашла проблем.') +
           (report.findings.length > 25 ? '\n… и ещё ' + (report.findings.length - 25) + ' замечаний' : '');
         atlasAuditResult.hidden = false;
+        ED.auditType = type;
         edStatus(report.errors ? 'В атласе найдены пустые кадры или направления.' :
           'Проверка завершена: ' + report.warnings + ' предупреждений.');
       } catch (err) { atlasAuditResult.hidden = true; edStatus(String(err.message)); }
@@ -804,7 +806,7 @@ function edBuildUI() {
   atlasFile.addEventListener('change', () => {
     const file = atlasFile.files && atlasFile.files[0];
     atlasFile.value = '';
-    atlasAuditResult.hidden = true; atlasAuditResult.textContent = '';
+    atlasAuditResult.hidden = true; atlasAuditResult.textContent = ''; ED.auditType = null;
     if (!file) return;
     if (!/\.png$/i.test(file.name) || file.type && file.type !== 'image/png' ||
         file.size > 16 * 1024 * 1024) { edStatus('Нужен PNG не больше 16 МБ.'); return; }
