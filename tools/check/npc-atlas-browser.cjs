@@ -365,5 +365,82 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         console.log('PASS NPC atlas upload, preview, runtime render and map isolation: ' + mode);
       } finally { await ctx.close(); }
     }
+    // The committed PNG must also work over HTTP. file:// is deliberately not
+    // canvas-readable in Chromium and uses procedural fallback; HTTP is same-origin.
+    const http = require('node:http');
+    const root = path.resolve(__dirname, '../..');
+    const server = http.createServer((request, response) => {
+      let pathname;
+      try { pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname); }
+      catch { response.writeHead(400); response.end(); return; }
+      if (!pathname.startsWith('/ASCII-Meadow/')) { response.writeHead(404); response.end(); return; }
+      const relative = pathname.slice('/ASCII-Meadow/'.length) || 'index.html';
+      const target = path.resolve(root, relative);
+      if (!target.startsWith(root + path.sep)) { response.writeHead(403); response.end(); return; }
+      const ext = path.extname(target);
+      const type = ext === '.png' ? 'image/png' : ext === '.html' ? 'text/html' :
+        ext === '.css' ? 'text/css' : 'text/javascript';
+      const stream = fs.createReadStream(target);
+      stream.on('error', () => { if (!response.headersSent) response.writeHead(404); response.end(); });
+      response.writeHead(200, { 'Content-Type': type });
+      stream.pipe(response);
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const url = 'http://127.0.0.1:' + server.address().port + '/ASCII-Meadow/index.html?edit';
+      for (const mode of ['gl', '2d']) {
+        const { page, ctx, errs, step } = await openGame(browser, url,
+          { mode, viewport: { width: 960, height: 600 } });
+        try {
+          let status = 'loading';
+          for (let attempt = 0; attempt < 80; attempt++) {
+            status = await page.evaluate(() => NPC_ATLASES.get('villager')?.status || 'loading');
+            if (status !== 'loading') break;
+            await step(1);
+            await page.waitForTimeout(30);
+          }
+          assert.equal(status, 'ready', 'real committed NPC PNG must be readable over HTTP');
+          const actual = await page.evaluate(() => {
+            const initial = mapFileText();
+            const entry = NPC_ATLASES.get('villager');
+            const actor = { actorType: 'villager', d8: 7, actorAnimTime: 0.25 };
+            const frame = npcAtlasFrame(actor, 'walk');
+            const image = npcAtlasPreviewImage(actor, 'walk', Math.PI);
+            const pixels = image.data;
+            let alpha = 0; for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) alpha++;
+            const audit = npcAtlasAudit('villager');
+            openEditor(); ED.tool = 'npc'; ED.variant.npc = 0; ED.previewDirection = 7;
+            ED.previewState = 'walk'; ED.previewAuto = false; edSyncUI();
+            ED.ui.npcGalleryToggle.click();
+            const directions = ED.ui.npcGallery.querySelectorAll('.ed-gallery-direction').length;
+            const [x, z] = toModelXZ(player.x + 12, player.y);
+            const spawned = spawnActor('villager',
+              { id: 'real-http-villager', world: [x, z], behavior: 'idle' });
+            return { dimensions: [entry.image.naturalWidth, entry.image.naturalHeight],
+              frame: frame.frame, y: frame.y, alpha, scanned: audit.inspected,
+              errors: audit.errors, directions, spawned: ents.includes(spawned),
+              mapUnchanged: initial === mapFileText() };
+          });
+          assert.deepEqual(actual.dimensions, [480, 1344]);
+          assert.equal(actual.y, 23 * 56);
+          assert(actual.alpha > 60, 'ASCII preview should contain opaque sprite pixels');
+          assert.equal(actual.scanned, 288);
+          assert.equal(actual.errors, 0);
+          assert.equal(actual.directions, 8);
+          assert(actual.spawned && actual.mapUnchanged, 'shipped NPC should be runtime-only');
+          await step(8);
+          await page.screenshot({ path: path.join(gallery, mode + '-shipped-villager-http.png') });
+          const cleanup = await page.evaluate(() => {
+            const was = despawnActor('real-http-villager');
+            closeEditor();
+            return { was, remaining: npcs.length };
+          });
+          assert(cleanup.was && cleanup.remaining === 0);
+          assert.deepEqual(realErrors(errs), [], 'HTTP PNG errors: ' + realErrors(errs).join('; '));
+          console.log('PASS real shipped villager PNG via HTTP ' + mode +
+            ': atlas, 8 views, quality scan, ASCII and world draw');
+        } finally { await ctx.close(); }
+      }
+    } finally { await new Promise(resolve => server.close(resolve)); }
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
