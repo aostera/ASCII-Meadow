@@ -40,7 +40,11 @@ const P = (o, a, len) => [o[0] + Math.sin(a) * len, o[1] + Math.cos(a) * len]; /
 
 // pose in model units: ground at y=100, body faces +x
 function pose(e) {
-  const m = e.walk, ph = e.step, stout = e.cls === 'dwarf';
+  const motion = e.rigMotion;
+  const state = e.aiState === 'talk' ? 'talk' : e.walk > 0 ? 'walk' : 'idle';
+  const stride = motion && motion.walk ? motion.walk.stride : 1;
+  const breath = motion && motion[state] && motion[state].breath !== undefined ? motion[state].breath : 1;
+  const m = Math.max(0, Math.min(1, e.walk * stride)), ph = e.step, stout = e.cls === 'dwarf';
   const thigh = stout ? 20 : 24, shin = stout ? 19 : 23;
   const legs = [0, 1].map(k => {
     const p = ph + k * Math.PI;
@@ -51,7 +55,7 @@ function pose(e) {
     return { knee, ankle, a };
   });
   const hipY = 97 - Math.max(legs[0].ankle[1], legs[1].ankle[1]);
-  const breathe = Math.sin(t * 2.2 + e.x) * 0.7 * (1 - m);
+  const breathe = Math.sin(t * 2.2 + e.x) * 0.7 * breath * (1 - m);
   const lean = 3 * m + (e.cls === 'knight' ? 2 * (1 - m) : 0);
   const torsoLen = stout ? 24 : 30;
   const hip = [0, hipY], neck = [lean, hipY - torsoLen + breathe];
