@@ -3,18 +3,24 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const zlib = require('node:zlib');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
 const root = path.resolve(__dirname, '../..');
-const filename = path.join(root, 'assets/npc/villager-starter.png');
-const original = fs.readFileSync(filename);
-const result = spawnSync(process.execPath, ['tools/npc/generate-villager.cjs'],
-  { cwd: root, encoding: 'utf8' });
+// Regenerate PNG into a private fixture, never into shipped assets/. The
+// shipped WebP is pixel-compared against this source in migrate_webp.py --check.
+const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'meadow-villager-'));
+const filename = path.join(temp, 'villager-starter.png');
+const generate = () => spawnSync(process.execPath,
+  ['tools/npc/generate-villager.cjs', filename], { cwd: root, encoding: 'utf8' });
+const result = generate();
 assert.equal(result.status, 0, result.stderr);
+const original = fs.readFileSync(filename);
+assert.equal(generate().status, 0, 'NPC generator must be reproducible');
 assert.deepEqual(fs.readFileSync(filename), original,
-  'Generated sprites must exactly match the committed PNG; update both when editing source');
+  'Generated source PNG must be byte-for-byte deterministic');
 const signature = Buffer.from([137,80,78,71,13,10,26,10]);
 assert(original.subarray(0, 8).equals(signature), 'Expected actual PNG data');
 let offset = 8, width = 0, height = 0, depth = 0, colorType = -1;
@@ -76,3 +82,5 @@ assert(!report.findings.some(f => f.code === 'duplicate-direction'),
 const digest = crypto.createHash('sha256').update(original).digest('hex').slice(0, 12);
 console.log('PASS NPC shipped starter art: 288 frames, 8 views, 3 states, indexed alpha, reproducible ' + digest +
   ' (' + report.warnings + ' non-blocking quality hints)');
+
+fs.rmSync(temp, { recursive: true, force: true });
