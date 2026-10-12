@@ -20,16 +20,16 @@ for (const p of legacy) {
   assert(!fs.existsSync(at(p)), `obsolete export unexpectedly returned: ${p}`);
 }
 const required = [
-  'assets/cow/cow_animation_atlas.png',
-  'assets/cow_v2/cow_eat_atlas.png',
-  'assets/cow_v2/cow_idle_atlas.png',
-  'assets/cow_v2/cow_jump_atlas.png',
-  'assets/cow_v2/cow_run_atlas.png',
-  'assets/cow_v2/cow_walk_atlas.png',
+  'assets/cow/cow_animation_atlas.webp',
+  'assets/cow_v2/cow_eat_atlas.webp',
+  'assets/cow_v2/cow_idle_atlas.webp',
+  'assets/cow_v2/cow_jump_atlas.webp',
+  'assets/cow_v2/cow_run_atlas.webp',
+  'assets/cow_v2/cow_walk_atlas.webp',
   'assets/dark_knight/dark_knight_idle_all_directions_atlas.png',
   'assets/crimson_knight/crimson_dark_knight_idle_atlas.png',
-  'assets/npc/villager-starter.png',
-  'assets/npc/hermit-starter.png',
+  'assets/npc/villager-starter.webp',
+  'assets/npc/hermit-starter.webp',
 ];
 for (const p of required)
   assert(fs.existsSync(at(p)), `required production/authoring source missing: ${p}`);
@@ -44,6 +44,9 @@ for (const file of trackedCandidates) {
   assert(!/(^|\/)(?:\.DS_Store|Thumbs\.db|__pycache__|\.env(?:\.|$))/.test(file) && !/\.py[cod]$/.test(file),
     `generated or secret file exists in working tree: ${file}`);
 }
+const unexpectedPngs = trackedCandidates.filter(p => p.startsWith('assets/') &&
+  p.endsWith('.png') && !p.split('/').some(part => part.toLowerCase().includes('knight')));
+assert.deepEqual(unexpectedPngs, [], 'All non-knight assets must be WebP');
 const pngs = trackedCandidates.filter(p => p.endsWith('.png'));
 const total = pngs.reduce((n, p) => n + fs.statSync(at(p)).size, 0);
-console.log(`PASS repo hygiene: ${pngs.length} source PNGs (${(total / 1048576).toFixed(2)} MiB), no obsolete exports; master sources and NPC assets preserved`);
+console.log(`PASS repo hygiene: ${pngs.length} knight/reference PNGs (${(total / 1048576).toFixed(2)} MiB), no obsolete exports; master sources and NPC assets preserved`);
