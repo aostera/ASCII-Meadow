@@ -440,7 +440,7 @@ function edPreviewNpc() {
   const selected = ED.sel?.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi]?.[1] : null;
   const type = selected || [...ACTOR_TYPES.keys()][ED.variant.npc];
   const spec = ACTOR_TYPES.get(type);
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!spec) return;
   const state = ED.previewState || 'idle';
