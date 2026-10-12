@@ -120,6 +120,25 @@ const ok = (value, detail) => assert(value, detail);
       for (let n = 0; n < 2; n++)
         ok(Math.abs(restored.runtime[0].map[n] - editing.moved.map[n + 2]) < 0.05, 'NPC drift after map re-import');
 
+      // Re-import must preserve NPC type while a read-only preview is opened.
+      const importedPreview = await replay.page.evaluate(() => {
+        const before = mapFileText();
+        openEditor();
+        ED.sel = { kind: 'actors', mi: 0 };
+        ED.tool = 'select';
+        ED.previewState = 'talk';
+        edSyncUI();
+        const label = ED.ui.npcLibrary.textContent;
+        const visible = !ED.ui.npcCanvas.hidden;
+        const pressed = ED.ui.npcStates.querySelector('[data-preview="talk"]').getAttribute('aria-pressed');
+        const unchanged = before === mapFileText();
+        closeEditor();
+        return { label, visible, pressed, unchanged };
+      });
+      ok(importedPreview.visible && importedPreview.unchanged && importedPreview.pressed === 'true' &&
+        importedPreview.label.includes(editing.moved.map[1]),
+        're-imported NPC preview must preserve actor type and v2 map');
+
       // Remove NPC via editor and restore a v1 map. No invisible NPC may survive.
       const cleaned = await replay.page.evaluate(() => {
         openEditor();
