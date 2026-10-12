@@ -13,22 +13,23 @@ const { launch, openGame, realErrors } = require('./common.cjs');
       try {
         await step(3);
         const created = await page.evaluate(() => {
-          if (npcs.length) throw new Error('catalog spawned an NPC by default');
+          if (npcs.length !== 1 || npcs[0].actorId !== 'camp-villager' || npcs[0].actorType !== 'villager' || npcs[0].behavior !== 'idle')
+            throw new Error('the game must start with exactly one stationary camp villager');
           const [wx, wz] = toModelXZ(player.x + 13, player.y);
           const a = spawnActor('villager', { id: 'qa-actor-a', world: [wx, wz], behavior: 'idle' });
           const b = spawnActor('hermit', { id: 'qa-actor-b', world: [wx + 15, wz + 15], behavior: 'idle', lines: ['Проверка NPC'] });
           if (b.rigMotion.walk.stride !== 0.8 || b.rigMotion.idle.breath !== 0.65) throw new Error('NPC motion profile lost');
           return { count: npcs.length, entCount: ents.length, types: [a.actorType, b.actorType], model: toModelXZ(a.x, a.y) };
         });
-        assert.equal(created.count, 2);
-        assert.equal(created.entCount, 6); // player + 3 cows + 2 NPCs
+        assert.equal(created.count, 3);
+        assert.equal(created.entCount, 7); // player + 3 cows + camp villager + 2 test NPCs
         assert.deepEqual(created.types, ['villager', 'hermit']);
         await step(12); // NPCs are really simulated and rendered in the same depth queue as the knight
         const before = await page.evaluate(() => {
           const world = snapshotActorWorld();
           return { world, states: npcs.map(n => n.aiState), indices: npcs.map(n => ents.includes(n)), frame: worldGen };
         });
-        assert.deepEqual(before.indices, [true, true]);
+        assert.deepEqual(before.indices, [true, true, true]);
         assert(before.states.every(s => s === 'idle' || s === 'talk'));
         await page.setViewportSize({ width: 800, height: 520 });
         await step(3); // build() reprojects the entity grid
@@ -41,12 +42,12 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         }
         const cleanup = await page.evaluate(() => ({
           first: despawnActor('qa-actor-a'), second: despawnActor('qa-actor-b'),
-          npcs: npcs.length, onlyPlayerAndCows: ents.length === 4
+          npcs: npcs.length, campResidentOnly: ents.length === 5 && npcs[0].actorId === 'camp-villager'
         }));
         assert.equal(cleanup.first, true);
         assert.equal(cleanup.second, true);
-        assert.equal(cleanup.npcs, 0);
-        assert.equal(cleanup.onlyPlayerAndCows, true);
+        assert.equal(cleanup.npcs, 1);
+        assert.equal(cleanup.campResidentOnly, true);
         const preview = await page.evaluate(() => {
           const original = JSON.stringify(MEADOW_MAP);
           openEditor();
@@ -98,7 +99,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           ED.ui.npcCatalog.querySelector('[data-npc-type="hermit"]').click();
           const choseHermit = ED.tool === 'npc' && ED.variant.npc === 1 &&
             ED.ui.npcCatalog.querySelector('[data-npc-type="hermit"]').getAttribute('aria-pressed') === 'true';
-          const catalogIsReadOnly = wasSnapshot === JSON.stringify(MEADOW_MAP) && npcs.length === 0;
+          const catalogIsReadOnly = wasSnapshot === JSON.stringify(MEADOW_MAP) && npcs.length === 1;
           ED.ui.npcCatalog.querySelector('[data-npc-type="villager"]').click();
           const states = [];
           for (const state of ['idle', 'walk', 'talk']) {
@@ -115,7 +116,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           const sliderHidden = ED.ui.npcPhase.hidden;
           const selectedButton = ED.ui.npcStates.querySelector('[data-preview="idle"]');
           const accessible = selectedButton.getAttribute('aria-pressed') === 'true';
-          const unchanged = original === JSON.stringify(MEADOW_MAP) && npcs.length === 0;
+          const unchanged = original === JSON.stringify(MEADOW_MAP) && npcs.length === 1;
           const playbackButton = ED.ui.npcPlay;
           if (ED.previewAuto) playbackButton.click(); // pause regardless of OS reduced motion
           ED.previewState = 'walk'; ED.previewPhase = 0; edSyncUI();
