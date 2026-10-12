@@ -1,6 +1,14 @@
 // Drawing entities: the knight from his baked frames (cloak spring, legs, breath, firelight) and rigged
 // figures; cows are drawn by entities/cow.js.
 
+// Preserve authored sprite aspect ratio, fit the old rig viewport and align
+// feet with the knight. The image never fills BOX_W unless its aspect needs it.
+function npcAtlasRect(frame) {
+  const factor = Math.min(BOX_W / frame.width, BOX_H / frame.height);
+  const w = frame.width * factor, h = frame.height * factor;
+  return { x: BOX_X0 + (BOX_W - w) / 2, y: BOX_H - h, w, h };
+}
+
 function drawEntity(e) {
   if (e.cls === 'cow') { drawCow(e); return; }
   const { ffs, fcw, fch, u } = charDims(e);
@@ -32,10 +40,9 @@ function drawEntity(e) {
     // box stretched its width by ~59%, making a knight-height NPC seem huge.
     // Keep the existing knight-aligned height but preserve the original art
     // aspect ratio and center it inside the legacy procedural rig canvas.
-    const spriteWidth = Math.min(BOX_W, BOX_H * frame.width / frame.height);
-    const spriteX = BOX_X0 + (BOX_W - spriteWidth) / 2;
+    const rect = npcAtlasRect(frame);
     rg.drawImage(frame.image, frame.x, frame.y, frame.width, frame.height,
-      spriteX, 0, spriteWidth, BOX_H);
+      rect.x, rect.y, rect.w, rect.h);
   } else drawRig(e, pose(e));
   if (e.cls === 'dwarf' && e.glowM) e.glowM = [e.glowM[0] * 1.12, 100 - (100 - e.glowM[1]) * 0.8];
   }
