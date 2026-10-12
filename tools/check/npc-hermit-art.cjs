@@ -73,6 +73,8 @@ assert.equal(report.empty, 0, 'All 288 frames must contain visible pixels');
 assert.equal(report.errors, 0, 'All authored rows must contain content');
 assert(!report.findings.some(f => f.code === 'duplicate-direction'),
   'Eight authored directions must have distinguishable silhouettes');
+assert(!report.findings.some(f => f.code === 'duplicate-frame' && f.state === 'talk'),
+  'Hermit dialogue should not repeat adjacent frames; idle holds are still permitted');
 const digest = crypto.createHash('sha256').update(original).digest('hex').slice(0, 12);
 console.log('PASS NPC hermit starter art: 288 frames, 8 views, 3 states, indexed alpha, reproducible ' + digest +
   ' (' + report.warnings + ' non-blocking quality hints)');
