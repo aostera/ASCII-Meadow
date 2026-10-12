@@ -26,18 +26,21 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
         const depths=Array.from(r.dep).filter((_,i)=>r.lum[i]>=0);
         const tonalRange=Math.max(...visible)-Math.min(...visible);
         const depthRange=Math.max(...depths)-Math.min(...depths);
-        const [sx,sy]=mapToCell(r.x+r.width/2-7,r.z-r.depth*.32);
+        const [swx,swz]=ruinWorldXZ(r,r.width/2-7,-r.depth*.32);
+        const [sx,sy]=mapToCell(swx,swz);
         const footShade=bshade[Math.round(sy)*COLS+Math.round(sx)];
-        const threshold=mapToCell(r.x,r.z-r.depth/2-24);
-        const end=mapToCell(r.x,r.z+r.depth/2+24);
+        const entrance=ruinWorldXZ(r,0,-r.depth/2-24);
+        const exit=ruinWorldXZ(r,0,r.depth/2+24);
+        const threshold=mapToCell(...entrance);
+        const end=mapToCell(...exit);
         const from={x:threshold[0],y:threshold[1],hT:0,jump:.85,cls:'knight'};
         const doorway=ruinsBlockMove(end[0],end[1],from);
-        const right=mapToCell(r.x+r.arch/2+15,r.z+r.depth/2+24);
-        const rightStart=mapToCell(r.x+r.arch/2+15,r.z-r.depth/2-24);
+        const right=mapToCell(...ruinWorldXZ(r,r.arch/2+15,r.depth/2+24));
+        const rightStart=mapToCell(...ruinWorldXZ(r,r.arch/2+15,-r.depth/2-24));
         const blockedPier=ruinsBlockMove(right[0],right[1],{
           ...from,x:rightStart[0],y:rightStart[1]});
-        const rightSide=mapToCell(r.x+r.width/2+30,r.z);
-        const inner=mapToCell(r.x,r.z);
+        const rightSide=mapToCell(...ruinWorldXZ(r,r.width/2+30,0));
+        const inner=mapToCell(...ruinWorldXZ(r,0,0));
         const blockedSide=ruinsBlockMove(inner[0],inner[1],{
           ...from,x:rightSide[0],y:rightSide[1],cls:'cow'});
         const cleared=flora.every(item=>{
@@ -70,14 +73,15 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
         if (!prop || prop.spots.length !== 2) throw Error('Missing inspect spots ' + site.id);
         const sides = prop.spots.map(spot => {
           const side = spot.id.endsWith('-south') ? -1 : 1;
-          [player.x, player.y] = mapToCell(site.x,
-            site.z + side * (site.depth / 2 + 18));
+          [player.x, player.y] = mapToCell(...ruinWorldXZ(site,0,
+            side * (site.depth / 2 + 18)));
           player.hT = 0;
           updateWorld(0);
           const picked = activeSpot === spot;
           const used = useSpot();
           const message = player.say;
-          [player.x, player.y] = mapToCell(site.x + site.width / 2 + 35, site.z);
+          [player.x, player.y] = mapToCell(...ruinWorldXZ(site,
+            site.width / 2 + 35,0));
           const throughWall = spot.need();
           return { picked, used, message, throughWall };
         });
@@ -91,7 +95,7 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
     for (const site of ['broken-gate','abbey-front','cloister-walk']) {
       await page.evaluate(id=>{
         const r=ruins.find(item=>item.id===id);
-        const [x,y]=mapToCell(r.x,r.z-r.depth/2-45);
+        const [x,y]=mapToCell(...ruinWorldXZ(r,0,-r.depth/2-45));
         player.x=x; player.y=y;
         // Centre the whole building in the screenshot. The normal gameplay
         // camera eases towards teleported test players and can crop the roof.
