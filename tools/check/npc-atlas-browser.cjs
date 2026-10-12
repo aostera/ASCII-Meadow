@@ -3,10 +3,13 @@
 // frame selection and the untouched original map export.
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
 const { launch, openGame, realErrors } = require('./common.cjs');
 
 (async () => {
   const browser = await launch();
+  const gallery = path.resolve(__dirname, '../../shots/npc-preview');
+  fs.mkdirSync(gallery, { recursive: true });
   try {
     for (const mode of ['gl', '2d']) {
       const { ctx, page, step, errs } = await openGame(browser,
@@ -15,6 +18,15 @@ const { launch, openGame, realErrors } = require('./common.cjs');
       try {
         await step(3);
         const original = await page.evaluate(() => mapFileText());
+        await page.evaluate(() => {
+          openEditor(); ED.tool = 'npc'; ED.previewAuto = false;
+          ED.previewState = 'walk'; ED.previewPhase = Math.PI / 2;
+          ED.variant.npc = 0; edSyncUI();
+        });
+        await page.screenshot({ path: path.join(gallery, mode + '-villager-procedural.png') });
+        await page.evaluate(() => { ED.variant.npc = 1; edSyncUI(); });
+        await page.screenshot({ path: path.join(gallery, mode + '-hermit-procedural.png') });
+        await page.evaluate(() => { ED.variant.npc = 0; edSyncUI(); });
         await page.evaluate(() => {
           const atlas = document.createElement('canvas');
           atlas.width = 128; atlas.height = 96;
@@ -69,6 +81,9 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         assert.notEqual(result.idle, result.walking, 'sprite state/frame changes ASCII preview');
         assert.equal(result.map, original, 'preview imports never rewrite map.js');
         await step(10); // the actual world renderer draws the new atlas-backed actor
+        await page.screenshot({ path: path.join(gallery, mode + '-synthetic-png.png') });
+        await page.evaluate(() => { ED.variant.npc = 1; ED.previewState = 'idle'; edSyncUI(); });
+        await page.screenshot({ path: path.join(gallery, mode + '-hermit-fallback.png') });
         const cleanup = await page.evaluate(() => {
           const removed = despawnActor('test-atlas-npc');
           closeEditor();
