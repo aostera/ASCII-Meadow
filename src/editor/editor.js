@@ -427,8 +427,9 @@ function edPreviewNpc() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!spec) return;
   const state = ED.previewState || 'idle';
+  const phase = ED.previewPhase || 0;
   const sample = { cls: spec.renderClass, rigMotion: spec.rigMotion, aiState: state,
-    walk: state === 'walk' ? 1 : 0, step: state === 'walk' ? 1.1 : 0, x: 0 };
+    walk: state === 'walk' ? 1 : 0, step: state === 'walk' ? phase : 0, x: 0 };
   const q = pose(sample);
   ctx.save(); ctx.translate(canvas.width / 2, 8); ctx.scale(1.55, 1.55);
   ctx.lineWidth = 3; ctx.strokeStyle = '#b4c8b4'; ctx.fillStyle = '#e0e9db';
@@ -463,6 +464,12 @@ function edSyncUI() {
         ' · дыхание ×' + spec.rigMotion.idle.breath : 'Нет доступных NPC';
     }
   }
+  if (ED.ui.npcStates) for (const b of ED.ui.npcStates.querySelectorAll('[data-preview]')) {
+    const active = b.dataset.preview === (ED.previewState || 'idle');
+    b.classList.toggle('on', active);
+    b.setAttribute('aria-pressed', String(active));
+  }
+  if (ED.ui.npcPhase) ED.ui.npcPhase.hidden = ED.ui.npcLibrary.hidden || (ED.previewState || 'idle') !== 'walk';
   edPreviewNpc();
   ED.ui.undo.disabled = !ED.undo.length; ED.ui.redo.disabled = !ED.redo.length;
   ED.ui.zoomPct.firstChild.textContent = Math.round(VZ * 100) + '%'; ED.ui.zoomOut.disabled = VZ <= ED_ZOOMS[0]; ED.ui.zoomIn.disabled = VZ >= ED_ZOOMS[ED_ZOOMS.length - 1];
@@ -494,6 +501,8 @@ function edBuildUI() {
   const npcStates = el('div', 'ed-grid'); npcStates.hidden = true;
   for (const state of ['idle', 'walk', 'talk']) npcStates.append(btn(state, '', { preview: state }));
   sOb.append(npcStates);
+  const npcPhase = el('input'); npcPhase.type = 'range'; npcPhase.min = '0'; npcPhase.max = '628'; npcPhase.value = '0';
+  npcPhase.setAttribute('aria-label', 'Фаза шага NPC'); npcPhase.hidden = true; sOb.append(npcPhase);
   const sMap = el('section', 'ed-sec', '<h3>Карта</h3>'); const mini = el('canvas', 'ed-mini'); mini.width = 216; mini.height = 300;
   const zoomRow = el('div', 'ed-zoom', 'Масштаб'); const zoomOut = btn('−', 'Q', { act: 'zoom-' }), zoomPct = btn('100%', '', { act: 'zoom1' }), zoomIn = btn('+', 'E', { act: 'zoom+' });
   zoomPct.title = 'Вернуть 100% (R)'; zoomRow.append(zoomOut, zoomPct, zoomIn); sMap.append(zoomRow, mini);
@@ -505,7 +514,7 @@ function edBuildUI() {
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
-  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcLibrary, npcCanvas, npcStates, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
+  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcLibrary, npcCanvas, npcStates, npcPhase, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
   ED.mini = mini;
 
   open.addEventListener('click', () => { open.blur(); openEditor(); });
@@ -530,6 +539,7 @@ function edBuildUI() {
     else if (a === 'draft-drop') { try { localStorage.removeItem(ED_DRAFT); } catch { /* nothing to drop */ } draft.hidden = true; }
     edSyncUI();
   });
+  npcPhase.addEventListener('input', () => { ED.previewPhase = +npcPhase.value / 100; edPreviewNpc(); });
   size.addEventListener('input', () => { ED.size = +size.value; edSyncUI(); });
   trail.addEventListener('change', () => {   // the whole generated trail on or off at once
     const on = trail.checked;   // read it first: edRecord re-syncs the box
