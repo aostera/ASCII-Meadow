@@ -22,6 +22,12 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           const knight = charDims(player), npc = charDims(resident);
           const visible = npc.u * BOX_H * (48 / 56);
           const knightHeight = knightPx();
+          const atlas = NPC_SHIPPED_ATLASES.find(a => a.type === resident.actorType);
+          const frame = atlas.layout;
+          const rect = npcAtlasRect({ width: frame.frameWidth, height: frame.frameHeight });
+          const sprite = { width: rect.w * npc.u, height: rect.h * npc.u,
+            aspect: rect.w / rect.h, x: rect.x, y: rect.y,
+            bottom: rect.y + rect.h };
           const camp = braziers.find(b => b.ground && b.cook && b.mi === 2);
           if (!camp) throw Error('missing existing camp cooking fire');
           const tests = braziers.map(f => ({
@@ -39,13 +45,21 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           move(actor, -1, 0, .7, 24); // intentionally crosses the entire campfire
           const after = [actor.x, actor.y];
           return { npcCount: npcs.length, pitch: [npc.fcw, knight.fcw, npc.fch, knight.fch],
-            visible, knightHeight, tests, origin, after,
+            visible, knightHeight, sprite, tests, origin, after,
             map: [MEADOW_MAP.v, MEADOW_MAP.actors || null] };
         });
         assert.equal(actual.npcCount, 1);
         assert.equal(actual.map[0], 1); assert.equal(actual.map[1], null);
         assert(Math.abs(actual.visible - actual.knightHeight) < .001,
           'NPC visible height must equal knight (not based on viewport H / 400)');
+        assert(Math.abs(actual.sprite.aspect - 40 / 56) < .000001,
+          'NPC sprites must preserve original portrait proportions, not stretch to 120x106');
+        assert(actual.sprite.width < actual.sprite.height * .75 &&
+          actual.sprite.width > actual.sprite.height * .7,
+          'resident image should have a knight-proportioned width');
+        assert(Math.abs(actual.sprite.bottom - 106) < .000001 &&
+          Math.abs(actual.sprite.height * 48 / 56 - actual.knightHeight) < .001,
+          'portrait sprite is grounded and stays knight-height');
         assert(Math.abs(actual.pitch[0] - actual.pitch[1]) < .00001 &&
           Math.abs(actual.pitch[2] - actual.pitch[3]) < .00001,
           'NPC and knight must have identical ASCII glyph pitch');
