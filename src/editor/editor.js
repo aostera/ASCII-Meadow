@@ -416,6 +416,29 @@ function edCheckDraft() {
   ED.draftData = d;
 }
 function edStatus(text) { ED.ui.status.textContent = text; }
+// Pure, isolated skeleton preview: no NPC spawn, map writes, rig canvas or game RNG.
+function edPreviewNpc() {
+  const canvas = ED.ui?.npcCanvas;
+  if (!canvas || canvas.hidden) return;
+  const selected = ED.sel?.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi]?.[1] : null;
+  const type = selected || [...ACTOR_TYPES.keys()][ED.variant.npc];
+  const spec = ACTOR_TYPES.get(type);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!spec) return;
+  const state = ED.previewState || 'idle';
+  const sample = { cls: spec.renderClass, rigMotion: spec.rigMotion, aiState: state,
+    walk: state === 'walk' ? 1 : 0, step: state === 'walk' ? 1.1 : 0, x: 0 };
+  const q = pose(sample);
+  ctx.save(); ctx.translate(canvas.width / 2, 8); ctx.scale(1.55, 1.55);
+  ctx.lineWidth = 3; ctx.strokeStyle = '#b4c8b4'; ctx.fillStyle = '#e0e9db';
+  const joint = (a, b) => { ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); };
+  joint(q.hip, q.neck);
+  for (const leg of q.legs) { joint(q.hip, leg.knee); joint(leg.knee, leg.ankle); }
+  for (const arm of q.arms) { joint(q.sh, arm.elbow); joint(arm.elbow, arm.hand); }
+  ctx.beginPath(); ctx.arc(...q.head, spec.renderClass === 'dwarf' ? 7 : 8, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
 function edSyncUI() {
   if (!ED.ui) return;
   for (const b of ED.ui.root.querySelectorAll('[data-tool]')) b.classList.toggle('on', b.dataset.tool === ED.tool);
@@ -430,6 +453,8 @@ function edSyncUI() {
   } else if (vt) ED.ui.variantOut.textContent = (fe ? fe[1] : ED.variant[vt]) + 1 + ' из ' + edVariants(vt);
   if (ED.ui.npcLibrary) {
     ED.ui.npcLibrary.hidden = ED.tool !== 'npc' && !selectedActor;
+    ED.ui.npcCanvas.hidden = ED.ui.npcLibrary.hidden;
+    ED.ui.npcStates.hidden = ED.ui.npcLibrary.hidden;
     if (!ED.ui.npcLibrary.hidden) {
       const type = selectedActor ? selectedActor[1] : [...ACTOR_TYPES.keys()][ED.variant.npc];
       const spec = ACTOR_TYPES.get(type);
@@ -438,6 +463,7 @@ function edSyncUI() {
         ' · дыхание ×' + spec.rigMotion.idle.breath : 'Нет доступных NPC';
     }
   }
+  edPreviewNpc();
   ED.ui.undo.disabled = !ED.undo.length; ED.ui.redo.disabled = !ED.redo.length;
   ED.ui.zoomPct.firstChild.textContent = Math.round(VZ * 100) + '%'; ED.ui.zoomOut.disabled = VZ <= ED_ZOOMS[0]; ED.ui.zoomIn.disabled = VZ >= ED_ZOOMS[ED_ZOOMS.length - 1];
 }
@@ -463,6 +489,11 @@ function edBuildUI() {
   // Catalog-only preview: inspecting a type never creates an actor or modifies the map.
   const npcLibrary = el('p', 'ed-help'); npcLibrary.setAttribute('aria-label', 'Библиотека NPC');
   npcLibrary.hidden = true; sOb.append(npcLibrary);
+  const npcCanvas = el('canvas', 'ed-mini'); npcCanvas.width = 180; npcCanvas.height = 180;
+  npcCanvas.hidden = true; npcCanvas.setAttribute('aria-label', 'Схема позы NPC'); sOb.append(npcCanvas);
+  const npcStates = el('div', 'ed-grid'); npcStates.hidden = true;
+  for (const state of ['idle', 'walk', 'talk']) npcStates.append(btn(state, '', { preview: state }));
+  sOb.append(npcStates);
   const sMap = el('section', 'ed-sec', '<h3>Карта</h3>'); const mini = el('canvas', 'ed-mini'); mini.width = 216; mini.height = 300;
   const zoomRow = el('div', 'ed-zoom', 'Масштаб'); const zoomOut = btn('−', 'Q', { act: 'zoom-' }), zoomPct = btn('100%', '', { act: 'zoom1' }), zoomIn = btn('+', 'E', { act: 'zoom+' });
   zoomPct.title = 'Вернуть 100% (R)'; zoomRow.append(zoomOut, zoomPct, zoomIn); sMap.append(zoomRow, mini);
@@ -474,12 +505,13 @@ function edBuildUI() {
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
-  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcLibrary, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
+  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcLibrary, npcCanvas, npcStates, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
   ED.mini = mini;
 
   open.addEventListener('click', () => { open.blur(); openEditor(); });
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return; b.blur();
+    if (b.dataset.preview) { ED.previewState = b.dataset.preview; edSyncUI(); return; }
     if (b.dataset.tool) { ED.tool = b.dataset.tool; if (!edIsBrush(ED.tool) && ED.tool !== 'select') ED.sel = null; edSyncUI(); return; }
     const a = b.dataset.act;
     if (a === 'close') closeEditor();
