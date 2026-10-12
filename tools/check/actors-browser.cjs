@@ -65,7 +65,17 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           const mainRig = [rig.width, rig.height];
           const baseline = fingerprint();
           edPreviewNpc();
-          const repeatable = baseline === fingerprint();
+          const second = fingerprint();
+          edPreviewNpc();
+          const third = fingerprint();
+          const repeatable = baseline === second && second === third;
+          const hashesRepeated = [baseline, second, third];
+          const spec = ACTOR_TYPES.get('villager');
+          const sample = { cls: spec.renderClass, rigMotion: spec.rigMotion, aiState: 'idle',
+            walk: 0, step: 0, x: 0 };
+          const rawA = npcRigPreviewImage(sample).data, rawB = npcRigPreviewImage(sample).data;
+          let rawDiff = 0;
+          for (let i = 0; i < rawA.length; i++) if (rawA[i] !== rawB[i]) rawDiff++;
           const variants = [baseline];
           ED.previewState = 'walk'; edSyncUI();
           ED.ui.npcPhase.value = '157';
@@ -109,7 +119,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           const manualPause = ED.previewAuto === false && playbackButton.getAttribute('aria-pressed') === 'false';
           return { visible, painted, states, unchanged, sliderVisible, sliderHidden, phaseApplied, accessible,
             repeatable, distinctFrames, isolatedRig, accessibleLabel, catalog, choseHermit, catalogIsReadOnly, manualPause,
-            hashes: variants };
+            hashes: variants, hashesRepeated, rawDiff };
         });
         assert(preview.visible && preview.painted && preview.unchanged);
         assert(preview.repeatable && preview.distinctFrames && preview.isolatedRig && preview.accessibleLabel,
