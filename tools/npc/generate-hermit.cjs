@@ -114,7 +114,7 @@ function buildHermitPng() {
  return new Uint8Array(out);
 }
 const png = buildHermitPng();
-const out = path.resolve(__dirname, '../../assets/npc/hermit-starter.png');
+const out = path.resolve(process.argv[2] || path.join(__dirname, '../../assets/npc/hermit-starter.png')); // optional temporary output for lossless WebP validation
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, png);
 console.log('Generated', out, png.length, 'bytes, 480x1344 indexed PNG');
