@@ -121,6 +121,33 @@ function campFence(ang, stakes, sd) {
     depth: len / 2, H: h + K * .07 };
 }
 
+// Rotate the ACTUAL convex planes, raycast bounding volumes, cloth markings,
+// anchor ropes and ground footprint together. Unlike turning the finished sprite,
+// this exposes the side canvas in perspective and keeps collision/grass aligned.
+function campTurn(model, yaw) {
+  if (!yaw) return model;
+  const c = Math.cos(yaw), sn = Math.sin(yaw);
+  const rot = p => [p[0] * c + p[2] * sn, p[1], -p[0] * sn + p[2] * c];
+  const inv = p => [p[0] * c - p[2] * sn, p[1], p[0] * sn + p[2] * c];
+  const localFoot = model.foot, localGrass = model.grass;
+  for (const shape of model.S) {
+    shape.p = shape.p.map(p => { const n = rot(p); return [n[0], n[1], n[2], p[3]]; });
+    const center = rot(shape.bs); shape.bs = [center[0], center[1], center[2], shape.bs[3]];
+    for (const key of ['door', 'flap', 'seam', 'dag', 'band']) {
+      const fn = shape[key];
+      if (fn) shape[key] = p => fn(inv(p));
+    }
+  }
+  model.ropes = model.ropes.map(([a, b]) => [rot(a), rot(b)]);
+  if (model.posts) model.posts = model.posts.map(rot);
+  model.foot = (x, z) => { const p = inv([x, 0, z]); return localFoot(p[0], p[2]); };
+  if (localGrass) model.grass = (x, z) => { const p = inv([x, 0, z]); return localGrass(p[0], p[2]); };
+  const R = model.R, depth = model.depth || R;
+  model.R = Math.abs(c) * R + Math.abs(sn) * depth;
+  model.depth = Math.abs(sn) * R + Math.abs(c) * depth;
+  model.yaw = yaw;
+  return model;
+}
 // A cooking fire's gear: three poles leaning together over the flames, a chain from where they cross, and a
 // sooty iron pot on it, dark stew inside. Stands over a campfire whose map entry says 'cook'.
 function campCook() {
@@ -254,7 +281,11 @@ function bakeCamp(type, model, sd) {
 }
 // The camp's variants: four tents (two whole, two torn), six stretches of fence (rails at four turns, stakes at two).
 function bakeCampVariants(out) {
-  [['ridge', 101], ['ridge', 104], ['torn', 103], ['torn', 107]].forEach(([k, sd]) => out.push(bakeCamp('tent', campTent(k, sd), sd)));   // whole and torn
+  // First four are the existing map's variants; keep their indices stable,
+  // but bake from oblique world-space camera angles. Four more for new camps.
+  [['ridge', 101, .36], ['ridge', 104, -.48], ['torn', 103, .78], ['torn', 107, -.69],
+   ['ridge', 109, 1.05], ['ridge', 112, -1.03], ['torn', 115, 1.27], ['torn', 119, -.21]]
+    .forEach(([k, sd, yaw]) => out.push(bakeCamp('tent', campTurn(campTent(k, sd), yaw), sd)));
   [[0, 0], [Math.PI / 2, 0], [Math.PI / 4, 0], [-Math.PI / 4, 0], [0, 1], [Math.PI / 2, 1]].forEach(([a, st], k) => out.push(bakeCamp('fence', campFence(a, st, 111 + k), 111 + k)));
   COOKV = bakeCamp('cook', campCook(), 131); out.push(COOKV);
 }
