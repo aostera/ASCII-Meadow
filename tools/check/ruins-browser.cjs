@@ -21,8 +21,13 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
       if(ruins.length!==3) throw Error('All three structures must be built');
       const source=JSON.stringify(MEADOW_MAP);
       const result=ruins.map(r=>{
-        const covered=r.lum.filter(v=>v>=0).length;
-        const glyphs=r.glyph.filter(v=>v>=0).length;
+        const visible=Array.from(r.lum).filter(v=>v>=0);
+        const covered=visible.length, glyphs=r.glyph.filter(v=>v>=0).length;
+        const depths=Array.from(r.dep).filter((_,i)=>r.lum[i]>=0);
+        const tonalRange=Math.max(...visible)-Math.min(...visible);
+        const depthRange=Math.max(...depths)-Math.min(...depths);
+        const [sx,sy]=mapToCell(r.x+r.width/2-7,r.z-r.depth*.32);
+        const footShade=bshade[Math.round(sy)*COLS+Math.round(sx)];
         const threshold=mapToCell(r.x,r.z-r.depth/2-24);
         const end=mapToCell(r.x,r.z+r.depth/2+24);
         const from={x:threshold[0],y:threshold[1],hT:0,jump:.85,cls:'knight'};
@@ -40,6 +45,7 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           return !ruinClearing(fx,fz);
         });
         return {id:r.id,covered,glyphs,doorway,blockedPier,blockedSide,cleared,
+          meshPieces:r.meshPieces,tonalRange,depthRange,footShade,
           cells:r.width*r.height};
       });
       return {result,sourceSame:source===JSON.stringify(MEADOW_MAP),
@@ -49,6 +55,9 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
     assert.equal(report.result.length,3);
     for(const r of report.result){
       assert(r.covered>250&&r.glyphs>150, r.id+' must have substantial ASCII geometry');
+      assert(r.meshPieces>70 && r.depthRange>35 && r.tonalRange>.25,
+        r.id+' must be multi-surface volume, not a depthless façade: '+JSON.stringify(r));
+      assert(r.footShade>.03,r.id+' must cast real contact shadows onto the ground');
       assert(!r.doorway&&r.blockedPier&&r.blockedSide,r.id+' arches must be sole entrances: '+JSON.stringify(r));
       assert(r.cleared,r.id+' corridors must be clear of trees: '+JSON.stringify(r));
     }
