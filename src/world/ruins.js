@@ -238,8 +238,10 @@ function ruinsBlockMove(x, y, actor) {
   const radius = (actor && (actor.cls === 'cow' || actor.isCow) ? 2.5 : 1.1) * CW / WS;
   for (const r of ruins) {
     const border = Math.max(r.width, r.depth) / 2 + 20 + radius;
-    if (Math.max(Math.abs(mx - r.x), Math.abs(mz - r.z),
-      Math.abs(ex - r.x), Math.abs(ez - r.z)) > border * 5) continue;
+    if (Math.min(mx, ex) > r.x + border ||
+      Math.max(mx, ex) < r.x - border ||
+      Math.min(mz, ez) > r.z + border ||
+      Math.max(mz, ez) < r.z - border) continue;
     for (const w of r.walls)
       if (ruinSegmentRect(ex - r.x, ez - r.z, mx - r.x, mz - r.z, w, radius)) return true;
   }

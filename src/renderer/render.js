@@ -14,6 +14,7 @@ function render() {
   else cloudTick = (cloudTick + 1) % 3;
 
   drawCathedral();
+  drawRuins();
   const C = cathedral;
   drawWindows();
   const order = visibleToads(visibleFlora([...ents, ...braziers])).sort((a, b) => a.y - b.y);
@@ -22,6 +23,7 @@ function render() {
   const boxes = [];  // people already drawn: grass in front of them gets a dark backing so it hides their legs
   const cX0 = C.cv ? C.cx0 : 1e9, cY0 = C.cv ? C.cy0 : 1e9, cX1 = C.cv ? C.cx0 + C.BW : -1, cY1 = C.cv ? C.cy0 + C.BH : -1;
   const covered = (cx, cy, baseY) => {
+    if (ruinCellCovered(cx, cy, baseY)) return true;
     if (cx < cX0 || cy < cY0 || cx >= cX1 || cy >= cY1) return false;
     const kx = cx - C.cx0, ky = cy - C.cy0;
     const k = ky * C.BW + kx; return C.lum[k] >= 0 && C.dep[k] > baseY;
@@ -45,12 +47,12 @@ function render() {
       if (e.isFlora) { drawFlora(e); continue; }
       if (e.isToad) { drawToad(e); continue; }
       if (e.isFire) { drawBrazier(e); continue; }
-      drawEntity(e); occlude(e);
+      drawEntity(e); occlude(e); occludeRuins(e);
       const G = geomOf(e); boxes.push([G.left + G.w * 0.18, G.top + G.h * 0.05, G.left + G.w * 0.82, G.gy + 2]);
     }
     const py = y * CH, baseY = py + CH;
     // most rows touch neither the castle nor a person: those skip every occlusion test
-    let slowRow = y + 1 >= cY0 && y - 5 < cY1;
+    let slowRow = y + 1 >= cY0 && y - 5 < cY1 || ruinRowNearby(y);
     for (const bb of boxes) if (py + CH > bb[1] && py - CH * 4 < bb[3]) { slowRow = true; break; }
     const P = slowRow ? put : fastPut, PF2 = slowRow ? putFlat : fastPut;
     for (let x = VX0; x <= VX1; x++) {
@@ -116,7 +118,7 @@ function render() {
       }
     }
   }
-  while (oi < order.length) { const e = order[oi++]; if (e.isFlora) drawFlora(e); else if (e.isToad) drawToad(e); else if (e.isFire) drawBrazier(e); else { drawEntity(e); occlude(e); } }
+  while (oi < order.length) { const e = order[oi++]; if (e.isFlora) drawFlora(e); else if (e.isToad) drawToad(e); else if (e.isFire) drawBrazier(e); else { drawEntity(e); occlude(e); occludeRuins(e); } }
 
   for (const d of dew) {
     const i = d.i, x = i % COLS, y = (i / COLS) | 0;

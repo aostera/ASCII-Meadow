@@ -24,6 +24,7 @@ function fireBlocksMove(x, y, b, e) {
 }
 function blocked(x, y, e) {
   if (x < 1 || y < 1 || x >= COLS - 1 || y >= ROWS - 1) return true;
+  if (ruinsBlockMove(x, y, e)) return true; // only true archways permit crossing ancient masonry
   const h = surfAt(x, y);
   if (tmask && tmask[Math.round(y + 0.2) * COLS + Math.round(x)]) return true;  // tree trunks, tents
   if (fmask && fmask[Math.round(y + 0.2) * COLS + Math.round(x)] && !(e && jumpPx(e) > knightPx() * 0.12)) return true;   // a fence: over it only in a jump
