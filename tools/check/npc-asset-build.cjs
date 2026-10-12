@@ -25,6 +25,10 @@ try {
   assert(fs.existsSync(published), 'Starter NPC asset missing from production site');
   assert.deepEqual(fs.readFileSync(published), fs.readFileSync(shipped),
     'Deployed NPC PNG must match committed artwork byte-for-byte');
+  const shippedHermit = path.join(root, 'assets/npc/hermit-starter.png');
+  const publishedHermit = path.join(temp, 'assets/npc/hermit-starter.png');
+  assert(fs.existsSync(publishedHermit), 'Hermit NPC atlas missing from production build');
+  assert.deepEqual(fs.readFileSync(publishedHermit), fs.readFileSync(shippedHermit));
   assert(!fs.existsSync(path.join(temp, 'assets/knight_idle_all_directions_atlas.png')),
     'Source concept art must not be copied wholesale into dist');
   assert(fs.existsSync(path.join(temp, 'src/data/npc-atlases.js')), 'Atlas startup manifest missing from dist');

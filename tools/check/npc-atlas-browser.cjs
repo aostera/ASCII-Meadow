@@ -33,7 +33,18 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         assert.equal(shipped.src, 'assets/npc/villager-starter.png');
         assert.equal(shipped.rows, 8);
         assert.equal(shipped.frames, 12);
-        assert.deepEqual(shipped.loadedTypes, ['villager']);
+        assert.deepEqual(shipped.loadedTypes, ['villager', 'hermit']);
+        const shippedHermit = await page.evaluate(() => ({
+          status: NPC_ATLASES.get('hermit')?.status,
+          source: NPC_ATLASES.get('hermit')?.source,
+          size: [NPC_ATLASES.get('hermit')?.image.naturalWidth,
+            NPC_ATLASES.get('hermit')?.image.naturalHeight],
+          views: NPC_ATLASES.get('hermit')?.layout.states.walk.rows.length
+        }));
+        assert.equal(shippedHermit.status, 'error', 'file:// hermit must use safe fallback');
+        assert.equal(shippedHermit.source, 'assets/npc/hermit-starter.png');
+        assert.deepEqual(shippedHermit.size, [480, 1344]);
+        assert.equal(shippedHermit.views, 8);
         assert.equal(shipped.map, original);
         await page.evaluate(() => {
           openEditor(); ED.tool = 'npc'; ED.previewAuto = false;
@@ -73,7 +84,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           ED.ui.npcGalleryToggle.click();
           const result = { dirs: ED.ui.npcGallery.querySelectorAll('.ed-gallery-direction').length,
             hasCaveat: ED.ui.npcGallery.textContent.includes('не подменяется поворотами'),
-            procedurallyRendered: !NPC_ATLASES.has('hermit') };
+            procedurallyRendered: NPC_ATLASES.get('hermit')?.status !== 'ready' };
           ED.ui.npcGalleryToggle.click();
           return result;
         });
@@ -247,7 +258,7 @@ const { launch, openGame, realErrors } = require('./common.cjs');
               pressed: button.getAttribute('aria-pressed') });
           }
           const eightVisible = !ED.ui.npcDirections.hidden;
-          ED.variant.npc = 1; edSyncUI(); // hermit has no authored eight-direction PNG
+          ED.variant.npc = 1; edSyncUI(); // file:// hermit PNG is unreadable; fallback is procedural
           const proceduralHidden = ED.ui.npcDirections.hidden;
           return { count: buttons.length, captures, eightVisible, proceduralHidden,
             mapUnchanged: source === mapFileText() };
@@ -453,6 +464,13 @@ const { launch, openGame, realErrors } = require('./common.cjs');
             await page.waitForTimeout(30);
           }
           assert.equal(status, 'ready', 'real committed NPC PNG must be readable over HTTP');
+          let hermitStatus = 'loading';
+          for (let attempt = 0; attempt < 80; attempt++) {
+            hermitStatus = await page.evaluate(() => NPC_ATLASES.get('hermit')?.status || 'loading');
+            if (hermitStatus !== 'loading') break;
+            await step(1); await page.waitForTimeout(30);
+          }
+          assert.equal(hermitStatus, 'ready', 'hermit PNG must load over HTTP too');
           const actual = await page.evaluate(() => {
             const initial = mapFileText();
             const entry = NPC_ATLASES.get('villager');
@@ -462,6 +480,13 @@ const { launch, openGame, realErrors } = require('./common.cjs');
             const pixels = image.data;
             let alpha = 0; for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) alpha++;
             const audit = npcAtlasAudit('villager');
+            const hermit = NPC_ATLASES.get('hermit');
+            const hermitImage = npcAtlasPreviewImage(
+              { actorType: 'hermit', d8: 4, actorAnimTime: 0.2 }, 'idle', Math.PI);
+            const hermitAudit = npcAtlasAudit('hermit');
+            const hermitPixels = hermitImage.data;
+            let hermitVisible = 0;
+            for (let i = 3; i < hermitPixels.length; i += 4) if (hermitPixels[i]) hermitVisible++;
             openEditor(); ED.tool = 'npc'; ED.variant.npc = 0; ED.previewDirection = 7;
             ED.previewState = 'walk'; ED.previewAuto = false; edSyncUI();
             ED.ui.npcGalleryToggle.click();
@@ -469,9 +494,15 @@ const { launch, openGame, realErrors } = require('./common.cjs');
             const [x, z] = toModelXZ(player.x + 12, player.y);
             const spawned = spawnActor('villager',
               { id: 'real-http-villager', world: [x, z], behavior: 'idle' });
+            const spawnedHermit = spawnActor('hermit',
+              { id: 'real-http-hermit', world: [x + 14, z + 7], behavior: 'idle' });
             return { dimensions: [entry.image.naturalWidth, entry.image.naturalHeight],
               frame: frame.frame, y: frame.y, alpha, scanned: audit.inspected,
               errors: audit.errors, directions, spawned: ents.includes(spawned),
+              hermitSize: [hermit.image.naturalWidth, hermit.image.naturalHeight],
+              hermitVisible, hermitFrames: hermitAudit.inspected,
+              hermitErrors: hermitAudit.errors,
+              spawnedHermit: ents.includes(spawnedHermit),
               mapUnchanged: initial === mapFileText() };
           });
           assert.deepEqual(actual.dimensions, [480, 1344]);
@@ -480,15 +511,26 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           assert.equal(actual.scanned, 288);
           assert.equal(actual.errors, 0);
           assert.equal(actual.directions, 8);
-          assert(actual.spawned && actual.mapUnchanged, 'shipped NPC should be runtime-only');
+          assert(actual.spawned && actual.spawnedHermit && actual.mapUnchanged,
+            'both shipped NPCs must be runtime-only and leave the map untouched');
+          assert.deepEqual(actual.hermitSize, [480, 1344]);
+          assert(actual.hermitVisible > 60 && actual.hermitFrames === 288 &&
+            actual.hermitErrors === 0, 'hermit atlas must render readable frames and pass quality audit');
           await step(8);
           await page.screenshot({ path: path.join(gallery, mode + '-shipped-villager-http.png') });
+          await page.evaluate(() => {
+            ED.variant.npc = 1; ED.previewDirection = 4; ED.previewState = 'walk';
+            ED.previewPhase = Math.PI / 2; edSyncUI();
+            ED.ui.npcGalleryToggle.click();
+          });
+          await page.screenshot({ path: path.join(gallery, mode + '-shipped-hermit-http.png') });
           const cleanup = await page.evaluate(() => {
             const was = despawnActor('real-http-villager');
+            const hermit = despawnActor('real-http-hermit');
             closeEditor();
-            return { was, remaining: npcs.length };
+            return { was, hermit, remaining: npcs.length };
           });
-          assert(cleanup.was && cleanup.remaining === 0);
+          assert(cleanup.was && cleanup.hermit && cleanup.remaining === 0);
           assert.deepEqual(realErrors(errs), [], 'HTTP PNG errors: ' + realErrors(errs).join('; '));
           console.log('PASS real shipped villager PNG via HTTP ' + mode +
             ': atlas, 8 views, quality scan, ASCII and world draw');
