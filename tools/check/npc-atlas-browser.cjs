@@ -200,6 +200,20 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         assert(directions.captures.every(v => v.pressed === 'true'));
         assert(new Set(directions.captures.map(v => v.hash)).size >= 3,
           'authored directions must display visually distinct glyph previews');
+        const quality = await page.evaluate(() => {
+          ED.variant.npc = 0; ED.sel = null; ED.tool = 'npc'; edSyncUI();
+          const before = mapFileText();
+          ED.ui.root.querySelector('[data-act="npc-atlas-audit"]').click();
+          const report = npcAtlasAudit('villager');
+          return { before: before === mapFileText(), report,
+            visible: !ED.ui.atlasAuditResult.hidden,
+            text: ED.ui.atlasAuditResult.textContent };
+        });
+        assert(quality.before && quality.visible, 'quality audit must be UI-triggered and map-read-only');
+        assert.equal(quality.report.inspected, 32, 'audit should scan every frame in all 8 directions');
+        assert.equal(quality.report.errors, 0, 'synthetic all-direction PNG must contain no transparent frames');
+        assert(quality.text.includes('32 кадров') && quality.text.includes('0 ошибок'),
+          'quality report must show scanned frames and error count');
         const timeline = await page.evaluate(() => {
           ED.variant.npc = 0; ED.sel = null; ED.tool = 'npc'; ED.previewState = 'idle';
           ED.previewPhase = 0; ED.previewAuto = false; edSyncUI();

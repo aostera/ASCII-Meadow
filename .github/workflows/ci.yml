@@ -34,6 +34,8 @@ jobs:
         run: node tools/check/actors.cjs
       - name: NPC animation atlas validation (frame geometry, rows and source restrictions)
         run: node tools/check/npc-atlas.cjs
+      - name: NPC frame quality rules (transparency, duplicates and silhouette continuity)
+        run: node tools/check/npc-atlas-audit.cjs
       - name: NPC atlas publish path and manifest contract
         run: node tools/check/npc-asset-build.cjs
       - name: Interaction registry (range, actions, NPC talk, stale references)
