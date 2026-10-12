@@ -13,8 +13,8 @@ class FakeImage {
 }
 const context = { document: { createElement: () => new FakeImage() }, ACTOR_TYPES: new Map([['villager', {}]]), Math, Object };
 vm.createContext(context);
-vm.runInContext(script + '\nthis.api = { npcAtlasLayout, npcAtlasAttach, npcAtlasFrame, npcAtlasExportSettings, npcAtlasImportSettings, NPC_ATLASES };', context);
-const { npcAtlasLayout, npcAtlasAttach, npcAtlasFrame, npcAtlasExportSettings, npcAtlasImportSettings, NPC_ATLASES } = context.api;
+vm.runInContext(script + '\nthis.api = { npcAtlasLayout, npcAtlasAttach, npcAtlasFrame, npcAtlasFrameIndex, npcAtlasExportSettings, npcAtlasImportSettings, NPC_ATLASES };', context);
+const { npcAtlasLayout, npcAtlasAttach, npcAtlasFrame, npcAtlasFrameIndex, npcAtlasExportSettings, npcAtlasImportSettings, NPC_ATLASES } = context.api;
 const spec = {
   frameWidth: 32, frameHeight: 32,
   states: {
@@ -50,6 +50,11 @@ assert.equal(walking.x, 96);
 assert.equal(npcAtlasFrame(a, 'idle').y, 0);
 assert.equal(npcAtlasFrame(a, 'talk', Math.PI).frame, 3);
 assert.equal(npcAtlasFrame(a, 'talk', Math.PI).y, 64);
+assert.deepEqual(Array.from({ length: 60 }, (_, frame) =>
+  npcAtlasFrameIndex(60, (frame + 0.5) / 60 * 2 * Math.PI)),
+Array.from({ length: 60 }, (_, frame) => frame), 'all 60 authored frames are seekable');
+assert.equal(npcAtlasFrameIndex(4, Math.PI * 2), 0, 'cycle wraps to first frame');
+assert.equal(npcAtlasFrameIndex(4, -0.01), 3, 'negative phase wraps to last frame');
 const exported = npcAtlasExportSettings('villager');
 assert.deepEqual(Object.keys(JSON.parse(exported)).sort(), ['layout', 'type', 'version']);
 assert(!exported.includes('assets/npc/') && !exported.includes('blob:') && !exported.includes('data:image/'),

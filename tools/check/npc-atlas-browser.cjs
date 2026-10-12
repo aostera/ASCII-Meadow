@@ -200,6 +200,55 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         assert(directions.captures.every(v => v.pressed === 'true'));
         assert(new Set(directions.captures.map(v => v.hash)).size >= 3,
           'authored directions must display visually distinct glyph previews');
+        const timeline = await page.evaluate(() => {
+          ED.variant.npc = 0; ED.sel = null; ED.tool = 'npc'; ED.previewState = 'idle';
+          ED.previewPhase = 0; ED.previewAuto = false; edSyncUI();
+          const source = mapFileText(), slider = ED.ui.npcFrameSlider;
+          const start = { frame: edNpcFrameDetails().frame, label: ED.ui.npcFrameReadout.textContent,
+            max: slider.max, state: ED.previewState };
+          ED.ui.root.querySelector('[data-act="npc-frame-next"]').click();
+          const next = { frame: edNpcFrameDetails().frame, paused: !ED.previewAuto,
+            slide: slider.value, pressed: ED.ui.npcPlay.getAttribute('aria-pressed') };
+          ED.ui.root.querySelector('[data-act="npc-frame-prev"]').click();
+          const previous = edNpcFrameDetails().frame;
+          ED.ui.root.querySelector('[data-act="npc-frame-prev"]').click();
+          const wrapped = edNpcFrameDetails().frame;
+          slider.value = '2'; slider.dispatchEvent(new Event('input', { bubbles: true }));
+          const scrub = { frame: edNpcFrameDetails().frame, paused: !ED.previewAuto,
+            counter: ED.ui.npcFrameReadout.textContent };
+          return { start, next, previous, wrapped, scrub, map: source === mapFileText() };
+        });
+        assert.equal(timeline.start.frame, 0);
+        assert.equal(timeline.start.max, '3');
+        assert(timeline.start.label.includes('Кадр 1 из 4') && timeline.start.label.includes('6 FPS'));
+        assert.deepEqual(timeline.next, { frame: 1, paused: true, slide: '1', pressed: 'false' });
+        assert.equal(timeline.previous, 0);
+        assert.equal(timeline.wrapped, 3);
+        assert.equal(timeline.scrub.frame, 2);
+        assert(timeline.scrub.paused && timeline.scrub.counter.includes('Кадр 3 из 4') && timeline.map);
+        for (const state of ['idle', 'walk', 'talk']) {
+          await page.evaluate(state => {
+            ED.previewState = state; ED.previewPhase = 0; ED.previewClock = 0;
+            ED.previewAuto = true; edSyncUI();
+          }, state);
+          await step(18); // 0.3s at 6 FPS = one frame (even for idle/talk).
+          const played = await page.evaluate(() => ({
+            frame: edNpcFrameDetails().frame, ui: +ED.ui.npcFrameSlider.value,
+            fps: edNpcFrameDetails().row.fps, phase: ED.previewPhase,
+            map: mapFileText()
+          }));
+          assert.equal(played.frame, 1, state + ' must advance at its configured FPS');
+          assert.equal(played.ui, played.frame, state + ' must update the timeline');
+          assert.equal(played.fps, 6);
+          assert.equal(played.map, original);
+        }
+        await page.evaluate(() => {
+          ED.previewAuto = false; ED.previewClock = 0; edSyncUI();
+        });
+        const pausedFrame = await page.evaluate(() => edNpcFrameDetails().frame);
+        await step(25);
+        assert.equal(await page.evaluate(() => edNpcFrameDetails().frame),
+          pausedFrame, 'manual pause must freeze animated PNG on its chosen frame');
         const cleanup = await page.evaluate(() => {
           const removed = despawnActor('test-atlas-npc');
           closeEditor();
