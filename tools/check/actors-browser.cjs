@@ -80,6 +80,13 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           const distinctFrames = new Set(variants).size >= 3;
           const isolatedRig = rig.width === mainRig[0] && rig.height === mainRig[1];
           const accessibleLabel = ED.ui.npcCanvas.getAttribute('aria-label') === 'ASCII-предпросмотр NPC';
+          const catalog = [...ED.ui.npcCatalog.querySelectorAll('[data-npc-type]')].map(b => b.dataset.npcType);
+          const wasSnapshot = JSON.stringify(MEADOW_MAP);
+          ED.ui.npcCatalog.querySelector('[data-npc-type="hermit"]').click();
+          const choseHermit = ED.tool === 'npc' && ED.variant.npc === 1 &&
+            ED.ui.npcCatalog.querySelector('[data-npc-type="hermit"]').getAttribute('aria-pressed') === 'true';
+          const catalogIsReadOnly = wasSnapshot === JSON.stringify(MEADOW_MAP) && npcs.length === 0;
+          ED.ui.npcCatalog.querySelector('[data-npc-type="villager"]').click();
           const states = [];
           for (const state of ['idle', 'walk', 'talk']) {
             ED.previewState = state;
@@ -96,13 +103,40 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           const selectedButton = ED.ui.npcStates.querySelector('[data-preview="idle"]');
           const accessible = selectedButton.getAttribute('aria-pressed') === 'true';
           const unchanged = original === JSON.stringify(MEADOW_MAP) && npcs.length === 0;
-          closeEditor();
-          return { visible, painted, states, unchanged, sliderVisible, sliderHidden, phaseApplied, accessible, repeatable, distinctFrames, isolatedRig, accessibleLabel };
+          const playbackButton = ED.ui.npcPlay;
+          if (ED.previewAuto) playbackButton.click(); // pause regardless of OS reduced motion
+          ED.previewState = 'walk'; ED.previewPhase = 0; edSyncUI();
+          const manualPause = ED.previewAuto === false && playbackButton.getAttribute('aria-pressed') === 'false';
+          return { visible, painted, states, unchanged, sliderVisible, sliderHidden, phaseApplied, accessible,
+            repeatable, distinctFrames, isolatedRig, accessibleLabel, catalog, choseHermit, catalogIsReadOnly, manualPause,
+            hashes: variants };
         });
         assert(preview.visible && preview.painted && preview.unchanged);
-        assert(preview.repeatable && preview.distinctFrames && preview.isolatedRig && preview.accessibleLabel, 'NPC ASCII preview should be distinct, reproducible and isolated');
+        assert(preview.repeatable && preview.distinctFrames && preview.isolatedRig && preview.accessibleLabel,
+          'NPC ASCII preview should be distinct, reproducible and isolated: ' + JSON.stringify(preview));
         assert(preview.sliderVisible && preview.sliderHidden && preview.phaseApplied && preview.accessible);
         assert.deepEqual(preview.states, ['idle', 'walk', 'talk']);
+        assert.deepEqual(preview.catalog, ['villager', 'hermit']);
+        assert(preview.choseHermit && preview.catalogIsReadOnly && preview.manualPause, 'NPC catalog browsing must not edit map');
+        const clock = await page.evaluate(() => {
+          ED.ui.npcPlay.click(); // play
+          return { on: ED.previewAuto, pressed: ED.ui.npcPlay.getAttribute('aria-pressed'),
+            initial: ED.previewPhase, original: JSON.stringify(MEADOW_MAP) };
+        });
+        assert(clock.on && clock.pressed === 'true');
+        await step(24); // preview clock advances exclusively in simulate() / updateEditor()
+        const animated = await page.evaluate(() => {
+          const changed = ED.previewPhase > 0;
+          ED.ui.npcPlay.click(); // pause
+          return { changed, paused: !ED.previewAuto, pressed: ED.ui.npcPlay.getAttribute('aria-pressed'),
+            phase: ED.previewPhase, map: JSON.stringify(MEADOW_MAP) };
+        });
+        assert(animated.changed && animated.paused && animated.pressed === 'false');
+        assert.equal(animated.map, clock.original);
+        await step(12);
+        const stopped = await page.evaluate(() => ED.previewPhase);
+        assert.equal(stopped, animated.phase, 'phase must freeze while paused');
+        await page.evaluate(() => closeEditor());
         await step(3);
         assert.deepEqual(realErrors(errs), [], 'browser console: ' + realErrors(errs).slice(0,3).join('; '));
         console.log('PASS actor catalog ' + mode + ': create, simulate, render, resize and remove');
