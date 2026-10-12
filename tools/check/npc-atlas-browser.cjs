@@ -517,6 +517,15 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           assert(actual.hermitVisible > 60 && actual.hermitFrames === 288 &&
             actual.hermitErrors === 0, 'hermit atlas must render readable frames and pass quality audit');
           await step(8);
+          // Actual gameplay camera size, no editor overlays: compare both distinct sprites
+          // before visually accepting any source art. Screenshot is not a golden assertion.
+          await page.evaluate(() => closeEditor());
+          await step(4);
+          await page.screenshot({ path: path.join(gallery, mode + '-both-npcs-world-scale.png') });
+          await page.evaluate(() => {
+            openEditor(); ED.tool = 'npc'; ED.variant.npc = 0;
+            ED.previewDirection = 0; ED.previewState = 'walk'; ED.previewAuto = false; edSyncUI();
+          });
           await page.screenshot({ path: path.join(gallery, mode + '-shipped-villager-http.png') });
           await page.evaluate(() => {
             ED.variant.npc = 1; ED.previewDirection = 4; ED.previewState = 'walk';
