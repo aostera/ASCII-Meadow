@@ -11,7 +11,7 @@ class FakeImage {
   onerror = null;
   set src(value) { this.source = value; }
 }
-const context = { Image: FakeImage, ACTOR_TYPES: new Map([['villager', {}]]), Math, Object };
+const context = { document: { createElement: () => new FakeImage() }, ACTOR_TYPES: new Map([['villager', {}]]), Math, Object };
 vm.createContext(context);
 vm.runInContext(script + '\nthis.api = { npcAtlasLayout, npcAtlasAttach, npcAtlasFrame, NPC_ATLASES };', context);
 const { npcAtlasLayout, npcAtlasAttach, npcAtlasFrame, NPC_ATLASES } = context.api;

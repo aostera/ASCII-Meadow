@@ -39,7 +39,7 @@ function npcAtlasAttach(type, raw, source) {
     /^blob:https?:\/\//.test(source) || /^blob:null\//.test(source) ||
     /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(source)))
     throw new Error('Invalid NPC atlas PNG source');
-  const image = new Image();
+  const image = document.createElement('img');
   const entry = { layout, image, source, status: 'loading', error: '' };
   NPC_ATLASES.set(type, entry);
   image.onload = () => {

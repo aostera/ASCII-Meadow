@@ -627,7 +627,7 @@ function edBuildUI() {
     if (!/\.png$/i.test(file.name) || file.type && file.type !== 'image/png' ||
         file.size > 16 * 1024 * 1024) { edStatus('Нужен PNG не больше 16 МБ.'); return; }
     const w = +atlasW.value, h = +atlasH.value, source = URL.createObjectURL(file);
-    const probe = new Image();
+    const probe = document.createElement('img');
     probe.onload = () => {
       const columns = probe.naturalWidth / w, rows = probe.naturalHeight / h;
       if (!Number.isInteger(columns) || !Number.isInteger(rows) ||
