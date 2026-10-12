@@ -357,6 +357,55 @@ const { launch, openGame, realErrors } = require('./common.cjs');
         await step(25);
         assert.equal(await page.evaluate(() => edNpcFrameDetails().frame),
           pausedFrame, 'manual pause must freeze animated PNG on its chosen frame');
+        // Create an intentionally defective 8-way atlas to exercise a genuine
+        // report -> exact-frame navigation, not a mocked finding.
+        await page.evaluate(() => {
+          const sheet = document.createElement('canvas'); sheet.width = 128; sheet.height = 256;
+          const ctx = sheet.getContext('2d');
+          for (let d = 0; d < 8; d++) for (let f = 0; f < 4; f++) {
+            if (d === 7 && f === 2) continue; // missing SE walk frame 3
+            ctx.fillStyle = 'rgb(' + (70 + d * 18) + ',' + (70 + f * 18) + ',145)';
+            ctx.fillRect(f * 32 + 5, d * 32 + 4, 20, 24);
+          }
+          npcAtlasAttach('villager', { frameWidth: 32, frameHeight: 32,
+            states: { idle: { frames: 4, fps: 6, rows: [0,1,2,3,4,5,6,7] },
+              walk: { frames: 4, fps: 6, rows: [0,1,2,3,4,5,6,7] } }
+          }, sheet.toDataURL('image/png'));
+        });
+        let defectiveReady = false;
+        for (let k = 0; k < 50; k++) {
+          defectiveReady = await page.evaluate(() => NPC_ATLASES.get('villager')?.status === 'ready');
+          if (defectiveReady) break;
+          await step(1); await page.waitForTimeout(30);
+        }
+        assert(defectiveReady, 'defective test PNG should be loadable for report QA');
+        const inspected = await page.evaluate(() => {
+          ED.variant.npc = 0; ED.sel = null; ED.tool = 'npc'; ED.previewAuto = false;
+          ED.previewState = 'idle'; ED.previewDirection = 0; edSyncUI();
+          const original = mapFileText();
+          ED.ui.root.querySelector('[data-act="npc-atlas-audit"]').click();
+          const issues = ED.auditReport.findings;
+          const target = issues.findIndex(f => f.code === 'blank-frame' &&
+            f.state === 'walk' && f.direction === 'SE' && f.frame === 3);
+          if (target < 0) throw new Error('Missing injected blank frame finding');
+          const action = ED.ui.atlasAuditResult.querySelector('[data-audit-index="' + target + '"]');
+          if (!action) throw new Error('Expected clickable QA finding');
+          action.click();
+          const selected = { state: ED.previewState, direction: ED.previewDirection,
+            frame: edNpcFrameDetails()?.frame, paused: !ED.previewAuto };
+          const report = JSON.parse(edNpcAuditJSON('villager', ED.auditReport));
+          return { selected, report, exported: !!ED.ui.atlasAuditResult.querySelector(
+            '[data-act="npc-audit-json-export"]'), unchanged: original === mapFileText() };
+        });
+        assert.deepEqual(inspected.selected, { state: 'walk', direction: 7, frame: 2, paused: true });
+        assert(inspected.unchanged && inspected.exported);
+        assert.equal(inspected.report.version, 1);
+        assert.equal(inspected.report.type, 'villager');
+        assert(inspected.report.errors >= 2);
+        assert(inspected.report.findings.some(f => f.code === 'blank-frame' &&
+          f.state === 'walk' && f.direction === 'SE' && f.frame === 3));
+        assert(!JSON.stringify(inspected.report).includes('data:image/') &&
+          !JSON.stringify(inspected.report).includes('blob:'));
         const cleanup = await page.evaluate(() => {
           const removed = despawnActor('test-atlas-npc');
           closeEditor();
