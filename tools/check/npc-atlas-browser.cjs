@@ -47,7 +47,16 @@ const { launch, openGame, realErrors } = require('./common.cjs');
           ED.ui.atlasFile.files = transfer.files;
           ED.ui.atlasFile.dispatchEvent(new Event('change', { bubbles: true }));
         });
-        await page.waitForFunction(() => NPC_ATLASES.get('villager')?.status === 'ready');
+        // The harness overrides rAF and setTimeout; advance fake time explicitly
+        // rather than relying on waitForFunction's browser-side polling clock.
+        let status = '';
+        for (let i = 0; i < 60; i++) {
+          status = await page.evaluate(() => NPC_ATLASES.get('villager')?.status || 'loading');
+          if (status !== 'loading') break;
+          await step(1);
+          await page.waitForTimeout(50);
+        }
+        assert.equal(status, 'ready', 'PNG atlas did not load: ' + status);
         const result = await page.evaluate(() => {
           const item = NPC_ATLASES.get('villager');
           const f = npcAtlasFrame({ actorType: 'villager', actorAnimTime: .35, d8: 0 }, 'walk');
