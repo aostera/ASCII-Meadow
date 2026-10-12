@@ -73,7 +73,7 @@ function spawnActor(type, options = {}) {
   if (!Array.isArray(lines) || lines.some(line => typeof line !== 'string')) throw new Error('Invalid actor lines');
   const actor = mk(options.name || def.name, def.renderClass, def.tint.slice(), {
     actorId: id, actorType: type, x, y, tx: x, ty: y,
-    lines: lines.slice(), rigMotion: def.rigMotion, aiState: 'idle', behavior: options.behavior || def.behavior,
+    lines: lines.slice(), rigMotion: def.rigMotion, aiState: 'idle', actorAnimTime: 0, behavior: options.behavior || def.behavior,
     speed: options.speed === undefined ? def.speed : options.speed, talkRadius: def.talkRadius,
     wanderRadius: def.wanderRadius, origin: world.slice(), sayT: 0, sayCd: 0
   });
@@ -108,6 +108,7 @@ function restoreActorWorld(snapshot) {
 
 function updateRegisteredNpc(n, dt) {
   if (!(dt >= 0) || !Number.isFinite(dt)) return;
+  n.actorAnimTime = (n.actorAnimTime || 0) + dt;
   const px = player.x - n.x, py = (player.y - n.y) * (CH / CW), distance = Math.hypot(px, py);
   n.sayCd -= dt; n.sayT -= dt;
   if (n.lines.length && distance < n.talkRadius && n.sayCd <= 0) {

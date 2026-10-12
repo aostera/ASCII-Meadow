@@ -7,7 +7,7 @@ const ED = {
   sel: null, hover: null, drag: null, pan: null, stroke: null, space: false,
   undo: [], redo: [], keys: new Set(), mx: -1, my: -1, inView: false,
   ui: null, mini: null, miniKey: '', draftTimer: 0,
-  previewAuto: true, previewClock: 0, previewPhase: 0, previewState: 'idle',
+  previewAuto: true, previewClock: 0, previewPhase: 0, previewState: 'idle', atlasUrls: {},
 };
 const ED_BRUSHES = [['g', 'Трава', '1'], ['t', 'Высокая трава', '2'], ['s', 'Низкая трава', '3'], ['e', 'Земля', '4'], ['r', 'Камни', '5'], ['f', 'Цветы', '6'], ['p', 'Тропа', '7'], ['w', 'Вода', '9'], ['m', 'Болото', 'P'], ['x', 'Стереть', '8'], ['.', 'Как было', '0']];
 const ED_OBJECTS = [['tree', 'Дерево', 'T'], ['dead', 'Сухое дерево', 'U'], ['bush', 'Куст', 'B'], ['stone', 'Камень', 'Z'], ['cow', 'Корова', 'C'], ['fire', 'Костёр', 'F'], ['start', 'Старт рыцаря', 'K'], ['tent', 'Палатка', 'Y'], ['fence', 'Забор', 'I'], ['toad', 'Жаба', 'G'], ['frog', 'Лягушка', 'X'], ['birds', 'Птицы в траве', 'O'], ['castle', 'Замок', 'L'], ['npc', 'NPC', 'N'], ['select', 'Выбрать и двигать', 'V']];
@@ -445,9 +445,9 @@ function edPreviewNpc() {
   if (!spec) return;
   const state = ED.previewState || 'idle';
   const phase = ED.previewPhase || 0;
-  const sample = { cls: spec.renderClass, rigMotion: spec.rigMotion, aiState: state,
+  const sample = { cls: spec.renderClass, actorType: type, d8: 0, rigMotion: spec.rigMotion, aiState: state,
     walk: state === 'walk' ? 1 : 0, step: state === 'walk' ? phase : 0, x: 0 };
-  const image = npcRigPreviewImage(sample);
+  const image = npcAtlasPreviewImage(sample, state, phase) || npcRigPreviewImage(sample);
   const cols = 30, rows = 27, cw = image.width / cols, ch = image.height / rows;
   ctx.save();
   ctx.fillStyle = '#c4c4c4';
@@ -485,6 +485,7 @@ function edSyncUI() {
     ED.ui.npcLibrary.hidden = ED.tool !== 'npc' && !selectedActor;
     ED.ui.npcCatalog.hidden = ED.ui.npcLibrary.hidden;
     ED.ui.npcPlay.hidden = ED.ui.npcLibrary.hidden;
+    ED.ui.npcAtlasTools.hidden = ED.ui.npcLibrary.hidden;
     ED.ui.npcCanvas.hidden = ED.ui.npcLibrary.hidden;
     ED.ui.npcStates.hidden = ED.ui.npcLibrary.hidden;
     if (!ED.ui.npcLibrary.hidden) {
@@ -492,7 +493,8 @@ function edSyncUI() {
       const spec = ACTOR_TYPES.get(type);
       ED.ui.npcLibrary.textContent = spec ? spec.name + ' · ' + type + ' · ' + spec.renderClass +
         ' · ' + spec.behavior + ' · шаг ×' + spec.rigMotion.walk.stride +
-        ' · дыхание ×' + spec.rigMotion.idle.breath : 'Нет доступных NPC';
+        ' · дыхание ×' + spec.rigMotion.idle.breath +
+        (NPC_ATLASES.has(type) ? ' · PNG: ' + NPC_ATLASES.get(type).status : ' · процедурный риг') : 'Нет доступных NPC';
     }
   }
   const shownType = selectedActor ? selectedActor[1] : [...ACTOR_TYPES.keys()][ED.variant.npc];
@@ -559,6 +561,20 @@ function edBuildUI() {
   sOb.append(npcPlay);
   const npcPhase = el('input'); npcPhase.type = 'range'; npcPhase.min = '0'; npcPhase.max = '628'; npcPhase.value = '0';
   npcPhase.setAttribute('aria-label', 'Фаза шага NPC'); npcPhase.hidden = true; sOb.append(npcPhase);
+  // Local atlas import is explicitly temporary: the map export never embeds binary image data.
+  const npcAtlasTools = el('div', 'ed-atlas-tools');
+  npcAtlasTools.hidden = true;
+  const atlasHint = el('p', 'ed-help', 'PNG: кадры по горизонтали; idle, walk, talk — по строкам. Только текущая вкладка.');
+  const atlasW = el('input'); atlasW.type = 'number'; atlasW.min = '8'; atlasW.max = '1024'; atlasW.value = '64'; atlasW.setAttribute('aria-label', 'Ширина кадра PNG');
+  const atlasH = el('input'); atlasH.type = 'number'; atlasH.min = '8'; atlasH.max = '1024'; atlasH.value = '96'; atlasH.setAttribute('aria-label', 'Высота кадра PNG');
+  const atlasGrid = el('div', 'ed-grid');
+  const atlasLabelW = el('label', '', 'Кадр ширина'); atlasLabelW.append(atlasW);
+  const atlasLabelH = el('label', '', 'Кадр высота'); atlasLabelH.append(atlasH);
+  atlasGrid.append(atlasLabelW, atlasLabelH);
+  const atlasUpload = btn('Выбрать PNG-атлас', '', { act: 'npc-atlas-open' });
+  const atlasFile = el('input'); atlasFile.type = 'file'; atlasFile.accept = '.png,image/png';
+  atlasFile.hidden = true; atlasFile.setAttribute('aria-label', 'PNG-атлас NPC');
+  npcAtlasTools.append(atlasHint, atlasGrid, atlasUpload, atlasFile); sOb.append(npcAtlasTools);
   const sMap = el('section', 'ed-sec', '<h3>Карта</h3>'); const mini = el('canvas', 'ed-mini'); mini.width = 216; mini.height = 300;
   const zoomRow = el('div', 'ed-zoom', 'Масштаб'); const zoomOut = btn('−', 'Q', { act: 'zoom-' }), zoomPct = btn('100%', '', { act: 'zoom1' }), zoomIn = btn('+', 'E', { act: 'zoom+' });
   zoomPct.title = 'Вернуть 100% (R)'; zoomRow.append(zoomOut, zoomPct, zoomIn); sMap.append(zoomRow, mini);
@@ -570,7 +586,7 @@ function edBuildUI() {
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
-  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcPlay, npcPhase, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
+  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcPlay, npcPhase, npcAtlasTools, atlasW, atlasH, atlasFile, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) ED.previewAuto = false;
   ED.mini = mini;
 
@@ -587,6 +603,7 @@ function edBuildUI() {
     const a = b.dataset.act;
     if (a === 'close') closeEditor();
     else if (a === 'preview-play') { ED.previewAuto = !ED.previewAuto; ED.previewClock = 0; }
+    else if (a === 'npc-atlas-open') atlasFile.click();
     else if (a === 'undo') edUndo();
     else if (a === 'redo') edRedo();
     else if (a === 'var-' || a === 'var+') edStepVariant(a === 'var+' ? 1 : -1);
@@ -603,6 +620,47 @@ function edBuildUI() {
     edSyncUI();
   });
   npcPhase.addEventListener('input', () => { ED.previewPhase = +npcPhase.value / 100; ED.previewClock = 0; edPreviewNpc(); });
+  atlasFile.addEventListener('change', () => {
+    const file = atlasFile.files && atlasFile.files[0];
+    atlasFile.value = '';
+    if (!file) return;
+    if (!/\\.png$/i.test(file.name) || file.type && file.type !== 'image/png' ||
+        file.size > 16 * 1024 * 1024) { edStatus('Нужен PNG не больше 16 МБ.'); return; }
+    const w = +atlasW.value, h = +atlasH.value, source = URL.createObjectURL(file);
+    const probe = new Image();
+    probe.onload = () => {
+      const columns = probe.naturalWidth / w, rows = probe.naturalHeight / h;
+      if (!Number.isInteger(columns) || !Number.isInteger(rows) ||
+          columns < 1 || columns > 60 || rows < 1 || rows > 256) {
+        URL.revokeObjectURL(source);
+        edStatus('Проверьте размер кадра: PNG должен делиться на ширину и высоту без остатка (1–60 колонок).'); return;
+      }
+      const type = [...ACTOR_TYPES.keys()][ED.variant.npc];
+      try {
+        const layout = { frameWidth: w, frameHeight: h, states: {
+          idle: { rows: [0], frames: columns, fps: 6 },
+          walk: { rows: [rows > 1 ? 1 : 0], frames: columns, fps: 10 },
+          talk: { rows: [rows > 2 ? 2 : 0], frames: columns, fps: 6 } } };
+        const entry = npcAtlasAttach(type, layout, source);
+        entry.image.addEventListener('load', () => {
+          if (entry.status !== 'ready') {
+            edStatus(entry.error); URL.revokeObjectURL(source); return;
+          }
+          const previous = ED.atlasUrls[type];
+          ED.atlasUrls[type] = source;
+          if (previous && previous !== source) URL.revokeObjectURL(previous);
+          edStatus('PNG-атлас ' + type + ' загружен: ' + columns + ' × ' + rows +
+            ' кадров/строк. Для постоянного использования добавьте PNG в assets/npc/ и подключите npcAtlasAttach().');
+          edSyncUI();
+        });
+        entry.image.addEventListener('error', () => {
+          edStatus(entry.error); URL.revokeObjectURL(source);
+        });
+      } catch (err) { URL.revokeObjectURL(source); edStatus(String(err.message)); }
+    };
+    probe.onerror = () => { URL.revokeObjectURL(source); edStatus('PNG не удалось прочитать.'); };
+    probe.src = source;
+  });
   size.addEventListener('input', () => { ED.size = +size.value; edSyncUI(); });
   trail.addEventListener('change', () => {   // the whole generated trail on or off at once
     const on = trail.checked;   // read it first: edRecord re-syncs the box
