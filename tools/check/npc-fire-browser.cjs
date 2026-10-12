@@ -53,8 +53,8 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
         });
         assert.equal(actual.npcCount, 1);
         assert.equal(actual.map[0], 1); assert.equal(actual.map[1], null);
-        assert(Math.abs(actual.visible / actual.knightHeight - .88) < .001,
-          'Even the FULL NPC frame must be 88% of knight silhouette height');
+        assert(Math.abs(actual.visible / actual.knightHeight - .72) < .001,
+          'Even the FULL NPC frame must be 72% of knight silhouette height');
         assert(Math.abs(actual.sprite.aspect - 40 / 56) < .000001,
           'NPC sprites must preserve original portrait proportions, not stretch to 120x106');
         assert(actual.sprite.width < actual.sprite.height * .75 &&
@@ -63,7 +63,7 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
         assert(actual.sprite.grounded && actual.sprite.hasOcclusionBounds,
           'NPC geometry must match its actual feet and have non-empty depth bounds');
         assert(Math.abs(actual.sprite.bottom - 106) < .000001 &&
-          Math.abs(actual.sprite.height - actual.knightHeight * .88) < .001,
+          Math.abs(actual.sprite.height - actual.knightHeight * .72) < .001,
           'full portrait frame remains below knight height even with tall hats');
         assert(Math.abs(actual.pitch[0] - actual.pitch[1]) < .00001 &&
           Math.abs(actual.pitch[2] - actual.pitch[3]) < .00001,
