@@ -341,10 +341,15 @@ function updateEditor(dt) {
     if (ED.previewClock >= 1 / 12) {
       const elapsed = ED.previewClock;
       ED.previewClock = 0;
-      if (ED.previewState === 'walk') {
+      const info = edNpcFrameDetails();
+      if (info) {
+        // One complete cycle takes frames/fps seconds in every authored animation state.
+        ED.previewPhase = (ED.previewPhase + elapsed * Math.PI * 2 *
+          info.row.fps / info.row.frames) % (Math.PI * 2);
+      } else if (ED.previewState === 'walk') {
         ED.previewPhase = (ED.previewPhase + elapsed * 3.2) % (Math.PI * 2);
-        ED.ui.npcPhase.value = String(Math.round(ED.previewPhase * 100));
       }
+      ED.ui.npcPhase.value = String(Math.round(ED.previewPhase * 100));
       edPreviewNpc();
     }
   }
@@ -433,6 +438,34 @@ function edCheckDraft() {
   ED.draftData = d;
 }
 function edStatus(text) { ED.ui.status.textContent = text; }
+// Frame navigation shares the atlas renderer's phase mapping.  No image/map writes.
+function edNpcFrameDetails() {
+  const selected = ED.sel?.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi]?.[1] : null;
+  const type = selected || [...ACTOR_TYPES.keys()][ED.variant.npc];
+  const atlas = NPC_ATLASES.get(type);
+  if (!atlas || atlas.status !== 'ready') return null;
+  const state = ED.previewState || 'idle';
+  const row = atlas.layout.states[state] || atlas.layout.states.idle;
+  return { row, state, fallback: !atlas.layout.states[state],
+    frame: npcAtlasFrameIndex(row.frames, ED.previewPhase) };
+}
+function edNpcSeekFrame(frame) {
+  const info = edNpcFrameDetails();
+  if (!info) return;
+  const index = ((frame % info.row.frames) + info.row.frames) % info.row.frames;
+  ED.previewPhase = (index + 0.5) / info.row.frames * Math.PI * 2;
+  ED.previewAuto = false; ED.previewClock = 0;
+  edSyncUI();
+}
+function edNpcUpdateFrameControls() {
+  if (!ED.ui) return;
+  const info = edNpcFrameDetails();
+  if (!info || ED.ui.npcAnimationTools.hidden) return;
+  ED.ui.npcFrameSlider.value = String(info.frame);
+  ED.ui.npcFrameReadout.textContent = 'Кадр ' + (info.frame + 1) + ' из ' + info.row.frames +
+    ' · ' + info.row.fps + ' FPS' + (info.fallback ? ' · idle fallback' : '') +
+    ' · ' + (info.row.frames / info.row.fps).toFixed(2) + ' с';
+}
 // Isolated ASCII preview of the actual production procedural rig, rather than a stick figure.
 // A fixed 30x27 glyph grid is intentionally separate from the game renderer and its state.
 function edPreviewNpc() {
@@ -469,6 +502,7 @@ function edPreviewNpc() {
     ctx.fillText(ramp[rank], x * 6, y * 6.5);
   }
   ctx.restore();
+  edNpcUpdateFrameControls();
 }
 function edSyncUI() {
   if (!ED.ui) return;
@@ -522,7 +556,8 @@ function edSyncUI() {
     const current = atlas.layout.states[state] || atlas.layout.states.idle;
     ED.ui.npcFrames.value = String(current.frames);
     ED.ui.npcFps.value = String(current.fps);
-    ED.ui.npcFrames.max = String(atlas.image.naturalWidth / atlas.layout.frameWidth);
+    ED.ui.npcFrames.max = String(Math.min(60, atlas.image.naturalWidth / atlas.layout.frameWidth));
+    ED.ui.npcFrameSlider.max = String(current.frames - 1);
     ED.ui.npcAnimName.textContent = state + (atlas.layout.states[state] ? '' : ' (idle fallback)');
   }
   if (ED.ui.npcStates) for (const b of ED.ui.npcStates.querySelectorAll('[data-preview]')) {
@@ -531,7 +566,7 @@ function edSyncUI() {
     b.setAttribute('aria-pressed', String(active));
   }
   if (ED.ui.npcPhase) {
-    ED.ui.npcPhase.hidden = ED.ui.npcLibrary.hidden || (!loaded && (ED.previewState || 'idle') !== 'walk');
+    ED.ui.npcPhase.hidden = ED.ui.npcLibrary.hidden || loaded || (ED.previewState || 'idle') !== 'walk';
     ED.ui.npcPhase.value = String(Math.round(ED.previewPhase * 100));
   }
   edPreviewNpc();
@@ -600,13 +635,25 @@ function edBuildUI() {
   npcFps.setAttribute('aria-label', 'Частота кадров анимации NPC');
   npcFpsLabel.append(npcFps);
   npcFrameRow.append(npcFramesLabel, npcFpsLabel);
+  const npcTimeline = el('div', 'ed-npc-timeline');
+  const npcFrameReadout = el('output'); npcFrameReadout.setAttribute('aria-live', 'off');
+  const npcFrameControls = el('div', 'ed-npc-frame-controls');
+  const npcFramePrev = btn('‹', '', { act: 'npc-frame-prev' });
+  npcFramePrev.title = 'Предыдущий кадр'; npcFramePrev.setAttribute('aria-label', 'Предыдущий кадр NPC');
+  const npcFrameSlider = el('input'); npcFrameSlider.type = 'range';
+  npcFrameSlider.min = '0'; npcFrameSlider.max = '0'; npcFrameSlider.value = '0';
+  npcFrameSlider.setAttribute('aria-label', 'Кадр анимации NPC');
+  const npcFrameNext = btn('›', '', { act: 'npc-frame-next' });
+  npcFrameNext.title = 'Следующий кадр'; npcFrameNext.setAttribute('aria-label', 'Следующий кадр NPC');
+  npcFrameControls.append(npcFramePrev, npcFrameSlider, npcFrameNext);
+  npcTimeline.append(npcFrameReadout, npcFrameControls);
   const npcSettingsActions = el('div', 'ed-grid');
   npcSettingsActions.append(btn('Экспорт JSON', '', { act: 'npc-json-export' }),
     btn('Импорт JSON', '', { act: 'npc-json-open' }));
   const npcSettingsFile = el('input');
   npcSettingsFile.type = 'file'; npcSettingsFile.accept = '.json,application/json';
   npcSettingsFile.hidden = true;
-  npcAnimationTools.append(npcAnimName, npcFrameRow, npcSettingsActions, npcSettingsFile);
+  npcAnimationTools.append(npcAnimName, npcFrameRow, npcTimeline, npcSettingsActions, npcSettingsFile);
   sOb.append(npcAnimationTools);
   const npcPhase = el('input'); npcPhase.type = 'range'; npcPhase.min = '0'; npcPhase.max = '628'; npcPhase.value = '0';
   npcPhase.setAttribute('aria-label', 'Фаза шага NPC'); npcPhase.hidden = true; sOb.append(npcPhase);
@@ -639,14 +686,14 @@ function edBuildUI() {
   root.append(head, draft, sBr, sFog, sOb, sMap, acts, help, status);
   const open = el('button', 'ed-open', 'Редактор карты <kbd>M</kbd>'); open.type = 'button';
   document.body.append(root, open);
-  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcDirections, npcPlay, npcAnimationTools, npcAnimName, npcFrames, npcFps, npcSettingsFile, npcPhase, npcAtlasTools, atlasW, atlasH, atlasEight, atlasFile, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
+  ED.ui = { root, open, size, sizeOut, variant, variantOut, npcCatalog, npcLibrary, npcCanvas, npcStates, npcDirections, npcPlay, npcAnimationTools, npcAnimName, npcFrames, npcFps, npcFrameSlider, npcFrameReadout, npcSettingsFile, npcPhase, npcAtlasTools, atlasW, atlasH, atlasEight, atlasFile, undo, redo, draft, draftText, status, file, trail, zoomPct, zoomOut, zoomIn };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) ED.previewAuto = false;
   ED.mini = mini;
 
   open.addEventListener('click', () => { open.blur(); openEditor(); });
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return; b.blur();
-    if (b.dataset.preview) { ED.previewState = b.dataset.preview; ED.previewClock = 0; edSyncUI(); return; }
+    if (b.dataset.preview) { ED.previewState = b.dataset.preview; ED.previewPhase = 0; ED.previewClock = 0; edSyncUI(); return; }
     if (b.dataset.npcDir !== undefined) { ED.previewDirection = Number(b.dataset.npcDir); edSyncUI(); return; }
     if (b.dataset.npcType) {
       const types = [...ACTOR_TYPES.keys()];
@@ -657,6 +704,10 @@ function edBuildUI() {
     const a = b.dataset.act;
     if (a === 'close') closeEditor();
     else if (a === 'preview-play') { ED.previewAuto = !ED.previewAuto; ED.previewClock = 0; }
+    else if (a === 'npc-frame-prev' || a === 'npc-frame-next') {
+      const info = edNpcFrameDetails();
+      if (info) edNpcSeekFrame(info.frame + (a === 'npc-frame-next' ? 1 : -1));
+    }
     else if (a === 'npc-atlas-open') atlasFile.click();
     else if (a === 'npc-json-open') npcSettingsFile.click();
     else if (a === 'npc-json-export') {
@@ -706,6 +757,7 @@ function edBuildUI() {
       edStatus(state + ': ' + frames + ' кадров · ' + fps + ' FPS. PNG и карта не изменены.');
     } catch (err) { edSyncUI(); edStatus(String(err.message)); }
   }
+  npcFrameSlider.addEventListener('input', () => edNpcSeekFrame(+npcFrameSlider.value));
   npcFrames.addEventListener('change', edTuneNpcAnimation);
   npcFps.addEventListener('change', edTuneNpcAnimation);
   npcSettingsFile.addEventListener('change', async () => {

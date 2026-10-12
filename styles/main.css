@@ -74,3 +74,10 @@ body.editing .stats { display: none; }
 .ed-animation-tools input[type="number"] { min-width: 0; width: 100%; box-sizing: border-box;
   background: #161616; border: 1px solid var(--line); color: var(--ink); padding: 5px; font: 12px var(--mono); }
 .ed-animation-tools .ed-btn { justify-content: center; }
+
+/* Frame-accurate NPC scrubber: 1–60 authored frames, responsive in the existing editor. */
+.ed-npc-timeline { display: grid; gap: 6px; margin: 5px 0; }
+.ed-npc-timeline output { min-width: 0; text-align: left; font: 500 11px/1.3 var(--mono); }
+.ed-npc-frame-controls { display: grid; grid-template-columns: 30px minmax(0,1fr) 30px; align-items: center; gap: 6px; }
+.ed-npc-frame-controls input[type="range"] { width: 100%; min-width: 0; accent-color: #c9a45c; }
+.ed-npc-frame-controls .ed-btn { min-height: 28px; justify-content: center; padding: 4px; font-size: 16px; }

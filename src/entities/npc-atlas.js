@@ -59,6 +59,11 @@ function npcAtlasAttach(type, raw, source) {
   image.src = source;
   return entry;
 }
+// Normalized phase (0–2π) has a single, stable frame mapping for both editor and renderer.
+function npcAtlasFrameIndex(count, phase) {
+  return Math.floor((((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) /
+    (Math.PI * 2) * count) % count;
+}
 function npcAtlasFrame(actor, state, phase) {
   const item = NPC_ATLASES.get(actor.actorType);
   if (!item || item.status !== 'ready') return null;
@@ -69,8 +74,7 @@ function npcAtlasFrame(actor, state, phase) {
   // phase: editor's explicit 0..2π scrubber. Runtime: elapsed seconds.
   const frame = phase === undefined
     ? Math.floor(Math.max(0, actor.actorAnimTime || 0) * row.fps) % row.frames
-    : Math.floor((((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) /
-        (Math.PI * 2) * row.frames) % row.frames;
+    : npcAtlasFrameIndex(row.frames, phase);
   return { image, x: frame * layout.frameWidth, y: row.rows[direction] * layout.frameHeight,
     width: layout.frameWidth, height: layout.frameHeight, frame, direction };
 }
