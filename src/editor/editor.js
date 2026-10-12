@@ -626,6 +626,8 @@ function edBuildUI() {
     if (!file) return;
     if (!/\.png$/i.test(file.name) || file.type && file.type !== 'image/png' ||
         file.size > 16 * 1024 * 1024) { edStatus('Нужен PNG не больше 16 МБ.'); return; }
+    const chosen = ED.sel?.kind === 'actors' ? MEADOW_MAP.actors?.[ED.sel.mi]?.[1] : null;
+    const type = chosen || [...ACTOR_TYPES.keys()][ED.variant.npc];
     const w = +atlasW.value, h = +atlasH.value, source = URL.createObjectURL(file);
     const probe = document.createElement('img');
     probe.onload = () => {
@@ -635,7 +637,6 @@ function edBuildUI() {
         URL.revokeObjectURL(source);
         edStatus('Проверьте размер кадра: PNG должен делиться на ширину и высоту без остатка (1–60 колонок).'); return;
       }
-      const type = [...ACTOR_TYPES.keys()][ED.variant.npc];
       try {
         const layout = { frameWidth: w, frameHeight: h, states: {
           idle: { rows: [0], frames: columns, fps: 6 },
