@@ -34,6 +34,8 @@ jobs:
         run: node tools/check/actors.cjs
       - name: Solid fire and brazier collision contract for all movers
         run: node tools/check/fire-collision.cjs
+      - name: Three gothic ruins collision geometry and arch-only passages
+        run: node tools/check/ruins.cjs
       - name: NPC animation atlas validation (frame geometry, rows and source restrictions)
         run: node tools/check/npc-atlas.cjs
       - name: Verify shipped 8-view NPC art, 288 frames and deterministic source
@@ -89,6 +91,15 @@ jobs:
         run: node tools/check/actors-browser.cjs
       - name: NPC vs knight size and fire blocking on desktop/phone
         run: node tools/check/npc-fire-browser.cjs
+      - name: Three raycast ASCII ruins and passable arches in both renderers
+        run: node tools/check/ruins-browser.cjs
+      - name: Upload gothic ruins reference screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gothic-ruins-gallery
+          path: shots/ruins/
+          if-no-files-found: warn
       - name: NPC PNG atlas upload, live preview and draw in WebGL2/Canvas 2D
         run: node tools/check/npc-atlas-browser.cjs
       - name: NPC editor visual gallery (both renderers)

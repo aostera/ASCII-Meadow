@@ -38,7 +38,7 @@ function ruinDetail(site) {
   const { width: w, depth: d, height: h, arch: a, archHeight: ah } = site;
   const th = 14;
   ruinPortalWall(w, -d / 2 + th / 2, th, h * .7, a, ah);
-  ruinPortalWall(w,  d / 2 - th / 2, th, h * .54, a, ah);
+  ruinPortalWall(w,  d / 2 - th / 2, th, Math.max(h * .54, ah + 14), a, ah);
   ruinSideWalls(w, d, h * .39, th);
   if (site.type === 'gate') {
     // Asymmetrically shattered gatehouse: a high left tower, a shorter right
