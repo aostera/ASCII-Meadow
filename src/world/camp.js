@@ -188,8 +188,15 @@ function bakeCampGround(type, model) {
     const x = dx * CW, z = -dy * CH / SINP;
     // Contact is nonzero only under the true model footprint, not a huge oval.
     const contact = foot(x, z) ? (type === 'fence' ? .31 : .28) : 0;
-    const hit = campHit(S, [x, .35, z], LGT);
-    const cast = hit ? (type === 'fence' ? .24 : .33) : 0;
+    // A ray from each sub-cell sample back towards the light produces a
+    // footprint aligned with the actual rotated solids. Subsampling softens
+    // the very hard one-cell shadow left by the previous binary test.
+    const delta = CW * .33, depthDelta = CH * .33 / SINP;
+    let hits = 0;
+    for (const [ox, oz] of [[0, 0], [-delta, -depthDelta], [delta, depthDelta]]) {
+      if (campHit(S, [x + ox, .35, z + oz], LGT)) hits++;
+    }
+    const cast = (hits / 3) * (type === 'fence' ? .36 : .44);
     const strength = Math.max(contact, cast);
     if (strength > 0) gshadow.push(dx, dy, Math.round(strength * 100));
     if (grass) {
@@ -273,7 +280,10 @@ function bakeCamp(type, model, sd) {
   let minY = 0; for (let k = 1; k < list.length; k += 4) minY = Math.min(minY, list[k]);
   // Geometry still blocks movement exactly as before. Only wood posts suppress
   // grass completely; the fence's rails allow shorter grass under them.
-  const hide = type === 'fence' ? ground.postHide : Int16Array.from(block);
+  // Collision is separate from terrain occlusion. Clearing every tent cell
+  // made a rectangular dead patch around its footprint; the softer grounding
+  // field shortens/parts blades while allowing grass at the canvas hem.
+  const hide = type === 'fence' ? ground.postHide : new Int16Array(0);
   return { type, list: Int32Array.from(list), runs: Int16Array.from(runs),
     shade: type === 'cook' ? Int16Array.from(shade) : new Int16Array(0),
     hide, block: Int16Array.from(block),
