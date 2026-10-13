@@ -38,3 +38,11 @@ Needs internet for pinned Three.js 0.186.1 module CDN. Existing src/data/map.js 
 - Claude: model/asset pipeline (glTF gothic architecture, animation and rigs) on a child branch.
 - GPT: scene adapter, grass contact / depth integration, performance regression and Safari QA.
 - Split experiments/three/app.js into small modules before simultaneous editing, to avoid conflicts.
+
+
+## Expanded graphical experiment, 2026-10-13
+- `gothic.js`: batched detailed solid masonry, pointed **open** arches, buttresses and ruins. Not final glTF fidelity.
+- `knight-rig.js`: animated procedural gothic knight (WASD, Shift, Space), separate arm/leg joints and damped cape. Not original authored knight frames.
+- `ground-contacts.js`: deterministic geometry footprints, skip planted GPU blades under solid stone and tents; bend near posts; character pushes GPU grass. Approximate, not finished gameplay physics.
+- Browser smoke checks model mesh counts, idle/walk/run, contacts and read-only map.
+- Pending: exact asset conversion/LOD, game/editor parity, on-device Safari QA and fair performance comparisons.
