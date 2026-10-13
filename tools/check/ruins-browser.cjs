@@ -47,8 +47,12 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           const [fx,fz]=toModelXZ(item.x,item.y);
           return !ruinClearing(fx,fz);
         });
+        const {skyline, towerLancet} = r.architecture;
+        const skylineRange = Math.max(...skyline) - Math.min(...skyline);
+        const skylineTiers = new Set(skyline.map(v => Math.round(v / 12))).size;
         return {id:r.id,covered,glyphs,doorway,blockedPier,blockedSide,cleared,
           meshPieces:r.meshPieces,tonalRange,depthRange,footShade,
+          skylineRange,skylineTiers,towerLancet,modelHeight:r.height,
           cells:r.width*r.height};
       });
       return {result,sourceSame:source===JSON.stringify(MEADOW_MAP),
@@ -60,6 +64,11 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
       assert(r.covered>250&&r.glyphs>150, r.id+' must have substantial ASCII geometry');
       assert(r.meshPieces>70 && r.depthRange>35 && r.tonalRange>.25,
         r.id+' must be multi-surface volume, not a depthless façade: '+JSON.stringify(r));
+      assert(r.meshPieces<420, r.id+' must keep raycast geometry reasonably bounded on phones');
+      assert(r.skylineRange>r.modelHeight*.20 && r.skylineTiers>=4,
+        r.id+' requires real multilevel broken wall silhouette: '+JSON.stringify(r));
+      if(r.id==='broken-gate') assert.equal(r.towerLancet,true,
+        'gate tower must have a real open lancet bounded by physical stone piers');
       assert(r.footShade>.03,r.id+' must cast real contact shadows onto the ground');
       assert(!r.doorway&&r.blockedPier&&r.blockedSide,r.id+' arches must be sole entrances: '+JSON.stringify(r));
       assert(r.cleared,r.id+' corridors must be clear of trees: '+JSON.stringify(r));
