@@ -130,6 +130,8 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
+      - name: Profile p50/p95 CPU frame budget on desktop, tablet, phone and fallback
+        run: npm run bench:render
       - name: Exactly one resident in camp (idle, resize and E interaction, both renderers)
         run: node tools/check/camp-resident-browser.cjs
       - name: Actor catalog in WebGL2 and Canvas 2D (create, render, resize, remove)
