@@ -52,6 +52,25 @@ badV2(v => { v.actors[0][2] = 'offmap'; }, /invalid coordinates/);
 badV2(v => { v.actors[0][1] = '../secret'; }, /invalid type/);
 badV2(v => { v.actors[0] = ['npc-1', 'villager']; }, /expected \[id, type, x, z\]/);
 invalid(m => { m.actors = []; }, /v1 map cannot contain actors/);
+const gothic = { ...base, ruins: [
+  ['broken-gate', 'gate', -735, -1120, .38],
+  ['abbey-front', 'abbey', 630, -985, -.34],
+  ['cloister-walk', 'cloister', 185, -1605, .43]
+] };
+assert.deepEqual(parseExport(source(gothic)), gothic); cases++;
+const badRuin = (mutator, pattern) => {
+  const sample = JSON.parse(JSON.stringify(gothic));
+  mutator(sample);
+  assert.throws(() => parseExport(source(sample)), pattern);
+  cases++;
+};
+badRuin(m => { m.ruins[0][1] = 'other'; }, /unknown ruin type/);
+badRuin(m => { m.ruins[1][0] = 'broken-gate'; }, /duplicate ruin id/);
+badRuin(m => { m.ruins[1][4] = null; }, /invalid ruin coordinates/);
+badRuin(m => { m.ruins[0].pop(); }, /expected \[id, type, x, z, yaw\]/);
+badRuin(m => { m.ruins[0][0] = '../etc'; }, /invalid ruin id/);
+assert.deepEqual(parseExport(source({ ...gothic, ruins: [] })).ruins, []); cases++;
+assert.equal(parseExport(source({ ...gothic, ruins: null })).ruins, null); cases++;
 
 const installedPath = path.resolve(__dirname, '../../src/data/map.js');
 const installed = fs.readFileSync(installedPath);

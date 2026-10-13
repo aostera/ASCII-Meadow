@@ -102,6 +102,8 @@ jobs:
         run: node tools/check/npc-fire-browser.cjs
       - name: Three raycast ASCII ruins and passable arches in both renderers
         run: node tools/check/ruins-browser.cjs
+      - name: Editable gothic ruins - place, rotate, move, delete, undo and export
+        run: node tools/check/ruins-editor-browser.cjs
       - name: Camp 3D shadows, fence roots and reproducible terrain in both renderers
         run: node tools/check/camp-ground-browser.cjs
       - name: Upload gothic ruins reference screenshots

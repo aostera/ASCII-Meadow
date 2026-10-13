@@ -87,6 +87,19 @@ function parseExport(raw) {
     if (!Array.isArray(e) || e.length !== 4 || typeof e[0] !== 'string' || !Number.isInteger(e[1])) throw new Error(name + ': invalid flora');
     pair(e.slice(2), name);
   });
+  if (Object.hasOwn(map, 'ruins')) {
+    const ids = new Set();
+    maybeArray(map.ruins, 'ruins', (e, name) => {
+      if (!Array.isArray(e) || e.length !== 5) throw new Error(name + ': expected [id, type, x, z, yaw]');
+      const [id, type, x, z, yaw] = e;
+      if (typeof id !== 'string' || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(id))
+        throw new Error(name + ': invalid ruin id');
+      if (ids.has(id)) throw new Error(name + ': duplicate ruin id');
+      if (!['gate', 'abbey', 'cloister'].includes(type)) throw new Error(name + ': unknown ruin type');
+      if (![x, z, yaw].every(Number.isFinite)) throw new Error(name + ': invalid ruin coordinates or yaw');
+      ids.add(id);
+    });
+  }
   checkRleLayer(map.paint, 'paint');
   checkRleLayer(map.fog, 'fog');
   return map;
