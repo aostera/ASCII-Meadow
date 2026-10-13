@@ -362,7 +362,10 @@ function ruinWeatheredStoneDetail(site) {
 // Extra vegetation clearance protects the visible 3D side faces and absorbs
 // pixel->world rounding at authored flora placements. The authored map stays
 // completely unchanged; only nearby rendered plants are filtered.
-const RUIN_FLORA_BUFFER = 72;
+// Keep trunk bases clear of stone, but allow the crowns of trees BEHIND
+// the wall to overlap it visually; the depth-aware masonry pass masks them.
+// The old 72-unit exclusion made buildings float in oversized bald clearings.
+const RUIN_FLORA_BUFFER = 24;
 function ruinClearing(x, z, pad = 0) {
   return ruins.some(r => {
     const [lx, lz] = ruinLocalXZ(r, x, z);
