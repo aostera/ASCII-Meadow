@@ -27,6 +27,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Build revision-stamped production assets
+        run: sh tools/build_site.sh dist
       - name: Verify published HTML, authored map, grass and depth/shadow renderer
         run: node tools/check/production-parity.cjs
 
