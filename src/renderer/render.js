@@ -2,6 +2,49 @@
 // with occlusion, dew, butterflies, gusts, fog, lights, ash, vignette, the prompt; then the batch flush.
 
 // ---------- render ----------
+// Static masonry uses a per-cell world-depth buffer. Sprites are sorted by
+// their grounded feet, but the cathedral/ruins are baked before the sprite
+// batch, so stone that is IN FRONT must be restored over a background tree,
+// tent or fence. Testing against the object's foot (not its tall crown) keeps
+// foreground foliage correctly in front of background buildings.
+function coverFloraWithArchitecture(f) {
+  const v = f.v, sp = GB.spr[v.whole], C = cathedral;
+  if (!sp) return;
+  const bx = Math.round(f.x) * CW, by = f.br * CH;
+  const x0 = Math.max(VX0, Math.floor((bx + sp[6] - 1) / CW));
+  const x1 = Math.min(VX1, Math.ceil((bx + sp[6] + sp[4] + 1) / CW));
+  const y0 = Math.max(VY0, Math.floor((by + sp[7] - 1) / CH));
+  const y1 = Math.min(VY1, Math.ceil((by + sp[7] + sp[5] + 1) / CH));
+  if (x1 < x0 || y1 < y0) return;
+  const castleNear = C.cv && x1 >= C.cx0 && x0 < C.cx0 + C.BW &&
+    y1 >= C.cy0 && y0 < C.cy0 + C.BH;
+  const nearRuins = ruins.filter(r => x1 >= r.x0 && x0 <= r.x1 &&
+    y1 >= r.y0 && y0 <= r.y1);
+  if (!castleNear && !nearRuins.length) return;
+  const feet = by + 1.5;
+  const up = Math.round(flash * 3);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    let best = feet, gl = -1, lv = 0;
+    if (castleNear && x >= C.cx0 && x < C.cx0 + C.BW &&
+      y >= C.cy0 && y < C.cy0 + C.BH) {
+      const i = (y - C.cy0) * C.BW + x - C.cx0;
+      if (C.lum[i] >= 0 && C.dep[i] > best) {
+        best = C.dep[i]; gl = C.glyph[i]; lv = Math.min(BL0 + BLN - 1, C.lev[i] + up);
+      }
+    }
+    for (const r of nearRuins) {
+      if (x < r.x0 || x > r.x1 || y < r.y0 || y > r.y1) continue;
+      const i = (y - r.y0) * r.gridW + x - r.x0;
+      if (r.lum[i] >= 0 && r.dep[i] > best) {
+        best = r.dep[i]; gl = r.glyph[i]; lv = Math.min(BL0 + BLN - 1, r.lev[i] + up);
+      }
+    }
+    if (best <= feet) continue;
+    gput(SOLID_CELL, x * CW, y * CH, 1);
+    if (gl >= 0) blit(gl, lv, x * CW, y * CH);
+  }
+}
+
 let cloudBuf, cloudTick = 0;
 
 function render() {
@@ -44,7 +87,7 @@ function render() {
   for (let y = VY0; y <= VY1 + 4 && y < ROWS; y++) {
     while (oi < order.length && (order[oi].y + 0.7) * CH < (y + 1) * CH) {
       const e = order[oi++];
-      if (e.isFlora) { drawFlora(e); continue; }
+      if (e.isFlora) { drawFlora(e); coverFloraWithArchitecture(e); continue; }
       if (e.isToad) { drawToad(e); continue; }
       if (e.isFire) { drawBrazier(e); continue; }
       drawEntity(e); occlude(e); occludeRuins(e);
@@ -98,7 +141,15 @@ function render() {
         } else if (s > 0.62) PF2(s > 0.9 ? CI['o'] : s > 0.78 ? CI[','] : CI['.'], s > 0.95 ? C_STONE2 : s > 0.85 ? C_STONE : C_DIRT, px, py, x, y, baseY);
         continue;
       }
-      if (kd >= 3) { P(FL[i] > 0.5 ? CI['.'] : (kd === 3 ? CI['*'] : kd === 4 ? CI['o'] : CI['"']), kd === 3 ? C_WHITE : kd === 4 ? C_YEL : C_LAV, px + AN[i] * 1.5, py, x, y, baseY); continue; }
+      if (kd >= 3) {
+        // Flowers share the tents' and fences' physical ground contact;
+        // none should float out through an opaque canvas or stone footing.
+        const contact = CG ? CG[i] : 0;
+        if (contact > .82 || (contact > .38 && s < contact * .65)) continue;
+        P(FL[i] > 0.5 ? CI['.'] : (kd === 3 ? CI['*'] : kd === 4 ? CI['o'] : CI['"']),
+          kd === 3 ? C_WHITE : kd === 4 ? C_YEL : C_LAV, px + AN[i] * 1.5, py, x, y, baseY);
+        continue;
+      }
       // a blade: stem at its cell, then up to three more glyphs climbing and bending further with the wind
       // The grass by a fence is shortened, not erased into a sterile strip.
       // Its posts conceal only their own cells; blades remain at the outer edge.
@@ -121,7 +172,7 @@ function render() {
       }
     }
   }
-  while (oi < order.length) { const e = order[oi++]; if (e.isFlora) drawFlora(e); else if (e.isToad) drawToad(e); else if (e.isFire) drawBrazier(e); else { drawEntity(e); occlude(e); occludeRuins(e); } }
+  while (oi < order.length) { const e = order[oi++]; if (e.isFlora) { drawFlora(e); coverFloraWithArchitecture(e); } else if (e.isToad) drawToad(e); else if (e.isFire) drawBrazier(e); else { drawEntity(e); occlude(e); occludeRuins(e); } }
 
   for (const d of dew) {
     const i = d.i, x = i % COLS, y = (i / COLS) | 0;
