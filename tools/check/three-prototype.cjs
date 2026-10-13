@@ -28,7 +28,9 @@ fs.mkdirSync(out, { recursive: true });
       }));
       if (!(first.stats.authoredFlora > 0 && first.stats.authoredRuins === 1 &&
         first.stats.grassInstances > 1000 && first.stats.gothicMeshCount >= 2 &&
-        first.stats.groundContactShapes > 10 && first.stats.animation === 'idle'))
+        first.stats.groundContactShapes > 10 && first.stats.animation === 'idle' &&
+        first.stats.forestTrees > 10 && first.stats.forestMeshes > 0 &&
+        first.stats.forestMeshes < first.stats.forestTrees * 3))
         throw new Error('Gothic scene, contacts or rig missing: ' + JSON.stringify(first.stats));
       // An actual animation transition, not merely a static 3D character mesh.
       await page.locator('#viewport canvas').click({position:{x:mobile?190:640,y:mobile?650:650}});
