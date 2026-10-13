@@ -108,6 +108,8 @@ jobs:
         run: node tools/check/ruin-shadow-browser.cjs
       - name: Camp 3D shadows, fence roots and reproducible terrain in both renderers
         run: node tools/check/camp-ground-browser.cjs
+      - name: Scenery depth and grass regression
+        run: node tools/check/scenery-depth-browser.cjs
       - name: Upload gothic ruins reference screenshots
         if: always()
         uses: actions/upload-artifact@v4
