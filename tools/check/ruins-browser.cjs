@@ -47,10 +47,42 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           const [fx,fz]=toModelXZ(item.x,item.y);
           return !ruinClearing(fx,fz);
         });
+        // A previously missing local (x - x0) in buildRuins() shifted
+        // masonry into wrong columns. The geometry looked substantial and
+        // existing tests still passed, while trees showed through walls.
+        // Compare the BAKED pixels against fresh 3D rays in their real
+        // authored world positions. Both must agree at every probe point.
+        const offset = solids.length;
+        ruinDetail(r);
+        const mesh = solids.splice(offset);
+        ruinRotateMesh(mesh, r);
+        const samples = { total: 0, expectedStone: 0, actualStone: 0, mismatch: [] };
+        for (let iy = 0; iy <= 16; iy++) for (let ix = 0; ix <= 16; ix++) {
+          const x = r.x0 + Math.floor(ix * (r.gridW - 1) / 16);
+          const y = r.y0 + Math.floor(iy * (r.gridH - 1) / 16);
+          const px = ((x + .5) * CW - r.cx) / WS;
+          const t0 = -((y + .5) * CH - r.cy) / WS;
+          const py = t0 * COSP, pz = t0 * SINP;
+          const d = RUIN_DIR;
+          const hit = !!cast(px - d[0] * 2200, py - d[1] * 2200,
+            pz - d[2] * 2200, d[0], d[1], d[2], 0, mesh);
+          const k = (y - r.y0) * r.gridW + (x - r.x0);
+          const drawn = r.lum[k] >= 0;
+          samples.total++;
+          if (hit) samples.expectedStone++;
+          if (drawn) samples.actualStone++;
+          if (hit !== drawn && samples.mismatch.length < 8)
+            samples.mismatch.push({ x, y, expected: hit, actual: drawn });
+        }
+        const authored = MEADOW_MAP.ruins.find(item => item[0] === r.id);
+        const mapAligned = !!authored && r.x === authored[2] &&
+          r.z === authored[3] && r.yaw === authored[4] &&
+          Math.abs(r.cx - (cathedral.ox + r.x * WS)) < .01 &&
+          Math.abs(r.cy - (cathedral.oy - r.z * SINP * WS)) < .01;
         const {skyline, towerLancet, validSolids} = r.architecture;
         const skylineRange = Math.max(...skyline) - Math.min(...skyline);
         const skylineTiers = new Set(skyline.map(v => Math.round(v / 12))).size;
-        return {id:r.id,covered,glyphs,doorway,blockedPier,blockedSide,cleared,
+        return {id:r.id,covered,glyphs,doorway,blockedPier,blockedSide,cleared, samples,mapAligned,
           meshPieces:r.meshPieces,tonalRange,depthRange,footShade,
           skylineRange,skylineTiers,towerLancet,validSolids,modelHeight:r.height,
           cells:r.width*r.height};
@@ -61,6 +93,11 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
     assert(report.sourceSame&&report.castleOK&&report.actorCount===1);
     assert.equal(report.result.length,3);
     for(const r of report.result){
+      assert(r.mapAligned, r.id + ' is displaced from authored map coordinates');
+      assert(r.samples.expectedStone > 10 && r.samples.actualStone > 10 &&
+        r.samples.mismatch.length === 0,
+        r.id + ' baked raster is shifted relative to its real 3D mesh: ' +
+        JSON.stringify(r.samples));
       assert(r.covered>250&&r.glyphs>150, r.id+' must have substantial ASCII geometry');
       assert(r.meshPieces>70 && r.depthRange>35 && r.tonalRange>.25,
         r.id+' must be multi-surface volume, not a depthless façade: '+JSON.stringify(r));
