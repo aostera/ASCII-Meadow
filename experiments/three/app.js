@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildGothicRuin } from './gothic.js';
 import { createAnimatedKnight } from './knight-rig.js';
 import { GroundContacts } from './ground-contacts.js';
+import { createInstancedForest } from './forest.js';
 
 const map = window.ASCII_MEADOW_MAP;
 if (!map || !Array.isArray(map.flora) || !Array.isArray(map.ruins)) {
@@ -110,25 +111,6 @@ const hash = n => {
   const x = Math.sin(n * 127.1 + 98.9) * 43758.5453;
   return x - Math.floor(x);
 };
-function tree(parent, k, type) {
-  const dead = type === 'dead', bush = type === 'bush';
-  const h = bush ? 2.3 : 8 + hash(k + 5) * 5;
-  const trunk = addMesh(parent, new THREE.CylinderGeometry(bush ? 0.1 : 0.22, bush ? 0.23 : 0.48, h, 5), material.wood, [0, h / 2, 0]);
-  trunk.rotation.z = (hash(k * 9) - 0.5) * 0.12;
-  if (!bush) for (let i = 0; i < 4; i++) {
-    const a = i * 2.3 + hash(k + i);
-    const b = addMesh(parent, new THREE.CylinderGeometry(0.07, 0.19, h * 0.48, 4), material.wood,
-      [Math.cos(a) * 1.2, h * 0.76, Math.sin(a) * 1.2]);
-    b.rotation.z = Math.cos(a) * 0.48;
-    b.rotation.x = Math.sin(a) * 0.48;
-  }
-  if (!dead) for (let i = 0; i < (bush ? 4 : 7); i++) {
-    const a = hash(k * 29 + i * 7) * Math.PI * 2, dist = bush ? 0.55 : 1.7;
-    const r = bush ? 1.1 : 2 + hash(i + k * 3) * 0.9;
-    addMesh(parent, new THREE.IcosahedronGeometry(r, 0), i % 3 === 0 ? material.leaf2 : material.leaf,
-      [Math.cos(a) * dist, bush ? 1.25 : h * 0.8 + hash(i * 3 + k) * 2, Math.sin(a) * dist]);
-  }
-}
 function tent(parent, kind) {
   const torn = kind >= 2, w = 5.5, d = 8.3, h = torn ? 3.2 : 4.6;
   // The actual triangular prism has two open gable triangles and two sloping roof planes.
@@ -252,13 +234,15 @@ function rebuild() {
   const which = LOCATIONS[ui.location.value], [cx, cz] = which.origin;
   const toLocal = (x,z) => [(x-cx)*SCALE, (z-cz)*SCALE];
   let floraCount = 0, ruinCount = 0;
+  const forestInstances=[];
   for (const [type, k, x, z] of map.flora) {
     if (Math.hypot(x-cx,z-cz)>SCENE_RADIUS) continue;
     const group = new THREE.Group(), [xx,zz]=toLocal(x,z);
     group.position.set(xx,0,zz);
     group.rotation.y = hash(k*7+x*.31+z*.19)*.7-.35;
     if (type==='tree'||type==='dead'||type==='bush') {
-      tree(group,Math.round(x+z)+k,type);
+      forestInstances.push({type,k,x:xx,z:zz,yaw:group.rotation.y,
+        scale:.85+.3*hash(Math.round(x+z)+k)});
       if(type!=='bush')groundContacts.circle(xx,zz,.45);
     } else if(type==='tent') {
       tent(group,k);
@@ -295,11 +279,15 @@ function rebuild() {
       const group = new THREE.Group();
       const a=i*2.39996, r=17 + (i%5)*8;
       group.position.set(Math.cos(a)*r,0,Math.sin(a)*r);
-      if(i%4===0)buildGothicRuin({THREE,parent:group,materials:material,type:'gate',seed:i+500});
-      else tree(group,i+800,'tree');
-      world.add(group);
+      if(i%4===0){
+        buildGothicRuin({THREE,parent:group,materials:material,type:'gate',seed:i+500});
+        world.add(group);
+      }else forestInstances.push({type:'tree',k:i+800,
+        x:group.position.x,z:group.position.z,yaw:hash(i*19)*6.28});
     }
   }
+  lastCount.forest=createInstancedForest({THREE,parent:world,
+    materials:material,instances:forestInstances});
   // At camp use the authored player start. Else add an *unsaved* rig demo
   // near the selected ruin, without altering the author's map.
   const [px,pz]=ui.location.value==='camp'?toLocal(map.start[0],map.start[1]):[0,17];
@@ -442,6 +430,8 @@ function frame(now) {
       animation:hero?.userData.animationState.lastMotion||'unavailable',
       gothicMeshCount:world.children.filter(x=>x.userData.modelStats).reduce((n,x)=>n+x.userData.modelStats.meshCount,0),
       groundContactShapes:groundContacts.items.length,
+      forestMeshes:lastCount.forest?.meshes||0,
+      forestTrees:lastCount.forest?.trees||0,
       fpsMedian:p50?1000/p50:0,frameP95ms:p95,submitP95ms:cpu95,
       drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,
       grassInstances:lastCount.grass,authoredFlora:lastCount.flora,
