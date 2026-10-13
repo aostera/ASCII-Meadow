@@ -492,7 +492,7 @@ function drawRuins() {
     const ya = Math.max(r.y0, VY0), yb = Math.min(r.y1, VY1);
     if (xa > xb || ya > yb) continue;
     for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) {
-      const k = (y - r.y0) * r.gridW + x;
+      const k = (y - r.y0) * r.gridW + (x - r.x0);
       if (r.lum[k] < 0) continue;
       const px = x * CW, py = y * CH;
       grect(px - .4, py - .4, CW + .8, CH + .8, .92);
@@ -504,7 +504,7 @@ function drawRuins() {
 function ruinCellCovered(x, y, baseY) {
   for (const r of ruins) {
     if (x < r.x0 || x > r.x1 || y < r.y0 || y > r.y1) continue;
-    const k = (y - r.y0) * r.gridW + x;
+    const k = (y - r.y0) * r.gridW + (x - r.x0);
     if (r.lum[k] >= 0 && r.dep[k] > baseY) return true;
   }
   return false;
@@ -524,7 +524,7 @@ function occludeRuins(e) {
     const y1 = Math.min(r.y1, Math.ceil(e.y + 1 - liftPx(e) / CH));
     if (left > right || y0 > y1) continue;
     for (let y = y0; y <= y1; y++) for (let x = left; x <= right; x++) {
-      const k = (y - r.y0) * r.gridW + x;
+      const k = (y - r.y0) * r.gridW + (x - r.x0);
       if (r.lum[k] < 0 || r.dep[k] <= feet + 1.5) continue;
       gput(SOLID_CELL, x * CW, y * CH, 1);
       if (r.glyph[k] >= 0) blit(r.glyph[k], r.lev[k], x * CW, y * CH);

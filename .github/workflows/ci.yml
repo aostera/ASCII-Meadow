@@ -146,6 +146,8 @@ jobs:
         run: node tools/check/camp-ground-browser.cjs
       - name: Scenery depth and grass regression
         run: node tools/check/scenery-depth-browser.cjs
+      - name: iPad Safari WebGL restore and ruin column-offset regression
+        run: node tools/check/ruin-context-browser.cjs
       - name: Upload gothic ruins reference screenshots
         if: always()
         uses: actions/upload-artifact@v4

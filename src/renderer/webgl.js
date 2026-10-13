@@ -1,11 +1,16 @@
 // WebGL2 back end of the glyph batch: one program and four textures: the glyphs of the frame, the sprite uv
 // table, the atlas and the castle.
 
-const GL = { ok: false };
-(function initGL() {
+// Safari on iPad may evict a WebGL context when Safari is backgrounded.
+// The entire program and all GPU textures must be recreated on restoration,
+// not merely the viewport. CPU-side atlas, glyph buffer and map are preserved.
+const GL = { ok: false, lost: false };
+function initGL() {
   const c = document.getElementById('g');
   const gl = c.getContext('webgl2', { alpha: false, antialias: false, premultipliedAlpha: true });
-  if (!gl) { GL.ctx2 = c.getContext('2d', { alpha: false }); return; }
+  if (!gl) { GL.ok = false; GL.ctx2 = c.getContext('2d', { alpha: false }); return; }
+  if (gl.isContextLost()) { GL.ok = false; GL.lost = true; return; }
+  GL.gl = gl; GL.ctx2 = null;
   const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
   // rows of the glyph and sprite textures: 4096 texels, or 2048 where the GPU allows no wider (the least
   // WebGL2 promises)
@@ -89,5 +94,31 @@ const GL = { ok: false };
     if (castle) { draw(gn, 1, castT, false); if (ext === 2) draw(gn + 1, 1, castT, true); }
     draw(0, gn, atlasT, false);
   };
+  // Re-upload immutable CPU-side textures after a tab resumes. Safari may
+  // discard GPU backing stores even with the original JS world still running.
+  GL.refresh = () => {
+    if (gl.isContextLost()) { GL.ok = false; GL.lost = true; return false; }
+    if (GB.atlasCv) GL.upload();
+    sv = -1; // re-upload UV table on the next frame, even if GB.sv did not change
+    if (W && H && DPR) GL.resize();
+    return true;
+  };
   GL.ok = true;
-})();
+}
+
+initGL();
+const gameCanvas = document.getElementById('g');
+gameCanvas.addEventListener('webglcontextlost', event => {
+  event.preventDefault(); // allow WebKit to emit webglcontextrestored
+  GL.lost = true;
+  GL.ok = false;
+});
+gameCanvas.addEventListener('webglcontextrestored', () => {
+  try {
+    initGL(); // new shaders, VAO and texture handles for the new context
+    if (GL.ok && GL.refresh()) GL.lost = false;
+  } catch (err) {
+    GL.ok = false; GL.lost = true;
+    console.error('WebGL2 context restoration failed:', err);
+  }
+});
