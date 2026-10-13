@@ -53,6 +53,28 @@ jobs:
           name: production-scenes
           path: shots/production/*.png
 
+  production-runtime:
+    name: Live Cloudflare game loads new map and grass (Chromium)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: production-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Verify running game uses authored ruins, camp and revisioned resources
+        run: node tools/check/production-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-game-screenshots
+          path: shots/production/
+
   static:
     name: Syntax, ESLint, resources, bundle
     runs-on: ubuntu-latest
