@@ -467,7 +467,9 @@ function buildRuins() {
         shade *= .46;
       shade *= (.82 + .18 * Math.min(1, hy / Math.max(1, site.height * .36))) *
         (.92 + .17 * vnoise(hx * .031 + hz * .021, hy * .035));
-      const k = (y - y0) * gridW + x;
+      // Bake in the ruin-local raster grid. drawRuins(), depth occlusion and
+      // tree-overlap masking all read the same local (x - x0) column.
+      const k = (y - y0) * gridW + (x - x0);
       lum[k] = Math.max(.02, Math.min(.999, shade));
       dep[k] = cy - hz * SINP * WS;
       const set = FACESETS[shade < .045 ? 4 : hit.kind === 'spire' ? 3 : n[1] > .6 ? 2 : n[2] < -.65 ? 0 : 1];
