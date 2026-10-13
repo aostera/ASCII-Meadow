@@ -142,6 +142,10 @@ function render() {
         continue;
       }
       if (kd >= 3) {
+        // The physical tent body occludes roots below its opaque canvas,
+        // while grass along the near edge and beside the guy ropes survives.
+        // tmask is a real footprint, not a broad rectangular sprite bbox.
+        if (tmask[i] && CG && CG[i] > .74) continue;
         // Flowers share the tents' and fences' physical ground contact;
         // none should float out through an opaque canvas or stone footing.
         const contact = CG ? CG[i] : 0;
@@ -154,15 +158,27 @@ function render() {
       // The grass by a fence is shortened, not erased into a sterile strip.
       // Its posts conceal only their own cells; blades remain at the outer edge.
       const grounding = CG ? CG[i] : 0;
-      const h = HT[i] * (1 - grounding * .52), f = Math.max(FL[i], grounding * .78), a = AN[i], front = FRT[i];
+      // Never show grass coming through the centre of a solid tent. The
+      // footprint has physical collision but does NOT clear the saved terrain:
+      // a tent moved in the editor restores the meadow exactly.
+      if (tmask[i] && grounding > .74) continue;
+      // The previous .78 flatten and .82 segment loss erased the foreground
+      // entirely. Rooted grass stays visible at the front hem and fence base.
+      const h = HT[i] * (1 - grounding * .2),
+        f = Math.max(FL[i], grounding * .22), a = AN[i], front = FRT[i];
       // its light: height, lean, a passing wind front; flattening, cloud and shade take from it, and a body's
       // shadow takes a share, so it shows even on grass lit to the full. Shades below 4 vanish into the ground
-      let l = 0.24 + h * 0.52 + Math.max(0, a) * 0.16 + (front > 0.55 ? (front - 0.55) * 0.55 : 0) - f * 0.38 - cloud * 0.75 - BS[i] + (s - 0.5) * 0.16;
-      l = (l > 0.999 ? 0.999 : l) * (1 - SHD[i]);
+      let l = 0.24 + h * 0.52 + Math.max(0, a) * 0.16 +
+        (front > 0.55 ? (front - 0.55) * 0.55 : 0) - f * 0.38 -
+        cloud * 0.75 - BS[i] * (1 - grounding * .32) + (s - 0.5) * 0.16;
+      // Static 3D cast shadow should darken the blades, not delete all their
+      // glyphs. Reserve a dim charcoal silhouette at a genuine contact rim.
+      if (grounding > .12) l = Math.max(l, .35 + grounding * .09);
+      l = (l > .999 ? .999 : l) * (1 - SHD[i]);
       const lt = l < 0 ? 0 : (l * SH) | 0;
       if (lt > 6) P(stemGlyph(a * 0.65, s, h, f), lt - 3, px + a * 0.8, py, x, y, baseY);
       if (f > 0.4 || h < 0.3) continue;
-      const n = grounding > .28 ? Math.max(1, Math.round(SG[i] * (1 - grounding * .82))) : SG[i];
+      const n = grounding > .28 ? Math.max(1, Math.round(SG[i] * (1 - grounding * .23))) : SG[i];
       for (let k = 1; k <= n && y - k >= 0; k++) {
         const bend = a * (0.6 + k * 0.45);
         const r = (s * 7.31 + k * 0.618) % 1;
