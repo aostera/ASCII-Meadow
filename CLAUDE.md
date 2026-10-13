@@ -18,3 +18,9 @@
 - `tools/build_site.sh` проставляет уникальный revision query для каждого JS/CSS и создаёт `build.json` и `_headers`. Не удалять это без эквивалентной защиты от старой карты в браузерном кеше.
 - Не путать «код внесён», «CI зелёный», «прод отдаёт нужные ресурсы» и «сцена визуально соответствует запросу» — это разные уровни проверки.
 - По окончании каждого значимого пакета обновить `notes/Для Claude.md`, `notes/Хронология.md`, `notes/Техническая архитектура.md`, `notes/Бэклог.md`, `notes/Сессия YYYY-MM-DD.md`: проблема, причина, решение, файлы/функции, проверки, что ещё не подтверждено.
+
+
+## Three.js experiment (2026-10-13)
+- Branch `experiment/threejs-ascii-prototype`, draft PR #37; this does not replace `main` or alter the map. Claude handoff: `experiments/three/CLAUDE_HANDOFF.md`.
+- `gothic.js` real 3D arches/buttresses/batched stone, `knight-rig.js` test idle/walk/run/jump/cape, `ground-contacts.js` approximate grass/structure contacts; all isolated.
+- No claim of full sprite, world or performance parity. Must inspect browser screenshots and test real iPad Safari before merging.
