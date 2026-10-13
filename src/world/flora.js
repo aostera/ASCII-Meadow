@@ -333,6 +333,7 @@ function placeFlora() {
     }
   }
   paintStoneGrassContact();
+  bakeSceneryGrassForces();
   build.flora = flora.length;
 }
 

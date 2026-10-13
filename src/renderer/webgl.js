@@ -23,7 +23,8 @@ function initGL() {
       uniform vec2 u_cam, u_view; uniform int u_base; uniform highp sampler2D u_gly, u_spr;
       out vec2 v_uv; out float v_a;
       void main() {
-        int g = gl_VertexID / 6, c = gl_VertexID - g * 6, k = c == 3 ? 1 : c == 4 ? 3 : c == 5 ? 2 : c;
+        // Instanced quad: four vertices instead of six per glyph.
+         int g = gl_InstanceID, k = gl_VertexID;
         bool hx = (k & 1) == 1, hy = k > 1;
         int i = (g + u_base) * 2;
         vec3 r = texelFetch(u_gly, ivec2(i & ${TW - 1}, i >> ${TS}), 0).xyz, e = texelFetch(u_gly, ivec2((i + 1) & ${TW - 1}, (i + 1) >> ${TS}), 0).xyz;
@@ -70,7 +71,7 @@ function initGL() {
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.blendFunc(gl.ONE, add ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
     gl.uniform1i(U('u_base'), start);
-    gl.drawArrays(gl.TRIANGLES, 0, count * 6);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, count);
   };
   GL.flush = (camx, camy, castle) => {
     gl.clearColor(12 / 255, 12 / 255, 12 / 255, 1); gl.clear(gl.COLOR_BUFFER_BIT);
