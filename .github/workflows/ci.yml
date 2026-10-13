@@ -37,6 +37,8 @@ jobs:
         run: python3 tools/migrate_webp.py --check
       - name: Syntax of every script
         run: node tools/check/syntax.cjs
+      - name: Scene registry contract (safe portals and immutable entries)
+        run: node tools/check/scenes.cjs
       - name: Actor catalog contract (types, IDs, behaviors, state and resize)
         run: node tools/check/actors.cjs
       - name: Solid fire and brazier collision contract for all movers
@@ -96,6 +98,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Exactly one resident in camp (idle, resize and E interaction, both renderers)
         run: node tools/check/camp-resident-browser.cjs
+      - name: Scene registry isolation in WebGL2 and Canvas 2D
+        run: node tools/check/scenes-browser.cjs
       - name: Actor catalog in WebGL2 and Canvas 2D (create, render, resize, remove)
         run: node tools/check/actors-browser.cjs
       - name: NPC vs knight size and fire blocking on desktop/phone
