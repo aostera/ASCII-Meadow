@@ -476,9 +476,11 @@ function buildRuins() {
     }
     ruins.push({ ...site, cx, cy, x0, x1, y0, y1, gridW, gridH,
       lum, dep, glyph, lev, walls: ruinWallRectangles(site),
-      meshPieces: mesh.length, architecture });
+      meshPieces: mesh.length, architecture, shadowMesh: mesh });
   }
+  // Bake from actual masonry and perforated arches; discard temporary solids.
   paintRuinGroundShadows();
+  for (const r of ruins) delete r.shadowMesh;
 }
 function drawRuins() {
   const up = Math.round(flash * 3);
@@ -532,41 +534,44 @@ function occludeRuins(e) {
  // contact shadow at their feet. Baked once on world build / resize.
 function paintRuinGroundShadows() {
   if (!bshade || !bshade.length) return;
+  // Project the actual convex masonry. Broken skylines, missing roof spans
+  // and through-arches no longer cast full-height rectangular shadow decals.
   for (const r of ruins) {
-    const height = r.height * .62;
-    const sx = -LGT[0] / LGT[1] * height;
-    const sz = -LGT[2] / LGT[1] * height;
-    const footprint = [];
-    for (const x of [-r.width / 2 - 20, r.width / 2 + 20])
-      for (const z of [-r.depth / 2 - 20, r.depth / 2 + 20]) {
-        const [wx, wz] = ruinWorldXZ(r, x, z);
-        footprint.push(mapToCell(wx, wz));
-        footprint.push(mapToCell(wx + sx, wz + sz));
-      }
-    const x0 = Math.max(1, Math.floor(Math.min(...footprint.map(p => p[0]))));
-    const x1 = Math.min(COLS - 2, Math.ceil(Math.max(...footprint.map(p => p[0]))));
-    const y0 = Math.max(1, Math.floor(Math.min(...footprint.map(p => p[1]))));
-    const y1 = Math.min(ROWS - 2, Math.ceil(Math.max(...footprint.map(p => p[1]))));
-    const c = Math.cos(r.yaw || 0), sn = Math.sin(r.yaw || 0);
-    const dsx = sx * c - sz * sn, dsz = sx * sn + sz * c;
+    const mesh = r.shadowMesh;
+    if (!mesh || !mesh.length) continue;
+    const dx = -LGT[0] / LGT[1], dz = -LGT[2] / LGT[1];
+    let xMin = Infinity, xMax = -Infinity, zMin = Infinity, zMax = -Infinity;
+    for (const so of mesh) {
+      const b = so.bb, h = Math.max(0, b[3]);
+      xMin = Math.min(xMin, b[0], b[0] + dx * h);
+      xMax = Math.max(xMax, b[1], b[1] + dx * h);
+      zMin = Math.min(zMin, b[4], b[4] + dz * h);
+      zMax = Math.max(zMax, b[5], b[5] + dz * h);
+    }
+    // Transform local, already-rotated bounds to the fixed editor map grid.
+    const [mx0, my0] = mapToCell(r.x + xMin - 16, r.z + zMax + 16);
+    const [mx1, my1] = mapToCell(r.x + xMax + 16, r.z + zMin - 16);
+    const x0 = Math.max(1, Math.floor(Math.min(mx0, mx1)));
+    const x1 = Math.min(COLS - 2, Math.ceil(Math.max(mx0, mx1)));
+    const y0 = Math.max(1, Math.floor(Math.min(my0, my1)));
+    const y1 = Math.min(ROWS - 2, Math.ceil(Math.max(my0, my1)));
+    if (x0 > x1 || y0 > y1) continue;
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-      const [mx, mz] = toModelXZ(x, y);
-      const [px, pz] = ruinLocalXZ(r, mx, mz);
-      let shadow = 0;
-      for (const w of r.walls) for (let step = 0; step <= 4; step++) {
-        const t = step / 4;
-        const wx = px - dsx * t, wz = pz - dsz * t;
-        const dx = Math.max(0, w[0] - wx, wx - w[1]);
-        const dz = Math.max(0, w[2] - wz, wz - w[3]);
-        const dist = Math.hypot(dx, dz);
-        if (dist >= 15) continue;
-        const strength = (step === 0 ? .32 : .37 * (1 - t)) *
-          Math.max(0, 1 - dist / 15);
-        shadow = Math.max(shadow, strength);
+      const [wx, wz] = toModelXZ(x, y);
+      const px = wx - r.x, pz = wz - r.z;
+      const hit = cast(px, .5, pz, LGT[0], LGT[1], LGT[2], .01, mesh);
+      let shade = hit ? .34 : 0;
+      // A narrow contact patch grounds real piers, not the open archway.
+      const [lx, lz] = ruinLocalXZ(r, wx, wz);
+      for (const w of r.walls) {
+        const ax = Math.max(0, w[0] - lx, lx - w[1]);
+        const az = Math.max(0, w[2] - lz, lz - w[3]);
+        const dist = Math.hypot(ax, az);
+        if (dist < 9) shade = Math.max(shade, .29 * (1 - dist / 9));
       }
-      if (shadow > 0) {
+      if (shade > 0) {
         const i = y * COLS + x;
-        bshade[i] = Math.min(.7, bshade[i] + shadow);
+        bshade[i] = Math.min(.7, bshade[i] + shade);
       }
     }
   }
