@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildGothicRuin } from './gothic.js';
 import { createAnimatedKnight } from './knight-rig.js';
+import { GroundContacts } from './ground-contacts.js';
 
 const map = window.ASCII_MEADOW_MAP;
 if (!map || !Array.isArray(map.flora) || !Array.isArray(map.ruins)) {
@@ -81,6 +82,7 @@ base.add(ground);
 const world = new THREE.Group();
 scene.add(world);
 let hero=null;
+const groundContacts=new GroundContacts();
 const keys=new Set();
 let jumpQueued=false;
 const typing=()=>['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName);
@@ -164,6 +166,7 @@ function fence(parent, variant) {
 function cleanWorld() {
   // The rig and instanced meadow belong to this scene, not to the map.
   hero=null;
+  groundContacts.clear();
   const disposed = new Set();
   world.traverse(o => {
     if (o.geometry && !disposed.has(o.geometry)) {
@@ -175,15 +178,24 @@ function cleanWorld() {
 }
 
 const grassMaterial = new THREE.ShaderMaterial({
-  uniforms: { uTime: { value: 0 }, uWind: { value: 1 } },
+  uniforms: {
+    uTime: { value: 0 }, uWind: { value: 1 },
+    uKnight: { value: new THREE.Vector2(9999,9999) }, uKnightActive: { value: 0 }
+  },
   vertexShader: [
     'attribute vec3 aOffset; attribute float aHeight; attribute float aPhase;',
+    'attribute vec2 aPush; uniform vec2 uKnight; uniform float uKnightActive;',
     'uniform float uTime; uniform float uWind; varying float vLight;',
     'void main(){',
     'vec3 p=position; p.y=(p.y+0.5)*aHeight;',
     'p.x*=0.25*aHeight;',
     'float wave=sin(uTime*1.5+aPhase)*0.24+sin(uTime*.47+aPhase*.3)*.14;',
     'p.x+=wave*uWind*p.y*p.y*.55;',
+    'p.xz+=aPush*min(2.,p.y)*.35;',
+    'vec2 away=p.xz-uKnight;',
+    'float d=length(away);',
+    'float reach=1.-smoothstep(.85,3.8,d);',
+    'p.xz+=normalize(away+vec2(.0001))*reach*p.y*.46*uKnightActive;',
     'p+=aOffset;',
     'vLight=.4+.3*max(0.,p.y/aHeight);',
     'gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);',
@@ -210,24 +222,30 @@ function plantGrass() {
   geom.index = plane.index;
   geom.setAttribute('position', plane.getAttribute('position'));
   geom.setAttribute('uv', plane.getAttribute('uv'));
-  const offset = new Float32Array(count * 3), heights = new Float32Array(count), phases = new Float32Array(count);
+  const offset = new Float32Array(count * 3), heights = new Float32Array(count),
+    phases = new Float32Array(count), pushes = new Float32Array(count * 2);
+  let alive=0;
   for (let i = 0; i < count; i++) {
-    offset[i*3] = (hash(i * 13 + 5) - .5) * 118;
-    offset[i*3+1] = 0;
-    offset[i*3+2] = (hash(i * 17 + 9) - .5) * 118;
-    heights[i] = .35 + hash(i * 23 + 7) * 1.5;
-    phases[i] = hash(i * 53 + 11) * 6.283;
+    const x=(hash(i*13+5)-.5)*118,z=(hash(i*17+9)-.5)*118;
+    const at=groundContacts.sample(x,z);
+    if(at.blocked)continue;
+    offset[alive*3]=x;offset[alive*3+1]=0;offset[alive*3+2]=z;
+    heights[alive]=.35+hash(i*23+7)*1.5;
+    phases[alive]=hash(i*53+11)*6.283;
+    pushes[alive*2]=at.pushX;pushes[alive*2+1]=at.pushZ;
+    alive++;
   }
-  geom.setAttribute('aOffset', new THREE.InstancedBufferAttribute(offset, 3));
-  geom.setAttribute('aHeight', new THREE.InstancedBufferAttribute(heights, 1));
-  geom.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phases, 1));
-  geom.instanceCount = count;
+  geom.setAttribute('aOffset', new THREE.InstancedBufferAttribute(offset.subarray(0,alive*3), 3));
+  geom.setAttribute('aHeight', new THREE.InstancedBufferAttribute(heights.subarray(0,alive), 1));
+  geom.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phases.subarray(0,alive), 1));
+  geom.setAttribute('aPush', new THREE.InstancedBufferAttribute(pushes.subarray(0,alive*2), 2));
+  geom.instanceCount = alive;
   plane.dispose();
   grass = new THREE.Mesh(geom, grassMaterial);
   grass.frustumCulled = false;
   grass.renderOrder = 0;
   world.add(grass);
-  lastCount.grass = count;
+  lastCount.grass = alive;
 }
 function rebuild() {
   cleanWorld();
@@ -239,10 +257,23 @@ function rebuild() {
     const group = new THREE.Group(), [xx,zz]=toLocal(x,z);
     group.position.set(xx,0,zz);
     group.rotation.y = hash(k*7+x*.31+z*.19)*.7-.35;
-    if (type==='tree'||type==='dead'||type==='bush') tree(group,Math.round(x+z)+k,type);
-    else if (type==='tent') tent(group,k);
-    else if (type==='fence') fence(group,k);
-    else if (type==='stone') box(group,2.2,.9,1.8,material.shade,0,.4,0);
+    if (type==='tree'||type==='dead'||type==='bush') {
+      tree(group,Math.round(x+z)+k,type);
+      if(type!=='bush')groundContacts.circle(xx,zz,.45);
+    } else if(type==='tent') {
+      tent(group,k);
+      groundContacts.rect(xx,zz,5.2,7.9,group.rotation.y);
+    } else if(type==='fence') {
+      fence(group,k);
+      const n=k>=4?8:5,gap=1.7;
+      for(let i=0;i<n;i++){
+        const ox=(i-(n-1)/2)*gap,cos=Math.cos(group.rotation.y),sin=Math.sin(group.rotation.y);
+        groundContacts.circle(xx+ox*cos,zz-ox*sin,.22);
+      }
+    } else if(type==='stone') {
+      box(group,2.2,.9,1.8,material.shade,0,.4,0);
+      groundContacts.circle(xx,zz,.7);
+    }
     world.add(group);
     floraCount++;
   }
@@ -253,6 +284,7 @@ function rebuild() {
     group.rotation.y = yaw; // exact authored yaw, no rotation correction or auto-regeneration
     buildGothicRuin({THREE,parent:group,materials:material,type,
       seed:Math.abs(Math.round(x*11+z*7))||1});
+    groundContacts.ruin(xx,zz,yaw,group.userData.gothicContact);
     group.userData.mapId=id;
     world.add(group);
     ruinCount++;
@@ -372,14 +404,20 @@ function frame(now) {
     const run=keys.has('ShiftLeft')||keys.has('ShiftRight');
     const speed=run?12:6.3;
     if(length){
-      hero.position.x=Math.max(-30,Math.min(30,hero.position.x+dx/length*speed*secs));
-      hero.position.z=Math.max(-30,Math.min(30,hero.position.z+dz/length*speed*secs));
+      const nx=Math.max(-30,Math.min(30,hero.position.x+dx/length*speed*secs));
+      const nz=Math.max(-30,Math.min(30,hero.position.z+dz/length*speed*secs));
+      if(!groundContacts.sample(nx,hero.position.z).blocked)hero.position.x=nx;
+      if(!groundContacts.sample(hero.position.x,nz).blocked)hero.position.z=nz;
     }
     hero.userData.animate(secs,{speed:length?speed:0,run,
       jump:jumpQueued,heading:length?Math.atan2(dx,dz):undefined},now*.001);
     jumpQueued=false;
   }
   grassMaterial.uniforms.uTime.value=now*.001;
+  if(hero){
+    grassMaterial.uniforms.uKnight.value.set(hero.position.x,hero.position.z);
+    grassMaterial.uniforms.uKnightActive.value=1;
+  }
   grassMaterial.uniforms.uWind.value=ui.wind.checked?1:0;
   renderer.shadowMap.enabled=ui.shadows.checked;
   renderer.info.reset();
@@ -403,6 +441,7 @@ function frame(now) {
     window.__ASCII_THREE_DIAGNOSTICS__={
       animation:hero?.userData.animationState.lastMotion||'unavailable',
       gothicMeshCount:world.children.filter(x=>x.userData.modelStats).reduce((n,x)=>n+x.userData.modelStats.meshCount,0),
+      groundContactShapes:groundContacts.items.length,
       fpsMedian:p50?1000/p50:0,frameP95ms:p95,submitP95ms:cpu95,
       drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,
       grassInstances:lastCount.grass,authoredFlora:lastCount.flora,
