@@ -51,8 +51,24 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
             if (campGround[i] > .1 && kind[i] === 1) grass++;
             if (bshade[i] > .08 && campGround[i] > .1) shadow++;
           }
+          // A tent/fence must deflect a blade as strongly as the knight's
+          // brush, not just tint the terrain. Probe the actual spring input.
+          const px = Math.min(COLS - 3, Math.max(3, VX0 + 8));
+          const py = Math.min(ROWS - 3, Math.max(3, VY0 + 8));
+          const i = py * COLS + px;
+          const offsets = [i, i - 1, i + 1, i - COLS, i + COLS];
+          const before = offsets.map(n => campGround[n]);
+          const oldPush = push[i], oldFlat = flat[i], oldKind = kind[i];
+          campGround[i] = .55; campGround[i - 1] = .92;
+          campGround[i + 1] = .11; campGround[i - COLS] = .55;
+          campGround[i + COLS] = .55;
+          kind[i] = 1; push[i] = 0; flat[i] = 0;
+          applySceneryGrassForces();
+          const bend = push[i], flatten = flat[i];
+          offsets.forEach((n, k) => { campGround[n] = before[k]; });
+          push[i] = oldPush; flat[i] = oldFlat; kind[i] = oldKind;
           return {
-            back, front, grass, shadow,
+            back, front, grass, shadow, bend, flatten,
             tents: tents.map(v => [v.hide.length, v.block.length, v.grounding.length, v.gshadow.length]),
             fences: fences.map(v => [v.hide.length, v.block.length, v.grounding.length, v.gshadow.length])
           };
@@ -65,6 +81,8 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           'fences hide only actual grounded posts');
         assert(result.grass > 5 && result.shadow > 5,
           'camp must leave living grass in partial, grounded shadows');
+        assert(result.bend > 1 && result.flatten > .15,
+          'fence/tent contact must visibly bend and flatten living grass');
         assert.deepEqual(realErrors(errs), [], 'runtime browser errors');
         console.log('PASS '+mode+': depth sorting, solid collision, grass and 3D shadows');
       } finally { await ctx.close(); }
