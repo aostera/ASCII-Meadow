@@ -10,6 +10,7 @@ const SHA = process.env.GITHUB_SHA || 'local';
 const ROOT = path.resolve(__dirname, '../..');
 const FILES = [
   'index.html',
+  'build.json',
   'src/data/map.js',
   'src/renderer/render.js',
   'src/world/grass.js',
@@ -24,7 +25,11 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function check() {
   const mismatches = [];
   for (const file of FILES) {
-    const expected = fs.readFileSync(path.join(ROOT, file));
+    // index.html is version-stamped during the production build;
+    // everything else is copied unchanged (except the generated build.json).
+    const builtFile = path.join(ROOT, 'dist', file);
+    const expected = fs.readFileSync(file === 'index.html' || file === 'build.json'
+      ? builtFile : path.join(ROOT, file));
     const url = ORIGIN + '/' + file + '?rev=' + encodeURIComponent(SHA) + '&check=' + Date.now();
     try {
       const r = await fetch(url, {
