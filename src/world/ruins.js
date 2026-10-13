@@ -92,7 +92,8 @@ function ruinSideWalls(w, d, wallHeight, thickness) {
       // Two offset widths give the broken top a *large* silhouette step.
       // Avoid tiny random points that turn into noisy ASCII at phone sizes.
       const mid = z0 + (z1 - z0) * (.42 + .12 * (variant % 3));
-      const left = crown - wallHeight * (.12 + .07 * (variant % 3));
+      const left = Math.max(wallHeight * .69,
+        crown - wallHeight * (.12 + .07 * (variant % 3)));
       addBox(x - thickness / 2, x + thickness / 2,
         wallHeight * .65, left, z0, mid, 'wall');
       addBox(x - thickness / 2, x + thickness / 2,
