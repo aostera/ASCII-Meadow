@@ -27,8 +27,22 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           window.__noGPU = true;
           for (let i=0; i<18; i++) ms.push(window.__step(1));
           window.__noGPU = false;
+          // Split CPU work into simulation and rendering without the
+          // requestAnimationFrame / GPU clock, to identify next hot spots.
+          const sim = [], renderMs = [];
+          for (let i=0; i<12; i++) {
+            const start = window.__realNow();
+            simulate(1/60);
+            const middle = window.__realNow();
+            render();
+            const end = window.__realNow();
+            sim.push(middle-start); renderMs.push(end-middle);
+          }
+          sim.sort((a,b)=>a-b); renderMs.sort((a,b)=>a-b);
           ms.sort((a,b)=>a-b);
           return {
+            simP50ms:+sim[Math.floor(sim.length*.5)].toFixed(2),
+            renderP50ms:+renderMs[Math.floor(renderMs.length*.5)].toFixed(2),
             p50ms:+ms[Math.floor(ms.length/2)].toFixed(2),
             p95ms:+ms[Math.floor(ms.length*.95)].toFixed(2),
             totalGlyphs:GB.n, activeFlora:flora.length,

@@ -12,6 +12,8 @@ function deterministic(mode) {
   let s = 0x9e3779b9; Math.random = () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   let T = 1000; const raf = [], timers = []; let tid = 1; const realNow = performance.now.bind(performance);
   performance.now = () => T; Date.now = () => 1.7e12 + T;
+  // Only test pages get a reference to a real monotonic timer for CPU profiling.
+  window.__realNow = realNow;
   window.requestAnimationFrame = cb => { raf.push(cb); return raf.length; };
   window.setTimeout = (cb, ms = 0) => { timers.push({ id: tid, at: T + ms, cb }); return tid++; };
   window.clearTimeout = id => { const k = timers.findIndex(t => t.id === id); if (k >= 0) timers.splice(k, 1); };

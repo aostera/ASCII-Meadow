@@ -63,10 +63,14 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           campGround[i + 1] = .11; campGround[i - COLS] = .55;
           campGround[i + COLS] = .55;
           kind[i] = 1; push[i] = 0; flat[i] = 0;
+          // Static forces are now baked when scenery changes. The test
+          // mutates campGround directly, so explicitly rebake its fixture.
+          bakeSceneryGrassForces();
           applySceneryGrassForces();
           const bend = push[i], flatten = flat[i];
           offsets.forEach((n, k) => { campGround[n] = before[k]; });
           push[i] = oldPush; flat[i] = oldFlat; kind[i] = oldKind;
+          bakeSceneryGrassForces(); // restore the original map force cache
           return {
             back, front, grass, shadow, bend, flatten,
             tents: tents.map(v => [v.hide.length, v.block.length, v.grounding.length, v.gshadow.length]),
