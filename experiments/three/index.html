@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0b">
+<title>ASCII Meadow — Three.js renderer experiment</title>
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="viewport" aria-label="Three.js proof of concept: ASCII Meadow gothic world"></div>
+<section id="controls" aria-label="Prototype controls">
+  <div class="heading"><div><span class="eyebrow">EXPERIMENT / NOT PRODUCTION</span><h1>ASCII MEADOW <small>THREE.JS</small></h1></div><a href="../../index.html" title="Open current game">Current game ↗</a></div>
+  <div class="control-row">
+    <label>Локация <select id="location"><option value="cloister">Готическая галерея</option><option value="abbey">Аббатство</option><option value="gate">Разрушенные ворота</option><option value="camp">Лагерь</option></select></label>
+    <label>Детализация <select id="quality"><option value="low">Низкая</option><option value="medium" selected>Средняя</option><option value="high">Высокая</option></select></label>
+  </div>
+  <div class="control-row toggles">
+    <label><input type="checkbox" id="ascii" checked> ASCII</label>
+    <label><input type="checkbox" id="wind" checked> Ветер</label>
+    <label><input type="checkbox" id="shadows" checked> Тени</label>
+    <label><input type="checkbox" id="stress"> + плотность (тест)</label>
+  </div>
+  <output id="stats">Инициализация…</output>
+  <p class="note">Карта и координаты читаются из <code>src/data/map.js</code> без изменений. Поверни камеру мышью или пальцем, приблизь колесом/щипком. «+ плотность» добавляет только временные объекты для стресс-теста.</p>
+</section>
+<div id="error" role="alert" hidden></div>
+<script src="../../src/data/map.js"></script>
+<script>window.ASCII_MEADOW_MAP = MEADOW_MAP;</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
