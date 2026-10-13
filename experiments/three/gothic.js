@@ -15,6 +15,13 @@ export function buildGothicRuin({ THREE, parent, materials: M, type, seed = 1 })
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0));
     transform.compose(new THREE.Vector3(x,y,z), q, new THREE.Vector3(1,1,1));
     geo.applyMatrix4(transform);
+    // BoxGeometry is indexed, ExtrudeGeometry is not. Normalize before
+    // batching: BufferGeometryUtils rejects mixed indexed/non-indexed input.
+    if (geo.index) {
+      const expanded=geo.toNonIndexed();
+      geo.dispose();
+      geo=expanded;
+    }
     const list = batches.get(mat) || [];
     list.push(geo);
     batches.set(mat,list);
