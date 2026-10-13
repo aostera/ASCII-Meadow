@@ -27,7 +27,25 @@ fs.mkdirSync(out, { recursive: true });
         source: JSON.stringify(window.ASCII_MEADOW_MAP)
       }));
       if (!(first.stats.authoredFlora > 0 && first.stats.authoredRuins === 1 &&
-        first.stats.grassInstances > 1000)) throw new Error('Original cloister placement missing: ' + JSON.stringify(first.stats));
+        first.stats.grassInstances > 1000 && first.stats.gothicMeshCount >= 2 &&
+        first.stats.groundContactShapes > 10 && first.stats.animation === 'idle'))
+        throw new Error('Gothic scene, contacts or rig missing: ' + JSON.stringify(first.stats));
+      // An actual animation transition, not merely a static 3D character mesh.
+      await page.locator('#viewport canvas').click({position:{x:mobile?190:640,y:mobile?650:650}});
+      await page.keyboard.down('w');
+      await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__?.animation === 'walk', {timeout:15000});
+      await page.keyboard.down('Shift');
+      await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__?.animation === 'run', {timeout:15000});
+      await page.keyboard.up('Shift');
+      await page.keyboard.up('w');
+      await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__?.animation === 'idle', {timeout:15000});
+      const contactCheck = await page.evaluate(async () => {
+        const {GroundContacts}=await import('/experiments/three/ground-contacts.js');
+        const test=new GroundContacts();
+        test.rect(0,0,3,4,Math.PI/4);
+        return test.sample(0,0).blocked && !test.sample(9,9).blocked;
+      });
+      if(!contactCheck)throw new Error('Rotated ground contacts failed');
       await page.screenshot({ path: path.join(out, mobile ? 'phone.png' : 'desktop.png') });
       await page.locator('#ascii').uncheck();
       await page.locator('#location').selectOption('camp');
