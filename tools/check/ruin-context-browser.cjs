@@ -77,6 +77,10 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
         // A raw pixel check catches the original failure: statistics continued
         // to update while the scene canvas itself was completely black.
         const image = await page.evaluate(() => {
+          // WebGL defaults to preserveDrawingBuffer:false. Read pixels in the
+          // SAME JS task as a freshly drawn frame, otherwise Chromium is
+          // permitted to invalidate the backbuffer between evaluate() calls.
+          window.__step(1);
           const g = document.getElementById('g');
           const scratch = document.createElement('canvas');
           scratch.width=128;scratch.height=96;
