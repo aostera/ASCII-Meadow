@@ -8,6 +8,11 @@
 const MEADOW_MAP = {
   "v": 1, "res": 4,
   "castle": null,
+  "ruins": [
+    ["broken-gate","gate",-735,-1120,0.38],
+    ["abbey-front","abbey",630,-985,-0.34],
+    ["cloister-walk","cloister",185,-1605,0.43]
+  ],
   "start": [-369.4,-1977],
   "fires": [
     [-108,66,120],
