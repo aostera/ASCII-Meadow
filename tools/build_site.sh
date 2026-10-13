@@ -6,6 +6,12 @@ set -eu
 out=${1:?usage: sh tools/build_site.sh <out dir>}
 mkdir -p "$out"
 cp -r index.html styles src "$out"/
+# Experimental Three.js scene is deployed only when present (branch previews).
+# It never replaces the current game's root entry or source map.
+if [ -d experiments/three ]; then
+  mkdir -p "$out/experiments"
+  cp -r experiments/three "$out/experiments/"
+fi
 if [ -d assets/npc ]; then
   mkdir -p "$out/assets"
   cp -r assets/npc "$out/assets/"
