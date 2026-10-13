@@ -277,3 +277,32 @@ jobs:
             echo "::error::frames differ from the base branch (see the visual-diff artifacts). If the change to the picture is intended, add the visual-change label."
             exit 1
           fi
+
+  three-prototype:
+    name: Three.js experiment (real WebGL, authored-map scene, phone viewport)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Module syntax
+        run: node --check experiments/three/app.js && node --check tools/check/three-prototype.cjs
+      - name: Render actual 3D scene and preserve the author map
+        run: |
+          python3 -m http.server 8181 > /tmp/three-http.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8181/experiments/three/ > /dev/null && break; sleep 1; done
+          node tools/check/three-prototype.cjs http://127.0.0.1:8181
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: three-prototype-screenshots
+          path: shots/three/
+          if-no-files-found: warn
