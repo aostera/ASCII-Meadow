@@ -3,6 +3,16 @@
 // Walls have physical ground footprints. The pointed arches are actual empty
 // spaces in the mesh and the ONLY traversable entries/exits.
 const ruins = [];
+// Map entries are [id, type, x, z, yaw]. A missing or null map field keeps
+// the original three ruins; an empty array intentionally removes them all.
+function ruinSites() {
+  if (typeof MEADOW_MAP === 'undefined' || MEADOW_MAP.ruins == null) return RUIN_SITES;
+  return MEADOW_MAP.ruins.map(([id, type, x, z, yaw]) => {
+    const model = RUIN_SITES.find(s => s.type === type);
+    if (!model) throw new Error('Unknown Gothic ruin: ' + type);
+    return { ...model, id, x, z, yaw };
+  });
+}
 const RUIN_DIR = [0, -SINP, COSP];
 
  // The global game camera is fixed; turn each 3D building itself to expose
@@ -354,7 +364,7 @@ function ruinWeatheredStoneDetail(site) {
 // completely unchanged; only nearby rendered plants are filtered.
 const RUIN_FLORA_BUFFER = 72;
 function ruinClearing(x, z, pad = 0) {
-  return RUIN_SITES.some(r => {
+  return ruins.some(r => {
     const [lx, lz] = ruinLocalXZ(r, x, z);
     return Math.abs(lx) < r.width / 2 + 20 + pad &&
       Math.abs(lz) < r.depth / 2 + 26 + pad;
@@ -407,7 +417,7 @@ function ruinArchitectureEvidence(site, mesh) {
 }
 function buildRuins() {
   ruins.length = 0;
-  for (const site of RUIN_SITES) {
+  for (const site of ruinSites()) {
     const before = solids.length;
     ruinDetail(site);              // borrow cathedral mesh builder
     const mesh = solids.splice(before); // isolate it from the castle's mesh/bins
@@ -619,7 +629,7 @@ function registerRuinInspections() {
   };
   const label = { gate: 'inspect the broken gate',
     abbey: 'inspect the old abbey', cloister: 'inspect the gothic cloister' };
-  for (const site of RUIN_SITES) {
+  for (const site of ruins) {
     const spots = [];
     for (const side of [-1, 1]) {
       // The trigger is slightly INSIDE the clear arch footprint, so either
