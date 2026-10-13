@@ -103,8 +103,8 @@ function ruinSideWalls(w, d, wallHeight, thickness) {
 // A genuine open lancet in the ruined gate's tower. Split the 3D stone in
 // three dimensions rather than painting black pixels on a solid box.
 function ruinBrokenTower(x0, x1, z0, z1, height) {
-  const cx = (x0 + x1) / 2, sill = height * .51;
-  const spring = height * .73, peak = height * .84;
+  const cx = x0 + (x1 - x0) * .70, sill = height * .71;
+  const spring = height * .85, peak = height * .94;
   addBox(x0, x1, 0, sill, z0, z1, 'wall', { courses: [sill * .36, sill * .69] });
   const half = 7.5;
   addBox(x0, cx - half, sill, spring, z0, z1, 'wall');
@@ -118,10 +118,10 @@ function ruinBrokenTower(x0, x1, z0, z1, height) {
     addBox(cx + gap, x1, bottom, top, z0, z1, 'wall');
   }
   // The roof is gone: one tall pier, one low broken return, uneven caps.
-  addBox(x0, cx - 2, peak, height * .93, z0, z1, 'wall');
-  addBox(cx + 4, x1, peak, height * .85, z0, z1, 'wall');
-  addBox(x0 - 3, cx - 8, height * .92, height, z0 - 3, z0 + 15, 'wall');
-  addBox(cx + 7, x1 + 2, height * .845, height * .88, z0 + 8, z1, 'wall');
+  addBox(x0, cx - 2, peak, height * .98, z0, z1, 'wall');
+  addBox(cx + 4, x1, peak, height * .965, z0, z1, 'wall');
+  addBox(x0 - 3, cx - 8, height * .97, height * 1.02, z0 - 3, z0 + 15, 'wall');
+  addBox(cx + 7, x1 + 2, height * .965, height * .99, z0 + 8, z1, 'wall');
 }
 function ruinDetail(site) {
   const { width: w, depth: d, height: h, arch: a, archHeight: ah } = site;
