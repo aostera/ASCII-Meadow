@@ -30,6 +30,7 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           // Split CPU work into simulation and rendering without the
           // requestAnimationFrame / GPU clock, to identify next hot spots.
           const sim = [], renderMs = [];
+          window.__profileRender = {setup:0,terrain:0,sprites:0,fog:0,overlay:0,flush:0};
           for (let i=0; i<12; i++) {
             const start = window.__realNow();
             simulate(1/60);
@@ -38,11 +39,15 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
             const end = window.__realNow();
             sim.push(middle-start); renderMs.push(end-middle);
           }
+          const stages = Object.fromEntries(Object.entries(window.__profileRender)
+            .map(([k,v])=>[k,+(v/12).toFixed(2)]));
+          window.__profileRender = null;
           sim.sort((a,b)=>a-b); renderMs.sort((a,b)=>a-b);
           ms.sort((a,b)=>a-b);
           return {
             simP50ms:+sim[Math.floor(sim.length*.5)].toFixed(2),
             renderP50ms:+renderMs[Math.floor(renderMs.length*.5)].toFixed(2),
+            renderStagesMs:stages,
             p50ms:+ms[Math.floor(ms.length/2)].toFixed(2),
             p95ms:+ms[Math.floor(ms.length*.95)].toFixed(2),
             totalGlyphs:GB.n, activeFlora:flora.length,
