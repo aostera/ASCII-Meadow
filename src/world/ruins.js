@@ -382,12 +382,33 @@ function ruinWallRectangles(site) {
   }
   return segments;
 }
+// Inspect the actual non-rotated volumes before they are baked to ASCII.
+// This is not a hardcoded "detail count": top heights are vertical rays and
+// the tower opening is a genuine empty 3D ray between two masonry piers.
+function ruinArchitectureEvidence(site, mesh) {
+  const x = -site.width / 2 + 7, skyline = [];
+  for (let bay = 0; bay < 9; bay++) {
+    const z = -site.depth / 2 + (bay + .65) * site.depth / 9;
+    const ray = cast(x, site.height * 2, z, 0, -1, 0, 0, mesh);
+    skyline.push(ray ? site.height * 2 - ray.t : 0);
+  }
+  let towerLancet = null;
+  if (site.type === 'gate') {
+    const at = -site.width / 2 - 9 + 44 * .70;
+    const y = site.height * .78, z = -site.depth / 2 - 20;
+    const open = cast(at, y, z, 0, 0, 1, 0, mesh);
+    const pier = cast(-site.width / 2 - 9 + 8, y, z, 0, 0, 1, 0, mesh);
+    towerLancet = (!open || open.t > 55) && !!pier && pier.t < 55;
+  }
+  return { skyline, towerLancet };
+}
 function buildRuins() {
   ruins.length = 0;
   for (const site of RUIN_SITES) {
     const before = solids.length;
     ruinDetail(site);              // borrow cathedral mesh builder
     const mesh = solids.splice(before); // isolate it from the castle's mesh/bins
+    const architecture = ruinArchitectureEvidence(site, mesh);
     ruinRotateMesh(mesh, site);
     mesh.forEach((so, i) => { so.id = 2000 + i; });
     const cx = cathedral.ox + site.x * WS;
@@ -442,7 +463,7 @@ function buildRuins() {
     }
     ruins.push({ ...site, cx, cy, x0, x1, y0, y1, gridW, gridH,
       lum, dep, glyph, lev, walls: ruinWallRectangles(site),
-      meshPieces: mesh.length });
+      meshPieces: mesh.length, architecture });
   }
   paintRuinGroundShadows();
 }
