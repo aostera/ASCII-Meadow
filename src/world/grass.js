@@ -95,7 +95,7 @@ function applySceneryGrassForces() {
       // blades shorten at the foot instead of magically leaning sideways.
       // At the canvas hem roots remain visible, never a rectangular bald area.
       if (contact > .25)
-        flat[i] = Math.max(flat[i], Math.min(.62, (contact - .25) * .72));
+        flat[i] = Math.max(flat[i], Math.min(.22, (contact - .25) * .32));
     }
   }
 }
