@@ -401,7 +401,9 @@ function ruinArchitectureEvidence(site, mesh) {
     const pier = cast(-site.width / 2 - 9 + 8, y, z, 0, 0, 1, 0, mesh);
     towerLancet = (!open || open.t > 55) && !!pier && pier.t < 55;
   }
-  return { skyline, towerLancet };
+  const validSolids = mesh.every(so => so.bb[0] < so.bb[1] &&
+    so.bb[2] < so.bb[3] && so.bb[4] < so.bb[5]);
+  return { skyline, towerLancet, validSolids };
 }
 function buildRuins() {
   ruins.length = 0;
