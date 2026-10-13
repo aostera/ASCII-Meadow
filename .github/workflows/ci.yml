@@ -33,7 +33,7 @@ jobs:
         run: node tools/check/production-parity.cjs
 
   production-runtime:
-    name: Public production Chromium: actual map, grass, scenery
+    name: 'Public production Chromium: actual map, grass, scenery'
     needs: production-parity
     runs-on: ubuntu-latest
     timeout-minutes: 20
