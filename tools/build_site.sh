@@ -1,15 +1,45 @@
 #!/bin/sh
-# The published site: the page, its styles and its scripts as they are (no build). Run by `npm ci`
-# (prepare) for the Cloudflare deployment, and by CI, which serves the folder under /ASCII-Meadow/
-# to prove every path is relative.
-# usage: sh tools/build_site.sh <out dir>
-set -e
+# Build a versioned Cloudflare static site. The source HTML remains unchanged,
+# while every release requests its own JS/CSS URLs so a browser cannot reuse
+# an obsolete map or grass renderer across deployments.
+set -eu
 out=${1:?usage: sh tools/build_site.sh <out dir>}
 mkdir -p "$out"
 cp -r index.html styles src "$out"/
-# Only optional authored NPC atlases need publishing; avoid copying the large concept/source sheets.
 if [ -d assets/npc ]; then
   mkdir -p "$out/assets"
   cp -r assets/npc "$out/assets/"
 fi
+
+# The checkout commit is the single source of truth for the release revision.
+rev=$(git rev-parse --verify --short=12 HEAD 2>/dev/null || printf 'local')
+node - "$out/index.html" "$rev" <<'NODE'
+const fs = require('node:fs');
+const [file, rev] = process.argv.slice(2);
+const html = fs.readFileSync(file, 'utf8');
+let scripts = 0;
+const versioned = html
+  .replace(/(<script\s+src="src\/[^"?]+\.js)(")/g, (_, a, b) => {
+    scripts++; return a + '?v=' + rev + b;
+  })
+  .replace(/(href="styles\/[^"?]+\.css)(")/g, (_, a, b) => a + '?v=' + rev + b);
+if (scripts < 20 || !versioned.includes('styles/main.css?v=')) {
+  throw new Error('Release asset versioning failed: original HTML structure changed');
+}
+fs.writeFileSync(file, versioned);
+NODE
+
+printf '{"revision":"%s"}\n' "$rev" > "$out/build.json"
+cat > "$out/_headers" <<'HEADERS'
+/
+  Cache-Control: no-store
+/index.html
+  Cache-Control: no-store
+/build.json
+  Cache-Control: no-store
+/src/*
+  Cache-Control: no-store
+/styles/*
+  Cache-Control: no-store
+HEADERS
 touch "$out/.nojekyll"
