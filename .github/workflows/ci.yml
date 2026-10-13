@@ -17,6 +17,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  production-parity:
+    name: Public Cloudflare site matches GitHub main
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify published HTML, authored map, grass and depth/shadow renderer
+        run: node tools/check/production-parity.cjs
+
   static:
     name: Syntax, ESLint, resources, bundle
     runs-on: ubuntu-latest
