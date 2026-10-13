@@ -83,10 +83,19 @@ function applySceneryGrassForces() {
       const i = row + x, contact = G[i];
       if (contact < .035 || kind[i] !== 1) continue;
       const dx = G[i - 1] - G[i + 1], dy = G[i - COLS] - G[i + COLS];
-      // Right/left and north/south gradients turn blades away from the object
-      // instead of pushing a whole rectangular area in one direction.
-      push[i] += (dx * 1.25 + dy * .4) * Math.min(1, contact);
-      if (contact > .78) flat[i] = Math.max(flat[i], Math.min(.64, (contact - .78) * 2.9));
+      const edge = Math.hypot(dx, dy);
+      // A physical silhouette gives a steady outward push, like the knight's
+      // brush() but with no artificial motion wake. Normalize the boundary
+      // gradient: the old dx*1.25 was too weak to read next to the wind.
+      if (edge > .008) {
+        const shove = Math.min(2.4, edge * 9) * (.65 + contact * 1.15);
+        push[i] += shove * dx / edge;
+      }
+      // Rails run along X and can have a mostly Y-facing gradient; those
+      // blades shorten at the foot instead of magically leaning sideways.
+      // At the canvas hem roots remain visible, never a rectangular bald area.
+      if (contact > .25)
+        flat[i] = Math.max(flat[i], Math.min(.62, (contact - .25) * .72));
     }
   }
 }
