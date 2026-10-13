@@ -60,12 +60,34 @@ function applyGrassForces(dt) {
   const x0 = SBX0 = Math.max(0, VX0 - 12), x1 = SBX1 = Math.min(COLS, VX1 + 13), y0 = SBY0 = Math.max(0, VY0 - 10), y1 = SBY1 = Math.min(ROWS, VY1 + 12);
   for (let y = y0; y < y1; y++) { const o = y * COLS; push.fill(0, o + x0, o + x1); shadow.fill(0, o + x0, o + x1); }
   for (const e of ents) influence(e, dt);
+  applySceneryGrassForces();
   if (mouse.on) {
     const mx = mouse.x / CW + camX, my = mouse.y / CH + camY;
     const v = Math.hypot(mx - mouse.lx, (my - mouse.ly) * CH / CW) / Math.max(dt, 1e-3);
     mouse.sp += (Math.min(1, v / 120) - mouse.sp) * Math.min(1, dt * 10);
     mouse.lx = mx; mouse.ly = my;
     brush(mx, my, 0.75 + mouse.sp * 1.1, dt);
+  }
+}
+
+// Solid scenery pushes nearby grass away from its true 3D footprint. Unlike
+// a moving body this is a steady boundary force; the blades still respond to
+// wind and spring back if a tent/fence is removed in the editor.
+function applySceneryGrassForces() {
+  const G = campGround;
+  if (!G) return;
+  const x0 = Math.max(1, VX0), x1 = Math.min(COLS - 2, VX1);
+  for (let y = Math.max(1, VY0 - 4); y <= Math.min(ROWS - 2, VY1 + 4); y++) {
+    const row = y * COLS;
+    for (let x = x0; x <= x1; x++) {
+      const i = row + x, contact = G[i];
+      if (contact < .035 || kind[i] !== 1) continue;
+      const dx = G[i - 1] - G[i + 1], dy = G[i - COLS] - G[i + COLS];
+      // Right/left and north/south gradients turn blades away from the object
+      // instead of pushing a whole rectangular area in one direction.
+      push[i] += (dx * 1.25 + dy * .4) * Math.min(1, contact);
+      if (contact > .78) flat[i] = Math.max(flat[i], Math.min(.64, (contact - .78) * 2.9));
+    }
   }
 }
 
