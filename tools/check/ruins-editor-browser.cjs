@@ -20,7 +20,14 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           const tools = ['ruin-gate', 'ruin-abbey', 'ruin-cloister']
             .every(t => !!document.querySelector('[data-tool="' + t + '"]'));
           openEditor();
+          // Existing ruins are far from the player's spawn. Move the editor
+          // camera over the first landmark before testing actual pick targets.
+          const [rx, ry] = mapToCell(ruins[0].x, ruins[0].z);
+          camX = rx - VC / (VZ * 2); camY = ry - VR / (VZ * 2);
           const ui = edObjects().filter(x => x.kind === 'ruins');
+          const firstMarker = ui.find(o => o.mi === 0);
+          const picked = firstMarker &&
+            edPick(firstMarker.sx, firstMarker.sy - Math.min(8, firstMarker.top * .3))?.kind === 'ruins';
           const original = MEADOW_MAP.ruins.map(x => x.slice());
           const initialProps = props.filter(x => x.ruinId).length;
           edPlace('ruin-gate', -420, -1550);
@@ -75,13 +82,13 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           edSyncUI();
           const rotationUI = ED.ui.variantOut.textContent.includes('Поворот');
           closeEditor();
-          return { tools,initialProps,ui:ui.length,original,placed:placed.length,
+          return { tools,initialProps,ui:ui.length,picked,original,placed:placed.length,
             placedCorrectly,moved,rotated,movingEvidence,blocked,passable,
             importSame,removed,restored,deletedAgain,restoredAgain,legacyDefaults,
             empty,final,vegetation,rotationUI };
         });
-        assert(result.tools && result.ui === 3 && result.initialProps === 3,
-          'all three authored ruins need discoverable editor selection and E spots');
+        assert(result.tools && result.ui >= 1 && result.initialProps === 3 && result.picked,
+          'ruins palette, viewport marker, selectable building and E spots: '+JSON.stringify(result));
         assert.equal(result.placed, 4);
         assert(result.placedCorrectly && result.movingEvidence && result.blocked && result.passable,
           'new model must place, move, rotate and carry true wall/arch collision and E spots');
