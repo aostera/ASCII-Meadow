@@ -75,21 +75,53 @@ function ruinPortalWall(w, z, thickness, height, gateWidth, gateHeight) {
   addBox(-a, a, top, height, zs[0], zs[1], 'wall',
     { win: [{ y0: height - 76, h: 54, w: 22 }], courses: [height - 35] });
 }
+// The curtain walls are broken, not a perfectly level low parapet. Every bay
+// has its own full-height profile: a few tall surviving piers alternate with
+// collapsed sections. The continuous base is INSIDE the existing collision.
 function ruinSideWalls(w, d, wallHeight, thickness) {
+  const skyline = [1.05, 1.42, .83, 1.77, 1.2, .94, 1.61, .72, 1.35];
   for (const side of [-1, 1]) {
     const x = side * (w / 2 - thickness / 2);
-    // A complete low wall for physics, but staggered stone heights above it.
     addBox(x - thickness / 2, x + thickness / 2, 0, wallHeight * .65,
       -d / 2, d / 2, 'wall', { courses: [wallHeight * .35] });
-    const n = 6, bay = d / n;
+    const n = skyline.length, bay = d / n;
     for (let k = 0; k < n; k++) {
       const z0 = -d / 2 + bay * k, z1 = z0 + bay;
-      const crown = wallHeight *
-        ([.98, .83, 1.12, .76, 1.04, .9][(k + (side > 0 ? 2 : 0)) % 6]);
+      const variant = (k + (side > 0 ? 4 : 0)) % n;
+      const crown = wallHeight * skyline[variant];
+      // Two offset widths give the broken top a *large* silhouette step.
+      // Avoid tiny random points that turn into noisy ASCII at phone sizes.
+      const mid = z0 + (z1 - z0) * (.42 + .12 * (variant % 3));
+      const left = crown - wallHeight * (.12 + .07 * (variant % 3));
       addBox(x - thickness / 2, x + thickness / 2,
-        wallHeight * .65, crown, z0, z1, 'wall', { courses: [wallHeight * .78] });
+        wallHeight * .65, left, z0, mid, 'wall');
+      addBox(x - thickness / 2, x + thickness / 2,
+        wallHeight * .65, crown, mid, z1, 'wall');
     }
   }
+}
+// A genuine open lancet in the ruined gate's tower. Split the 3D stone in
+// three dimensions rather than painting black pixels on a solid box.
+function ruinBrokenTower(x0, x1, z0, z1, height) {
+  const cx = (x0 + x1) / 2, sill = height * .51;
+  const spring = height * .73, peak = height * .84;
+  addBox(x0, x1, 0, sill, z0, z1, 'wall', { courses: [sill * .36, sill * .69] });
+  const half = 7.5;
+  addBox(x0, cx - half, sill, spring, z0, z1, 'wall');
+  addBox(cx + half, x1, sill, spring, z0, z1, 'wall');
+  // Six slices of the pointed stone arch, leaving a visible HOLE between.
+  for (let k = 0; k < 6; k++) {
+    const bottom = spring + k * (peak - spring) / 6;
+    const top = spring + (k + 1) * (peak - spring) / 6;
+    const gap = half * (1 - Math.pow((k + .5) / 6, 1.28));
+    addBox(x0, cx - gap, bottom, top, z0, z1, 'wall');
+    addBox(cx + gap, x1, bottom, top, z0, z1, 'wall');
+  }
+  // The roof is gone: one tall pier, one low broken return, uneven caps.
+  addBox(x0, cx - 2, peak, height * .93, z0, z1, 'wall');
+  addBox(cx + 4, x1, peak, height * .85, z0, z1, 'wall');
+  addBox(x0 - 3, cx - 8, height * .92, height, z0 - 3, z0 + 15, 'wall');
+  addBox(cx + 7, x1 + 2, height * .845, height * .88, z0 + 8, z1, 'wall');
 }
 function ruinDetail(site) {
   const { width: w, depth: d, height: h, arch: a, archHeight: ah } = site;
@@ -100,9 +132,14 @@ function ruinDetail(site) {
   if (site.type === 'gate') {
     // Asymmetrically shattered gatehouse: a high left tower, a shorter right
     // broken curtain, crenelated stone ends and irregular capstones.
-    addBox(-w / 2 - 9, -w / 2 + 35, 0, h, -d / 2 - 5, -d / 2 + 39, 'wall',
-      { win: [{ y0: h * .55, h: 91, w: 18 }], courses: [70, 154, 238] });
-    addBox(w / 2 - 32, w / 2 + 7, 0, h * .65, -d / 2 - 5, -d / 2 + 30, 'wall');
+    ruinBrokenTower(-w / 2 - 9, -w / 2 + 35,
+      -d / 2 - 5, -d / 2 + 39, h);
+    addBox(w / 2 - 32, w / 2 + 7, 0, h * .46,
+      -d / 2 - 5, -d / 2 + 30, 'wall');
+    addBox(w / 2 - 32, w / 2 - 11, h * .46, h * .7,
+      -d / 2 - 5, -d / 2 + 30, 'wall');
+    addBox(w / 2 - 7, w / 2 + 7, h * .46, h * .58,
+      -d / 2 - 5, -d / 2 + 30, 'wall');
     for (const [x, ht] of [[-w / 2 - 4, h * .94], [-w / 2 + 30, h * .87],
       [w / 2 - 15, h * .57], [w / 2 + 4, h * .6]]) {
       addBox(x - 7, x + 7, ht, ht + 18, -d / 2 - 4, -d / 2 + 18, 'wall');
@@ -111,12 +148,32 @@ function ruinDetail(site) {
     addGableZ(-w * .28, w * .28, -d / 2, -d / 2 + th, h * .7, h * .88, 'wall');
   } else if (site.type === 'abbey') {
     // Large abbey façade, central open arcade, damaged gable and twin lancets.
-    addGableZ(-w * .42, w * .42, -d / 2, -d / 2 + th, h * .7, h, 'wall');
+    // Gable shattered at its apex: two surviving wings with an exposed
+    // central notch. All stones are above the passable portal.
+    addGableZ(-w * .42, -w * .10, -d / 2, -d / 2 + th,
+      h * .7, h * .97, 'wall');
+    addGableZ(w * .14, w * .42, -d / 2, -d / 2 + th,
+      h * .7, h * .86, 'wall');
+    addBox(-w * .10, w * .14, h * .7, h * .76,
+      -d / 2, -d / 2 + th, 'wall');
+    // Surviving slender arch canopy, with an unmistakable dark gap above.
+    addBeam(-w * .25, -w * .10, -d / 2 - 3, -d / 2 + 2,
+      h * .76, h * .89, 7, 'wall');
+    addBox(-w * .27, -w * .23, h * .88, h * .91,
+      -d / 2 - 4, -d / 2 + 4, 'wall');
     for (const sx of [-1, 1]) {
       const x = sx * (w / 2 - 18);
       addPrism(x, -d / 2 + 4, 21, 6, 0, h * .84, 'wall',
         { win: [{ y0: h * .47, h: 80, w: 14 }] });
-      addCone(x, -d / 2 + 4, 26, 4, h * .84, h * .98, 'spire');
+      // One spire survives; the other is snapped off at an uneven course.
+      if (sx < 0) addCone(x, -d / 2 + 4, 26, 4,
+        h * .84, h * .99, 'spire');
+      else {
+        addBox(x - 14, x + 2, h * .84, h * .91,
+          -d / 2 - 12, -d / 2 + 15, 'wall');
+        addBox(x + 3, x + 15, h * .84, h * .875,
+          -d / 2 - 12, -d / 2 + 13, 'wall');
+      }
       addBox(x - 18, x + 18, 0, h * .31, d / 2 - 18, d / 2 + 6, 'wall');
     }
     // Damaged tracery stays well above the passable portal.
@@ -139,7 +196,13 @@ function ruinDetail(site) {
       addBeam(12, w / 2 - 15, z - 7, z + 7, h * .89, h * .58, 12, 'wall');
     }
     // Far end broken gable silhouette.
-    addGableZ(-w * .35, w * .35, d / 2 - th, d / 2, h * .54, h * .81, 'wall');
+    addGableZ(-w * .35, -w * .08, d / 2 - th, d / 2,
+      h * .62, h * .91, 'wall');
+    addGableZ(w * .12, w * .35, d / 2 - th, d / 2,
+      h * .62, h * .76, 'wall');
+    // Central rib is broken away, leaving an open upper silhouette.
+    addBox(-w * .08, w * .12, h * .68, h * .73,
+      d / 2 - th, d / 2, 'wall');
   }
   ruinArchitecturalRelief(site);
   ruinWeatheredStoneDetail(site);
