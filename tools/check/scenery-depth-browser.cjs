@@ -81,8 +81,8 @@ const url = 'file://' + path.resolve(__dirname, '../../index.html');
           'fences hide only actual grounded posts');
         assert(result.grass > 5 && result.shadow > 5,
           'camp must leave living grass in partial, grounded shadows');
-        assert(result.bend > 1 && result.flatten > .15,
-          'fence/tent contact must visibly bend and flatten living grass');
+        assert(result.bend > 1 && result.flatten > .06 && result.flatten < .23,
+          'fence/tent contact must bend living grass without flattening its visible tips');
         assert.deepEqual(realErrors(errs), [], 'runtime browser errors');
         console.log('PASS '+mode+': depth sorting, solid collision, grass and 3D shadows');
       } finally { await ctx.close(); }
