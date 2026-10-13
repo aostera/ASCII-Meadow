@@ -3,6 +3,8 @@
 // comparison, not a port of the knight's 192 ASCII frames or the map's 2D paint layers.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { buildGothicRuin } from './gothic.js';
+import { createAnimatedKnight } from './knight-rig.js';
 
 const map = window.ASCII_MEADOW_MAP;
 if (!map || !Array.isArray(map.flora) || !Array.isArray(map.ruins)) {
@@ -78,6 +80,20 @@ base.add(ground);
 
 const world = new THREE.Group();
 scene.add(world);
+let hero=null;
+const keys=new Set();
+let jumpQueued=false;
+const typing=()=>['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName);
+window.addEventListener('keydown',ev=>{
+  if(typing())return;
+  if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','Space'].includes(ev.code)){
+    if(!ev.repeat&&ev.code==='Space')jumpQueued=true;
+    if(ev.code!=='ShiftLeft'&&ev.code!=='ShiftRight')ev.preventDefault();
+    keys.add(ev.code);
+  }
+});
+window.addEventListener('keyup',ev=>keys.delete(ev.code));
+window.addEventListener('blur',()=>{keys.clear();jumpQueued=false;});
 const addMesh = (parent, geo, mat, pos, rotation) => {
   const m = new THREE.Mesh(geo, mat);
   m.position.set(pos[0], pos[1], pos[2]);
@@ -145,64 +161,9 @@ function fence(parent, variant) {
   }
   if (variant < 4) for (const y of [1, 2]) box(parent, n * gap, .18, .18, material.wood, 0, y, 0);
 }
-function ruin(parent, type) {
-  const wall = (w, h, d, x, y, z, mat = material.stone) => box(parent, w, h, d, mat, x, y, z);
-  const width = type === 'gate' ? 24 : type === 'abbey' ? 33 : 38;
-  const depth = type === 'gate' ? 11 : 21;
-  const archSpan = type === 'cloister' ? 6 : 10;
-  const arches = type === 'cloister' ? 4 : 2;
-  const baseY = 9;
-  const split = width / arches;
-  for (let j = 0; j <= arches; j++) {
-    const x = -width/2 + j * split;
-    const extra = j === 0 || j === arches ? 4 : 0;
-    wall(2, baseY + 4 + extra, 2.5, x, (baseY + 4 + extra)/2, depth/2, j%2 ? material.shade : material.stone);
-    wall(1.35, 1.2, 3, x, 10.2, depth/2, material.trim);
-    if (j === 0 || j === arches) {
-      wall(3, 17 + (j===0?4:0), 4, x, 8.5, -depth/2, material.stone);
-      addMesh(parent, new THREE.ConeGeometry(2.5, 6, 4), material.trim, [x, 19.7 + (j===0?4:0), -depth/2], [0, Math.PI/4, 0]);
-    }
-  }
-  for (let j = 0; j < arches; j++) {
-    const center = -width/2 + (j+.5)*split;
-    // True open pointed arch: diagonal stone beams and no filled central wall.
-    const a = archSpan*.32;
-    wall(1.3, 6.4, 2.6, center-a, 13.1, depth/2, material.stone).rotation.z = -0.56;
-    wall(1.3, 6.4, 2.6, center+a, 13.1, depth/2, material.stone).rotation.z = 0.56;
-    wall(split-1.5, 1.8, 3.1, center, 16.6, depth/2, material.trim);
-    for (let k = 0; k < 3; k++) wall(0.55, 0.4, 3.3, center+(k-1)*split*.2, 17.7, depth/2, material.shade);
-  }
-  for (const side of [-1,1]) {
-    for (let j = 0; j < 9; j++) {
-      const z = -depth/2+j*depth/8;
-      const broken = (hash(j*8+side*5+width) - .5) * 4;
-      const h = Math.max(2,8+broken + (j%5===0 ? 7 : 0));
-      wall(2.3, h, depth/9 + .55, side * width/2, h/2, z, j%3 ? material.stone : material.shade);
-    }
-  }
-  for (let i = 0; i < 38; i++) {
-    const x = (hash(i * 11) - .5) * (width+10), z = (hash(i * 19) - .5) * (depth+14);
-    const h = .2 + hash(i*3)*.8;
-    wall(.6 + hash(i+5)*1.9, h, .6 + hash(i+8)*1.6, x, h/2, z, i%4 ? material.shade : material.trim);
-  }
-}
-function knight(parent) {
-  const armor = new THREE.Group();
-  parent.add(armor);
-  box(armor, 2, 3.3, 1.2, material.iron, 0, 4.2, 0);
-  box(armor, 2.2, 2.1, .25, material.red, 0, 3.4, .78);
-  addMesh(armor, new THREE.CylinderGeometry(.8,.75,1.55,8), material.iron, [0,6.75,0]);
-  addMesh(armor, new THREE.ConeGeometry(.8, .65, 8), material.iron, [0,7.85,0]);
-  for (const x of [-.65,.65]) {
-    box(armor, .58, 2.6, .63, material.iron, x, 1.5, 0);
-    box(armor, .65, 2.5, .7, material.iron, x*2, 4.7, 0);
-  }
-  box(armor, .15, 5.2, .2, material.trim, 2, 4, .3);
-  box(armor, .9, .15, .3, material.trim, 2, 5.2, .3);
-  armor.userData.isKnight = true;
-  return armor;
-}
 function cleanWorld() {
+  // The rig and instanced meadow belong to this scene, not to the map.
+  hero=null;
   const disposed = new Set();
   world.traverse(o => {
     if (o.geometry && !disposed.has(o.geometry)) {
@@ -290,7 +251,8 @@ function rebuild() {
     const group = new THREE.Group(), [xx,zz]=toLocal(x,z);
     group.position.set(xx,0,zz);
     group.rotation.y = yaw; // exact authored yaw, no rotation correction or auto-regeneration
-    ruin(group,type);
+    buildGothicRuin({THREE,parent:group,materials:material,type,
+      seed:Math.abs(Math.round(x*11+z*7))||1});
     group.userData.mapId=id;
     world.add(group);
     ruinCount++;
@@ -301,17 +263,18 @@ function rebuild() {
       const group = new THREE.Group();
       const a=i*2.39996, r=17 + (i%5)*8;
       group.position.set(Math.cos(a)*r,0,Math.sin(a)*r);
-      if (i%4===0) ruin(group,'gate'); else tree(group,i+800,'tree');
+      if(i%4===0)buildGothicRuin({THREE,parent:group,materials:material,type:'gate',seed:i+500});
+      else tree(group,i+800,'tree');
       world.add(group);
     }
   }
-  const [px,pz]=toLocal(map.start[0],map.start[1]);
-  if (Math.hypot(px,pz) < 55) {
-    const person = new THREE.Group();
-    person.position.set(px,0,pz);
-    knight(person);
-    world.add(person);
-  }
+  // At camp use the authored player start. Else add an *unsaved* rig demo
+  // near the selected ruin, without altering the author's map.
+  const [px,pz]=ui.location.value==='camp'?toLocal(map.start[0],map.start[1]):[0,17];
+  hero=createAnimatedKnight(THREE,material);
+  hero.name='Unsaved animation rig preview';
+  hero.position.set(px,0,pz);
+  world.add(hero);
   plantGrass();
   lastCount.flora=floraCount;
   lastCount.ruins=ruinCount;
@@ -401,6 +364,21 @@ function frame(now) {
   if (dt<500) {samples.push(dt);if(samples.length>120)samples.shift();}
   const started=performance.now();
   controls.update();
+  if(hero){
+    const secs=Math.min(.05,dt/1000);
+    const dx=Number(keys.has('KeyD'))-Number(keys.has('KeyA'));
+    const dz=Number(keys.has('KeyS'))-Number(keys.has('KeyW'));
+    const length=Math.hypot(dx,dz);
+    const run=keys.has('ShiftLeft')||keys.has('ShiftRight');
+    const speed=run?12:6.3;
+    if(length){
+      hero.position.x=Math.max(-30,Math.min(30,hero.position.x+dx/length*speed*secs));
+      hero.position.z=Math.max(-30,Math.min(30,hero.position.z+dz/length*speed*secs));
+    }
+    hero.userData.animate(secs,{speed:length?speed:0,run,
+      jump:jumpQueued,heading:length?Math.atan2(dx,dz):undefined},now*.001);
+    jumpQueued=false;
+  }
   grassMaterial.uniforms.uTime.value=now*.001;
   grassMaterial.uniforms.uWind.value=ui.wind.checked?1:0;
   renderer.shadowMap.enabled=ui.shadows.checked;
@@ -423,6 +401,8 @@ function frame(now) {
       '\nMap objects nearby: '+lastCount.flora+'  |  ruins: '+lastCount.ruins+
       '  |  DPR: '+pixelRatio.toFixed(2);
     window.__ASCII_THREE_DIAGNOSTICS__={
+      animation:hero?.userData.animationState.lastMotion||'unavailable',
+      gothicMeshCount:world.children.filter(x=>x.userData.modelStats).reduce((n,x)=>n+x.userData.modelStats.meshCount,0),
       fpsMedian:p50?1000/p50:0,frameP95ms:p95,submitP95ms:cpu95,
       drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,
       grassInstances:lastCount.grass,authoredFlora:lastCount.flora,
