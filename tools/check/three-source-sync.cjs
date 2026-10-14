@@ -9,6 +9,11 @@ const original=scripts(main);
 const migrated=scripts(parity).map(s=>s.replace(/^\.\.\/\.\.\//,''));
 assert.ok(original.length>=45,'Unexpected incomplete original game');
 assert.deepEqual(migrated,original,'Parity migration must use ALL original scripts in the original order');
+const landing=scripts(fs.readFileSync('experiments/three/index.html','utf8'))
+  .map(s=>s.replace(/^\.\.\/\.\.\//,''));
+assert.deepEqual(landing,original,'Default preview must use the full original game, never synthetic scene');
+assert.deepEqual(scripts(fs.readFileSync('experiments/three/procedural.html','utf8')).length,3,
+  'Original procedural research demo must remain accessible separately');
 assert.match(parity,/href="\.\.\/\.\.\/styles\/main\.css"/);
 assert.match(parity,/src="\.\.\/\.\.\/src\/data\/map\.js"/);
 assert.match(parity,/src="\.\.\/\.\.\/src\/main\.js"/);
