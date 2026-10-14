@@ -60,7 +60,7 @@ fs.mkdirSync(dest,{recursive:true});
        const countAfter=GB.n;
        if(countAfter<=countBefore)throw Error('Flora and NPC do not share glyph painter');
        if(JSON.stringify(MEADOW_MAP)!==sourceMap)
-         throw Error('NPC migration modified the author's map');
+         throw Error("NPC migration modified the author map");
        return {paletteCount:window.__ASCII_NATIVE_NPCS__.paletteCount,
          npcGlyphs:characterCount,bodyOnGPU:n,
          overlayTextCalls:textCalls,
