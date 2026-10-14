@@ -185,6 +185,11 @@ window.__ASCII_PARITY__={
   get canvas(){return backend?.renderer.domElement||null;},
   get ready(){return Boolean(GB.atlasCv&&GB.spr.length&&W&&H&&GB.n>1000);},
   get baselineGlyphs(){return GB.n;},
+  setGlyphCullingForTest(enabled){
+    if(!new URLSearchParams(location.search).has('parityTest')||!backend)return false;
+    backend.cullingEnabled=Boolean(enabled);
+    return true;
+  },
   // Produce ONE exact glyph buffer from the original scene, then render that
   // identical buffer in the independent Three.js backend. No second foliage
   // draw, no extra smoothing ticks, no perceptual brightness manipulation.

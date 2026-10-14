@@ -79,6 +79,7 @@ export class ThreeGlyphBackend {
     this.scene.add(this.castle.mesh,this.glyphs.mesh);
     this.stats={glyphs:0,drawCalls:0,triangles:0,frame:0};
     this.lost=false;
+    this.cullingEnabled=true;
     this.renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();this.lost=true;});
     this.renderer.domElement.addEventListener('webglcontextrestored',()=>{
       this.lost=false;this.sv=-1;this.width=0;this.height=0;
@@ -182,7 +183,7 @@ export class ThreeGlyphBackend {
     }
     const count=GB.n-extra;
     const uploadStart=performance.now();
-    const clip=glyphClipWindow(camx,camy,W,H,VZ,4);
+    const clip=this.cullingEnabled?glyphClipWindow(camx,camy,W,H,VZ,4):null;
     const visibleGlyphs=this.upload(this.glyphs,GB.buf,0,count,clip);
     this.upload(this.castle,GB.buf,count,extra);
     const uploadCpuMs=performance.now()-uploadStart;

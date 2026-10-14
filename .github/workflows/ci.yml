@@ -339,6 +339,7 @@ jobs:
           node --check experiments/three/glyph-visibility.mjs
           node tools/check/three-glyph-visibility.mjs
           node --check tools/check/three-parity.cjs
+          node --check tools/check/three-performance.cjs
           node --check tools/check/three-motion-parity.cjs
           node tools/check/three-source-sync.cjs
           node --check experiments/three/source-masonry.mjs
@@ -361,6 +362,7 @@ jobs:
           for i in $(seq 1 20); do curl -sf http://127.0.0.1:8181/experiments/three/parity.html > /dev/null && break; sleep 1; done
           node tools/check/three-parity.cjs http://127.0.0.1:8181
           node tools/check/three-motion-parity.cjs http://127.0.0.1:8181
+          node tools/check/three-performance.cjs http://127.0.0.1:8181
           node tools/check/three-architecture.cjs http://127.0.0.1:8181
           node tools/check/three-live-architecture.cjs http://127.0.0.1:8181
           node tools/check/three-depth.cjs http://127.0.0.1:8181
@@ -377,4 +379,5 @@ jobs:
             shots/three-parity/
             shots/three-depth/
             shots/three-motion/
+            shots/three-performance/
           if-no-files-found: warn
