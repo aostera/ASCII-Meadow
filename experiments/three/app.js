@@ -561,6 +561,14 @@ function frame(now) {
     lastStats=now;
   }
 }
+const hud=$('controls'),hudToggle=$('hud-toggle');
+function setHudCollapsed(collapsed){
+  hud.classList.toggle('collapsed',collapsed);
+  hudToggle.textContent=collapsed?'Настройки':'Свернуть';
+  hudToggle.setAttribute('aria-expanded',String(!collapsed));
+}
+hudToggle.addEventListener('click',()=>setHudCollapsed(!hud.classList.contains('collapsed')));
+if(window.matchMedia('(pointer:coarse)').matches)setHudCollapsed(true);
 ui.location.addEventListener('change',rebuild);
 ui.character.addEventListener('change',()=>{
   if(hero)hero.visible=ui.character.value==='rig';

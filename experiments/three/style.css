@@ -10,3 +10,12 @@
 .mobile-pad button:active,.mobile-pad button[aria-pressed=true]{background:#797b7b;color:#050505}
 @media(pointer:coarse){.mobile-pad{display:flex}}
 @media(max-height:500px){.mobile-pad{bottom:5px}.pad-directions{grid-template-rows:repeat(2,38px);grid-template-columns:repeat(3,38px)}.mobile-pad button{min-width:38px;min-height:38px}.pad-actions button{min-height:43px}}
+
+/* Focus on the artwork, not a huge controls overlay on phone screens. */
+.hud-actions{display:flex;gap:10px;align-items:center}
+#hud-toggle{font:inherit;font-size:11px;color:#c7c7c5;background:#292929;border:1px solid #545451;border-radius:3px;padding:5px 7px;cursor:pointer}
+#controls.collapsed .control-row,#controls.collapsed output,#controls.collapsed .note{display:none}
+#controls.collapsed{width:min(350px,calc(100vw - 24px));max-height:100px}
+#controls.collapsed .heading h1{margin:0}
+#controls.collapsed .heading{align-items:center}
+@media(max-width:640px){#controls.collapsed{padding:8px 11px}.hud-actions{gap:7px}.heading a{white-space:nowrap}}
