@@ -337,6 +337,7 @@ jobs:
           node --check experiments/three/parity.js
           node --check experiments/three/three-glyphs.js
           node --check tools/check/three-parity.cjs
+          node --check tools/check/three-motion-parity.cjs
           node tools/check/three-source-sync.cjs
           node --check experiments/three/source-masonry.mjs
           node --check experiments/three/architecture-viewer.mjs
@@ -357,12 +358,14 @@ jobs:
           trap 'kill $server 2>/dev/null || true' EXIT
           for i in $(seq 1 20); do curl -sf http://127.0.0.1:8181/experiments/three/parity.html > /dev/null && break; sleep 1; done
           node tools/check/three-parity.cjs http://127.0.0.1:8181
+          node tools/check/three-motion-parity.cjs http://127.0.0.1:8181
           node tools/check/three-architecture.cjs http://127.0.0.1:8181
           node tools/check/three-live-architecture.cjs http://127.0.0.1:8181
           node tools/check/three-depth.cjs http://127.0.0.1:8181
       - name: Report fixed-scene pixel differences / block empty Three output
         run: |
           python3 tools/check/three-pixel-parity.py shots/three-parity
+          python3 tools/check/three-motion-pixels.py shots/three-motion
           python3 tools/check/three-depth-visibility.py shots/three-depth
       - uses: actions/upload-artifact@v4
         if: always()
@@ -371,4 +374,5 @@ jobs:
           path: |
             shots/three-parity/
             shots/three-depth/
+            shots/three-motion/
           if-no-files-found: warn
