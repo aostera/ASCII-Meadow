@@ -166,11 +166,19 @@ function fence(parent, variant) {
   if (variant < 4) for (const y of [1, 2]) box(parent, n * gap, .18, .18, material.wood, 0, y, 0);
 }
 function cleanWorld() {
-  // The rig and instanced meadow belong to this scene, not to the map.
+  // Explicit ownership of GPU resources prevents accumulation when sites
+  // are changed repeatedly (especially important for iPad Safari).
   hero=null;
-  // Dispose the dynamic canvas texture before losing its scene reference.
-  if(legacyKnight)legacyKnight.userData.disposeLegacy();
-  legacyKnight=null;
+  if(legacyKnight){
+    legacyKnight.userData.disposeLegacy();
+    world.remove(legacyKnight);
+    legacyKnight=null;
+  }
+  if(grass){
+    world.remove(grass);
+    grass.geometry.dispose();
+    grass=null;
+  }
   groundContacts.clear();
   const disposed = new Set();
   world.traverse(o => {
