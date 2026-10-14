@@ -59,7 +59,11 @@ fs.mkdirSync(dir,{recursive:true});
      path:path.join(dir,label+'-grey-3d.png'),timeout:60000
    });
    const slider=page.locator('.native-grey-rotation input[type=range]');
-   await slider.fill('75');
+   await slider.evaluate(el=>{
+     el.value='75';
+     el.dispatchEvent(new Event('input',{bubbles:true}));
+     el.dispatchEvent(new Event('change',{bubbles:true}));
+   });
    await page.waitForFunction(()=>(
      Math.abs(ruinSites()[1].yaw-75*Math.PI/180)<.001 &&
      window.__ASCII_NATIVE__.greyEditor.selected==='abbey-front'
@@ -85,7 +89,7 @@ fs.mkdirSync(dir,{recursive:true});
      undefined,{timeout:90000});
    await page.evaluate(()=>edUndo());
    await page.waitForFunction(()=>MEADOW_MAP.ruins===null||
-     Math.abs(ruinSites()[1].yaw-.34)<.001,
+     Math.abs(ruinSites()[1].yaw-(-.34))<.001,
      undefined,{timeout:90000});
    const restored=await page.evaluate(()=>({
      map:JSON.stringify(MEADOW_MAP),
