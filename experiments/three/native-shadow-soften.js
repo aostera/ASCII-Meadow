@@ -29,8 +29,8 @@ function nativeShadowEdgeFilter(source,width,height,x,y) {
   return nativeShadowClamp(v*(1-edge*.79)+filtered*(edge*.79),0,.7);
 }
 function nativeSoftShadowPatch(x0,y0,x1,y1){
-  const xa=Math.max(2,Math.floor(x0)),ya=Math.max(2,Math.floor(y0));
-  const xb=Math.min(COLS-3,Math.ceil(x1)),yb=Math.min(ROWS-3,Math.ceil(y1));
+  const xa=Math.max(4,Math.floor(x0)),ya=Math.max(4,Math.floor(y0));
+  const xb=Math.min(COLS-5,Math.ceil(x1)),yb=Math.min(ROWS-5,Math.ceil(y1));
   if(xb<=xa||yb<=ya)return 0;
   const padding=3,w=xb-xa+1+padding*2,h=yb-ya+1+padding*2;
   const src=new Float32Array(w*h);
