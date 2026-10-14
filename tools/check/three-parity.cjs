@@ -58,6 +58,25 @@ const file=(mobile,name,mode)=>path.join(shots,(mobile?'phone':'desktop')+'-'+na
      console.log('CAPTURE '+(mobile?'PHONE':'DESKTOP')+' '+site,
        JSON.stringify({glyphs:verify.stats.glyphs,drawCalls:verify.stats.drawCalls,mapUnchanged:true}));
    }
+   // Bright lightning uses two original castle quads with DIFFERENT blend
+   // modes. A faithful Three port must match the source at every pixel.
+   const flashSetup=await page.evaluate(()=>{
+     const p=window.__ASCII_PARITY__;
+     p.visitForTest('castle');
+     if(!p.setSourceFlashForTest(.65))return null;
+     return p.captureReferenceForTest();
+   });
+   if(!flashSetup||flashSetup.glyphs<1000)
+     throw Error('Source castle lightning frame absent');
+   await page.screenshot({path:file(mobile,'castle-flash','original'),timeout:60000,animations:'disabled'});
+   const flashThree=await page.evaluate(()=>window.__ASCII_PARITY__.captureThreeForTest());
+   if(!flashThree||flashThree.glyphs!==flashSetup.glyphs||flashThree.drawCalls<3)
+     throw Error('Three renderer lost additive source castle flash '+JSON.stringify(flashThree));
+   await page.screenshot({path:file(mobile,'castle-flash','three'),timeout:60000,animations:'disabled'});
+   await page.evaluate(()=>{
+     window.__ASCII_PARITY__.select('legacy');
+     window.__ASCII_PARITY__.setSourceFlashForTest(0);
+   });
    const restored=await page.evaluate(()=>({
      mode:window.__ASCII_PARITY__.mode,
      visible:getComputedStyle(document.getElementById('g')).visibility,
