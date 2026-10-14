@@ -79,6 +79,8 @@ const material = {
 };
 // Repeating worn-earth texture: generated only once, no network images.
 function createDirtTexture() {
+  // Initialized locally: createDirtTexture executes before the later const hash.
+  const hash=n=>{const v=Math.sin(n*127.1+98.9)*43758.5453;return v-Math.floor(v);};
   const c=document.createElement('canvas');c.width=128;c.height=128;
   const g=c.getContext('2d',{alpha:false});
   g.fillStyle='#66665e';g.fillRect(0,0,128,128);
@@ -434,6 +436,9 @@ const postMaterial=new THREE.ShaderMaterial({
     'vec3 ink=mix(vec3(.52),vec3(1.),level);',
     'vec3 outCol=vec3(.025)+stroke*ink*sceneMask;',
     'gl_FragColor=vec4(outCol,1.);',
+    // ShaderMaterial needs explicit linear -> sRGB conversion at display output.
+    // Without it, most dark PBR surfaces are effectively invisible.
+    '#include <colorspace_fragment>',
     '}'
   ].join('\n'),
   depthTest:false,depthWrite:false
