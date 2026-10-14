@@ -65,7 +65,20 @@ bakeFloraSprites=function(){
 
 drawEntity=function nativeDepthSortedEntity(e){
   if(e.cls==='knight'||e.cls==='cow'||!nativeNpcPalettes.has(nativeNpcKey(e.tint))){
+    const start=GB.n;
     nativeSourceEntityDrawer(e);
+    // The source knight and cattle already emit original authored glyphs to
+    // GB. Tag their exact source batch spans for the same 3D masonry depth as
+    // NPCs; this cannot change any character sprite or animation frame.
+    if(GB.nativeActorRanges&&GB.n>start){
+      let rect=geomOf(e);
+      if(e.cls==='cow'){
+        const k=charDims(e),gx=e.x*CW,gy=(e.y+.7)*CH-hopPx(e);
+        rect={left:gx-CG.fx*k.fcw,top:gy-CG.fy*k.fch,
+          w:CG.cols*k.fcw,h:CG.rows*k.fch};
+      }
+      GB.nativeActorRanges.push({start,end:GB.n,rect,source:e});
+    }
     return;
   }
   const batchStart=GB.n;
