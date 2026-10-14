@@ -30,14 +30,14 @@ fs.mkdirSync(dir,{recursive:true});
      p.captureReferenceForTest();
      p.captureThreeForTest();
    });
-   await page.addStyleTag({content:'.hud,.stats,#parity-toolbar,.ed,.ed-open{visibility:hidden!important}'});
+   await page.addStyleTag({content:'.hud,.stats,#parity-toolbar,.ed,.ed-open,#c{visibility:hidden!important}'});
    const src=await page.evaluate(()=>({
      map:JSON.stringify(window.__ASCII_PARITY__.map),
      canvases:document.querySelectorAll('canvas').length,
      glyphs:window.__ASCII_PARITY__.stats.glyphs
    }));
    if(src.glyphs<1000)throw Error('Original ASCII source buffer empty');
-   await page.screenshot({path:path.join(dir,name+'-before.png'),animations:'disabled'});
+   await page.screenshot({path:path.join(dir,name+'-before.png'),animations:'disabled',scale:'css'});
    const activated=await page.evaluate(()=>window.__ASCII_PARITY__.setDepthMode(true));
    if(!activated)throw Error('Cannot enable original architecture GPU depth');
    await page.evaluate(()=>window.__ASCII_PARITY__.captureThreeForTest());
@@ -53,12 +53,12 @@ fs.mkdirSync(dir,{recursive:true});
       live.depth.frames<1||live.map!==src.map||
       live.canvases!==src.canvases||live.mode!=='three')
      throw Error('Three depth source mismatch: '+JSON.stringify(live));
-   await page.screenshot({path:path.join(dir,name+'-depth.png'),animations:'disabled'});
+   await page.screenshot({path:path.join(dir,name+'-depth.png'),animations:'disabled',scale:'css'});
    fs.writeFileSync(path.join(dir,name+'-rect.json'),JSON.stringify(live.depth.viewport));
    if(!await page.evaluate(()=>window.__ASCII_PARITY__.setDepthMode(false)))
       throw Error('Cannot disable depth prepass');
    await page.evaluate(()=>window.__ASCII_PARITY__.captureThreeForTest());
-   await page.screenshot({path:path.join(dir,name+'-restored.png'),animations:'disabled'});
+   await page.screenshot({path:path.join(dir,name+'-restored.png'),animations:'disabled',scale:'css'});
    const end=await page.evaluate(()=>({
      depth:window.__ASCII_PARITY__.liveArchitecture?.depth||null,
      map:JSON.stringify(window.__ASCII_PARITY__.map),

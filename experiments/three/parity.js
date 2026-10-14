@@ -9,6 +9,7 @@ const modeOriginal=document.getElementById('parity-legacy');
 const modeThree=document.getElementById('parity-three');
 const architectureButton=document.getElementById('parity-architecture');
 const depthButton=document.getElementById('parity-depth');
+let depthStartedArchitecture=false;
 let liveArchitecture=null,architectureLoading=null,architectureWanted=false;
 const status=document.getElementById('parity-status');
 let legacyFlush=GL.flush;
@@ -74,6 +75,7 @@ function selectMode(next){
     // Free experimental 3D GPU resources on returning to original mode.
     if(liveArchitecture){liveArchitecture.dispose();liveArchitecture=null}
     architectureWanted=false;
+    depthStartedArchitecture=false;
     architectureButton.setAttribute('aria-pressed','false');
     architectureButton.textContent='3D архитектура: выкл.';
     depthButton.setAttribute('aria-pressed','false');
@@ -89,6 +91,7 @@ async function setLiveArchitecture(enabled){
   architectureWanted=Boolean(enabled);
   if(!architectureWanted){
     if(liveArchitecture){liveArchitecture.dispose();liveArchitecture=null}
+    depthStartedArchitecture=false;
     depthButton.setAttribute('aria-pressed','false');
     depthButton.textContent='Глубина 3D: выкл.';
     architectureButton.setAttribute('aria-pressed','false');
@@ -124,11 +127,18 @@ async function setDepthMode(enabled){
   try{
     if(!enabled){
       if(liveArchitecture)await liveArchitecture.setDepthPreview(false);
+      // If depth created the source layer on its own, disabling depth must
+      // also remove that layer. Do not leave a distracting gray inset behind.
+      if(depthStartedArchitecture)await setLiveArchitecture(false);
+      depthStartedArchitecture=false;
       depthButton.setAttribute('aria-pressed','false');
       depthButton.textContent='Глубина 3D: выкл.';
       return true;
     }
-    if(!liveArchitecture&&!(await setLiveArchitecture(true)))return false;
+    if(!liveArchitecture){
+      if(!(await setLiveArchitecture(true)))return false;
+      depthStartedArchitecture=true;
+    }else depthStartedArchitecture=false;
     if(!liveArchitecture||!(await liveArchitecture.setDepthPreview(true)))return false;
     depthButton.setAttribute('aria-pressed','true');
     depthButton.textContent='Глубина 3D: вкл.';
