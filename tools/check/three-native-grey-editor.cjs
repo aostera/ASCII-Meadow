@@ -62,8 +62,23 @@ fs.mkdirSync(dir,{recursive:true});
    await slider.evaluate(el=>{
      el.value='75';
      el.dispatchEvent(new Event('input',{bubbles:true}));
-     el.dispatchEvent(new Event('change',{bubbles:true}));
    });
+   // Dragging must rotate real THREE geometry without immediately rebaking
+   // source masonry or changing the exported map. Mirrored X means the
+   // Three-space Y rotation is the negative source yaw delta.
+   await page.waitForFunction(original=>
+     Math.abs(window.__ASCII_NATIVE__.greyEditor.previewRotationY-
+       (original-75*Math.PI/180))<.002,
+     before.yaw,{timeout:90000});
+   const during=await page.evaluate(()=>({
+     map:JSON.stringify(MEADOW_MAP),
+     preview:window.__ASCII_NATIVE__.greyEditor.yawPreview
+   }));
+   if(during.map!==scene.source||
+      Math.abs(during.preview-75*Math.PI/180)>.001)
+     throw Error(label+' grey preview wrote to authored map too soon');
+   await slider.evaluate(el=>
+     el.dispatchEvent(new Event('change',{bubbles:true})));
    await page.waitForFunction(()=>(
      Math.abs(ruinSites()[1].yaw-75*Math.PI/180)<.001 &&
      window.__ASCII_NATIVE__.greyEditor.selected==='abbey-front'
