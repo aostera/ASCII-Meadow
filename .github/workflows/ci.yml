@@ -344,6 +344,9 @@ jobs:
           node --check experiments/three/source-cow-motion.mjs
           node --check experiments/three/device-profiler.mjs
           node tools/check/three-device-profiler.mjs
+          node --check experiments/three/engine-comparison.mjs
+          node tools/check/three-engine-comparison.mjs
+          node --check tools/check/three-engine-comparison.cjs
           node --check tools/check/three-device-profiler.cjs
           node tools/check/three-source-cow-motion.mjs
           node --check tools/check/three-live-cow.cjs
@@ -376,6 +379,7 @@ jobs:
           node tools/check/three-live-knight.cjs http://127.0.0.1:8181
           node tools/check/three-live-cow.cjs http://127.0.0.1:8181
           node tools/check/three-device-profiler.cjs http://127.0.0.1:8181
+          node tools/check/three-engine-comparison.cjs http://127.0.0.1:8181
           node tools/check/three-architecture.cjs http://127.0.0.1:8181
           node tools/check/three-live-architecture.cjs http://127.0.0.1:8181
           node tools/check/three-depth.cjs http://127.0.0.1:8181
@@ -398,4 +402,5 @@ jobs:
             shots/three-knight/
             shots/three-cow/
             shots/three-device-profiler/
+            shots/three-engine-comparison/
           if-no-files-found: warn
