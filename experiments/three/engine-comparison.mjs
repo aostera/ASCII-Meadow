@@ -91,6 +91,10 @@ export function installEngineComparison({
   function tick(now){
     frame=null;
     if(!active||!running)return;
+    if(getMode()!==ENGINE_SEQUENCE[phase]){
+      fail(Error('Режим игры изменился во время измерения; результат отменён'));
+      return;
+    }
     if(document.hidden){last=null;schedule();return}
     if(last===null){last=now;schedule();return}
     const dt=now-last;last=now;
