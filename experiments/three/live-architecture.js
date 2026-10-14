@@ -8,6 +8,8 @@ import {makeSourceArchitecture} from './source-masonry.mjs';
 import {createNativeSourceWorld,configureNativeCamera} from './source-world.mjs';
 import {createAnimatedKnight} from './knight-rig.js';
 import {projectOriginalActor,sourceKnightMotion} from './source-motion.mjs';
+import {createAnimatedCow} from './cow-rig.js';
+import {sourceCowPose,projectSourceCow} from './source-cow-motion.mjs';
 
 // CSS-pixel rectangle, anchored to the top-right of the source game canvas.
 export function architectureInsetRect(width,height){
@@ -54,6 +56,62 @@ export class LiveSourceArchitecture {
     this.knightSample=null;this.knightClock=null;
     this.knightEnabled=false;
     this.stats.knightRig=false;
+    this.cowRig=null;this.cowMaterials=null;
+    this.cowClock=null;this.cowSample=null;this.cowEnabled=false;
+    this.stats.cowRig=false;
+  }
+  setCowRig(enabled){
+    if(this.disposed&&enabled)return false;
+    if(!enabled){
+      if(this.cowRig){
+        this.scene.remove(this.cowRig);
+        this.cowRig.userData.dispose();
+        for(const mat of Object.values(this.cowMaterials||{}))mat.dispose();
+      }
+      this.cowRig=null;this.cowMaterials=null;
+      this.cowClock=null;this.cowSample=null;
+      this.cowEnabled=false;this.stats.cowRig=false;
+      this.stats.cowMotion='off';this.stats.cowHeadLowering=0;
+      return true;
+    }
+    if(!this.cowRig){
+      this.cowMaterials={
+        hide:new THREE.MeshStandardMaterial({color:0x444444,roughness:.91}),
+        armor:new THREE.MeshStandardMaterial({color:0x777777,roughness:.82}),
+        hoof:new THREE.MeshStandardMaterial({color:0x282828,roughness:1}),
+        shadow:new THREE.MeshStandardMaterial({color:0x292929,roughness:1}),
+        muzzle:new THREE.MeshStandardMaterial({color:0x676767,roughness:.97}),
+        horn:new THREE.MeshStandardMaterial({color:0x9b9b9b,roughness:.87})
+      };
+      this.cowRig=createAnimatedCow(THREE,this.cowMaterials);
+      this.cowRig.traverse(o=>o.layers.set(1));
+      this.scene.add(this.cowRig);
+      this.stats.cowMeshes=0;
+      this.cowRig.traverse(o=>{if(o.isMesh)this.stats.cowMeshes++});
+    }
+    this.cowEnabled=true;this.stats.cowRig=true;
+    return true;
+  }
+  updateCowFromSource(data,CW,CH){
+    if(!this.cowEnabled||!this.cowRig||!data.cows?.length)return;
+    const sourceCow=data.cows[0];
+    const now=Number(data.gameTime)||0;
+    const dt=this.cowClock===null?1/60:
+      Math.max(1/240,Math.min(.05,now-this.cowClock));
+    const pose=sourceCowPose(sourceCow,this.cowSample,dt,CW,CH,now);
+    const projected=projectSourceCow(sourceCow,CW,CH,data.pitch,data.cowSourceHeight);
+    this.cowRig.position.set(...projected.position);
+    this.cowRig.scale.setScalar(projected.scale);
+    const status=this.cowRig.userData.animateFromSource(dt,pose);
+    this.cowSample=pose.sample;this.cowClock=now;
+    this.stats.cowMotion=status;
+    this.stats.cowHeadLowering=pose.lowerHead;
+    this.stats.cowHop=pose.hop;
+    this.stats.cowGait=pose.gait;
+    this.stats.cowOriginalState=sourceCow.state;
+    this.stats.cowActorFoot=projected.sourceScreen;
+    this.stats.cowNativePosition=projected.position;
+    this.stats.cowHeading=pose.heading;
   }
   setKnightRig(enabled){
     if(this.disposed&&enabled)return false;
@@ -150,6 +208,7 @@ export class LiveSourceArchitecture {
     if(this.disposed||!this.active||!(W>0&&H>0))return;
     const data=this.refresh();
     this.updateKnightFromSource(data,CW,CH);
+    this.updateCowFromSource(data,CW,CH);
     if(this.depthPass){
       this.depthPass.render({
         W,H,VZ,CW,CH,camX,camY,pitch:data.pitch,sites:this.stats.sites
@@ -177,15 +236,19 @@ export class LiveSourceArchitecture {
     // Player-driven rig gets a camera-closeup ONLY inside the inset, so that
     // knees, arms and cape motion are visible on both desktop and narrow phones.
     // The actual ASCII camera/image remains completely untouched.
-    const zoom=this.knightEnabled&&data.player?
-      Math.max(.1,Math.min(1.45,rect.height*.60/data.knightSourceHeight)):
+    const actorMode=this.cowEnabled&&data.cows?.length?'cow':
+      this.knightEnabled&&data.player?'knight':null;
+    const focusActor=actorMode==='cow'?data.cows[0]:data.player;
+    const sourceHeight=actorMode==='cow'?data.cowSourceHeight:data.knightSourceHeight;
+    const zoom=actorMode?
+      Math.max(.1,Math.min(1.45,rect.height*.60/sourceHeight)):
       VZ*.14*Math.min(1,rect.width/340);
-    const actorSx=data.player?(data.player.x*CW):0;
-    const actorSy=data.player?((data.player.y+.7)*CH-data.knightSourceHeight*.5):0;
-    const cx=this.knightEnabled?
+    const actorSx=focusActor?(focusActor.x*CW):0;
+    const actorSy=focusActor?((focusActor.y+.7)*CH-sourceHeight*.5):0;
+    const cx=actorMode?
       (actorSx-rect.width/(2*zoom))/CW:
       camX+(W/(2*VZ)-rect.width/(2*zoom))/CW;
-    const cy=this.knightEnabled?
+    const cy=actorMode?
       (actorSy-rect.height/(2*zoom))/CH:
       camY+(H/(2*VZ)-rect.height/(2*zoom))/CH;
     const view=configureNativeCamera(THREE,this.camera,{
@@ -231,6 +294,7 @@ export class LiveSourceArchitecture {
     if(this.depthPass){this.depthPass.dispose();this.depthPass=null}
     this.removeWorld();
     this.setKnightRig(false);
+    this.setCowRig(false);
     for(const material of Object.values(this.materials))material.dispose();
     this.scene.clear();
   }
