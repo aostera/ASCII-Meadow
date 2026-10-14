@@ -1,7 +1,8 @@
-// Opt-in 3D player knight in the MAIN native picture (native.html?knight3d).
-// Checks desktop/phone: GLB (or procedural fallback) loads into the same WebGL
-// context, follows the source player's foot, plays Walk/Run/Jump from real input,
-// leaves the source map untouched, and that without the flag nothing changes.
+// The player in native.html is the 3D glTF knight printed as the game's glyphs.
+// Checks desktop/phone: ?knight3d=0 loads nothing 3D; by default the GLB loads into
+// the same WebGL context, its render becomes knight glyphs in the source batch,
+// clips follow real input (Walk/Run/Jump), no extra canvas, map untouched. Without
+// the GLB the original ASCII knight must stay in place (no procedural stand-in).
 const {chromium}=require('playwright');
 const fs=require('node:fs'),path=require('node:path');
 const base=(process.argv[2]||'http://127.0.0.1:8181').replace(/\/$/,'');
@@ -24,23 +25,23 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    // Without the flag the native page must not even load the 3D knight module.
    const requested=[];
    page.on('request',r=>requested.push(r.url()));
-   await page.goto(base+'/experiments/three/native.html',{waitUntil:'domcontentloaded'});
+   await page.goto(base+'/experiments/three/native.html?knight3d=0',{waitUntil:'domcontentloaded'});
    await page.waitForFunction(()=>window.__ASCII_NATIVE__?.ready&&
      window.__ASCII_NATIVE__.frameCount>2,undefined,{timeout:90000});
    if(await page.evaluate(()=>window.__ASCII_NATIVE__.knight3d)!==null)
-     throw Error('3D knight active without ?knight3d');
+     throw Error('3D knight active with ?knight3d=0');
    if(requested.some(u=>/native-knight3d|masked_knight\.glb/.test(u)))
-     throw Error('3D knight assets requested without ?knight3d');
+     throw Error('3D knight assets requested with ?knight3d=0');
    const baseCanvases=await page.evaluate(()=>document.querySelectorAll('canvas').length);
 
    const glbPresent=await page.evaluate(async()=>{
      try{return (await fetch('experiments/three/assets/knight/masked_knight.glb',
        {method:'HEAD'})).ok}catch(_){return false}
    });
-   await page.goto(base+'/experiments/three/native.html?knight3d',{waitUntil:'domcontentloaded'});
+   await page.goto(base+'/experiments/three/native.html',{waitUntil:'domcontentloaded'});
    await page.waitForFunction(()=>{
      const n=window.__ASCII_NATIVE__,k=n?.knight3d;
-     return n?.ready&&k?.active&&(k.loaded||k.error)&&k.frames>2;
+     return n?.ready&&n.frameCount>3&&k&&(k.error||k.frames>2);
    },undefined,{timeout:90000});
    const before=await page.evaluate(()=>({
      map:JSON.stringify(window.__ASCII_NATIVE__.originalMap),
@@ -68,8 +69,11 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    await page.addStyleTag({content:'.hud,.stats,.ed,.ed-open{visibility:hidden!important}'});
    const idle=await shot('idle');
    if(glbPresent&&!idle.loaded)throw Error('GLB present but not loaded: '+idle.error);
-   if(!glbPresent&&!idle.error)throw Error('GLB absent but no fallback error');
-   if(!(idle.drawCalls>=1))throw Error('3D knight drew nothing');
+   if(!glbPresent&&(!idle.error||idle.frames))
+     throw Error('GLB absent: the original ASCII knight must stay, got '+JSON.stringify(idle));
+   if(glbPresent&&!(idle.glyphs>300&&idle.cells>=idle.glyphs))
+     throw Error('3D knight printed too few glyphs: '+JSON.stringify(idle));
+   if(glbPresent&&!(idle.cloakCells>20))throw Error('No cloak cells for the crimson block');
 
    // SwiftShader renders a few frames per second: wait for states, not for time.
    const seen=new Set([idle.clip]);
@@ -112,8 +116,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    if(disposed)throw Error('3D knight survived dispose');
    if(errors.length)throw Error('Page errors:\n'+errors.join('\n'));
    console.log(`${name.toUpperCase()} NATIVE 3D KNIGHT PASS`,JSON.stringify({
-     glb:glbPresent?'loaded':'ABSENT - procedural fallback verified',
-     clips:[...seen],frames:after.frames,drawCalls:after.drawCalls,
+     glb:glbPresent?'loaded':'ABSENT - original ASCII knight kept',
+     clips:[...seen],frames:after.frames,glyphs:after.glyphs,cloakCells:after.cloakCells,
      canvases:before.canvases,mapUnchanged:true,disposed:true
    }));
    await context.close();

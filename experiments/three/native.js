@@ -8,16 +8,27 @@ import {NativeArchitectureDepth} from './native-architecture-depth.mjs';
 const fallbackCanvas=document.getElementById('g');
 let backend=null,depthPass=null,disposed=false,fallbackReason=null,frames=0;
 let testDepthDisabled=false;
-// Opt-in 3D player knight in the main picture: ?knight3d replaces the ASCII
-// knight, ?knight3d=both draws both. Without the flag nothing below runs.
-const knight3dParam=new URLSearchParams(location.search).get('knight3d');
-const knight3dMode=knight3dParam===null?null:(knight3dParam==='both'?'both':'replace');
+// The player is the skinned 3D knight printed as the game's own glyphs (see
+// native-knight3d.mjs). ?knight3d=0 keeps the original baked ASCII knight; so does
+// any failure, and the time until the GLB has loaded.
+const knight3dOn=new URLSearchParams(location.search).get('knight3d')!=='0';
 let knight3d=null,knight3dError=null;
-if(knight3dMode==='replace'){
+if(knight3dOn){
   const originalDrawKnight=drawKnight;
-  // Only the player's ASCII body is skipped; its name tag is still drawn.
   drawKnight=function(e,G,fcw,fch){
-    if(e===player&&knight3d&&!knight3d.disposed){drawTag(e,G.gx,G.gy);return}
+    if(e===player&&knight3d?.ready){
+      try{
+        knight3d.draw(e,G,fcw,fch,{t,CW,CH,PITCH,KG,JUMP_T,AIR0,AIR1,
+          rampCode,grect,gput,KN0,KNS,fireLightAt,knightFireBlock});
+        drawTag(e,G.gx,G.gy);
+        return;
+      }catch(error){
+        // A broken 3D knight hands the player back to the original ASCII art.
+        knight3dError=String(error?.message||error);
+        console.error('3D knight disabled:',error);
+        knight3d.dispose();knight3d=null;
+      }
+    }
     return originalDrawKnight(e,G,fcw,fch);
   };
 }
@@ -76,16 +87,6 @@ function flushNative(camx,camy,castle){
     if(testDepthDisabled)backend.actorDepthTexture=null;
     backend.actorDepthPitch=PITCH;
     backend.flush(GB,SPF,gput,CAST,camx,camy,castle,W,H,DPR,VZ,cathedral.cv);
-    if(knight3d)try{
-      knight3d.render({player,gameTime:t,
-        sourceHeight:KG.art*charDims(player).fch,
-        W,H,VZ,CW,CH,camX,camY,pitch:PITCH});
-    }catch(knightError){
-      // A broken 3D knight never takes the glyph renderer down with it.
-      knight3dError=String(knightError?.message||knightError);
-      console.error('Native 3D knight disabled:',knightError);
-      knight3d.dispose();knight3d=null;
-    }
     frames++;
   }catch(error){
     enableFallback(error);
@@ -132,9 +133,9 @@ try{
   });
 }catch(err){enableFallback(err)}
 
-if(knight3dMode&&backend){
-  import('./native-knight3d.mjs').then(({NativeKnight3D})=>{
-    if(!disposed&&backend)knight3d=new NativeKnight3D(backend.renderer);
+if(knight3dOn&&backend){
+  import('./native-knight3d.mjs').then(({NativeKnightGlyphs})=>{
+    if(!disposed&&backend)knight3d=new NativeKnightGlyphs(backend.renderer);
   }).catch(error=>{
     knight3dError=String(error?.message||error);
     console.error('Native 3D knight unavailable:',error);
@@ -157,8 +158,8 @@ window.__ASCII_NATIVE__={
     return true;
   },
   get error(){return fallbackReason},
-  get knight3d(){return knight3dMode?{mode:knight3dMode,active:!!knight3d,
-    error:knight3dError,...(knight3d?.stats||{})}:null},
+  get knight3d(){return knight3dOn?{active:!!knight3d,ready:!!knight3d?.ready,
+    error:knight3dError||knight3d?.stats.error||null,...(knight3d?.stats||{})}:null},
   // Explicitly off the production route; visual art review comes at the end.
   dispose(){
     if(disposed)return;

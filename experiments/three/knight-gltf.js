@@ -8,7 +8,8 @@
 //   Idle 48 f loop, Walk 32 f loop (0.62 m/s), Run 20 f loop (1.9 m/s),
 //   Jump 36 f once (take-off f9, touch-down f23), Crouch 24 f once.
 // The jump height stays with this module (same arc constants as knight-rig.js); the Jump clip
-// is time-mapped so its take-off and touch-down meet the arc's.
+// is time-mapped so its take-off and touch-down meet the arc's. A caller that owns the jump
+// (the source game) passes movement.jumpClipTime instead and creates the knight with arc:false.
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 
 export const KNIGHT_GLB_URL = new URL('./assets/knight/masked_knight.glb', import.meta.url).href;
@@ -20,7 +21,7 @@ const JUMP_TAKEOFF = 9 / 24, JUMP_LAND = 23 / 24;
 const JUMP_V = 8.8, GRAVITY = 23;   // knight-rig.js arc, rig units
 const FADE = .18;
 
-export function createGltfKnight(THREE, {url = KNIGHT_GLB_URL, fallback = null, onLoad, onError} = {}) {
+export function createGltfKnight(THREE, {url = KNIGHT_GLB_URL, fallback = null, arc = true, onLoad, onError} = {}) {
   const root = new THREE.Group();
   root.name = 'Masked Knight (glTF)';
   const holder = new THREE.Group();          // carries the jump height
@@ -47,6 +48,7 @@ export function createGltfKnight(THREE, {url = KNIGHT_GLB_URL, fallback = null, 
     });
     holder.add(model);
     applyLayers(model);
+    root.userData.prepareModel?.(model);
     st.mixer = new THREE.AnimationMixer(model);
     for (const clip of gltf.animations) {
       const a = st.mixer.clipAction(clip);
@@ -98,10 +100,21 @@ export function createGltfKnight(THREE, {url = KNIGHT_GLB_URL, fallback = null, 
     const run = moving && !!movement.run;
     // heading: same smoothing as the procedural rig
     const targetYaw = movement.heading === undefined ? root.rotation.y : movement.heading;
+    if (typeof movement.jumpClipTime === 'number') {
+      // the caller's jump: its phase picks the frame, its arc lifts the figure
+      root.rotation.y += Math.atan2(Math.sin(targetYaw - root.rotation.y),
+        Math.cos(targetYaw - root.rotation.y)) * Math.min(1, dt * 11);
+      holder.position.y = 0;
+      play('Jump', .08, movement.jumpClipTime);
+      st.actions.Jump.timeScale = 0;
+      st.motion = 'jump';
+      st.mixer.update(dt);
+      return st.motion;
+    }
     const delta = Math.atan2(Math.sin(targetYaw - root.rotation.y), Math.cos(targetYaw - root.rotation.y));
     root.rotation.y += delta * Math.min(1, dt * 11);
     // jump arc in rig units
-    if (movement.jump && st.air <= .001 && st.vy <= 0) st.vy = JUMP_V;
+    if (arc && movement.jump && st.air <= .001 && st.vy <= 0) st.vy = JUMP_V;
     const airborne = st.air > 0 || st.vy > 0;
     if (airborne) {
       st.air += st.vy * dt;

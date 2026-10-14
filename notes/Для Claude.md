@@ -190,5 +190,6 @@ Native game only (`/experiments/three/native.html`):
 - Пайплайн рыцаря — скрипты в `blender/`, порядок и правила в `blender/README.md`. Пересборка: подготовка → риг → плащ → `bake_clip` × 5 → `export_glb`. Не правь GLB руками.
 - Three.js: `experiments/three/knight-gltf.js` (контракт как у `knight-rig.js`), по умолчанию в 3D-риге; `?knight=procedural` — старый риг. Тест `tools/check/three-live-knight.cjs`.
 - Объект, привязанный к кости, не позиционировать через `matrix_world` — только identity `matrix_basis` + `matrix_parent_inverse` из покоя кости.
-- Основная картинка native-игры: `native.html?knight3d` — 3D-рыцарь вместо ASCII-рыцаря игрока (`?knight3d=both` — оба). Модуль `experiments/three/native-knight3d.mjs`, тест `tools/check/three-native-knight3d.cjs`. Без флага модуль даже не загружается — паритет 1:1 не затронут.
+- Основная картинка native-игры: игрок по умолчанию — 3D glTF-рыцарь, напечатанный глифами игры (`experiments/three/native-knight3d.mjs`: рендер в offscreen-цель → рецепт `tools/to_ascii.py` → `grect`/`gput` в общий батч с атласом рыцаря и огнём). `?knight3d=0`, отсутствие GLB или ошибка — исходный ASCII-рыцарь. Тест `tools/check/three-native-knight3d.cjs`. Лаборатория паритета (`parity.html`) не затронута.
+- Спрайт-камера рыцаря — своя (подъём 0,35 рад), не `PITCH` карты: с наклона карты глубина плаща раздувала фигуру в 1,5 раза.
 - Лицензия Fab на GLB в публичном репозитории не подтверждена — спроси автора, прежде чем коммитить `assets/knight/*.glb`.
