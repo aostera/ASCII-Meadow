@@ -86,6 +86,21 @@ window.__ASCII_PARITY__={
   get canvas(){return backend?.renderer.domElement||null;},
   get ready(){return Boolean(GB.atlasCv&&GB.spr.length&&W&&H&&GB.n>1000);},
   get baselineGlyphs(){return GB.n;},
+  get positionDiagnostics(){
+    if(!backend)return null;
+    const layer=backend.glyphs,n=layer.geo.instanceCount;
+    const rect=layer.rect,cam=layer.uniforms.uCam.value,view=layer.uniforms.uView.value;
+    let visible=0,minX=Infinity,maxX=-Infinity;
+    for(let i=0;i<n;i+=Math.max(1,Math.floor(n/2048))){
+      const j=i*4,x=(rect[j]-cam.x)/view.x*2-1,xx=(rect[j+2]-cam.x)/view.x*2-1;
+      if(x<1&&xx>-1)visible++;
+      minX=Math.min(minX,x);maxX=Math.max(maxX,xx);
+    }
+    return {sampledVisibleX:visible,clipXRange:[minX,maxX],
+      first:rect.slice(0,16).join(','),cam:[cam.x,cam.y],view:[view.x,view.y],
+      positions:layer.geo.instanceCount,draws:backend.stats.drawCalls,
+      triangles:backend.stats.triangles};
+  },
   // Debug shader modes are available ONLY in ?parityTest=1, never to players.
   debugForTest(mode){
     if(!new URLSearchParams(location.search).has('parityTest')||!backend)return false;
