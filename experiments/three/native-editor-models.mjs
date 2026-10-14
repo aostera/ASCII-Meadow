@@ -136,8 +136,14 @@ export class NativeGreyMapEditor {
       if(e.type==='pointerdown'&&this.active&&
          this.controller.isEditing()&&e.target===cv&&e.button===0&&
          (e.altKey||e.shiftKey)){
-        const hovered=edPick(e.clientX,e.clientY);
-        if(hovered?.kind==='ruins'){
+        // Prioritize actual grey 3D buildings over grass/flowers at their
+        // feet; the normal source picker remains authoritative for plain
+        // clicks and dragging all other map objects.
+        const hovered=edObjects().filter(o=>o.kind==='ruins'&&
+          Math.abs(e.clientX-o.sx)<o.r&&
+          e.clientY<o.sy+CH*1.5*VZ&&
+          e.clientY>o.sy-o.top).sort((a,b)=>b.sy-a.sy)[0];
+        if(hovered){
           ED.tool='select';ED.sel={kind:'ruins',mi:hovered.mi};
           edSyncUI();this.refreshUi();
           const r=this.controller.selectedRuin();
