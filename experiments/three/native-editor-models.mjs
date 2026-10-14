@@ -205,15 +205,16 @@ export class NativeGreyMapEditor {
     this.refreshUi();
     if(!this.active||!this.controller.isEditing()||!this.renderer)return;
     this.ensureWorld(this.sourceProvider());
-    // The source scene is already yaw-transformed; preview only the delta.
-    // In the mirrored native Three coordinate frame this is +yaw around Y.
+    // The source mesh is already yaw-transformed. Three reverses the X
+    // coordinate, so its preview Y-axis rotation is NEGATIVE delta yaw.
+    // This must match ruinRotateMesh() when the authored map is committed.
     const sel=this.selection;
     for(let i=0;i<this.world.children.length;i++){
       const child=this.world.children[i];
       const index=i-1;
       if(index>=0&&sel?.index===index&&this.preview){
         const sourceYaw=this.sourceProvider().ruinSites()[index]?.yaw||0;
-        child.rotation.y=this.preview.angle-sourceYaw;
+        child.rotation.y=sourceYaw-this.preview.angle;
       }else child.rotation.y=0;
     }
     const target=sel?this.world.children[sel.index+1]:null;
