@@ -65,3 +65,7 @@ The link is for testing and may briefly show the previous build while Cloudflare
 
 ## Real GPU timing, when supported
 `gpu-timing.js` records asynchronous WebGL2 `EXT_disjoint_timer_query_webgl2` elapsed GPU milliseconds for the entire scene plus ASCII postprocessing. The HUD shows a GPU p95 (or unsupported), next to actual requestAnimationFrame interval and CPU submit duration. This is not a prediction of mobile FPS and requires equal-scene benchmarking. The timer never calls blocking GPU readback; it also drops pending queries after context loss. `tools/check/three-unit.cjs` validates timer lifecycle and oriented grass masks without Chromium.
+
+## Side-by-side performance QA on actual hardware (2026-10-14)
+
+Use [the opt-in original / Three A/B comparison](https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev/experiments/three/?profile=compare) on the same device. Four sequential 5-second samples run **Original → Three → Three → Original** (plus warm-up per segment), restore the initial renderer on completion or Close, and show both measured FPS and frame p95. Press **Скопировать JSON** to share the result. This runs the actual unchanged source game on both renderers; no brightness, alpha or world-data substitutions. Results are display-vsync capped and affected by scene movement and thermals; for a meaningful performance decision, compare several runs on the same physical device. CI SwiftShader is a functional smoke test, not a real-world speed benchmark.
