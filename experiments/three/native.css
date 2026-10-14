@@ -4,3 +4,23 @@
 #three-parity-canvas { z-index:1; pointer-events:none; }
 #c { z-index:2; }
 .hud,.stats,.ed,.ed-open { z-index:4; }
+
+/* Android browser chrome, cut-outs and WebView gesture surfaces. Only native
+   touch layouts change; world glyph RGB/alpha/pixel ratios remain authored. */
+html,body { overscroll-behavior: none; }
+#c { touch-action: none; -webkit-tap-highlight-color: transparent; }
+@media (pointer: coarse) {
+  .hud {
+    box-sizing: border-box;
+    left: max(10px,env(safe-area-inset-left,0px));
+    right: max(10px,env(safe-area-inset-right,0px));
+    top: calc(10px + env(safe-area-inset-top,0px));
+    max-width: none;
+    padding: 8px 10px;
+  }
+  .hud p { max-width: 36ch; }
+  .stats {
+    right: max(10px,env(safe-area-inset-right,0px));
+    bottom: calc(10px + env(safe-area-inset-bottom,0px));
+  }
+}
