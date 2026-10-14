@@ -28,7 +28,7 @@ fs.mkdirSync(dir,{recursive:true});
    const result=await page.evaluate(()=>{
      const api=window.__ASCII_NATIVE_BUSHES__;
      const source=JSON.stringify(MEADOW_MAP);
-     if(!(api.shift(-8,0,50,1)<0&&api.shift(8,0,50,1)>0)&&
+     if(!(api.shift(-8,0,50,1)<0&&api.shift(8,0,50,1)>0)||
         api.shift(100,0,50,1)!==0)
        throw Error('Parting function does not displace away from actor');
      // Choose a real authored/generated bush, not a synthetic re-created
