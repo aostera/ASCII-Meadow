@@ -337,6 +337,7 @@ jobs:
           node --check experiments/three/parity.js
           node --check experiments/three/three-glyphs.js
           node --check tools/check/three-parity.cjs
+          node tools/check/three-source-sync.cjs
       - name: Render original full game through both rasterizers
         run: |
           python3 -m http.server 8181 > /tmp/parity-http.log 2>&1 &
