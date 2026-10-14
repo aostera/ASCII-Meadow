@@ -1,7 +1,7 @@
 /* Exact-parity migration lab. The original game stylesheet is untouched. */
 #g { z-index: 0; }
 #three-parity-canvas { z-index: 1; pointer-events: none; }
-#c { z-index: 2; pointer-events: none; }
+#c { z-index: 2; }
 .hud,.stats,.ed,.ed-open { z-index: 4; }
 #parity-toolbar {
   position: fixed;
