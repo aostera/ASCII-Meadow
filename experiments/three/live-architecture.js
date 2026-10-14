@@ -28,6 +28,8 @@ export class LiveSourceArchitecture {
     this.scene.background=new THREE.Color().setRGB(12/255,12/255,12/255,
       THREE.LinearSRGBColorSpace);
     this.camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,40000);
+    // Actor diagnostic on layer 1; source masonry and native depth stay on layer 0.
+    this.camera.layers.enable(1);
     this.scene.add(new THREE.HemisphereLight(0xe1e1e1,0x2b2b2b,1.2));
     const sun=new THREE.DirectionalLight(0xdadada,1.7);
     sun.position.set(-450,950,680);this.scene.add(sun);
@@ -75,6 +77,7 @@ export class LiveSourceArchitecture {
       };
       this.knightRig=createAnimatedKnight(THREE,this.knightMaterials);
       this.knightRig.name='source-player-driven-3D-rig-diagnostic';
+      this.knightRig.traverse(o=>o.layers.set(1));
       this.scene.add(this.knightRig);
       this.stats.knightMeshes=0;
       this.knightRig.traverse(o=>{if(o.isMesh)this.stats.knightMeshes++});
@@ -171,9 +174,20 @@ export class LiveSourceArchitecture {
     // Gothic source volumes range from hundreds to thousands of original
     // screen pixels. A wider diagnostic FOV is necessary to reveal the
     // complete ruins instead of a heavily clipped striped wall close-up.
-    const zoom=VZ*.14*Math.min(1,rect.width/340);
-    const cx=camX+(W/(2*VZ)-rect.width/(2*zoom))/CW;
-    const cy=camY+(H/(2*VZ)-rect.height/(2*zoom))/CH;
+    // Player-driven rig gets a camera-closeup ONLY inside the inset, so that
+    // knees, arms and cape motion are visible on both desktop and narrow phones.
+    // The actual ASCII camera/image remains completely untouched.
+    const zoom=this.knightEnabled&&data.player?
+      Math.max(.1,Math.min(1.45,rect.height*.60/data.knightSourceHeight)):
+      VZ*.14*Math.min(1,rect.width/340);
+    const actorSx=data.player?(data.player.x*CW):0;
+    const actorSy=data.player?((data.player.y+.7)*CH-data.knightSourceHeight*.5):0;
+    const cx=this.knightEnabled?
+      (actorSx-rect.width/(2*zoom))/CW:
+      camX+(W/(2*VZ)-rect.width/(2*zoom))/CW;
+    const cy=this.knightEnabled?
+      (actorSy-rect.height/(2*zoom))/CH:
+      camY+(H/(2*VZ)-rect.height/(2*zoom))/CH;
     const view=configureNativeCamera(THREE,this.camera,{
       W:rect.width,H:rect.height,VZ:zoom,
       camX:cx,camY:cy,CW,CH,pitch:data.pitch
