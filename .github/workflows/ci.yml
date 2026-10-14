@@ -336,6 +336,9 @@ jobs:
         run: |
           node --check experiments/three/parity.js
           node --check experiments/three/three-glyphs.js
+          node --check experiments/three/native-gl.js
+          node --check experiments/three/native.js
+          node --check tools/check/three-native-game.cjs
           node --check experiments/three/glyph-visibility.mjs
           node --check experiments/three/source-motion.mjs
           node tools/check/three-source-motion.mjs
@@ -380,6 +383,7 @@ jobs:
           node tools/check/three-live-cow.cjs http://127.0.0.1:8181
           node tools/check/three-device-profiler.cjs http://127.0.0.1:8181
           node tools/check/three-engine-comparison.cjs http://127.0.0.1:8181
+          node tools/check/three-native-game.cjs http://127.0.0.1:8181
           node tools/check/three-architecture.cjs http://127.0.0.1:8181
           node tools/check/three-live-architecture.cjs http://127.0.0.1:8181
           node tools/check/three-depth.cjs http://127.0.0.1:8181
@@ -403,4 +407,5 @@ jobs:
             shots/three-cow/
             shots/three-device-profiler/
             shots/three-engine-comparison/
+            shots/three-native-game/
           if-no-files-found: warn
