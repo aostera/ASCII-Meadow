@@ -91,6 +91,30 @@ fs.mkdirSync(dir,{recursive:true});
    await page.waitForFunction(()=>MEADOW_MAP.ruins===null||
      Math.abs(ruinSites()[1].yaw-(-.34))<.001,
      undefined,{timeout:90000});
+   // Direct rotation by touching the actual grey ruin IN THE MAP.
+   // Keep this distinct from the slider: Alt-drag must generate a single
+   // normal source editor undo entry, and never drag the ruin's world position.
+   const point=await page.evaluate(()=>{
+     const r=ruins[1];
+     const [x,y]=mapToCell(r.x,r.z);
+     camX=x-W/(CW*VZ)*.5;camY=y-H/(CH*VZ)*.5;
+     const o=edObjects().find(o=>o.kind==='ruins'&&o.mi===1);
+     if(!o)throw Error('Selected abbey not present in editor');
+     return {x:o.sx,y:o.sy-Math.min(22,o.top*.25)};
+   });
+   await page.keyboard.down('Alt');
+   await page.mouse.move(point.x,point.y);
+   await page.mouse.down();
+   await page.mouse.move(point.x+74,point.y,{steps:6});
+   await page.mouse.up();
+   await page.keyboard.up('Alt');
+   await page.waitForFunction(()=>
+     Math.abs(ruinSites()[1].yaw-(-.34))>.08,
+     undefined,{timeout:90000});
+   await page.evaluate(()=>edUndo());
+   await page.waitForFunction(()=>MEADOW_MAP.ruins===null||
+     Math.abs(ruinSites()[1].yaw-(-.34))<.001,
+     undefined,{timeout:90000});
    const restored=await page.evaluate(()=>({
      map:JSON.stringify(MEADOW_MAP),
      editor:window.__ASCII_NATIVE__.greyEditor,
@@ -114,6 +138,7 @@ fs.mkdirSync(dir,{recursive:true});
      savedAngleDegrees:75,
      rotatedByButtonDegrees:90,
      undoWorks:true,
+     directAltDragOnMap:true,
      singleThreeContext:true,
      inMap:true,
      sourceGameIntact:true
