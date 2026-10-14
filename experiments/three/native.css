@@ -1,0 +1,6 @@
+/* Experimental native runtime: one full-screen Three WebGL canvas plus
+   the existing 2D overlay; the old GPU canvas is never created. */
+#g { z-index:0; }
+#three-parity-canvas { z-index:1; pointer-events:none; }
+#c { z-index:2; }
+.hud,.stats,.ed,.ed-open { z-index:4; }
