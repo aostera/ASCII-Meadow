@@ -35,3 +35,12 @@ Do not touch author-set **brightness or transparency**. Deliver first: original-
 - User can select castle/ruins, rotate and zoom. The viewer pauses hidden simulation and resumes it on close, releasing its GPU resources.
 - CI `tools/check/three-architecture.cjs` verifies geometry, screenshot, source map immutability, return to legacy, distinct from the eight 100% matching original ASCII frames.
 - **Still pending**: camera/texturing parity and integration of this real source mesh into the live game's hybrid depth/lighting pipeline, 3D character animation and real-device performance acceptance.
+
+
+## 2026-10-14 — Stage 2, native geometry in original world coordinates
+
+A new `source-world.mjs` projects **the castle and all 3 original Gothic ruins together**, using actual `cathedral.kx/ky`, `cathedral.ox/oy`, authored `ruinSites()`, `MS` / `WS`, and `PITCH`. Mesh transforms encode exactly the old raycast-to-glyph projection. This is not an invented map or placeholder asset.
+
+Open `/experiments/three/?geometry=world` to see the combined original-world 3D geometry, not individual orbit-only prototypes. In the same viewer, choose `Камера игры` to switch to an orthographic camera matching the real game's tilt, zoom and scroll; toggle back for a castle-centred view. The original `/experiments/three/` continues unchanged with 1:1 glyph raster buttons.
+
+`tools/check/three-world-projection.mjs` asserts pixel correspondence for transformed source vertices, authored ruin offsets/yaw, castle and ruin scales, restored solids and unchanged map data. `tools/check/three-architecture.cjs` exercises complete world, four source site IDs, camera switch and game restoration. The source mesh inspector does **not** replace the live gameplay rasterizer or touch user brightness/opacity; full 3D scene integration, animation and actual Safari FPS remain open.

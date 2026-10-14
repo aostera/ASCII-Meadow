@@ -342,6 +342,8 @@ jobs:
           node --check experiments/three/architecture-viewer.mjs
           node --check tools/check/three-architecture.cjs
           node tools/check/three-source-masonry.mjs
+          node --check experiments/three/source-world.mjs
+          node tools/check/three-world-projection.mjs
       - name: Screenshot-diff dependency
         run: python3 -m pip install 'Pillow==12.0.0'
       - name: Render original full game through both rasterizers
