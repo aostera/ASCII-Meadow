@@ -349,6 +349,8 @@ jobs:
           node --check experiments/three/source-motion.mjs
           node tools/check/three-source-motion.mjs
           node --check tools/check/three-live-knight.cjs
+          node --check experiments/three/native-knight3d.mjs
+          node --check tools/check/three-native-knight3d.cjs
           node --check experiments/three/cow-rig.js
           node --check experiments/three/source-cow-motion.mjs
           node --check experiments/three/device-profiler.mjs
@@ -390,6 +392,7 @@ jobs:
           node tools/check/three-motion-parity.cjs http://127.0.0.1:8181
           node tools/check/three-performance.cjs http://127.0.0.1:8181
           node tools/check/three-live-knight.cjs http://127.0.0.1:8181
+          node tools/check/three-native-knight3d.cjs http://127.0.0.1:8181
           node tools/check/three-live-cow.cjs http://127.0.0.1:8181
           node tools/check/three-device-profiler.cjs http://127.0.0.1:8181
           node tools/check/three-engine-comparison.cjs http://127.0.0.1:8181
