@@ -242,7 +242,9 @@ function nativeRuinGothicComplete(site){
     // battered open roof spans. No new side exits or sealed interior.
     for(let bay=0;bay<3;bay++){
       const z=-d*.3+bay*d*.3;
-      const base=ah*.7;
+      // The old arch clearance is through to ah. Decorative roof ribs must
+      // begin ABOVE it; otherwise the new 3D detail seals the walkway.
+      const base=ah+10;
       for(const side of [-1,1]){
         const x=side*(w*.5-18);
         nativeGothicBox(x-8,x+8,9,base,z-8,z+9,{
@@ -251,7 +253,7 @@ function nativeRuinGothicComplete(site){
         nativeGothicBox(x-12,x+12,base-6,base+7,z-10,z+12);
       }
       nativeGothicPointedCrown(0,w*.36,base,
-        Math.min(h*.94,base+58),z-10,8);
+        Math.min(h*.94,base+46),z-10,8);
       if(bay!==1)nativeGothicGargoyles(
         [[-w*.42,z],[w*.42,z]],h*.61);
     }
