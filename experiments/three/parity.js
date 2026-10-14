@@ -11,6 +11,8 @@ const status=document.getElementById('parity-status');
 let legacyFlush=GL.flush;
 let backend=null,mode='legacy',lastError=null;
 let lastStats=0;
+const referenceRender=render; // original complete draw of the exact source glyph batch
+let referenceBatch=null;
 const safeStatus=text=>{status.textContent=text;};
 
 function renderThree(camx,camy,castle){
@@ -91,6 +93,25 @@ window.__ASCII_PARITY__={
   get canvas(){return backend?.renderer.domElement||null;},
   get ready(){return Boolean(GB.atlasCv&&GB.spr.length&&W&&H&&GB.n>1000);},
   get baselineGlyphs(){return GB.n;},
+  // Produce ONE exact glyph buffer from the original scene, then render that
+  // identical buffer in the independent Three.js backend. No second foliage
+  // draw, no extra smoothing ticks, no perceptual brightness manipulation.
+  captureReferenceForTest(){
+    if(!new URLSearchParams(location.search).has('parityTest'))return null;
+    if(mode!=='legacy')selectMode('legacy');
+    referenceRender();
+    const castle=castleDraw;
+    const count=GB.n-(castle?(castle.flash>0.02?2:1):0);
+    referenceBatch={count,camX:camX*CW,camY:camY*CH,castle};
+    return {glyphs:count,camera:[referenceBatch.camX,referenceBatch.camY]};
+  },
+  captureThreeForTest(){
+    if(!new URLSearchParams(location.search).has('parityTest')||!referenceBatch)return null;
+    if(!selectMode('three'))return null;
+    GB.n=referenceBatch.count;
+    renderThree(referenceBatch.camX,referenceBatch.camY,referenceBatch.castle);
+    return backend?.stats||null;
+  },
 
   // Only used in automated screenshot QA. Camera and player positions are
   // temporary; the authored MEADOW_MAP and editor state are not mutated.
@@ -134,6 +155,7 @@ window.__ASCII_PARITY__={
   freezeForTest(){
     if(!new URLSearchParams(location.search).has('parityTest'))return false;
     window.simulate=()=>{};
+    window.render=()=>{}; // freeze canvas-producing render(), not just simulate()
     return true;
   },
   get map(){return MEADOW_MAP;},

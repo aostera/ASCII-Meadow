@@ -24,13 +24,14 @@ const file=(mobile,name,mode)=>path.join(shots,(mobile?'phone':'desktop')+'-'+na
    if(!res?.ok())throw Error('parity page failed to load');
    await page.waitForFunction(()=>window.__ASCII_PARITY__?.ready,{timeout:90000});
    const sourceMap=await page.evaluate(()=>JSON.stringify(window.__ASCII_PARITY__.map));
-   if(!await page.evaluate(()=>window.__ASCII_PARITY__.freezeForTest()))throw Error('Cannot freeze game world');
    // Click as a player first: the controls must stay interactive.
    await page.locator('#parity-three').click();
    await page.waitForFunction(()=>window.__ASCII_PARITY__?.mode==='three'&&
       window.__ASCII_PARITY__.stats?.glyphs>1000,{timeout:60000});
    await page.locator('#parity-legacy').click();
    await page.waitForFunction(()=>window.__ASCII_PARITY__?.mode==='legacy',{timeout:30000});
+   if(!await page.evaluate(()=>window.__ASCII_PARITY__.freezeForTest()))
+     throw Error('Cannot freeze game world and source render');
    // Hide UI only in test screenshots, not in the actual playable preview.
    await page.addStyleTag({content:'.hud,.stats,#parity-toolbar,.ed,.ed-open{visibility:hidden!important}'});
    const sites=mobile?['camp','broken-gate','castle']:
@@ -38,13 +39,13 @@ const file=(mobile,name,mode)=>path.join(shots,(mobile?'phone':'desktop')+'-'+na
    for(const site of sites){
      const loc=await page.evaluate(name=>window.__ASCII_PARITY__.visitForTest(name),site);
      if(!loc)throw Error('Authored map location not found: '+site);
-     await page.waitForTimeout(400);
+     const originalBatch=await page.evaluate(()=>window.__ASCII_PARITY__.captureReferenceForTest());
+     if(!originalBatch||originalBatch.glyphs<1000)
+       throw Error('Original glyph source missing at '+site);
      await page.screenshot({path:file(mobile,site,'original'),timeout:60000,animations:'disabled'});
-     const last=await page.evaluate(()=>window.__ASCII_PARITY__.stats?.frame||0);
-     if(!await page.evaluate(()=>window.__ASCII_PARITY__.select('three')))
-       throw Error('Three.js unavailable at '+site);
-     await page.waitForFunction(previous=>window.__ASCII_PARITY__.stats?.frame>previous,
-       last,{timeout:60000});
+     const threeBatch=await page.evaluate(()=>window.__ASCII_PARITY__.captureThreeForTest());
+     if(!threeBatch||threeBatch.glyphs!==originalBatch.glyphs)
+       throw Error('Not rendering the SAME original glyphs in Three.js at '+site);
      await page.screenshot({path:file(mobile,site,'three'),timeout:60000,animations:'disabled'});
      const verify=await page.evaluate(()=>({
        map:JSON.stringify(window.__ASCII_PARITY__.map),
