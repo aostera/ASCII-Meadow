@@ -14,10 +14,11 @@ const landing=scripts(fs.readFileSync('experiments/three/index.html','utf8'))
 assert.deepEqual(landing,original,'Default preview must use the full original game, never synthetic scene');
 assert.match(fs.readFileSync('experiments/three/procedural.html','utf8'),/src="\.\/app\.js"/,
   'Procedural research demo must remain accessible separately');
-assert.match(parity,/href="\.\.\/\.\.\/styles\/main\.css"/);
-assert.match(parity,/src="\.\.\/\.\.\/src\/data\/map\.js"/);
-assert.match(parity,/src="\.\.\/\.\.\/src\/main\.js"/);
-assert.match(parity,/src="\.\/parity\.js"/);
+assert.match(parity,/<base href="\.\.\/\.\.\/"/);
+assert.match(parity,/href="styles\/main\.css"/);
+assert.match(parity,/src="src\/data\/map\.js"/);
+assert.match(parity,/src="src\/main\.js"/);
+assert.match(parity,/src="experiments\/three\/parity\.js"/);
 assert.match(parity,/id="parity-three"/);
 assert.match(parity,/id="parity-legacy"/);
 const productionMap=fs.readFileSync('src/data/map.js','utf8');

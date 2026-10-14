@@ -5,16 +5,16 @@ import * as THREE from 'three';
 
 const VERT = [
   'precision highp float; precision highp int;',
-  'in vec2 position; in vec4 aRect; in vec2 aIdAlpha;',
+  'in vec3 position; in vec4 aRect; in vec2 aIdAlpha;',
   'uniform vec2 uCam,uView; uniform highp sampler2D uSprites;',
   'uniform int uSpriteWidth;',
   'out vec2 vUv; out float vAlpha;',
   'void main(){',
   'int id=int(aIdAlpha.x+.5);',
   'vec4 uv=texelFetch(uSprites,ivec2(id%uSpriteWidth,id/uSpriteWidth),0);',
-  'vec2 q=(mix(aRect.xy,aRect.zw,position)-uCam)/uView*2.-1.;',
+  'vec2 q=(mix(aRect.xy,aRect.zw,position.xy)-uCam)/uView*2.-1.;',
   'gl_Position=vec4(q.x,-q.y,0.,1.);',
-  'vUv=mix(uv.xy,uv.zw,position);vAlpha=aIdAlpha.y;',
+  'vUv=mix(uv.xy,uv.zw,position.xy);vAlpha=aIdAlpha.y;',
   '}'
 ].join('\n');
 const FRAG = [
@@ -27,9 +27,11 @@ const FRAG = [
 
 function allocate(capacity) {
   const geo=new THREE.InstancedBufferGeometry();
+  // Three's bounding-sphere calculation requires XYZ, even for screen quads.
+  // A vec2 position attribute makes z undefined and NaNs culling metadata.
   geo.setAttribute('position',new THREE.Float32BufferAttribute([
-    0,0, 1,0, 0,1, 1,0, 1,1, 0,1
-  ],2));
+    0,0,0, 1,0,0, 0,1,0, 1,0,0, 1,1,0, 0,1,0
+  ],3));
   const rect=new Float32Array(capacity*4),idAlpha=new Float32Array(capacity*2);
   const rectAttr=new THREE.InstancedBufferAttribute(rect,4);
   const idAttr=new THREE.InstancedBufferAttribute(idAlpha,2);
