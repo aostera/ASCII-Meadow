@@ -17,6 +17,7 @@
   <div class="control-row">
     <label>Локация <select id="location"><option value="cloister">Готическая галерея</option><option value="abbey">Аббатство</option><option value="gate">Разрушенные ворота</option><option value="camp">Лагерь</option></select></label>
     <label>Детализация <select id="quality"><option value="low">Низкая</option><option value="medium" selected>Средняя</option><option value="high">Высокая</option></select></label>
+    <label>Рыцарь <select id="character"><option value="rig">3D-риг</option><option value="original">192 кадра оригинала</option></select></label>
   </div>
   <div class="control-row toggles">
     <label><input type="checkbox" id="ascii" checked> ASCII</label>
@@ -25,11 +26,12 @@
     <label><input type="checkbox" id="stress"> + плотность (тест)</label>
   </div>
   <output id="stats">Инициализация…</output>
-  <p class="note">Карта и координаты читаются из <code>src/data/map.js</code> без изменений. Поверни камеру мышью или пальцем, приблизь колесом/щипком. «+ плотность» добавляет только временные объекты для стресс-теста.</p>
+  <p class="note">Карта и координаты читаются из <code>src/data/map.js</code> без изменений. Поверни камеру мышью или пальцем, приблизь колесом/щипком. WASD — шаг, Shift — бег, Space — прыжок. Переключатель «Рыцарь» показывает также исходные 192 ASCII-кадра. «+ плотность» добавляет только временные объекты для стресс-теста.</p>
 </section>
 <div id="error" role="alert" hidden></div>
 <script src="../../src/data/map.js"></script>
-<script>window.ASCII_MEADOW_MAP = MEADOW_MAP;</script>
+<script src="../../src/data/knight-frames.js"></script>
+<script>window.ASCII_MEADOW_MAP = MEADOW_MAP; window.ASCII_KNIGHT_FRAMES = KNIGHT_ART;</script>
 <script type="module" src="./app.js"></script>
 </body>
 </html>
