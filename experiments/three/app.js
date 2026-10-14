@@ -98,6 +98,25 @@ window.addEventListener('keydown',ev=>{
 });
 window.addEventListener('keyup',ev=>keys.delete(ev.code));
 window.addEventListener('blur',()=>{keys.clear();jumpQueued=false;});
+// Multi-touch controls: two fingers can hold direction + run simultaneously;
+// OrbitControls remain available on the rest of the viewport.
+for(const button of document.querySelectorAll('[data-move]')){
+  const key=button.dataset.move;
+  const held=new Set();
+  button.addEventListener('pointerdown',ev=>{
+    ev.preventDefault();button.setPointerCapture(ev.pointerId);
+    held.add(ev.pointerId);keys.add(key);
+    button.setAttribute('aria-pressed','true');
+    if(key==='Space')jumpQueued=true;
+  });
+  const release=ev=>{
+    held.delete(ev.pointerId);
+    if(!held.size){keys.delete(key);button.setAttribute('aria-pressed','false');}
+  };
+  button.addEventListener('pointerup',release);
+  button.addEventListener('pointercancel',release);
+  button.addEventListener('lostpointercapture',release);
+}
 const addMesh = (parent, geo, mat, pos, rotation) => {
   const m = new THREE.Mesh(geo, mat);
   m.position.set(pos[0], pos[1], pos[2]);
