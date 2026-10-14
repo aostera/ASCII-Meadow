@@ -32,9 +32,8 @@ fs.mkdirSync(out,{recursive:true});
         originalRenderer:window.__ASCII_PARITY__.stats.frame
       }));
       await page.locator('#parity-architecture').click();
-      await page.waitForFunction(()=>window.__ASCII_PARITY__.liveArchitecture?.frames>3,{
-        timeout:90000
-      });
+      await page.waitForFunction(()=>window.__ASCII_PARITY__.liveArchitecture?.frames>3,
+        undefined,{timeout:90000});
       const enabled=await page.evaluate(()=>{
         const p=window.__ASCII_PARITY__;
         return {
@@ -55,9 +54,8 @@ fs.mkdirSync(out,{recursive:true});
       // Restore original ASCII output, proving no extra context or stray
       // source-world meshes are left drawing after this diagnostic is off.
       await page.locator('#parity-architecture').click();
-      await page.waitForFunction(()=>window.__ASCII_PARITY__.liveArchitecture===null,{
-        timeout:30000
-      });
+      await page.waitForFunction(()=>window.__ASCII_PARITY__.liveArchitecture===null,
+        undefined,{timeout:30000});
       await page.locator('#parity-legacy').click();
       const restored=await page.evaluate(()=>({
         mode:window.__ASCII_PARITY__.mode,
