@@ -88,7 +88,10 @@ export class ThreeGlyphBackend {
     };
     const mat=new THREE.RawShaderMaterial({
       vertexShader:VERT,fragmentShader:FRAG,glslVersion:THREE.GLSL3,
-      uniforms,transparent:true,depthTest:false,depthWrite:false,
+      // Screen coordinates flip Y from the game's downward pixel axis.
+      // That reverses glyph triangle winding: without DoubleSide Three.js
+      // culls ALL original sprite quads as backfaces (the blank screen bug).
+      uniforms,side:THREE.DoubleSide,transparent:true,depthTest:false,depthWrite:false,
       blending:THREE.CustomBlending,blendEquation:THREE.AddEquation,
       blendSrc:THREE.OneFactor,blendDst:THREE.OneMinusSrcAlphaFactor,
       blendSrcAlpha:THREE.OneFactor,blendDstAlpha:THREE.OneMinusSrcAlphaFactor,
