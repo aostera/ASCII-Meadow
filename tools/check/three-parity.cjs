@@ -20,7 +20,7 @@ fs.mkdirSync(shots,{recursive:true});
    const page=await context.newPage(),errors=[];
    page.on('pageerror',e=>errors.push(e.stack||e.message));
    page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-   const res=await page.goto(base.replace(/\/$/,'')+'/experiments/three/parity.html?edit=0',
+   const res=await page.goto(base.replace(/\/$/,'')+'/experiments/three/parity.html?edit=0&parityTest=1',
      {waitUntil:'domcontentloaded'});
    if(!res||!res.ok())throw Error('parity HTML failed');
    await page.waitForFunction(()=>window.__ASCII_PARITY__?.ready,{timeout:90000});
@@ -31,6 +31,9 @@ fs.mkdirSync(shots,{recursive:true});
      frames:window.__ASCII_PARITY__.baselineGlyphs
    }));
    if(before.mode!=='legacy'||before.frames<1000)throw Error('legacy baseline missing: '+JSON.stringify({mode:before.mode,frames:before.frames}));
+   const frozen=await page.evaluate(()=>window.__ASCII_PARITY__.freezeForTest());
+   if(!frozen)throw Error('Cannot hold the same original world frame for raster comparisons');
+   await page.waitForTimeout(750);
    await page.screenshot({path:path.join(shots,mobile?'phone-original.png':'desktop-original.png')});
    await page.locator('#parity-three').click();
    await page.waitForFunction(()=>{
