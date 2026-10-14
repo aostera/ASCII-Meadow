@@ -124,3 +124,17 @@ Browser test `tools/check/three-live-architecture.cjs` validates desktop + mobil
 Added `experiments/three/architecture-depth.js` and the `Глубина 3D` button on both full original-world preview pages. The live source world of the real castle + all 3 ruins is rendered into `WebGLRenderTarget.depthTexture` at half resolution, using the **same** `ThreeGlyphBackend.renderer` and exact original `configureNativeCamera`. A small black/white diagnostic inset maps occupied stone vs empty background from the **actual hardware depth buffer**. This does not replace or recolor original ASCII glyphs, and the default always remains pixel-perfect. The depth texture is retained as the real input for later actor/world occlusion; this step does NOT yet apply depth to NPCs/player glyphs because doing so prematurely causes unacceptable ordering regressions.
 
 Switching back to original or disabling the mode disposes the texture, shaders and meshes and restores original WebGL fallback. Safari/iPadOS restore and true FPS improvement still require real-device tests. Automated `tools/check/three-depth.cjs` captures a frozen authored castle with and without native depth (desktop + phone); `three-depth-visibility.py` proves the mask contains stone + empty space and **every pixel outside the diagnostic inset is exactly unchanged**. The preceding 8/8 100%-identical scene proof must remain green. No brightness or transparency edits. Deferred shadows, bushes, NPC sorting only after 3D, animations and performance.
+
+
+## 2026-10-14 — acceptance: GPU source depth diagnostic PASSED
+
+**Verified against actual Chromium WebGL2 CI, workflow run 38537748888, experimental code SHA 6956b708e6d9c5ef2f45cdcc443a7c53466ce63c.**
+- All 8 frozen, full-screen original WebGL vs Three ASCII scene captures still **exact=100%, MAE=0, maxDiff=0**.
+- Live native source masonry: castle + 3 Gothic ruin buildings, one game GPU context, no author map modification.
+- Desktop depth texture **550×370** for **1100×740** game; phone **195×422** for **390×844** viewport (half CSS-resolution). Observed 4 source depth draw calls in CI; not a real-device FPS number.
+- Actual depth-test occupancy: **stone=88.46% desktop and 63.37% phone** within the selected castle diagnostic frame; black empty-space pixels present. A pure white/empty fake texture is rejected.
+- Frame comparison outside depth-inset: **maxRGBchange=0/255**. After disabling the depth pass and auto-created source geometry, **all screen pixels restored exactly: maxRGBchange=0/255** for BOTH desktop and mobile.
+- The first CI failed because the original overlay canvas colors the debug mask and disabling depth left the default 3D inspector active. The corrected QA hides `#c` *only during depth-mask proof* and captures screenshots with CSS-pixel scale. Gameplay canvas and fog remain untouched. Depth activation tracks whether it created the architecture layer; disabling it also disposes that layer while not switching off a manually activated 3D inspector.
+- Main `index.html`, `src/data/map.js`, `src/renderer/render.js` **not edited**. PR #37 remains draft; `main` separate and safe.
+
+**Not yet complete:** using the native depth texture for actual per-actor occlusion in the *full* original ASCII image, depth-aware 3D character/rig animation, real hardware speed and GPU memory measurements, original shadows, bushes parting, and NPC ordering. Do not claim these are complete. User explicitly required later shadows/bush/NPC only AFTER architecture, animation and optimization.

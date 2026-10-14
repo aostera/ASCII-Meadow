@@ -53,3 +53,17 @@ Open `/experiments/three/`, press **Three.js**, then **3D архитектура
 ## 2026-10-14 — GPU source depth is now a live in-world resource
 
 The Three live game offers **Глубина 3D** as an opt-in engineering layer alongside **3D архитектура**. It renders actual authored Gothic architecture to a depth texture in the same GPU context, with the same camera and map and without allocating a second canvas. A diagnostic inset displays white for source stone and black for open space. Pixel-perfect original sprites, their brightness and transparency remain untouched. Depth values are now available for a future carefully tested glyph actor/building occlusion pass, not yet applied. The CI test pairs a frozen castle frame before/after enabling depth on phone and desktop, tests real stone/empty-space pixels, disables the layer and requires unchanged pixels outside the inset. This also checks no GPU context leaks.
+
+
+## 2026-10-14 — acceptance: GPU source depth diagnostic PASSED
+
+**Verified against actual Chromium WebGL2 CI, workflow run 38537748888, experimental code SHA 6956b708e6d9c5ef2f45cdcc443a7c53466ce63c.**
+- All 8 frozen, full-screen original WebGL vs Three ASCII scene captures still **exact=100%, MAE=0, maxDiff=0**.
+- Live native source masonry: castle + 3 Gothic ruin buildings, one game GPU context, no author map modification.
+- Desktop depth texture **550×370** for **1100×740** game; phone **195×422** for **390×844** viewport (half CSS-resolution). Observed 4 source depth draw calls in CI; not a real-device FPS number.
+- Actual depth-test occupancy: **stone=88.46% desktop and 63.37% phone** within the selected castle diagnostic frame; black empty-space pixels present. A pure white/empty fake texture is rejected.
+- Frame comparison outside depth-inset: **maxRGBchange=0/255**. After disabling the depth pass and auto-created source geometry, **all screen pixels restored exactly: maxRGBchange=0/255** for BOTH desktop and mobile.
+- The first CI failed because the original overlay canvas colors the debug mask and disabling depth left the default 3D inspector active. The corrected QA hides `#c` *only during depth-mask proof* and captures screenshots with CSS-pixel scale. Gameplay canvas and fog remain untouched. Depth activation tracks whether it created the architecture layer; disabling it also disposes that layer while not switching off a manually activated 3D inspector.
+- Main `index.html`, `src/data/map.js`, `src/renderer/render.js` **not edited**. PR #37 remains draft; `main` separate and safe.
+
+**Not yet complete:** using the native depth texture for actual per-actor occlusion in the *full* original ASCII image, depth-aware 3D character/rig animation, real hardware speed and GPU memory measurements, original shadows, bushes parting, and NPC ordering. Do not claim these are complete. User explicitly required later shadows/bush/NPC only AFTER architecture, animation and optimization.
