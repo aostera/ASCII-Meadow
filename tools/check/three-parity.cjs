@@ -28,9 +28,9 @@ fs.mkdirSync(shots,{recursive:true});
      mode:window.__ASCII_PARITY__.mode,
      map:JSON.stringify(window.__ASCII_PARITY__.map),
      world:window.__ASCII_PARITY__.playerLocation,
-     frames:window.GB?.n||0
+     frames:window.__ASCII_PARITY__.baselineGlyphs
    }));
-   if(before.mode!=='legacy'||before.frames<1000)throw Error('legacy baseline missing: '+JSON.stringify(before));
+   if(before.mode!=='legacy'||before.frames<1000)throw Error('legacy baseline missing: '+JSON.stringify({mode:before.mode,frames:before.frames}));
    await page.screenshot({path:path.join(shots,mobile?'phone-original.png':'desktop-original.png')});
    await page.locator('#parity-three').click();
    await page.waitForFunction(()=>{
