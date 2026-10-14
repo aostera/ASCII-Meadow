@@ -439,6 +439,28 @@ if(new URLSearchParams(location.search).get('profile')==='1'){
   requestAnimationFrame(readyForProfile);
 }
 
+// On-device alternating A/B test. Only the GL backend changes. Ordinary
+// gameplay, authored sprites, light levels and source map are never edited.
+// URL: ?profile=compare (short deterministic smoke: &profileTest=1).
+if(new URLSearchParams(location.search).get('profile')==='compare'){
+  const readyForComparison=()=>{
+    if(!GB.atlasCv||!W||!H||!GL.ok){
+      if(!GL.ok){safeStatus('A/B невозможно: исходный WebGL2 недоступен');return}
+      requestAnimationFrame(readyForComparison);return;
+    }
+    import('./engine-comparison.mjs').then(m=>m.installEngineComparison({
+      selectMode,getMode:()=>mode,getStats:()=>backend?.stats||{},
+      getMapSnapshot:()=>JSON.stringify(MEADOW_MAP),
+      durationMs:new URLSearchParams(location.search).has('profileTest')?250:5000,
+      warmupMs:new URLSearchParams(location.search).has('profileTest')?50:400
+    })).catch(e=>{
+      console.error('Original / Three device A/B profiling failed',e);
+      safeStatus('A/B измерение недоступно: '+e.message);
+    });
+  };
+  requestAnimationFrame(readyForComparison);
+}
+
 // Dedicated opt-in geometry inspection mode. Never enters the pixel-perfect
 // original / Three glyph comparison unless explicitly requested in the URL.
 // It builds meshes from the REAL raycast source and is not the game's renderer.
