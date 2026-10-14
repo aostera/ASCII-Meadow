@@ -39,6 +39,7 @@ export class NativeGreyMapEditor {
     this.scene.add(this.selectionHelper);
     this.frame=0;this.drawCalls=0;this.disposed=false;
     this.buildUi();
+    this.installMapDrag();
   }
   buildUi(){
     const panel=document.createElement('section');
@@ -103,6 +104,57 @@ export class NativeGreyMapEditor {
       if(e.target===this.slider&&e.code.startsWith('Arrow'))
         e.stopPropagation();
     });
+  }
+  // Restore direct model rotation *on the map* (Alt+drag / Shift+drag),
+  // which the source editor replaced with only a 15-degree bracket control.
+  // Install a native-only delegate after removing that same source handler
+  // from the capture phase; ordinary painting, dragging, zooming, placement
+  // and undo pass through untouched to edPointer.
+  installMapDrag(){
+    if(typeof edPointer!=='function'||typeof edPick!=='function')return;
+    const types=['pointerdown','pointermove','pointerup','pointercancel'];
+    this.modelDrag=null;
+    this.editorPointer=(e)=>{
+      const cv=document.getElementById('c');
+      if(this.modelDrag&&e.pointerId===this.modelDrag.pointerId){
+        const d=this.modelDrag;
+        e.stopImmediatePropagation();e.preventDefault();
+        if(e.type==='pointermove'){
+          const angle=fromDegrees(wrapped(
+            toDegrees(d.startAngle)+(e.clientX-d.startX)*.6));
+          this.preview={index:d.index,original:d.startAngle,angle};
+        }else if(e.type==='pointerup'||e.type==='pointercancel'){
+          const pending=this.preview;
+          this.modelDrag=null;this.preview=null;
+          try{cv.releasePointerCapture(e.pointerId)}catch(_){}
+          if(e.type==='pointerup'&&pending)
+            this.controller.commit(d.index,pending.angle);
+          this.refreshUi();
+        }
+        return;
+      }
+      if(e.type==='pointerdown'&&this.active&&
+         this.controller.isEditing()&&e.target===cv&&e.button===0&&
+         (e.altKey||e.shiftKey)){
+        const hovered=edPick(e.clientX,e.clientY);
+        if(hovered?.kind==='ruins'){
+          ED.tool='select';ED.sel={kind:'ruins',mi:hovered.mi};
+          edSyncUI();this.refreshUi();
+          const r=this.controller.selectedRuin();
+          this.modelDrag={pointerId:e.pointerId,index:hovered.mi,
+            startX:e.clientX,startAngle:r?.yaw||0};
+          try{cv.setPointerCapture(e.pointerId)}catch(_){}
+          e.preventDefault();e.stopImmediatePropagation();
+          return;
+        }
+      }
+      edPointer(e);
+    };
+    for(const type of types){
+      window.removeEventListener(type,edPointer,true);
+      window.addEventListener(type,this.editorPointer,true);
+    }
+    this.replacedPointerTypes=types;
   }
   refreshUi(){
     if(this.disposed)return;
@@ -190,6 +242,12 @@ export class NativeGreyMapEditor {
   dispose(){
     if(this.disposed)return;
     this.disposed=true;this.panel.remove();this.clearWorld();
+    if(this.replacedPointerTypes){
+      for(const type of this.replacedPointerTypes){
+        window.removeEventListener(type,this.editorPointer,true);
+        window.addEventListener(type,edPointer,true);
+      }
+    }
     this.selectionHelper.geometry.dispose();this.selectionHelper.material.dispose();
     for(const m of Object.values(this.materials))m.dispose();
     this.scene.clear();
