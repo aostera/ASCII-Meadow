@@ -29,6 +29,7 @@ fs.mkdirSync(dir,{recursive:true});
     window.__ASCII_PARITY__.captureThreeForTest();
    });
    await page.addStyleTag({content:'.hud,.stats,#parity-toolbar,.ed,.ed-open{visibility:hidden!important}'});
+   const gpuCanvasBaseline=await page.evaluate(()=>document.querySelectorAll('canvas').length);
    await page.screenshot({path:path.join(dir,name+'-base.png'),animations:'disabled'});
    if(!await page.evaluate(()=>window.__ASCII_PARITY__.setCowMode(true)))
     throw Error('Failed to enable true-source native cow diagnostic');
@@ -39,7 +40,7 @@ fs.mkdirSync(dir,{recursive:true});
     canvases:document.querySelectorAll('canvas').length
    }));
    if(!active.active||!active.cowRig||active.cowMeshes<20||
-      !active.cowActorFoot||active.map!==authored||active.canvases!==3)
+      !active.cowActorFoot||active.map!==authored||active.canvases!==gpuCanvasBaseline)
     throw Error('Missing native source cow or leaked GPU context '+JSON.stringify(active));
    await page.screenshot({path:path.join(dir,name+'-cow.png'),animations:'disabled'});
    const stages=[];
@@ -66,7 +67,7 @@ fs.mkdirSync(dir,{recursive:true});
      mode:window.__ASCII_PARITY__.mode,
      canvases:document.querySelectorAll('canvas').length
    }));
-   if(after.active||after.map!==authored||after.mode!=='three'||after.canvases!==3)
+   if(after.active||after.map!==authored||after.mode!=='three'||after.canvases!==gpuCanvasBaseline)
       throw Error('Native cow cleanup or source map failure '+JSON.stringify(after));
    if(errors.length)throw Error('Cow 3D JS exceptions: '+errors.join('\n'));
    console.log(name.toUpperCase()+' NATIVE SOURCE COW PASS '+JSON.stringify({
