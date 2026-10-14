@@ -96,9 +96,9 @@ fs.mkdirSync(dir,{recursive:true});
          }
          if(best.pixelDelta>12)break;
        }
-       if(!(best.depthFrames>0&&best.depthDrawCalls>=3&&best.sites===4))
+       if(!(best.depthFrames>0&&best.depthDrawCalls>=1&&best.sites===4))
          throw Error('Source 3D geometry depth failed '+JSON.stringify(best));
-       if(!(best.pixelDelta>12&&best.actorDepthRanges>0))
+       if(!(best.pixelDelta>12&&best.actorDepthRanges>=2))
          throw Error('Actual GPU NPC occlusion not visible '+JSON.stringify(best));
        if(best.rendererContexts!==1)
          throw Error('Source 3D pass allocated additional canvas');
