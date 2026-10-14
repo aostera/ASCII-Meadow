@@ -18,7 +18,7 @@ fs.mkdirSync(dir,{recursive:true});
    });
    const page=await context.newPage(),errors=[];
    page.on('pageerror',err=>errors.push(err.message));
-   const res=await page.goto(base.replace(/\\/$/,'')+
+   const res=await page.goto((base.endsWith('/')?base.slice(0,-1):base)+
     '/experiments/three/?profile=compare&profileTest=1',
     {waitUntil:'domcontentloaded'});
    if(!res?.ok())throw Error('A/B page not served '+kind);
