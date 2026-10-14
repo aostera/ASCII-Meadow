@@ -14,16 +14,18 @@ export function openSourceArchitecture({solids,ruinSites,ruinDetail,ruinRotateMe
   const root=document.createElement('section');
   root.id='source-architecture-lab';
   root.style.cssText='position:fixed;inset:0;z-index:30;background:#0c0c0c;color:#e0e0e0;display:flex;flex-direction:column;font:12px/1.5 ui-monospace,monospace;touch-action:none';
-  root.innerHTML='<div id="source-arch-toolbar" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px;background:#101010;border-bottom:1px solid #3a3a3a;z-index:1"><strong>ASCII MEADOW · ИСХОДНАЯ 3D-ГЕОМЕТРИЯ</strong><select id="source-arch-site" aria-label="Объект" style="background:#242424;color:#eee;border:1px solid #777;padding:7px"></select><button id="source-arch-sync" type="button" style="background:#242424;color:#eee;border:1px solid #777;padding:7px;display:none">Камера игры: выкл.</button><span id="source-arch-meta">Загрузка геометрии...</span><button id="source-arch-close" style="margin-left:auto;background:#2a2a2a;color:#fff;border:1px solid #777;padding:7px 11px">Вернуться к игре</button></div><div id="source-arch-stage" style="flex:1;min-height:100px;position:relative;overflow:hidden"></div><small style="padding:7px 12px;color:#8d8d8d">Экспериментальная 3D-геометрия оригинальных стен и проёмов. Перетаскивание — поворот, колёсико — масштаб. Исходная ASCII-графика не изменена.</small>';
+  root.innerHTML='<div id="source-arch-toolbar" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px;background:#101010;border-bottom:1px solid #3a3a3a;z-index:1"><strong>ASCII MEADOW · ИСХОДНАЯ 3D-ГЕОМЕТРИЯ</strong><select id="source-arch-site" aria-label="Объект" style="background:#242424;color:#eee;border:1px solid #777;padding:7px"></select><select id="source-arch-focus" aria-label="Центр камеры" style="display:none;background:#242424;color:#eee;border:1px solid #777;padding:7px"></select><button id="source-arch-sync" type="button" style="background:#242424;color:#eee;border:1px solid #777;padding:7px;display:none">Камера игры: выкл.</button><span id="source-arch-meta">Загрузка геометрии...</span><button id="source-arch-close" style="margin-left:auto;background:#2a2a2a;color:#fff;border:1px solid #777;padding:7px 11px">Вернуться к игре</button></div><div id="source-arch-stage" style="flex:1;min-height:100px;position:relative;overflow:hidden"></div><small style="padding:7px 12px;color:#8d8d8d">Экспериментальная 3D-геометрия оригинальных стен и проёмов. Перетаскивание — поворот, колёсико — масштаб. Исходная ASCII-графика не изменена.</small>';
   document.body.append(root);
   const stage=root.querySelector('#source-arch-stage');
   const select=root.querySelector('#source-arch-site');
+  const focusSelect=root.querySelector('#source-arch-focus');
   const meta=root.querySelector('#source-arch-meta');
   const chooser=[{id:'world',title:'Весь мир · исходная карта',site:null},{id:'castle',title:'Главный замок',site:null}];
   for(const site of ruinSites())chooser.push({id:site.id,title:site.type+' — '+site.id,site});
   for(const item of chooser){
     const option=document.createElement('option');
     option.value=item.id;option.textContent=item.title;select.append(option);
+    if(item.id!=='world')focusSelect.append(option.cloneNode(true));
   }
   const renderer=new THREE.WebGLRenderer({
     antialias:true,alpha:false,powerPreference:'low-power'
@@ -60,9 +62,13 @@ export function openSourceArchitecture({solids,ruinSites,ruinDetail,ruinRotateMe
       // An orthographic world view with the EXACT authored camera pitch,
       // zoom, map scale and camera coordinates. Source plane vertices have
       // not been stylized, recolored or shifted relative to the original map.
-      const focus=syncWithGame?{camX:original.camX,camY:original.camY}:worldProjection;
+      const zoom=syncWithGame?original.VZ:worldProjection.zoom;
+      const focus=syncWithGame?{camX:original.camX,camY:original.camY}:{
+        camX:(worldProjection.x-w/(2*zoom))/original.CW,
+        camY:(worldProjection.y-h/(2*zoom))/original.CH
+      };
       configureNativeCamera(THREE,orthographic,{
-        ...original,W:w,H:h,camX:focus.camX,camY:focus.camY,pitch:PITCH
+        ...original,W:w,H:h,VZ:zoom,camX:focus.camX,camY:focus.camY,pitch:PITCH
       });
       renderer.render(scene,orthographic);
     }else{
@@ -77,6 +83,29 @@ export function openSourceArchitecture({solids,ruinSites,ruinDetail,ruinRotateMe
       renderer.render(scene,camera);
     }
   }
+  function focusOn(siteId){
+    if(!worldMode||!mesh)return false;
+    const building=mesh.children.find(child=>child.name===siteId);
+    if(!building)return false;
+    const box=new THREE.Box3().setFromObject(building);
+    if(box.isEmpty())return false;
+    const bounds=box.getSize(new THREE.Vector3());
+    const center=box.getCenter(new THREE.Vector3());
+    const w=Math.max(1,stage.clientWidth),h=Math.max(1,stage.clientHeight);
+    // Fit actual projected screen footprint, not its unconstrained depth.
+    // Native map X is mirrored so the right-handed Three.js camera displays
+    // the same screen X as the author's original raycaster.
+    const apparentHeight=Math.abs(bounds.y*Math.cos(PITCH))+Math.abs(bounds.z*Math.sin(PITCH));
+    const zoom=Math.max(.08,Math.min(1.1,
+      w*.78/Math.max(1,bounds.x),h*.76/Math.max(1,apparentHeight)));
+    worldProjection={x:-center.x,
+      y:-(center.y*Math.cos(PITCH)+center.z*Math.sin(PITCH)),zoom};
+    focusSelect.value=siteId;
+    syncWithGame=false;
+    syncButton.textContent='Камера игры: выкл.';
+    render();
+    return true;
+  }
   function clearGeometry(){
     if(!mesh)return;
     mesh.traverse(part=>{if(part.geometry)part.geometry.dispose()});
@@ -89,19 +118,12 @@ export function openSourceArchitecture({solids,ruinSites,ruinDetail,ruinRotateMe
     let parts=solids,site=item.site;
     worldMode=id==='world';
     syncButton.style.display=worldMode?'inline-block':'none';
+    focusSelect.style.display=worldMode?'inline-block':'none';
     if(worldMode){
       mesh=createNativeSourceWorld(THREE,{
         solids,ruinSites,ruinDetail,ruinRotateMesh,cathedral,
         WS,MS,pitch:PITCH,materials,makeSourceArchitecture
       });
-      const original=getCamera();
-      const anchor=anchorForSource('castle',null,cathedral,WS,PITCH);
-      // Center on the original castle first; users can also sync to the
-      // moving game's exact current camera via the dedicated button.
-      worldProjection={
-        camX:(anchor[0]-original.W/(2*original.VZ))/original.CW,
-        camY:(anchor[1]-450*MS-original.H/(2*original.VZ))/original.CH
-      };
       scene.add(mesh);
       const counts=mesh.userData.sourceCounts;
       Object.assign(stats,{
@@ -113,7 +135,7 @@ export function openSourceArchitecture({solids,ruinSites,ruinDetail,ruinRotateMe
       });
       meta.textContent=stats.authoredSites+' исходных построек · '+
         stats.triangles+' треугольников · '+stats.drawCalls+' батчей';
-      select.value=id;render();
+      select.value=id;focusOn('castle');
       return {...stats};
     }
     if(site){
@@ -166,6 +188,7 @@ export function openSourceArchitecture({solids,ruinSites,ruinDetail,ruinRotateMe
     scale=Math.max(80,Math.min(14000,scale*Math.exp(e.deltaY*.0008)));
     render();
   },{passive:false});
+  focusSelect.addEventListener('change',()=>focusOn(focusSelect.value));
   syncButton.addEventListener('click',()=>{
     syncWithGame=!syncWithGame;
     syncButton.textContent=syncWithGame?'Камера игры: вкл.':'Камера игры: выкл.';
@@ -191,8 +214,11 @@ export function openSourceArchitecture({solids,ruinSites,ruinDetail,ruinRotateMe
     setCameraSync(enabled){
       syncWithGame=Boolean(enabled);
       syncButton.textContent=syncWithGame?'Камера игры: вкл.':'Камера игры: выкл.';
+      if(syncWithGame)meta.textContent='Камера игрока · здесь могут отсутствовать 3D-здания: трава пока в ASCII';
+      else meta.textContent=stats.authoredSites+' исходных построек · '+stats.triangles+' треугольников';
       render();
-    }
+    },
+    focus:focusOn
   };
   window.__ASCII_SOURCE_3D__=api;
   try{show(initialWorld?'world':'castle')}catch(err){close();throw err}
