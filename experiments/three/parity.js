@@ -16,6 +16,7 @@ let legacyFlush=GL.flush;
 let backend=null,mode='legacy',lastError=null;
 let lastStats=0;
 const referenceRender=render; // original complete draw of the exact source glyph batch
+const referenceSimulate=simulate; // actual original game logic for controlled animation QA
 let referenceBatch=null;
 const safeStatus=text=>{status.textContent=text;};
 
@@ -196,6 +197,36 @@ window.__ASCII_PARITY__={
     referenceBatch={count,camX:camX*CW,camY:camY*CH,castle};
     return {glyphs:count,camera:[referenceBatch.camX,referenceBatch.camY]};
   },
+
+  stepAnimatedReferenceForTest(dt,action=''){
+    if(!new URLSearchParams(location.search).has('parityTest'))return null;
+    if(!(dt>0&&dt<=.15))throw Error('Invalid animation QA timestep');
+    if(mode!=='legacy')selectMode('legacy');
+    if(action==='jump')jump();
+    if(action==='cow-graze'&&cows.length){
+      const cow=cows[0];
+      cow.state='graze';cow.gp='down';cow.gl=3;cow.at=0;
+    }
+    // The real gameplay clock, NPCs, physics, sprite phases, grass, fog,
+    // knight and cow art all move; no fake 3D replacement rig is involved.
+    referenceSimulate(dt);
+    referenceRender();
+    const castle=castleDraw;
+    const count=GB.n-(castle?(castle.flash>0.02?2:1):0);
+    referenceBatch={count,camX:camX*CW,camY:camY*CH,castle};
+    const bits=new Uint32Array(GB.buf.buffer,GB.buf.byteOffset,count*6);
+    let fingerprint=2166136261>>>0;
+    const stride=Math.max(1,Math.floor(bits.length/9000));
+    for(let i=0;i<bits.length;i+=stride)
+      fingerprint=Math.imul(fingerprint^bits[i],16777619)>>>0;
+    return {
+      glyphs:count,fingerprint,time:t,
+      playerJump:player.jump||0,player:[player.x,player.y],
+      cows:cows.map(c=>({state:c.state,at:c.at,d8:c.d8})),
+      npcs:npcs.length,worldGen
+    };
+  },
+
   captureThreeForTest(){
     if(!new URLSearchParams(location.search).has('parityTest')||!referenceBatch)return null;
     if(!selectMode('three'))return null;
