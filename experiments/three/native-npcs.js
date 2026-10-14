@@ -68,6 +68,7 @@ drawEntity=function nativeDepthSortedEntity(e){
     nativeSourceEntityDrawer(e);
     return;
   }
+  const batchStart=GB.n;
   const {ffs,fcw,fch,u}=charDims(e);
   const G=geomOf(e),{gx,gy,top}=G;
   const BH=boxH(e);
@@ -161,6 +162,13 @@ drawEntity=function nativeDepthSortedEntity(e){
     ctx.shadowBlur=0;
   }
   e.nativeDepthGlyphs=chars;
+  // The entire NPC silhouette (not only bright body pixels) receives true
+  // source-camera occlusion from stone in the native Three glyph pass.
+  // The source actor reference is read-only and never serialized to the map.
+  if(GB.nativeActorRanges)
+    GB.nativeActorRanges.push({
+      start:batchStart,end:GB.n,rect:G,source:e
+    });
   drawTag(e,gx,gy);
 };
 window.__ASCII_NATIVE_NPCS__={
