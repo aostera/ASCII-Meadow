@@ -195,3 +195,21 @@ Native game only (`/experiments/three/native.html`):
 - CI run `38578424190`, job `115901568487`, head `ae94d38c`: native game desktop/phone PASS; physical bush desktop/phone PASS; native NPC depth desktop/phone PASS; parity 10/10 source/Three static images 100% exact (includes lightning) plus prior animation/source-rig/depth tests. CI software GPU timing is not real hardware FPS. Only source-parity lab frames are guaranteed pixel exact; new native-world bush displacement and NPC compositing necessarily change the picture intentionally.
 - Keep actual Safari/iPad hardware acceptance, full source geometry depth compositing, shadows, 3D character art fidelity and memory/performance work open. Do not call full Three migration complete. Preserve independent draft PR #37 and main production.
 
+## 2026-10-14 — glTF Masked Knight: скелет, анимации с тканью, подключение к Three.js (Claude)
+
+**Задача автора:** перейти на 3D-рыцаря для новой версии движка и сделать «всё правильно». Модель — Masked Knight (Fab, сгенерирован Meshy), выбран вместо SF Knight (поза с рукой на бедре, сплавленная STL) и `Knight.ZPR` (проект ZBrush, без ZBrush не открыть).
+
+**Что сделано (ветка `feat/three-gltf-knight` от `experiment/threejs-ascii-prototype`, `main` и карта не тронуты):**
+- `blender/` — пайплайн из скриптов, порядок и правила в `blender/README.md`: подготовка модели (`prepare_masked_knight.py`), скелет из 91 кости (`rig_masked_knight.py`: IK-ноги, `Weapon.R` с мечом, 63 кости плаща), симуляция плаща через сетку-заместитель (`cloak_sim_masked_knight.py`), клипы и экспорт (`anim_knight.py`). Исходники, `.blend` и рендеры в `.gitignore`.
+- Клипы Idle 48 / Walk 32 / Run 20 / Jump 36 / Crouch 24 кадров (24 fps). Ткань симулируется на авторском действии с настоящим перемещением и прыжком, затем вся поза (IK, ткань через кости плаща) запекается в обычные FK-ключи «на месте» — glTF и Three.js не нужны ни IK, ни симуляция.
+- `experiments/three/assets/knight/masked_knight.glb` — 1,9 МБ: тело 40k треугольников с цветом вершин, меч на кости, 5 анимаций; Y вверх, лицом +Z, рост 1,90 м.
+- `experiments/three/knight-gltf.js` — `createGltfKnight(THREE, {fallback})` с тем же контрактом, что `createAnimatedKnight`: `userData.animate(dt, movement)` → idle/walk/run/jump. GLB грузится асинхронно, до загрузки (и при ошибке) показан процедурный риг. Высоту прыжка считает модуль (константы knight-rig.js), клип Jump отображается на дугу: взлёт f9 ↔ отрыв, касание f23 ↔ приземление. Темп Walk/Run подстраивается под реальную скорость (px/м из высоты исходного спрайта).
+- `live-architecture.js`: 3D-риг по умолчанию — glTF; `?knight=procedural` возвращает старый. Статистика: `knightModel`, `knightGltfLoaded`, `knightGltfError`, `knightClips`, `knightClip`, `knightClipTimeScale`.
+- importmap `three/addons/` (GLTFLoader 0.186.1) в `index.html`, `parity.html`, `native.html`.
+- `tools/check/three-live-knight.cjs`: ждёт загрузку GLB, требует 5 клипов и переключение клипа Walk/Run → Jump по исходному игроку; процедурный режим проверяется прежним порогом мешей.
+
+**Проверки (локально, Chromium SwiftShader):** `three-live-knight.cjs` desktop/phone PASS (glTF загружен, клипы, 0 лишних контекстов, карта неизменна, освобождение); `three-live-knight-pixels.py` — вне окна рига исходная картинка побайтово неизменна; `three-source-sync.cjs`, `three-native-game.cjs` PASS. CI ветки ещё не запускался.
+
+**Найдено и исправлено по дороге:** меч улетал вперёд (смещение копилось в `matrix_basis` при привязке к кости); тепловые веса тащили броню и ноги за костями плаща («доска» от бедра на беге) — кости плаща теперь только у вершин в 9 см от ткани; пятка сапога и смешанные вершины подола тянулись — внизу вершина либо целиком ткань, либо нога; слишком быстрая дуга прыжка (≈15 м/с²) поднимала плащ — теперь 0,40 м за 14 кадров.
+
+**Не сделано / не подтверждено:** художественная приёмка рыцаря в окне рига (сейчас тёмный — освещение диагностической вставки; яркость оригинала не трогать); калибровка темпа шага под реальные скорости игры; рыцарь пока только в диагностическом окне, а не в основной картинке native-игры; лицензия Fab на публикацию GLB в публичном репозитории — нужно решение автора до коммита GLB.

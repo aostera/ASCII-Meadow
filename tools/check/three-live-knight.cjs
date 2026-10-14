@@ -38,6 +38,12 @@ fs.mkdirSync(shots,{recursive:true});
    await page.screenshot({path:path.join(shots,name+'-base.png'),animations:'disabled'});
    if(!await page.evaluate(()=>window.__ASCII_PARITY__.setKnightMode(true)))
      throw Error('Source-driven native knight rig mode refused');
+   // The default knight is the skinned glTF Masked Knight (experiments/three/knight-gltf.js);
+   // it loads asynchronously, the procedural rig stands in until then.
+   await page.waitForFunction(()=>{
+     const la=window.__ASCII_PARITY__.liveArchitecture;
+     return la?.knightModel!=='gltf'||la.knightGltfLoaded||la.knightGltfError;
+   },undefined,{timeout:60000});
    await page.evaluate(()=>window.__ASCII_PARITY__.captureThreeForTest());
    const active=await page.evaluate(()=>({
      ...window.__ASCII_PARITY__.liveArchitecture,
@@ -45,7 +51,11 @@ fs.mkdirSync(shots,{recursive:true});
      canvases:document.querySelectorAll('canvas').length,
      player:window.__ASCII_PARITY__.playerLocation
    }));
-   if(!active.active||!active.knightRig||active.knightMeshes<25||
+   const gltfOk=active.knightModel==='gltf'?
+     active.knightGltfLoaded&&!active.knightGltfError&&active.knightMeshes>=2&&
+     ['Idle','Walk','Run','Jump','Crouch'].every(c=>(active.knightClips||[]).includes(c)):
+     active.knightMeshes>=25;
+   if(!active.active||!active.knightRig||!gltfOk||
       !active.knightActorFoot||!active.knightNativePosition||
       active.map!==before.map||active.canvases!==before.canvases)
      throw Error('Real source-controlled rig is not in shared WebGL render '+JSON.stringify(active));
@@ -58,10 +68,16 @@ fs.mkdirSync(shots,{recursive:true});
      if(!frame||!frame.feet)throw Error('Live source 3D tracking stopped');
      motions.push(frame);
    }
+   const walkClip=await page.evaluate(()=>window.__ASCII_PARITY__.liveArchitecture.knightClip);
    await page.keyboard.up('w');
    const jumped=await page.evaluate(()=>window.__ASCII_PARITY__.advanceThreeForTest(.05,'jump'));
    if(!(jumped.jump>0)||!['jump','walk','run'].includes(jumped.motion))
       throw Error('Knight did not receive original jump state '+JSON.stringify(jumped));
+   if(active.knightModel==='gltf'){
+     const jumpClip=await page.evaluate(()=>window.__ASCII_PARITY__.liveArchitecture.knightClip);
+     if(!['Walk','Run'].includes(walkClip)||jumpClip!=='Jump')
+       throw Error('glTF knight clips did not follow the source state '+JSON.stringify({walkClip,jumpClip}));
+   }
    if(motions.every(s=>s.player[1]===motions[0].player[1]))
       throw Error('Test movement had no effect on original real player');
    await page.screenshot({path:path.join(shots,name+'-rig-jump.png'),animations:'disabled'});
@@ -78,7 +94,7 @@ fs.mkdirSync(shots,{recursive:true});
      throw Error('Native rig GPU resources not detached '+JSON.stringify(restored));
    if(errors.length)throw Error('Three source rig browser exceptions '+errors.join('\n'));
    console.log(name.toUpperCase()+' SOURCE KNIGHT 3D PASS '+JSON.stringify({
-     bodyMeshes:active.knightMeshes,sourceMapUnchanged:true,
+     model:active.knightModel,clips:active.knightClips,bodyMeshes:active.knightMeshes,sourceMapUnchanged:true,
      sourceFoot:active.knightActorFoot,walkUpdated:true,jumpReceived:true,
      extraCanvasContexts:0,disposed:true
    }));
