@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import {makeSourceArchitecture} from './source-masonry.mjs';
 import {createNativeSourceWorld,configureNativeCamera} from './source-world.mjs';
+import {NativeTreeDepth,pickNativeActorTrees} from './native-tree-depth.mjs';
 
 export function sourceArchitectureOverlaps(rect,source,CW,CH,margin=12){
   if(!rect)return false;
@@ -23,6 +24,7 @@ export class NativeArchitectureDepth{
   constructor(renderer){
     this.renderer=renderer;
     this.scene=new THREE.Scene();
+    this.treeDepth=new NativeTreeDepth(this.scene);
     this.camera=new THREE.OrthographicCamera(-1,1,1,-1,.01,40000);
     this.material=new THREE.MeshDepthMaterial({side:THREE.DoubleSide});
     this.material.depthWrite=true;
@@ -42,7 +44,8 @@ export class NativeArchitectureDepth{
     this.target.depthTexture.generateMipmaps=false;
     this.world=null;this.generation=-1;this.disposed=false;
     this.stats={frames:0,builds:0,drawCalls:0,sites:0,visible:false,
-      activeActors:0,width:0,height:0};
+      activeActors:0,width:0,height:0,
+      treeClusters:0,treeWood:0,treeLeaves:0};
   }
   removeWorld(){
     if(!this.world)return;
@@ -65,12 +68,23 @@ export class NativeArchitectureDepth{
   // footprints come from the SAME source geomOf() used to draw each actor.
   prepare({source,W,H,VZ,CW,CH,camX,camY,actorRanges}){
     if(this.disposed||!(W>0&&H>0))return null;
-    const nearby=(actorRanges||[]).filter(a=>
+    const nearArchitecture=(actorRanges||[]).filter(a=>
       sourceArchitectureOverlaps(a.rect,source,CW,CH));
-    this.stats.activeActors=nearby.length;
+    const nearTrees=pickNativeActorTrees(
+      source.flora||[],actorRanges,CW,CH);
+    this.stats.activeActors=nearArchitecture.length+nearTrees.length;
     this.stats.visible=false;
-    if(!nearby.length)return null;
-    this.ensureWorld(source);
+    this.stats.treeClusters=0;this.stats.treeWood=0;this.stats.treeLeaves=0;
+    if(!nearArchitecture.length&&!nearTrees.length)return null;
+    // Do not pay the castle+three-ruin geometry build/draw cost when only
+    // tree contact is nearby. Tree trunks and branches use one InstancedMesh.
+    if(nearArchitecture.length)this.ensureWorld(source);
+    else if(this.world)this.world.visible=false;
+    if(this.world)this.world.visible=!!nearArchitecture.length;
+    this.treeDepth.update(source,actorRanges,CW,CH);
+    this.stats.treeClusters=this.treeDepth.stats.trees;
+    this.stats.treeWood=this.treeDepth.stats.woodInstances;
+    this.stats.treeLeaves=this.treeDepth.stats.leafInstances;
     // Half-screen pass limits fill rate on high-DPR iPads while maintaining
     // geometric depth in the actual game camera.
     const dw=Math.max(1,Math.ceil(W*.5));
@@ -118,6 +132,7 @@ export class NativeArchitectureDepth{
     if(this.disposed)return;
     this.disposed=true;
     this.removeWorld();
+    this.treeDepth.dispose();
     this.target.dispose();
     this.target.depthTexture.dispose();
     this.material.dispose();
