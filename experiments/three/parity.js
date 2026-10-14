@@ -7,6 +7,8 @@ import { ThreeGlyphBackend } from './three-glyphs.js';
 const originalCanvas=document.getElementById('g');
 const modeOriginal=document.getElementById('parity-legacy');
 const modeThree=document.getElementById('parity-three');
+const architectureButton=document.getElementById('parity-architecture');
+let liveArchitecture=null,architectureLoading=null,architectureWanted=false;
 const status=document.getElementById('parity-status');
 let legacyFlush=GL.flush;
 let backend=null,mode='legacy',lastError=null;
@@ -18,6 +20,12 @@ const safeStatus=text=>{status.textContent=text;};
 function renderThree(camx,camy,castle){
   try {
     backend.flush(GB,SPF,gput,CAST,camx,camy,castle,W,H,DPR,VZ,cathedral.cv);
+    // Native Gothic source meshes share this very same GPU context. The
+    // full-screen original ASCII image is committed first; optional geometry
+    // is restricted to a small diagnostic viewport, never replacing art.
+    if(liveArchitecture?.active){
+      liveArchitecture.render({W,H,VZ,CW,CH,camX:camx/CW,camY:camy/CH,DPR});
+    }
     const now=performance.now();
     if(now-lastStats>1100){
       const s=backend.stats;
@@ -69,6 +77,39 @@ function selectMode(next){
   modeThree.setAttribute('aria-pressed',String(mode==='three'));
   return true;
 }
+async function setLiveArchitecture(enabled){
+  architectureWanted=Boolean(enabled);
+  if(!architectureWanted){
+    if(liveArchitecture){liveArchitecture.dispose();liveArchitecture=null}
+    architectureButton.setAttribute('aria-pressed','false');
+    architectureButton.textContent='3D архитектура: выкл.';
+    return true;
+  }
+  if(!selectMode('three')){
+    architectureWanted=false;return false;
+  }
+  architectureButton.disabled=true;
+  try{
+    // Lazy dependency: main game and old WebGL never spend CPU/GPU resources
+    // generating native meshes unless the player explicitly chooses 3D QA.
+    const {LiveSourceArchitecture}=await import('./live-architecture.js');
+    if(!architectureWanted)return false;
+    liveArchitecture=new LiveSourceArchitecture(backend.renderer,()=>({
+      solids,ruinSites,ruinDetail,ruinRotateMesh,cathedral,
+      WS,MS,pitch:PITCH,worldGen
+    }));
+    architectureButton.setAttribute('aria-pressed','true');
+    architectureButton.textContent='3D архитектура: вкл.';
+    return true;
+  }catch(error){
+    console.error('Native 3D architecture integration failed',error);
+    architectureWanted=false;
+    architectureButton.setAttribute('aria-pressed','false');
+    architectureButton.textContent='3D архитектура: ошибка';
+    return false;
+  }finally{architectureButton.disabled=false}
+}
+architectureButton.addEventListener('click',()=>setLiveArchitecture(!architectureWanted));
 modeOriginal.addEventListener('click',()=>selectMode('legacy'));
 modeThree.addEventListener('click',()=>selectMode('three'));
 
@@ -89,6 +130,12 @@ window.__ASCII_PARITY__={
   select:selectMode,
   get mode(){return mode;},
   get stats(){return backend?.stats||null;},
+  get liveArchitecture(){return liveArchitecture?{
+    active:liveArchitecture.active,
+    ...liveArchitecture.stats,
+    camera:liveArchitecture.lastCamera
+  }:null;},
+  setLiveArchitecture,
   get error(){return lastError;},
   get canvas(){return backend?.renderer.domElement||null;},
   get ready(){return Boolean(GB.atlasCv&&GB.spr.length&&W&&H&&GB.n>1000);},

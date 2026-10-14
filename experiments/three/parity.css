@@ -42,3 +42,8 @@ body.editing #parity-toolbar { opacity: .55; pointer-events: none; }
   #parity-toolbar button { padding: 6px 8px; }
   #parity-status { font-size: 10px; }
 }
+
+/* Opt-in architecture is rendered through the SAME WebGL context; this
+   button merely exposes it, leaving the main glyph image untouched. */
+#parity-architecture[aria-pressed="true"]{border-color:#bcbcb9;color:#fff}
+#parity-architecture:disabled{opacity:.5;cursor:wait}
