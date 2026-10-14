@@ -3,9 +3,13 @@
 // but never initialises the old WebGL shader. One Three WebGL2 context handles
 // the complete authored glyph framebuffer; #g is a Canvas2D-only fallback.
 import {ThreeGlyphBackend} from './three-glyphs.js';
+import {NativeArchitectureDepth} from './native-architecture-depth.mjs';
 
 const fallbackCanvas=document.getElementById('g');
-let backend=null,disposed=false,fallbackReason=null,frames=0;
+let backend=null,depthPass=null,disposed=false,fallbackReason=null,frames=0;
+// The source game remains the authoritative painter: collect only NPC spans.
+const originalNativeRender=render;
+render=function(){GB.nativeActorRanges=[];return originalNativeRender()};
 const nativeBridge=GL;
 const resizeFallback=GL.resize.bind(GL);
 
@@ -13,6 +17,7 @@ function enableFallback(error){
   fallbackReason=String(error?.message||error||'WebGL2 unavailable');
   console.error('Native Three runtime fell back to Canvas2D:',error);
   GL.ok=false;GL.lost=false;GL.gl=null;
+  depthPass?.dispose();depthPass=null;
   GL.flush=()=>{};
   try{backend?.show(false)}catch(_){}
   fallbackCanvas.style.visibility='visible';
@@ -24,6 +29,35 @@ function enableFallback(error){
 function flushNative(camx,camy,castle){
   if(!backend||backend.lost)return;
   try{
+    const source={solids,ruinSites,ruinDetail,ruinRotateMesh,
+      cathedral,ruins,WS,MS,pitch:PITCH,worldGen};
+    const ranges=GB.nativeActorRanges||[];
+    if(ranges.length){
+      for(const a of ranges){
+        const world=toModelXZ(a.source.x,a.source.y);
+        // Source camera is 12,000 model pixels above the projected target.
+        // Farther north in the game map means farther from the camera.
+        const z=12000+world[1]*WS*Math.cos(PITCH);
+        a.depth=Math.max(0,Math.min(1,(z-.01)/39999.99));
+        a.footY=(a.source.y+.7)*CH;
+      }
+    }
+    // Cache native geometry, and perform Z prepass only near real masonry.
+    // The source glyph pixels and 2D overlay remain completely unchanged.
+    if(ranges.length&&!depthPass)
+      depthPass=new NativeArchitectureDepth(backend.renderer);
+    if(depthPass){
+      try{
+        backend.actorDepthTexture=depthPass.prepare({
+          source,W,H,VZ,CW,CH,camX,camY,actorRanges:ranges
+        });
+      }catch(depthError){
+        console.warn('Native depth disabled; original painter retained:',depthError);
+        depthPass.dispose();depthPass=null;
+        backend.actorDepthTexture=null;
+      }
+    }else backend.actorDepthTexture=null;
+    backend.actorDepthPitch=PITCH;
     backend.flush(GB,SPF,gput,CAST,camx,camy,castle,W,H,DPR,VZ,cathedral.cv);
     frames++;
   }catch(error){
@@ -61,6 +95,8 @@ try{
   GL.ok=true;
   backend.renderer.domElement.addEventListener('webglcontextlost',e=>{
     e.preventDefault();GL.lost=true;GL.ok=false;
+    depthPass?.dispose();depthPass=null;
+    backend.actorDepthTexture=null;
   });
   backend.renderer.domElement.addEventListener('webglcontextrestored',()=>{
     GL.lost=false;GL.ok=true;
@@ -76,6 +112,7 @@ window.__ASCII_NATIVE__={
   get renderer(){return backend?.renderer||null},
   get originalMap(){return MEADOW_MAP},
   get frameCount(){return frames},
+  get nativeDepth(){return depthPass?.stats||{frames:0,builds:0,visible:false,activeActors:0}},
   get error(){return fallbackReason},
   // Explicitly off the production route; visual art review comes at the end.
   dispose(){
