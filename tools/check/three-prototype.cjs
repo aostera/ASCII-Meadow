@@ -69,6 +69,13 @@ fs.mkdirSync(out, { recursive: true });
       await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__.location === 'camp');
       const camp = await page.evaluate(() => window.__ASCII_THREE_DIAGNOSTICS__);
       if (camp.authoredRuins !== 0 || camp.authoredFlora < 8) throw new Error('Authored camp missing: ' + JSON.stringify(camp));
+      await page.locator('#location').selectOption('castle');
+      await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__?.location === 'castle', {timeout:15000});
+      const castle=await page.evaluate(() => window.__ASCII_THREE_DIAGNOSTICS__);
+      if(!castle.hasGothicCastle || castle.gothicMeshCount < 3 ||
+        castle.groundContactShapes < 15)
+        throw new Error('3D gothic castle, merged masonry or contacts missing: '+JSON.stringify(castle));
+      await page.screenshot({ path: path.join(out, mobile ? 'phone-castle.png' : 'desktop-castle.png') });
       await page.locator('#ascii').check();
       await page.locator('#stress').check();
       await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__.stress);
