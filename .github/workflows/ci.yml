@@ -342,6 +342,8 @@ jobs:
           node --check experiments/three/native-bushes.js
           node --check tools/check/three-native-bush.cjs
           node --check experiments/three/native-npcs.js
+          node --check experiments/three/native-architecture-depth.mjs
+          node --check tools/check/three-native-depth.cjs
           node --check tools/check/three-native-npcs.cjs
           node --check experiments/three/glyph-visibility.mjs
           node --check experiments/three/source-motion.mjs
@@ -383,6 +385,7 @@ jobs:
           node tools/check/three-native-game.cjs http://127.0.0.1:8181
           node tools/check/three-native-bush.cjs http://127.0.0.1:8181
           node tools/check/three-native-npcs.cjs http://127.0.0.1:8181
+          node tools/check/three-native-depth.cjs http://127.0.0.1:8181
           node tools/check/three-parity.cjs http://127.0.0.1:8181
           node tools/check/three-motion-parity.cjs http://127.0.0.1:8181
           node tools/check/three-performance.cjs http://127.0.0.1:8181
@@ -416,4 +419,5 @@ jobs:
             shots/three-native-game/
             shots/three-native-bush/
             shots/three-native-npcs/
+            shots/three-native-depth/
           if-no-files-found: warn
