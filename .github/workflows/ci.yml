@@ -339,6 +339,8 @@ jobs:
           node --check experiments/three/native-gl.js
           node --check experiments/three/native.js
           node --check tools/check/three-native-game.cjs
+          node --check experiments/three/native-bushes.js
+          node --check tools/check/three-native-bush.cjs
           node --check experiments/three/glyph-visibility.mjs
           node --check experiments/three/source-motion.mjs
           node tools/check/three-source-motion.mjs
@@ -377,6 +379,7 @@ jobs:
           trap 'kill $server 2>/dev/null || true' EXIT
           for i in $(seq 1 20); do curl -sf http://127.0.0.1:8181/experiments/three/parity.html > /dev/null && break; sleep 1; done
           node tools/check/three-native-game.cjs http://127.0.0.1:8181
+          node tools/check/three-native-bush.cjs http://127.0.0.1:8181
           node tools/check/three-parity.cjs http://127.0.0.1:8181
           node tools/check/three-motion-parity.cjs http://127.0.0.1:8181
           node tools/check/three-performance.cjs http://127.0.0.1:8181
@@ -408,4 +411,5 @@ jobs:
             shots/three-device-profiler/
             shots/three-engine-comparison/
             shots/three-native-game/
+            shots/three-native-bush/
           if-no-files-found: warn
