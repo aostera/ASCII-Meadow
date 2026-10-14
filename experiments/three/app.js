@@ -438,7 +438,8 @@ function frame(now) {
       legacyKnight.userData.billboard.rotation.y=Math.atan2(
         camera.position.x-legacyKnight.position.x,
         camera.position.z-legacyKnight.position.z);
-      legacyKnight.userData.animateLegacy(secs,{
+      // In 3D-rig mode don't pay for Canvas2D frame painting and GPU texture uploads.
+      if(legacyKnight.visible)legacyKnight.userData.animateLegacy(secs,{
         mode:state.lastMotion,heading:hero.rotation.y,
         jumpProgress:state.air>0?Math.max(0,Math.min(.999,1-Math.abs(state.air-1.7)/1.7)):0
       });
