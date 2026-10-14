@@ -72,7 +72,15 @@ fs.mkdirSync(output,{recursive:true});
    if(fallback.mode!=='canvas2d'||fallback.oldVisible!=='visible'||
       fallback.three!==null||fallback.map!==start.map)
      throw Error(label+' Canvas2D fallback failed '+JSON.stringify(fallback));
-   await page.waitForTimeout(150);
+   // Software SwiftShader frames may take 400ms: do not mistake a blank
+   // pre-next-RAF canvas for a broken fallback. Wait for a real 2D frame.
+   await page.waitForFunction(()=>{
+     if(!GL.ctx2||GL.ok)return false;
+     const pixels=GL.ctx2.getImageData(0,0,Math.min(40,GL.ctx2.canvas.width),
+       Math.min(40,GL.ctx2.canvas.height)).data;
+     for(let i=0;i<pixels.length;i+=4)if(pixels[i]>=10)return true;
+     return false;
+   },undefined,{timeout:60000});
    const drawn=await page.evaluate(()=>{
      const g=GL.ctx2;
      const data=g.getImageData(0,0,Math.min(40,g.canvas.width),
