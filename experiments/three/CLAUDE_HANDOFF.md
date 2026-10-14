@@ -42,3 +42,14 @@ The isolated branch now has `gothic.js` with real arch voids, columns, buttresse
 
 ## 2026-10-13 / Dense forest batching
 `forest.js` now generates reusable living/dead/bush geometry variants and uses InstancedMesh instead of drawing each branch and leaf separately. `app.js` preserves map x,z and existing root-contact masks; stress objects remain temporary. CI smoke checks instanced forest meshes and no map changes. Chromium SwiftShader draw calls decreased in the camp smoke scene from ~472 to ~302, but frame time worsened in this software-GPU run, so this is NOT evidence of higher actual FPS. Real Safari/desktop GPU profiling remains mandatory.
+
+
+## Expanded migration scope as of 2026-10-14
+The owner requested GPT to implement the originally planned Claude tasks during Claude usage limits. Additional modules are now implemented:
+- `forest.js`: deterministic geometry variants, batched leaf/branch bark per material, `InstancedMesh` for authored trees, dead trees and bushes. Preserves authored map positions.
+- `castle.js`: modelled multi-tower main gothic castle / courtyard with open entrance, keep and contact rectangles. Located at the authored `map.castle` or unshifted world origin when null. Model is a placeholder, NOT final original visual parity.
+- `knight-ascii.js`: 192-frame read-only legacy knight bridge from `src/data/knight-frames.js`; uses a SINGLE reused GPU canvas texture, keeping the procedural 3D rig as an alternative. The depth-tested camera billboard is not a skinned mesh.
+- `index.html` / `style.css` / `app.js`: character mode selector plus a real multitouch D-pad, run and jump; castle location added.
+- `tools/check/three-prototype.cjs`: asserts original frame count/animation, mapped gothic castle geometry, contacts and touch control.
+
+The permanent preview link (Cloudflare Workers Builds) is https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev/experiments/three/ . Main `src/data/map.js` and renderer must remain unchanged. DO NOT claim 200 FPS or parity without measurements, nor treat CI Chromium/SwiftShader as iPad Safari verification. When Claude returns, start with glTF art fidelity, dynamic 3D colliders, camera matching original scene, actual cinematic rig cloth and equal-detail GPU profiling.

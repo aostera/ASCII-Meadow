@@ -46,3 +46,18 @@ Needs internet for pinned Three.js 0.186.1 module CDN. Existing src/data/map.js 
 - `ground-contacts.js`: deterministic geometry footprints, skip planted GPU blades under solid stone and tents; bend near posts; character pushes GPU grass. Approximate, not finished gameplay physics.
 - Browser smoke checks model mesh counts, idle/walk/run, contacts and read-only map.
 - Pending: exact asset conversion/LOD, game/editor parity, on-device Safari QA and fair performance comparisons.
+
+
+## Live preview and latest progress (2026-10-14)
+
+**Live branch preview:** https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev/experiments/three/
+
+The main game at https://ascii-meadow.aloster36.workers.dev/ remains unchanged. Preview uses Cloudflare Workers Builds on the experimental branch, not the main deployment.
+
+- `castle.js`: batched gothic main castle with towers, real open gate, walls, inner courtyard, keep, buttresses and shadow geometry. **Visual prototype, NOT the authored castle model.**
+- `knight-ascii.js`: direct read-only 192-frame bridge to `src/data/knight-frames.js`. One reused `CanvasTexture`, updated only when original-sprite mode is shown. Choose `Рыцарь → 192 кадра оригинала` to compare with the procedural rig; sprites use 3D depth but may need aliasing/fidelity work.
+- `index.html` has touch D-pad and run/jump controls on mobile; keyboard WASD, Shift, Space on PC. Both modes move from one common player position, and map.js is not modified.
+- `ground-contacts.js` prevents basic solid footprint penetration in 3D experiment, but does not represent original gameplay collision logic. True collision and mobile Safari verification are still required.
+- `tools/check/three-prototype.cjs` checks authored scenes, real castle meshes and foundations, original-frame registration, toggled animation and control states. These are automated smoke tests, not user acceptance of visual quality.
+
+The link is for testing and may briefly show the previous build while Cloudflare updates branch previews. No GPU FPS improvement has been established.
