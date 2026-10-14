@@ -28,6 +28,7 @@ fs.mkdirSync(out, { recursive: true });
         throw new Error('Three.js failed to initialize: '+errors.join(' | ')+'; visible error: '+
           (await page.locator('#error').textContent())+'; '+err.message);
       }
+      if(mobile)await page.locator('#hud-toggle').click(); // phone starts with debug panel minimized
       const first = await page.evaluate(() => ({
         stats: window.__ASCII_THREE_DIAGNOSTICS__,
         source: JSON.stringify(window.ASCII_MEADOW_MAP)
@@ -69,9 +70,13 @@ fs.mkdirSync(out, { recursive: true });
       await page.keyboard.up('w');
       await page.locator('#character').selectOption('rig');
       await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__?.characterMode === 'rig');
+      if(mobile)await page.locator('#hud-toggle').click();
       await page.screenshot({ path: path.join(out, mobile ? 'phone.png' : 'desktop.png') });
+      if(mobile)await page.locator('#hud-toggle').click();
       await page.locator('#ascii').uncheck();
+      if(mobile)await page.locator('#hud-toggle').click();
       await page.screenshot({path:path.join(out,mobile?'phone-3d-no-ascii.png':'desktop-3d-no-ascii.png')});
+      if(mobile)await page.locator('#hud-toggle').click();
       await page.locator('#location').selectOption('camp');
       await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__.location === 'camp');
       const camp = await page.evaluate(() => window.__ASCII_THREE_DIAGNOSTICS__);
@@ -82,7 +87,9 @@ fs.mkdirSync(out, { recursive: true });
       if(!castle.hasGothicCastle || castle.gothicMeshCount < 3 ||
         castle.groundContactShapes < 15)
         throw new Error('3D gothic castle, merged masonry or contacts missing: '+JSON.stringify(castle));
+      if(mobile)await page.locator('#hud-toggle').click();
       await page.screenshot({ path: path.join(out, mobile ? 'phone-castle.png' : 'desktop-castle.png') });
+      if(mobile)await page.locator('#hud-toggle').click();
       await page.locator('#ascii').check();
       await page.locator('#stress').check();
       await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__.stress);
