@@ -18,3 +18,16 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# 3D knight pipeline (blender/): only the scripts are tracked. Sources, .blend files and
+# renders are large or third-party; rebuild them with the scripts (see blender/README.md).
+blender/*.blend
+blender/*.blend1
+blender/SF_Knight_v1.0/
+blender/Masked_Knight_src/
+blender/anim/
+blender/previews/
+blender/previews_masked/
+blender/refs/
+/SF_medival_knight_no_supports/
+/SF_medival_knight_with_supports/

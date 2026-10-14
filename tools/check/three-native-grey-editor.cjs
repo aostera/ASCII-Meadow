@@ -103,9 +103,9 @@ fs.mkdirSync(dir,{recursive:true});
      Math.abs(ruinSites()[1].yaw-75*Math.PI/180)<.001,
      undefined,{timeout:90000});
    await page.evaluate(()=>edUndo());
-   await page.waitForFunction(()=>MEADOW_MAP.ruins===null||
-     Math.abs(ruinSites()[1].yaw-before.yaw)<.001,
-     undefined,{timeout:90000});
+   await page.waitForFunction(yaw=>MEADOW_MAP.ruins===null||
+     Math.abs(ruinSites()[1].yaw-yaw)<.001,
+     before.yaw,{timeout:90000});
    // Direct rotation by touching the actual grey ruin IN THE MAP.
    // Keep this distinct from the slider: Alt-drag must generate a single
    // normal source editor undo entry, and never drag the ruin's world position.
@@ -123,13 +123,13 @@ fs.mkdirSync(dir,{recursive:true});
    await page.mouse.move(point.x+74,point.y,{steps:6});
    await page.mouse.up();
    await page.keyboard.up('Alt');
-   await page.waitForFunction(()=>
-     Math.abs(ruinSites()[1].yaw-before.yaw)>.08,
-     undefined,{timeout:90000});
+   await page.waitForFunction(yaw=>
+     Math.abs(ruinSites()[1].yaw-yaw)>.08,
+     before.yaw,{timeout:90000});
    await page.evaluate(()=>edUndo());
-   await page.waitForFunction(()=>MEADOW_MAP.ruins===null||
-     Math.abs(ruinSites()[1].yaw-before.yaw)<.001,
-     undefined,{timeout:90000});
+   await page.waitForFunction(yaw=>MEADOW_MAP.ruins===null||
+     Math.abs(ruinSites()[1].yaw-yaw)<.001,
+     before.yaw,{timeout:90000});
    const restored=await page.evaluate(()=>({
      map:JSON.stringify(MEADOW_MAP),
      editor:window.__ASCII_NATIVE__.greyEditor,

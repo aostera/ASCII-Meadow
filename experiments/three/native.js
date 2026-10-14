@@ -9,6 +9,30 @@ import {NativeGreyMapEditor} from './native-editor-models.mjs';
 const fallbackCanvas=document.getElementById('g');
 let backend=null,depthPass=null,editorModels=null,disposed=false,fallbackReason=null,frames=0;
 let testDepthDisabled=false;
+// The player is the skinned 3D knight printed as the game's own glyphs (see
+// native-knight3d.mjs). ?knight3d=0 keeps the original baked ASCII knight; so does
+// any failure, and the time until the GLB has loaded.
+const knight3dOn=new URLSearchParams(location.search).get('knight3d')!=='0';
+let knight3d=null,knight3dError=null;
+if(knight3dOn){
+  const originalDrawKnight=drawKnight;
+  drawKnight=function(e,G,fcw,fch){
+    if(e===player&&knight3d?.ready){
+      try{
+        knight3d.draw(e,G,fcw,fch,{t,CW,CH,PITCH,KG,JUMP_T,AIR0,AIR1,
+          rampCode,grect,gput,KN0,KNS,fireLightAt,knightFireBlock});
+        drawTag(e,G.gx,G.gy);
+        return;
+      }catch(error){
+        // A broken 3D knight hands the player back to the original ASCII art.
+        knight3dError=String(error?.message||error);
+        console.error('3D knight disabled:',error);
+        knight3d.dispose();knight3d=null;
+      }
+    }
+    return originalDrawKnight(e,G,fcw,fch);
+  };
+}
 let contextLostCount=0,contextRestoredCount=0,nativeFallbackFrames=0;
 // The source game remains the authoritative painter: collect only NPC spans.
 const originalNativeRender=render;
@@ -182,6 +206,15 @@ try{
   });
 }catch(err){enableFallback(err)}
 
+if(knight3dOn&&backend){
+  import('./native-knight3d.mjs').then(({NativeKnightGlyphs})=>{
+    if(!disposed&&backend)knight3d=new NativeKnightGlyphs(backend.renderer);
+  }).catch(error=>{
+    knight3dError=String(error?.message||error);
+    console.error('Native 3D knight unavailable:',error);
+  });
+}
+
 window.__ASCII_NATIVE__={
   get ready(){return Boolean(GB.atlasCv&&W&&H&&GB.n>1000)},
   get mode(){return GL.ok&&!GL.lost?'three':'canvas2d'},
@@ -205,10 +238,13 @@ window.__ASCII_NATIVE__={
     return true;
   },
   get error(){return fallbackReason},
+  get knight3d(){return knight3dOn?{active:!!knight3d,ready:!!knight3d?.ready,
+    error:knight3dError||knight3d?.stats.error||null,...(knight3d?.stats||{})}:null},
   // Explicitly off the production route; visual art review comes at the end.
   dispose(){
     if(disposed)return;
     disposed=true;
+    knight3d?.dispose();knight3d=null;
     enableFallback('Native GPU bridge disposed');
     backend?.dispose();backend=null;
   }

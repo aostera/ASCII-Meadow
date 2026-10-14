@@ -185,3 +185,11 @@ Native game only (`/experiments/three/native.html`):
 - CI run `38578424190`, job `115901568487`, head `ae94d38c`: native game desktop/phone PASS; physical bush desktop/phone PASS; native NPC depth desktop/phone PASS; parity 10/10 source/Three static images 100% exact (includes lightning) plus prior animation/source-rig/depth tests. CI software GPU timing is not real hardware FPS. Only source-parity lab frames are guaranteed pixel exact; new native-world bush displacement and NPC compositing necessarily change the picture intentionally.
 - Keep actual Safari/iPad hardware acceptance, full source geometry depth compositing, shadows, 3D character art fidelity and memory/performance work open. Do not call full Three migration complete. Preserve independent draft PR #37 and main production.
 
+
+## 2026-10-14 — 3D-рыцарь (glTF Masked Knight)
+- Пайплайн рыцаря — скрипты в `blender/`, порядок и правила в `blender/README.md`. Пересборка: подготовка → риг → плащ → `bake_clip` × 5 → `export_glb`. Не правь GLB руками.
+- Three.js: `experiments/three/knight-gltf.js` (контракт как у `knight-rig.js`), по умолчанию в 3D-риге; `?knight=procedural` — старый риг. Тест `tools/check/three-live-knight.cjs`.
+- Объект, привязанный к кости, не позиционировать через `matrix_world` — только identity `matrix_basis` + `matrix_parent_inverse` из покоя кости.
+- Основная картинка native-игры: игрок по умолчанию — 3D glTF-рыцарь, напечатанный глифами игры (`experiments/three/native-knight3d.mjs`: рендер в offscreen-цель → рецепт `tools/to_ascii.py` → `grect`/`gput` в общий батч с атласом рыцаря и огнём). `?knight3d=0`, отсутствие GLB или ошибка — исходный ASCII-рыцарь. Тест `tools/check/three-native-knight3d.cjs`. Лаборатория паритета (`parity.html`) не затронута.
+- Спрайт-камера рыцаря — своя (подъём 0,35 рад), не `PITCH` карты: с наклона карты глубина плаща раздувала фигуру в 1,5 раза.
+- GLB (`experiments/three/assets/knight/masked_knight.glb`) в git с 2026-10-14: автор проверил лицензию Fab и разрешил коммит. При пересборке заменяй файл целиком через `export_glb()`.

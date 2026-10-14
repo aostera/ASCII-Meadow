@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import {makeSourceArchitecture} from './source-masonry.mjs';
 import {createNativeSourceWorld,configureNativeCamera} from './source-world.mjs';
 import {createAnimatedKnight} from './knight-rig.js';
+import {createGltfKnight} from './knight-gltf.js';
 import {projectOriginalActor,sourceKnightMotion} from './source-motion.mjs';
 import {createAnimatedCow} from './cow-rig.js';
 import {sourceCowPose,projectSourceCow} from './source-cow-motion.mjs';
@@ -118,7 +119,8 @@ export class LiveSourceArchitecture {
     if(!enabled){
       if(this.knightRig){
         this.scene.remove(this.knightRig);
-        this.knightRig.traverse(o=>{if(o.geometry)o.geometry.dispose()});
+        if(this.knightRig.userData.dispose)this.knightRig.userData.dispose();
+        else this.knightRig.traverse(o=>{if(o.geometry)o.geometry.dispose()});
         for(const mat of Object.values(this.knightMaterials||{}))mat.dispose();
       }
       this.knightRig=null;this.knightMaterials=null;
@@ -133,12 +135,30 @@ export class LiveSourceArchitecture {
         red:new THREE.MeshStandardMaterial({color:0x3a3436,roughness:1}),
         wood:new THREE.MeshStandardMaterial({color:0x272727,roughness:1})
       };
-      this.knightRig=createAnimatedKnight(THREE,this.knightMaterials);
+      // The skinned glTF Masked Knight is the default; ?knight=procedural keeps the old
+      // box rig. The procedural rig also stands in while the GLB is loading or if it fails.
+      const procedural=()=>createAnimatedKnight(THREE,this.knightMaterials);
+      const wantGltf=!/[?&]knight=procedural/.test(globalThis.location?.search||'');
+      const countMeshes=()=>{
+        this.stats.knightMeshes=0;
+        this.knightRig?.traverse(o=>{if(o.isMesh)this.stats.knightMeshes++});
+      };
+      this.stats.knightModel=wantGltf?'gltf':'procedural';
+      this.stats.knightGltfLoaded=false;this.stats.knightGltfError=null;
+      this.knightRig=wantGltf?createGltfKnight(THREE,{fallback:procedural,
+        onLoad:rig=>{
+          if(rig!==this.knightRig)return;
+          this.stats.knightGltfLoaded=true;
+          this.stats.knightClips=Object.keys(rig.userData.gltf.actions);
+          countMeshes();
+        },
+        onError:err=>{this.stats.knightGltfError=String(err?.message||err)}
+      }):procedural();
       this.knightRig.name='source-player-driven-3D-rig-diagnostic';
+      this.knightRig.layers.set(1);
       this.knightRig.traverse(o=>o.layers.set(1));
       this.scene.add(this.knightRig);
-      this.stats.knightMeshes=0;
-      this.knightRig.traverse(o=>{if(o.isMesh)this.stats.knightMeshes++});
+      countMeshes();
     }
     this.knightEnabled=true;this.stats.knightRig=true;
     return true;
@@ -153,7 +173,13 @@ export class LiveSourceArchitecture {
       data.pitch,data.knightSourceHeight);
     this.knightRig.position.set(...project.position);
     this.knightRig.scale.setScalar(project.scale);
+    // glTF clips play at the real ground speed: source sprite pixels per metre (1.90 m knight)
+    this.knightRig.userData.pxPerMeter=data.knightSourceHeight>0?data.knightSourceHeight/1.9:null;
     const state=this.knightRig.userData.animate(dt,motion.movement,now);
+    if(this.knightRig.userData.gltf){
+      this.stats.knightClip=this.knightRig.userData.gltf.clip;
+      this.stats.knightClipTimeScale=this.knightRig.userData.gltf.timeScale;
+    }
     this.knightSample=motion.sample;
     this.knightClock=now;
     this.stats.knightMotion=state;
