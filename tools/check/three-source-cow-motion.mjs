@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import {sourceCowPose,projectSourceCow,COW_GRAZE_DOWN,COW_GRAZE_UP}
+ from '../../experiments/three/source-cow-motion.mjs';
+const cow={x:55,y:80,d8:4,state:'idle',at:0};
+const state=JSON.stringify(cow);
+const idle=sourceCowPose(cow,null,.05,5,8,1);
+assert.equal(idle.state,'idle');
+assert.equal(idle.lowerHead,0);
+assert.deepEqual(idle.sourceFoot,[275,645.6]);
+const down=sourceCowPose({...cow,state:'graze',gp:'down',at:COW_GRAZE_DOWN*.5},idle.sample,.1,5,8);
+assert.ok(down.lowerHead>.49&&down.lowerHead<.51);
+const loop=sourceCowPose({...cow,state:'graze',gp:'loop',at:1.1},idle.sample,.1,5,8);
+assert.equal(loop.lowerHead,1);
+const up=sourceCowPose({...cow,state:'graze',gp:'up',at:COW_GRAZE_UP*.5},idle.sample,.1,5,8);
+assert.ok(up.lowerHead>.49&&up.lowerHead<.51);
+const walk=sourceCowPose({...cow,state:'walk',x:56},idle.sample,.1,5,8);
+assert.equal(walk.state,'walk');assert.equal(walk.gait,1);
+const run=sourceCowPose({...cow,state:'run',x:60},idle.sample,.1,5,8);
+assert.equal(run.gait,1.8);
+const hop=sourceCowPose({...cow,state:'hop',at:.42},idle.sample,.05,5,8);
+assert.ok(hop.hop>.98);
+assert.equal(sourceCowPose({...cow,state:'hop',at:0},idle.sample,.05,5,8).hop,0);
+const loc=projectSourceCow(cow,5,8,.87,144);
+assert.ok(loc.scale>0&&loc.position.every(Number.isFinite));
+assert.equal(JSON.stringify(cow),state,'source cow map/state must remain immutable');
+assert.throws(()=>sourceCowPose(null,null,.05,5,8));
+console.log('PASS source cow: original graze down/up, chew loop, walk/run, hop and projected feet; no writes');
