@@ -57,29 +57,38 @@ export class NativePropDepth {
     this.root.name='source-medieval-tent-and-fence-depth';
     scene.add(this.root);
     this.cache=new Map();
+    this.instances=new Map();
     this.generation=-1;
     this.stats={props:0,tents:0,fences:0,sourceSolids:0,triangles:0};
   }
   clear(){
     this.root.clear();
+    this.instances.clear();
     for(const m of this.cache.values())
       m.traverse(o=>{if(o.geometry)o.geometry.dispose()});
     this.cache.clear();
   }
   reset(){
-    this.root.clear();
     this.stats={props:0,tents:0,fences:0,sourceSolids:0,triangles:0};
   }
   update(source,actorRanges,CW,CH){
     this.reset();
     if(!source.flora||!source.VARS||
-       !source.campTent||!source.campFence||!source.campTurn)
+       !source.campTent||!source.campFence||!source.campTurn){
+      this.root.clear();this.instances.clear();
       return 0;
+    }
     if(this.generation!==source.worldGen){
       this.clear();this.generation=source.worldGen;
     }
     const props=pickNativeActorProps(
       source.flora,actorRanges,CW,CH,6);
+    const wanted=new Set(props);
+    for(const [oldProp,instance] of this.instances){
+      if(!wanted.has(oldProp)){
+        this.root.remove(instance);this.instances.delete(oldProp);
+      }
+    }
     const variants={
       tent:source.VARS.filter(v=>v.type==='tent'),
       fence:source.VARS.filter(v=>v.type==='fence')
@@ -101,10 +110,14 @@ export class NativePropDepth {
         template=makeSourceArchitecture(THREE,solids,{wall:this.material});
         this.cache.set(key,template);
       }
-      const instance=template.clone(true);
+      let instance=this.instances.get(p);
+      if(!instance){
+        instance=template.clone(true);
+        this.instances.set(p,instance);
+        this.root.add(instance);
+      }
       instance.position.set(-p.x*CW,-p.br*CH*c,-p.br*CH*s);
       instance.scale.set(-1,1,1);
-      this.root.add(instance);
       this.stats.props++;
       this.stats[type==='tent'?'tents':'fences']++;
       this.stats.sourceSolids+=template.userData.sourceStatistics.solids;
