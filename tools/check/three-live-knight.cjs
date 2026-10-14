@@ -51,10 +51,17 @@ fs.mkdirSync(shots,{recursive:true});
      canvases:document.querySelectorAll('canvas').length,
      player:window.__ASCII_PARITY__.playerLocation
    }));
-   const gltfOk=active.knightModel==='gltf'?
-     active.knightGltfLoaded&&!active.knightGltfError&&active.knightMeshes>=2&&
-     ['Idle','Walk','Run','Jump','Crouch'].every(c=>(active.knightClips||[]).includes(c)):
-     active.knightMeshes>=25;
+   // The GLB is a third-party asset that may be absent from the repository (licence
+   // pending): then the procedural rig must remain as a working fallback.
+   const glbPresent=await page.evaluate(async()=>{
+     const r=await fetch(new URL('assets/knight/masked_knight.glb',location.href),{method:'HEAD'});
+     return r.ok;
+   });
+   const gltfOk=active.knightModel!=='gltf'?active.knightMeshes>=25:
+     glbPresent?
+       active.knightGltfLoaded&&!active.knightGltfError&&active.knightMeshes>=2&&
+       ['Idle','Walk','Run','Jump','Crouch'].every(c=>(active.knightClips||[]).includes(c)):
+       !active.knightGltfLoaded&&!!active.knightGltfError&&active.knightMeshes>=25;
    if(!active.active||!active.knightRig||!gltfOk||
       !active.knightActorFoot||!active.knightNativePosition||
       active.map!==before.map||active.canvases!==before.canvases)
@@ -73,7 +80,7 @@ fs.mkdirSync(shots,{recursive:true});
    const jumped=await page.evaluate(()=>window.__ASCII_PARITY__.advanceThreeForTest(.05,'jump'));
    if(!(jumped.jump>0)||!['jump','walk','run'].includes(jumped.motion))
       throw Error('Knight did not receive original jump state '+JSON.stringify(jumped));
-   if(active.knightModel==='gltf'){
+   if(active.knightModel==='gltf'&&glbPresent){
      const jumpClip=await page.evaluate(()=>window.__ASCII_PARITY__.liveArchitecture.knightClip);
      if(!['Walk','Run'].includes(walkClip)||jumpClip!=='Jump')
        throw Error('glTF knight clips did not follow the source state '+JSON.stringify({walkClip,jumpClip}));
@@ -94,7 +101,8 @@ fs.mkdirSync(shots,{recursive:true});
      throw Error('Native rig GPU resources not detached '+JSON.stringify(restored));
    if(errors.length)throw Error('Three source rig browser exceptions '+errors.join('\n'));
    console.log(name.toUpperCase()+' SOURCE KNIGHT 3D PASS '+JSON.stringify({
-     model:active.knightModel,clips:active.knightClips,bodyMeshes:active.knightMeshes,sourceMapUnchanged:true,
+     model:active.knightModel,glb:glbPresent?'loaded':'ABSENT - procedural fallback verified',
+     clips:active.knightClips,bodyMeshes:active.knightMeshes,sourceMapUnchanged:true,
      sourceFoot:active.knightActorFoot,walkUpdated:true,jumpReceived:true,
      extraCanvasContexts:0,disposed:true
    }));

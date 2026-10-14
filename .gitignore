@@ -31,3 +31,6 @@ blender/previews_masked/
 blender/refs/
 /SF_medival_knight_no_supports/
 /SF_medival_knight_with_supports/
+# Fab Masked Knight export: kept local until the author confirms the licence allows a public
+# repository (knight-gltf.js and the tests fall back to the procedural rig without it).
+experiments/three/assets/knight/*.glb
