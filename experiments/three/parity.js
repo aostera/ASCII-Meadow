@@ -167,14 +167,17 @@ selectMode('legacy');
 // Dedicated opt-in geometry inspection mode. Never enters the pixel-perfect
 // original / Three glyph comparison unless explicitly requested in the URL.
 // It builds meshes from the REAL raycast source and is not the game's renderer.
-if(new URLSearchParams(location.search).get('geometry')==='1'){
+if(['1','world'].includes(new URLSearchParams(location.search).get('geometry'))){
   const readyForSourceModel=()=>{
     if(!GB.atlasCv||!solids.length){
       requestAnimationFrame(readyForSourceModel);return;
     }
     import('./architecture-viewer.mjs')
       .then(m=>m.openSourceArchitecture({
-        solids,ruinSites,ruinDetail,ruinRotateMesh,cathedral
+        solids,ruinSites,ruinDetail,ruinRotateMesh,cathedral,
+        WS,MS,PITCH,
+        getCamera:()=>({W,H,VZ,CW,CH,camX,camY}),
+        initialWorld:new URLSearchParams(location.search).get('geometry')==='world'
       }))
       .catch(err=>{
         console.error('Original-masonry Three.js view failed:',err);
