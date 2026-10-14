@@ -28,6 +28,18 @@
   <output id="stats">Инициализация…</output>
   <p class="note">Карта и координаты читаются из <code>src/data/map.js</code> без изменений. Поверни камеру мышью или пальцем, приблизь колесом/щипком. WASD — шаг, Shift — бег, Space — прыжок. Переключатель «Рыцарь» показывает также исходные 192 ASCII-кадра. «+ плотность» добавляет только временные объекты для стресс-теста.</p>
 </section>
+<nav id="mobile-pad" aria-label="Управление движением" class="mobile-pad">
+  <div class="pad-directions">
+    <button type="button" data-move="KeyW" class="pad-up" aria-label="Идти вперёд">↑</button>
+    <button type="button" data-move="KeyA" class="pad-left" aria-label="Идти влево">←</button>
+    <button type="button" data-move="KeyS" class="pad-down" aria-label="Идти назад">↓</button>
+    <button type="button" data-move="KeyD" class="pad-right" aria-label="Идти вправо">→</button>
+  </div>
+  <div class="pad-actions">
+    <button type="button" data-move="ShiftLeft" aria-label="Бег">БЕГ</button>
+    <button type="button" data-move="Space" aria-label="Прыжок">ПРЫЖОК</button>
+  </div>
+</nav>
 <div id="error" role="alert" hidden></div>
 <script src="../../src/data/map.js"></script>
 <script src="../../src/data/knight-frames.js"></script>
