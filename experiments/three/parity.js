@@ -451,7 +451,7 @@ if(new URLSearchParams(location.search).get('profile')==='compare'){
     import('./engine-comparison.mjs').then(m=>m.installEngineComparison({
       selectMode,getMode:()=>mode,getStats:()=>backend?.stats||{},
       getMapSnapshot:()=>JSON.stringify(MEADOW_MAP),
-      durationMs:new URLSearchParams(location.search).has('profileTest')?250:5000,
+      durationMs:new URLSearchParams(location.search).has('profileTest')?700:5000,
       warmupMs:new URLSearchParams(location.search).has('profileTest')?50:400
     })).catch(e=>{
       console.error('Original / Three device A/B profiling failed',e);
