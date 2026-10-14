@@ -134,12 +134,12 @@ if(!device)throw Error('Playwright Android Pixel device missing');
   },undefined,{timeout:60000});
   const noWebgl=await fallbackPage.evaluate(()=>({
     mode:window.__ASCII_NATIVE__.mode,
-    canvas2d:GL.ctx2!==null,gpuCanvas:document.querySelector('#three-parity-canvas'),
+    canvas2d:GL.ctx2!==null,hasGpuCanvas:!!document.querySelector('#three-parity-canvas'),
     map:JSON.stringify(MEADOW_MAP),
     hint:document.querySelector('.hud p')?.textContent
   }));
   if(noWebgl.mode!=='canvas2d'||!noWebgl.canvas2d||
-    noWebgl.gpuCanvas!==null||noWebgl.map!==initial.map)
+    noWebgl.hasGpuCanvas||noWebgl.map!==initial.map)
     throw Error('Android WebView without WebGL2 failed '+JSON.stringify(noWebgl));
   await fallbackPage.screenshot({
     path:path.join(shotDir,'android-webview-canvas2d.png'),timeout:60000
