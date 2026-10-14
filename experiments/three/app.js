@@ -7,6 +7,7 @@ import { buildGothicRuin } from './gothic.js';
 import { createAnimatedKnight } from './knight-rig.js';
 import { GroundContacts } from './ground-contacts.js';
 import { createInstancedForest } from './forest.js';
+import { createLegacyKnight } from './knight-ascii.js';
 
 const map = window.ASCII_MEADOW_MAP;
 if (!map || !Array.isArray(map.flora) || !Array.isArray(map.ruins)) {
@@ -14,7 +15,7 @@ if (!map || !Array.isArray(map.flora) || !Array.isArray(map.ruins)) {
 }
 const $ = id => document.getElementById(id);
 const view = $('viewport'), ui = {
-  location: $('location'), quality: $('quality'), ascii: $('ascii'),
+  location: $('location'), quality: $('quality'), character: $('character'), ascii: $('ascii'),
   wind: $('wind'), shadows: $('shadows'), stress: $('stress'), stats: $('stats')
 };
 const SCALE = 0.12; // keep the authored world coordinate system; only display units change
@@ -82,7 +83,7 @@ base.add(ground);
 
 const world = new THREE.Group();
 scene.add(world);
-let hero=null;
+let hero=null,legacyKnight=null;
 const groundContacts=new GroundContacts();
 const keys=new Set();
 let jumpQueued=false;
@@ -148,6 +149,9 @@ function fence(parent, variant) {
 function cleanWorld() {
   // The rig and instanced meadow belong to this scene, not to the map.
   hero=null;
+  // Dispose the dynamic canvas texture before losing its scene reference.
+  if(legacyKnight)legacyKnight.userData.disposeLegacy();
+  legacyKnight=null;
   groundContacts.clear();
   const disposed = new Set();
   world.traverse(o => {
@@ -295,6 +299,12 @@ function rebuild() {
   hero.name='Unsaved animation rig preview';
   hero.position.set(px,0,pz);
   world.add(hero);
+  legacyKnight=createLegacyKnight(THREE,window.ASCII_KNIGHT_FRAMES);
+  legacyKnight.name='Original 192 ASCII frames / 3D depth bridge';
+  legacyKnight.position.set(px,0,pz);
+  world.add(legacyKnight);
+  hero.visible=ui.character.value==='rig';
+  legacyKnight.visible=ui.character.value==='original';
   plantGrass();
   lastCount.flora=floraCount;
   lastCount.ruins=ruinCount;
@@ -400,6 +410,20 @@ function frame(now) {
     hero.userData.animate(secs,{speed:length?speed:0,run,
       jump:jumpQueued,heading:length?Math.atan2(dx,dz):undefined},now*.001);
     jumpQueued=false;
+    if(legacyKnight){
+      const state=hero.userData.animationState;
+      legacyKnight.position.copy(hero.position);
+      legacyKnight.position.y=state.air;
+      // Vertical billboard only: transparent sprite retains realistic depth
+      // ordering behind a wall without leaning when the camera tilts down.
+      legacyKnight.userData.billboard.rotation.y=Math.atan2(
+        camera.position.x-legacyKnight.position.x,
+        camera.position.z-legacyKnight.position.z);
+      legacyKnight.userData.animateLegacy(secs,{
+        mode:state.lastMotion,heading:hero.rotation.y,
+        jumpProgress:state.air>0?Math.max(0,Math.min(.999,1-Math.abs(state.air-1.7)/1.7)):0
+      });
+    }
   }
   grassMaterial.uniforms.uTime.value=now*.001;
   if(hero){
@@ -432,6 +456,9 @@ function frame(now) {
       groundContactShapes:groundContacts.items.length,
       forestMeshes:lastCount.forest?.meshes||0,
       forestTrees:lastCount.forest?.trees||0,
+      originalKnightFrames:window.ASCII_KNIGHT_FRAMES?.length||0,
+      originalKnightFrame:legacyKnight?.userData.legacyState.frame??-1,
+      characterMode:ui.character.value,
       fpsMedian:p50?1000/p50:0,frameP95ms:p95,submitP95ms:cpu95,
       drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,
       grassInstances:lastCount.grass,authoredFlora:lastCount.flora,
@@ -442,6 +469,10 @@ function frame(now) {
   }
 }
 ui.location.addEventListener('change',rebuild);
+ui.character.addEventListener('change',()=>{
+  if(hero)hero.visible=ui.character.value==='rig';
+  if(legacyKnight)legacyKnight.visible=ui.character.value==='original';
+});
 ui.stress.addEventListener('change',rebuild);
 ui.quality.addEventListener('change',()=>{plantGrass();resize();});
 window.addEventListener('resize',resize);
