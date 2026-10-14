@@ -24,4 +24,18 @@ assert.equal(packVisibleGlyphs(orig,0,2,r,ids,clip),1);
 assert.equal(packVisibleGlyphs(orig,1,4,r,ids,clip),2);
 assert.throws(()=>glyphClipWindow(0,0,100,100,0));
 assert.throws(()=>packVisibleGlyphs(orig,0,7,r,ids,clip));
-console.log('PASS safe authored glyph viewport clip: 4/6 visible, order/alpha/source retained');
+// Depth metadata must follow the exact same surviving source glyph when
+// viewport clipping removes earlier instances; no sort, alpha or ID changes.
+const depths=new Float32Array(12);
+const range=[
+ {start:0,end:1,depth:.3,footY:90},
+ {start:2,end:3,depth:.4,footY:100},
+ {start:4,end:5,depth:.6,footY:150}
+];
+const dc=packVisibleGlyphs(orig,0,6,r,ids,clip,depths,range);
+assert.equal(dc,4);
+assert.deepEqual(Array.from(depths.slice(0,8)).map((v,i)=>
+ i%2===0?Math.round(v*10)/10:v),[.3,90,.4,100,.6,150,-1,0]);
+assert.deepEqual(Array.from(orig),Array.from(baseline));
+assert.throws(()=>packVisibleGlyphs(orig,0,6,r,ids,clip,new Float32Array(4),range));
+console.log('PASS safe authored glyph viewport clip: 4/6 visible, source order/alpha and actor-Z ranges retained');
