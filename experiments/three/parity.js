@@ -8,6 +8,7 @@ const originalCanvas=document.getElementById('g');
 const modeOriginal=document.getElementById('parity-legacy');
 const modeThree=document.getElementById('parity-three');
 const architectureButton=document.getElementById('parity-architecture');
+const depthButton=document.getElementById('parity-depth');
 let liveArchitecture=null,architectureLoading=null,architectureWanted=false;
 const status=document.getElementById('parity-status');
 let legacyFlush=GL.flush;
@@ -70,6 +71,13 @@ function selectMode(next){
     GL.flush=legacyFlush;
     originalCanvas.style.visibility='visible';
     backend?.show(false);
+    // Free experimental 3D GPU resources on returning to original mode.
+    if(liveArchitecture){liveArchitecture.dispose();liveArchitecture=null}
+    architectureWanted=false;
+    architectureButton.setAttribute('aria-pressed','false');
+    architectureButton.textContent='3D архитектура: выкл.';
+    depthButton.setAttribute('aria-pressed','false');
+    depthButton.textContent='Глубина 3D: выкл.';
     mode='legacy';
     safeStatus('Оригинальный движок: эталон 1:1 без каких-либо визуальных замен');
   }
@@ -81,6 +89,8 @@ async function setLiveArchitecture(enabled){
   architectureWanted=Boolean(enabled);
   if(!architectureWanted){
     if(liveArchitecture){liveArchitecture.dispose();liveArchitecture=null}
+    depthButton.setAttribute('aria-pressed','false');
+    depthButton.textContent='Глубина 3D: выкл.';
     architectureButton.setAttribute('aria-pressed','false');
     architectureButton.textContent='3D архитектура: выкл.';
     return true;
@@ -109,7 +119,29 @@ async function setLiveArchitecture(enabled){
     return false;
   }finally{architectureButton.disabled=false}
 }
+async function setDepthMode(enabled){
+  depthButton.disabled=true;
+  try{
+    if(!enabled){
+      if(liveArchitecture)await liveArchitecture.setDepthPreview(false);
+      depthButton.setAttribute('aria-pressed','false');
+      depthButton.textContent='Глубина 3D: выкл.';
+      return true;
+    }
+    if(!liveArchitecture&&!(await setLiveArchitecture(true)))return false;
+    if(!liveArchitecture||!(await liveArchitecture.setDepthPreview(true)))return false;
+    depthButton.setAttribute('aria-pressed','true');
+    depthButton.textContent='Глубина 3D: вкл.';
+    return true;
+  }catch(error){
+    console.error('Native Gothic depth prepass failed',error);
+    depthButton.setAttribute('aria-pressed','false');
+    depthButton.textContent='Глубина 3D: ошибка';
+    return false;
+  }finally{depthButton.disabled=false}
+}
 architectureButton.addEventListener('click',()=>setLiveArchitecture(!architectureWanted));
+depthButton.addEventListener('click',()=>setDepthMode(depthButton.getAttribute('aria-pressed')!=='true'));
 modeOriginal.addEventListener('click',()=>selectMode('legacy'));
 modeThree.addEventListener('click',()=>selectMode('three'));
 
@@ -133,8 +165,10 @@ window.__ASCII_PARITY__={
   get liveArchitecture(){return liveArchitecture?{
     active:liveArchitecture.active,
     ...liveArchitecture.stats,
-    camera:liveArchitecture.lastCamera
+    camera:liveArchitecture.lastCamera,
+    depth:liveArchitecture.depthInfo
   }:null;},
+  setDepthMode,
   setLiveArchitecture,
   get error(){return lastError;},
   get canvas(){return backend?.renderer.domElement||null;},

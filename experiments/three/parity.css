@@ -47,3 +47,6 @@ body.editing #parity-toolbar { opacity: .55; pointer-events: none; }
    button merely exposes it, leaving the main glyph image untouched. */
 #parity-architecture[aria-pressed="true"]{border-color:#bcbcb9;color:#fff}
 #parity-architecture:disabled{opacity:.5;cursor:wait}
+
+#parity-depth[aria-pressed="true"]{border-color:#bbb;color:#fff}
+#parity-depth:disabled{opacity:.5;cursor:wait}

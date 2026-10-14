@@ -21,6 +21,7 @@ assert.match(parity,/src="src\/main\.js"/);
 assert.match(parity,/src="experiments\/three\/parity\.js"/);
 assert.match(parity,/id="parity-three"/);
 assert.match(parity,/id="parity-architecture"/);
+assert.match(parity,/id="parity-depth"/);
 assert.match(fs.readFileSync('experiments/three/index.html','utf8'),/id="parity-architecture"/);
 assert.match(parity,/id="parity-legacy"/);
 const productionMap=fs.readFileSync('src/data/map.js','utf8');

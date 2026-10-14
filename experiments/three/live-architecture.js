@@ -14,7 +14,7 @@ export function architectureInsetRect(width,height){
   const x=Math.max(0,width-w-14);
   // The mobile settings toolbar spans the top of the scene; keep the native
   // preview BELOW it so that tapping buttons never hides most of the 3D view.
-  const top=width<650?Math.min(194,Math.max(14,height-h-14)):14;
+  const top=width<650?Math.min(244,Math.max(14,height-h-14)):14;
   return {x,top,width:w,height:h};
 }
 
