@@ -27,3 +27,11 @@ DO NOT merge draft PR #37 into `main` as a complete engine migration. Read `CLAU
 
 ## Owner order / non-negotiables (2026-10-14)
 Do not touch author-set **brightness or transparency**. Deliver first: original-image fidelity (without brightness/alpha tuning), improved gothic 3D architecture, faithful animation migration, measurable performance optimization. **After** these stages, correct shadows, add bushes physically parting when player/NPC passes (spring return like grass), and repair NPC depth ordering so trees, ruins, houses and vegetation occlude NPCs correctly when in front. The later tasks are noted in `notes/Бэклог.md`. Keep the production branch untouched.
+
+
+## Stage 2 / optional true source-geometry inspection (2026-10-14)
+- Open `/experiments/three/?geometry=1` to inspect **real native Three.js geometry generated from original castle and Gothic ruin raycast primitives**, never from handcrafted generic replacements. Original ASCII pixel-perfect comparison stays the default at `/experiments/three/`.
+- `architecture-viewer.mjs` consumes actual `solids`, `ruinDetail`, `ruinRotateMesh` and authoritative `MEADOW_MAP.ruins` without modifying any source map file. It uses `source-masonry.mjs` to intersect source half-spaces into triangulated native meshes and batch by material kind. The visual styling in this **opt-in geometry inspector** is temporary; author-set original ASCII brightness and transparency remain unchanged.
+- User can select castle/ruins, rotate and zoom. The viewer pauses hidden simulation and resumes it on close, releasing its GPU resources.
+- CI `tools/check/three-architecture.cjs` verifies geometry, screenshot, source map immutability, return to legacy, distinct from the eight 100% matching original ASCII frames.
+- **Still pending**: camera/texturing parity and integration of this real source mesh into the live game's hybrid depth/lighting pipeline, 3D character animation and real-device performance acceptance.
