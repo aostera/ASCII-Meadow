@@ -8,9 +8,15 @@ import {NativeArchitectureDepth} from './native-architecture-depth.mjs';
 const fallbackCanvas=document.getElementById('g');
 let backend=null,depthPass=null,disposed=false,fallbackReason=null,frames=0;
 let testDepthDisabled=false;
+let contextLostCount=0,contextRestoredCount=0,nativeFallbackFrames=0;
 // The source game remains the authoritative painter: collect only NPC spans.
 const originalNativeRender=render;
-render=function(){GB.nativeActorRanges=[];return originalNativeRender()};
+render=function(){
+  GB.nativeActorRanges=[];
+  const result=originalNativeRender();
+  if(!GL.ok&&!GL.lost&&GL.ctx2)nativeFallbackFrames++;
+  return result;
+};
 const nativeBridge=GL;
 const resizeFallback=GL.resize.bind(GL);
 
@@ -98,14 +104,48 @@ try{
   GL.flush=flushNative;
   GL.ok=true;
   backend.renderer.domElement.addEventListener('webglcontextlost',e=>{
-    e.preventDefault();GL.lost=true;GL.ok=false;
-    depthPass?.dispose();depthPass=null;
+    e.preventDefault();
+    contextLostCount++;
+    // Source main.js intentionally stops animation while GL.lost is true
+    // because its original #g framebuffer *is* the lost WebGL canvas.
+    // Unlike production, native.html has an INDEPENDENT 2D #g backing;
+    // permit its normal simulation/flush2D to continue during GPU loss.
+    GL.ok=false;GL.lost=false;
     backend.actorDepthTexture=null;
+    backend.show(false);
+    fallbackCanvas.style.visibility='visible';
+    // Do not dispose GPU resources during context loss: stale render targets
+    // will be freed and reconstructed only AFTER Three's restore event.
   });
   backend.renderer.domElement.addEventListener('webglcontextrestored',()=>{
-    GL.lost=false;GL.ok=true;
+    if(disposed)return;
+    contextRestoredCount++;
+    // The original CPU world atlas, source geometry and authored map remain
+    // intact. The GPU target and mesh resources are recreated lazily.
+    depthPass?.dispose();depthPass=null;
+    backend.actorDepthTexture=null;
     backend.sv=-1;backend.width=0;backend.height=0;
-    backend.show(true);fallbackCanvas.style.visibility='hidden';
+    for(const tex of [backend.atlas,backend.castleTexture,backend.uvTexture])
+      if(tex)tex.needsUpdate=true;
+    backend.show(true);
+    fallbackCanvas.style.visibility='hidden';
+    GL.ok=true;GL.lost=false;
+  });
+  // WebKit may restore automatically after a background tab resumes.
+  // When supported, explicitly request restoration; if unsupported, the
+  // Canvas2D game continues to run rather than leaving a black screen.
+  const requestRestore=()=>{
+    if(disposed||!backend?.lost||document.hidden)return;
+    try{
+      const gl=backend.renderer.getContext();
+      if(gl?.isContextLost())
+        gl.getExtension('WEBGL_lose_context')?.restoreContext();
+    }catch(error){console.warn('Native WebGL restore deferred:',error)}
+  };
+  window.addEventListener('pageshow',requestRestore);
+  window.addEventListener('focus',requestRestore);
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden)requestRestore();
   });
 }catch(err){enableFallback(err)}
 
@@ -116,6 +156,12 @@ window.__ASCII_NATIVE__={
   get renderer(){return backend?.renderer||null},
   get originalMap(){return MEADOW_MAP},
   get frameCount(){return frames},
+  get recovery(){return {
+    contextLostCount,contextRestoredCount,
+    fallbackFrames:nativeFallbackFrames,
+    runningOnFallback:!GL.ok&&!GL.lost&&!!GL.ctx2,
+    hasGpu:!!backend&&!backend.lost&&GL.ok
+  }},
   get nativeDepth(){return depthPass?.stats||{frames:0,builds:0,visible:false,activeActors:0}},
   // Strictly test-scoped: prove an actual GPU occlusion difference without
   // needing any user-facing renderer toggle or laboratory overlay.
