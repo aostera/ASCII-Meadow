@@ -19,7 +19,7 @@ fs.mkdirSync(out, { recursive: true });
       const page = await context.newPage(), errors = [];
       page.on('pageerror', e => errors.push(e.message));
       page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-      const res = await page.goto(host.replace(/\/$/, '') + '/experiments/three/', { waitUntil: 'domcontentloaded' });
+      const res = await page.goto(host.replace(/\/$/, '') + '/experiments/three/procedural.html', { waitUntil: 'domcontentloaded' });
       if (!res || !res.ok()) throw new Error('Prototype HTTP error');
       try {
         await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__ !== undefined, { timeout: 30000 });
