@@ -38,6 +38,8 @@ export class LiveSourceArchitecture {
     };
     this.world=null;
     this.generation=null;
+    this.depthPass=null;
+    this.depthPending=false;
     this.active=true;
     this.frames=0;
     this.lastCamera=null;
@@ -65,9 +67,43 @@ export class LiveSourceArchitecture {
     this.scene.remove(this.world);
     this.world=null;
   }
+  async setDepthPreview(enabled){
+    if(!enabled){
+      if(this.depthPass){this.depthPass.dispose();this.depthPass=null}
+      this.stats.depthFrames=0;
+      return true;
+    }
+    if(this.disposed)return false;
+    if(!this.depthPass){
+      this.depthPending=true;
+      try{
+        const {ArchitectureDepthPass}=await import('./architecture-depth.js');
+        if(this.disposed||!this.depthPending)return false;
+        this.depthPass=new ArchitectureDepthPass(this.renderer,this.scene);
+      }finally{this.depthPending=false}
+    }
+    return true;
+  }
+  get depthInfo(){return this.depthPass?{
+    ...this.depthPass.stats,
+    active:true
+  }:null}
   render({W,H,VZ,CW,CH,camX,camY,DPR}){
     if(this.disposed||!this.active||!(W>0&&H>0))return;
     const data=this.refresh();
+    if(this.depthPass){
+      this.depthPass.render({
+        W,H,VZ,CW,CH,camX,camY,pitch:data.pitch,sites:this.stats.sites
+      });
+      this.stats.depthFrames=this.depthPass.stats.frames;
+      this.stats.depthDrawCalls=this.depthPass.stats.drawCalls;
+      this.stats.frames++;
+      this.lastCamera={
+        worldGen:this.generation,viewport:this.depthPass.stats.viewport,
+        depth:true,cameraTarget:this.depthPass.stats.cameraTarget
+      };
+      return;
+    }
     const rect=architectureInsetRect(W,H);
     // WebGLRenderer.setViewport/setScissor convert CSS pixels to device
     // pixels internally. Multiplying by DPR here would double-scale (and
@@ -120,7 +156,10 @@ export class LiveSourceArchitecture {
   }
   dispose(){
     if(this.disposed)return;
-    this.disposed=true;this.active=false;this.removeWorld();
+    this.disposed=true;this.active=false;
+    this.depthPending=false;
+    if(this.depthPass){this.depthPass.dispose();this.depthPass=null}
+    this.removeWorld();
     for(const material of Object.values(this.materials))material.dispose();
     this.scene.clear();
   }
