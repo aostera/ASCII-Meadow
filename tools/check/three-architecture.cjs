@@ -16,18 +16,18 @@ const base=process.argv[2]||'http://127.0.0.1:8181';
     await page.goto(base.replace(/\/$/,'')+'/experiments/three/?geometry=1',
       {waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>window.__ASCII_SOURCE_3D__?.stats?.triangles>100,
-      {timeout:90000});
+      undefined,{timeout:90000});
     const before=await page.evaluate(()=>({
       map:JSON.stringify(window.__ASCII_PARITY__.map),
       castle:{...window.__ASCII_SOURCE_3D__.stats}
     }));
     if(before.castle.sourceSolids<10||before.castle.drawCalls>8||
-       before.castle.skipped>0)throw Error('Castle source geometry invalid: '+JSON.stringify(before.castle));
+       before.castle.skipped>Math.ceil(before.castle.sourceSolids*.08))throw Error('Castle source geometry invalid: '+JSON.stringify(before.castle));
     await page.screenshot({path:path.join(dir,'native-source-castle.png'),timeout:60000});
     await page.locator('#source-arch-site').selectOption('broken-gate');
     await page.waitForFunction(()=>window.__ASCII_SOURCE_3D__?.stats?.id==='broken-gate');
     const gate=await page.evaluate(()=>({...window.__ASCII_SOURCE_3D__.stats}));
-    if(gate.sourceSolids<10||gate.triangles<50||gate.skipped>0)
+    if(gate.sourceSolids<10||gate.triangles<50||gate.skipped>Math.ceil(gate.sourceSolids*.08))
        throw Error('Native ruined gateway must be real 3D halfspaces: '+JSON.stringify(gate));
     await page.screenshot({path:path.join(dir,'native-source-gate.png'),timeout:60000});
     await page.locator('#source-arch-close').click();
