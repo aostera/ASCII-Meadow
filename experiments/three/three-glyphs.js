@@ -19,10 +19,17 @@ const VERT = [
 ].join('\n');
 const FRAG = [
   'precision mediump float;',
-  'uniform sampler2D uTexture;',
+  'uniform sampler2D uTexture; uniform int uDebugMode;',
   'in vec2 vUv; in float vAlpha;',
   'out vec4 outColor;',
-  'void main(){outColor=texture(uTexture,vUv)*vAlpha;}'
+  'void main(){',
+  'if(uDebugMode==1){outColor=vec4(1.,1.,1.,1.);return;}',
+  'if(uDebugMode==2){outColor=vec4(vUv.xy,0.,1.);return;}',
+  'vec4 col=texture(uTexture,vUv);',
+  'if(uDebugMode==3){outColor=vec4(col.rgb,1.);return;}',
+  'if(uDebugMode==4){outColor=vec4(col.aaa,1.);return;}',
+  'outColor=col*vAlpha;',
+  '}'
 ].join('\n');
 
 function allocate(capacity) {
@@ -76,7 +83,7 @@ export class ThreeGlyphBackend {
     const layer=allocate(capacity);
     const uniforms={
       uCam:{value:new THREE.Vector2()},uView:{value:new THREE.Vector2(1,1)},
-      uSprites:{value:null},uSpriteWidth:{value:1},uTexture:{value:null}
+      uSprites:{value:null},uSpriteWidth:{value:1},uTexture:{value:null},uDebugMode:{value:0}
     };
     const mat=new THREE.RawShaderMaterial({
       vertexShader:VERT,fragmentShader:FRAG,glslVersion:THREE.GLSL3,
@@ -183,6 +190,11 @@ export class ThreeGlyphBackend {
       triangles:this.renderer.info.render.triangles,frame:this.stats.frame+1
     };
     GB.n=originalCount;
+  }
+  debug(mode) {
+    const n=Math.max(0,Math.min(4,mode|0));
+    this.glyphs.uniforms.uDebugMode.value=n;
+    this.castle.uniforms.uDebugMode.value=n;
   }
   show(visible){this.renderer.domElement.style.display=visible?'block':'none';}
   dispose(){

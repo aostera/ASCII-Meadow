@@ -86,6 +86,11 @@ window.__ASCII_PARITY__={
   get canvas(){return backend?.renderer.domElement||null;},
   get ready(){return Boolean(GB.atlasCv&&GB.spr.length&&W&&H&&GB.n>1000);},
   get baselineGlyphs(){return GB.n;},
+  // Debug shader modes are available ONLY in ?parityTest=1, never to players.
+  debugForTest(mode){
+    if(!new URLSearchParams(location.search).has('parityTest')||!backend)return false;
+    backend.debug(mode);return true;
+  },
   // Test-only deterministic frame comparison. Never available during normal play.
   freezeForTest(){
     if(!new URLSearchParams(location.search).has('parityTest'))return false;
