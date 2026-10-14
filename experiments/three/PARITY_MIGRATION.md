@@ -23,3 +23,7 @@ The 47 original game scripts load in exactly the same order from ../../src/. The
 The Three backend's texture filtering/UV, alpha, sRGB and blending must be adjusted to meet strict pixel-level equality on the same frozen frame. Editor/keyboard/touch/Safari restore and performance at real devices remain unproven. Real 3D lighting and architectural depth upgrades must be added as isolated opt-in enhancements only **after** the baseline matches. The temporary 3D models in `app.js` are NOT authored assets and must never be presented as replacement art.
 
 DO NOT merge draft PR #37 into `main` as a complete engine migration. Read `CLAUDE_HANDOFF.md` and original repo notes before resuming.
+
+
+## Owner order / non-negotiables (2026-10-14)
+Do not touch author-set **brightness or transparency**. Deliver first: original-image fidelity (without brightness/alpha tuning), improved gothic 3D architecture, faithful animation migration, measurable performance optimization. **After** these stages, correct shadows, add bushes physically parting when player/NPC passes (spring return like grass), and repair NPC depth ordering so trees, ruins, houses and vegetation occlude NPCs correctly when in front. The later tasks are noted in `notes/Бэклог.md`. Keep the production branch untouched.
