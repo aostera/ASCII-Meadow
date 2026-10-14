@@ -84,7 +84,8 @@ window.__ASCII_PARITY__={
   get stats(){return backend?.stats||null;},
   get error(){return lastError;},
   get canvas(){return backend?.renderer.domElement||null;},
-  get ready(){return Boolean(GB.atlasCv&&GB.spr.length&&W&&H);},
+  get ready(){return Boolean(GB.atlasCv&&GB.spr.length&&W&&H&&GB.n>1000);},
+  get baselineGlyphs(){return GB.n;},
   get map(){return MEADOW_MAP;},
   get originalWebGL(){return Boolean(GL.ok);},
   get playerLocation(){return [player?.x||0,player?.y||0];}
