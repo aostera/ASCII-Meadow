@@ -21,7 +21,13 @@ fs.mkdirSync(out, { recursive: true });
       page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
       const res = await page.goto(host.replace(/\/$/, '') + '/experiments/three/', { waitUntil: 'domcontentloaded' });
       if (!res || !res.ok()) throw new Error('Prototype HTTP error');
-      await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__ !== undefined, { timeout: 60000 });
+      try {
+        await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__ !== undefined, { timeout: 30000 });
+      } catch(err) {
+        await page.screenshot({path:path.join(out,mobile?'startup-failed-phone.png':'startup-failed-desktop.png')});
+        throw new Error('Three.js failed to initialize: '+errors.join(' | ')+'; visible error: '+
+          (await page.locator('#error').textContent())+'; '+err.message);
+      }
       const first = await page.evaluate(() => ({
         stats: window.__ASCII_THREE_DIAGNOSTICS__,
         source: JSON.stringify(window.ASCII_MEADOW_MAP)
@@ -65,6 +71,7 @@ fs.mkdirSync(out, { recursive: true });
       await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__?.characterMode === 'rig');
       await page.screenshot({ path: path.join(out, mobile ? 'phone.png' : 'desktop.png') });
       await page.locator('#ascii').uncheck();
+      await page.screenshot({path:path.join(out,mobile?'phone-3d-no-ascii.png':'desktop-3d-no-ascii.png')});
       await page.locator('#location').selectOption('camp');
       await page.waitForFunction(() => window.__ASCII_THREE_DIAGNOSTICS__.location === 'camp');
       const camp = await page.evaluate(() => window.__ASCII_THREE_DIAGNOSTICS__);
