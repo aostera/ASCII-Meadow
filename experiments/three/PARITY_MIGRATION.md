@@ -67,3 +67,7 @@ The Three live game offers **Глубина 3D** as an opt-in engineering layer 
 - Main `index.html`, `src/data/map.js`, `src/renderer/render.js` **not edited**. PR #37 remains draft; `main` separate and safe.
 
 **Not yet complete:** using the native depth texture for actual per-actor occlusion in the *full* original ASCII image, depth-aware 3D character/rig animation, real hardware speed and GPU memory measurements, original shadows, bushes parting, and NPC ordering. Do not claim these are complete. User explicitly required later shadows/bush/NPC only AFTER architecture, animation and optimization.
+
+
+## 2026-10-14 — safe offscreen native glyph optimization
+No author visual changes. Opt-in testing uses one frozen original buffer for a pair of exact screenshot outputs, with and without conservative GPU glyph culling. Under parityTest=1, QA API setGlyphCullingForTest toggles the algorithm. Normal Three rendering defaults to culling. The pure layout packer preserves paint ordering and all vertex UV/alpha IDs; original input is not mutated. Test CPU upload/render median and p95 on SwiftShader with tools/check/three-performance.cjs. Validate with all prior static 8/8 and animated 10/10 pixel-parity tests. Real mobile-device GPU performance and Safari memory checks remain pending.
