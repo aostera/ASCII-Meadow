@@ -54,7 +54,7 @@ export class LiveSourceArchitecture {
     this.stats.knightRig=false;
   }
   setKnightRig(enabled){
-    if(this.disposed)return false;
+    if(this.disposed&&enabled)return false;
     if(!enabled){
       if(this.knightRig){
         this.scene.remove(this.knightRig);

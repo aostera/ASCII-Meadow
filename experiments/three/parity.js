@@ -9,7 +9,9 @@ const modeOriginal=document.getElementById('parity-legacy');
 const modeThree=document.getElementById('parity-three');
 const architectureButton=document.getElementById('parity-architecture');
 const depthButton=document.getElementById('parity-depth');
+const knightButton=document.getElementById('parity-knight');
 let depthStartedArchitecture=false;
+let knightStartedArchitecture=false;
 let liveArchitecture=null,architectureLoading=null,architectureWanted=false;
 const status=document.getElementById('parity-status');
 let legacyFlush=GL.flush;
@@ -81,6 +83,9 @@ function selectMode(next){
     architectureButton.textContent='3D архитектура: выкл.';
     depthButton.setAttribute('aria-pressed','false');
     depthButton.textContent='Глубина 3D: выкл.';
+    knightButton.setAttribute('aria-pressed','false');
+    knightButton.textContent='3D риг: выкл.';
+    knightStartedArchitecture=false;
     mode='legacy';
     safeStatus('Оригинальный движок: эталон 1:1 без каких-либо визуальных замен');
   }
@@ -95,6 +100,9 @@ async function setLiveArchitecture(enabled){
     depthStartedArchitecture=false;
     depthButton.setAttribute('aria-pressed','false');
     depthButton.textContent='Глубина 3D: выкл.';
+    knightButton.setAttribute('aria-pressed','false');
+    knightButton.textContent='3D риг: выкл.';
+    knightStartedArchitecture=false;
     architectureButton.setAttribute('aria-pressed','false');
     architectureButton.textContent='3D архитектура: выкл.';
     return true;
@@ -110,7 +118,10 @@ async function setLiveArchitecture(enabled){
     if(!architectureWanted)return false;
     liveArchitecture=new LiveSourceArchitecture(backend.renderer,()=>({
       solids,ruinSites,ruinDetail,ruinRotateMesh,cathedral,
-      WS,MS,pitch:PITCH,worldGen
+      WS,MS,pitch:PITCH,worldGen,
+      player:{x:player.x,y:player.y,d8:player.d8,
+        moving:player.moving,walk:player.walk,run:player.run,jump:player.jump},
+      gameTime:t,knightSourceHeight:KG.art*charDims(player).fch
     }));
     architectureButton.setAttribute('aria-pressed','true');
     architectureButton.textContent='3D архитектура: вкл.';
@@ -151,7 +162,36 @@ async function setDepthMode(enabled){
     return false;
   }finally{depthButton.disabled=false}
 }
+async function setKnightMode(enabled){
+  knightButton.disabled=true;
+  try{
+    if(!enabled){
+      if(liveArchitecture)liveArchitecture.setKnightRig(false);
+      if(knightStartedArchitecture&&depthButton.getAttribute('aria-pressed')!=='true')
+        await setLiveArchitecture(false);
+      knightStartedArchitecture=false;
+      knightButton.setAttribute('aria-pressed','false');
+      knightButton.textContent='3D риг: выкл.';
+      return true;
+    }
+    if(!liveArchitecture){
+      if(!(await setLiveArchitecture(true)))return false;
+      knightStartedArchitecture=true;
+    }else knightStartedArchitecture=false;
+    if(!liveArchitecture?.setKnightRig(true))return false;
+    knightButton.setAttribute('aria-pressed','true');
+    knightButton.textContent='3D риг: вкл.';
+    return true;
+  }catch(error){
+    console.error('Experimental source-driven Three knight rig failed',error);
+    knightButton.setAttribute('aria-pressed','false');
+    knightButton.textContent='3D риг: ошибка';
+    return false;
+  }finally{knightButton.disabled=false}
+}
+
 architectureButton.addEventListener('click',()=>setLiveArchitecture(!architectureWanted));
+knightButton.addEventListener('click',()=>setKnightMode(knightButton.getAttribute('aria-pressed')!=='true'));
 depthButton.addEventListener('click',()=>setDepthMode(depthButton.getAttribute('aria-pressed')!=='true'));
 modeOriginal.addEventListener('click',()=>selectMode('legacy'));
 modeThree.addEventListener('click',()=>selectMode('three'));
@@ -181,10 +221,24 @@ window.__ASCII_PARITY__={
   }:null;},
   setDepthMode,
   setLiveArchitecture,
+  setKnightMode,
   get error(){return lastError;},
   get canvas(){return backend?.renderer.domElement||null;},
   get ready(){return Boolean(GB.atlasCv&&GB.spr.length&&W&&H&&GB.n>1000);},
   get baselineGlyphs(){return GB.n;},
+  advanceThreeForTest(dt,action=''){
+    if(!new URLSearchParams(location.search).has('parityTest')||mode!=='three')
+      return null;
+    if(!(dt>0&&dt<=.15))throw Error('Invalid live 3D animation dt');
+    if(action==='jump')jump();
+    // Keep the real original simulation, atlas, rig and GL frame authoritative.
+    referenceSimulate(dt);
+    referenceRender();
+    return {player:[player.x,player.y],jump:player.jump,
+      motion:liveArchitecture?.stats.knightMotion||'off',
+      feet:liveArchitecture?.stats.knightActorFoot||null,
+      sourceMap:JSON.stringify(MEADOW_MAP)};
+  },
   setGlyphCullingForTest(enabled){
     if(!new URLSearchParams(location.search).has('parityTest')||!backend)return false;
     backend.cullingEnabled=Boolean(enabled);
