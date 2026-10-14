@@ -22,16 +22,18 @@ fs.mkdirSync(shots,{recursive:true});
     '/experiments/three/?parityTest=1',{waitUntil:'domcontentloaded'});
    if(!res?.ok())throw Error('Author 3D rig preview failed to load');
    await page.waitForFunction(()=>window.__ASCII_PARITY__?.ready,undefined,{timeout:90000});
-   const before=await page.evaluate(()=>({
-     map:JSON.stringify(window.__ASCII_PARITY__.map),
-     canvases:document.querySelectorAll('canvas').length
-   }));
    await page.evaluate(()=>{
      const p=window.__ASCII_PARITY__;
      p.freezeForTest();
      p.captureReferenceForTest();
      p.captureThreeForTest();
    });
+   // Baseline includes ThreeGlyphBackend's ONE necessary canvas. The rig
+   // must add zero further contexts, but original mode has only two canvases.
+   const before=await page.evaluate(()=>({
+     map:JSON.stringify(window.__ASCII_PARITY__.map),
+     canvases:document.querySelectorAll('canvas').length
+   }));
    await page.addStyleTag({content:'.hud,.stats,#parity-toolbar,.ed,.ed-open{visibility:hidden!important}'});
    await page.screenshot({path:path.join(shots,name+'-base.png'),animations:'disabled'});
    if(!await page.evaluate(()=>window.__ASCII_PARITY__.setKnightMode(true)))
