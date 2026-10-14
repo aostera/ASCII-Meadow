@@ -75,3 +75,8 @@ No author visual changes. Opt-in testing uses one frozen original buffer for a p
 
 ## 2026-10-14 — opt-in original-driven 3D knight
 The experimental full-world page now offers 3D риг. It connects the original player x/y, eight d8 facings and walking, running, jumping to the real source knight 3D hierarchy, visible only within the existing diagnostic inset. No source 192-frame sprite is replaced, source colors and transparency do not change. The existing real Gothic depth and actor geometry share the original Three WebGLRenderer; no new GPU contexts. Automated QA tests preserve the authored map and every glyph outside the designated 3D inset. This 3D model is still a mechanical test; fine-grain character mesh visual parity and 3D cow/NPC assets require further work.
+
+
+## 2026-10-14 — true native 3D cow movement diagnostic
+
+Optional `3D корова` in the experiment loads one source-driven articulated 3D cow in the existing shared Three renderer and focuses the diagnostic inset on its real position. The source herd, silhouettes, grazing atlas and editor never change. Native head-lowering follows real down/loop/up phases and hop/walk/run follow real simulation states. This is NOT a complete replacement or visually accepted 1:1 3D cow; preserve original art until user approval. The mode cleans GPU geometry and materials on disable and returns the original view untouched. CI tests desktop/mobile original sprite isolation and original herd state transitions.

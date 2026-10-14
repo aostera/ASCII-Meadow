@@ -340,6 +340,10 @@ jobs:
           node --check experiments/three/source-motion.mjs
           node tools/check/three-source-motion.mjs
           node --check tools/check/three-live-knight.cjs
+          node --check experiments/three/cow-rig.js
+          node --check experiments/three/source-cow-motion.mjs
+          node tools/check/three-source-cow-motion.mjs
+          node --check tools/check/three-live-cow.cjs
           node tools/check/three-glyph-visibility.mjs
           node --check tools/check/three-parity.cjs
           node --check tools/check/three-performance.cjs
@@ -367,6 +371,7 @@ jobs:
           node tools/check/three-motion-parity.cjs http://127.0.0.1:8181
           node tools/check/three-performance.cjs http://127.0.0.1:8181
           node tools/check/three-live-knight.cjs http://127.0.0.1:8181
+          node tools/check/three-live-cow.cjs http://127.0.0.1:8181
           node tools/check/three-architecture.cjs http://127.0.0.1:8181
           node tools/check/three-live-architecture.cjs http://127.0.0.1:8181
           node tools/check/three-depth.cjs http://127.0.0.1:8181
@@ -375,6 +380,7 @@ jobs:
           python3 tools/check/three-pixel-parity.py shots/three-parity
           python3 tools/check/three-motion-pixels.py shots/three-motion
           python3 tools/check/three-live-knight-pixels.py shots/three-knight
+          python3 tools/check/three-live-cow-pixels.py shots/three-cow
           python3 tools/check/three-depth-visibility.py shots/three-depth
       - uses: actions/upload-artifact@v4
         if: always()
@@ -386,4 +392,5 @@ jobs:
             shots/three-motion/
             shots/three-performance/
             shots/three-knight/
+            shots/three-cow/
           if-no-files-found: warn
