@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ASCII Meadow — exact-visual renderer migration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Rubik:wght@400;500&display=swap">
+<link rel="stylesheet" href="../../styles/main.css"
+<link rel="stylesheet" href="./parity.css">
+</head>
+<body>
+
+<canvas id="g" aria-hidden="true"></canvas>
+<canvas id="c" aria-label="ASCII grass field. Move with WASD or arrow keys, or drag; hold Shift or drag far to run. Tap to send a gust."></canvas>
+<div id="parity-toolbar" role="group" aria-label="Сравнение старого движка и Three.js">
+  <span id="parity-label">ВИЗУАЛЬНЫЙ ЭТАЛОН / 1:1</span>
+  <button id="parity-legacy" type="button" aria-pressed="true">Оригинал</button>
+  <button id="parity-three" type="button" aria-pressed="false">Three.js</button>
+  <span id="parity-status" aria-live="polite">Все оригинальные игровые системы сохранены</span>
+</div>
+<div class="hud">
+  <h1>ASCII MMORPG</h1>
+  <p><kbd>WASD</kbd> or drag to walk · <kbd>Shift</kbd> to run · <kbd>E</kbd> or tap a prompt to use · <kbd>Space</kbd> to jump</p>
+</div>
+<div class="stats" id="stats"></div>
+
+<script src="../../src/core/state.js"></script>
+<script src="../../src/core/noise.js"></script>
+<script src="../../src/data/map.js"></script>
+<script src="../../src/data/ruins.js"></script>
+<script src="../../src/renderer/glyphs.js"></script>
+<script src="../../src/renderer/lighting.js"></script>
+<script src="../../src/renderer/batch.js"></script>
+<script src="../../src/renderer/webgl.js"></script>
+<script src="../../src/renderer/canvas2d.js"></script>
+<script src="../../src/world/terrain.js"></script>
+<script src="../../src/entities/entities.js"></script>
+<script src="../../src/entities/catalog.js"></script>
+<script src="../../src/world/life.js"></script>
+<script src="../../src/world/wind.js"></script>
+<script src="../../src/world/grass.js"></script>
+<script src="../../src/world/shadows.js"></script>
+<script src="../../src/systems/physics.js"></script>
+<script src="../../src/systems/animation.js"></script>
+<script src="../../src/core/camera.js"></script>
+<script src="../../src/world/world.js"></script>
+<script src="../../src/systems/interactions.js"></script>
+<script src="../../src/world/castle.js"></script>
+<script src="../../src/world/ruins.js"></script>
+<script src="../../src/systems/collisions.js"></script>
+<script src="../../src/world/fog.js"></script>
+<script src="../../src/world/trees3d.js"></script>
+<script src="../../src/world/flora.js"></script>
+<script src="../../src/world/camp.js"></script>
+<script src="../../src/world/toads.js"></script>
+<script src="../../src/world/birds.js"></script>
+<script src="../../src/world/map.js"></script>
+<script src="../../src/world/lights.js"></script>
+<script src="../../src/entities/rig.js"></script>
+<script src="../../src/entities/npc-atlas.js"></script>
+<script src="../../src/entities/npc-atlas-audit.js"></script>
+<script src="../../src/data/npc-atlases.js"></script>
+<script src="../../src/data/knight-frames.js"></script>
+<script src="../../src/entities/knight.js"></script>
+<script src="../../src/data/cow-frames.js"></script>
+<script src="../../src/entities/cow.js"></script>
+<script src="../../src/renderer/entities.js"></script>
+<script src="../../src/renderer/render.js"></script>
+<script src="../../src/core/input.js"></script>
+<script src="../../src/core/game.js"></script>
+<script src="../../src/editor/editor.js"></script>
+<script src="../../src/editor/npc-gallery.js"></script>
+<script src="../../src/main.js"></script>
+<!-- Migration experiment ONLY: all original game scripts stay unchanged. -->
+<script type="module" src="./parity.js"></script>
+</body>
+</html>
