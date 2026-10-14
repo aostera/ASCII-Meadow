@@ -31,12 +31,12 @@ const LOCATIONS = {
 const SCENE_RADIUS = 310; // map units; same across screen sizes
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x090909);
-scene.fog = new THREE.FogExp2(0x111111, 0.011);
+scene.background = new THREE.Color(0x141517);
+scene.fog = new THREE.FogExp2(0x191a1d, 0.005);
 const camera = new THREE.OrthographicCamera(-70, 70, 50, -50, 0.1, 800);
 camera.position.set(44, 55, 70);
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', alpha: false });
-renderer.setClearColor(0x090909);
+renderer.setClearColor(0x141517);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -52,8 +52,8 @@ controls.maxPolarAngle = Math.PI * 0.475;
 controls.target.set(0, 6, 0);
 controls.update();
 
-scene.add(new THREE.HemisphereLight(0x9c9da5, 0x111113, 1.25));
-const moon = new THREE.DirectionalLight(0xe1e0df, 2.4);
+scene.add(new THREE.HemisphereLight(0xbabdc8, 0x333437, 2.0));
+const moon = new THREE.DirectionalLight(0xf2ede5, 2.7);
 moon.position.set(-38, 70, -44);
 moon.castShadow = true;
 moon.shadow.camera.left = -85;
@@ -71,12 +71,39 @@ const material = {
   trim: new THREE.MeshStandardMaterial({ color: 0xb0aba2, roughness: 1, flatShading: true }),
   wood: new THREE.MeshStandardMaterial({ color: 0x525054, roughness: 1, flatShading: true }),
   canvas: new THREE.MeshStandardMaterial({ color: 0x86807c, roughness: 1, flatShading: true, side: THREE.DoubleSide }),
-  leaf: new THREE.MeshStandardMaterial({ color: 0x474c4a, roughness: 1, flatShading: true }),
-  leaf2: new THREE.MeshStandardMaterial({ color: 0x666b67, roughness: 1, flatShading: true }),
-  ground: new THREE.MeshStandardMaterial({ color: 0x222524, roughness: 1 }),
+  leaf: new THREE.MeshStandardMaterial({ color: 0x666d69, roughness: 1, flatShading: true }),
+  leaf2: new THREE.MeshStandardMaterial({ color: 0x7f8782, roughness: 1, flatShading: true }),
+  ground: new THREE.MeshStandardMaterial({ color: 0xd1d1d0, roughness: 1 }),
   iron: new THREE.MeshStandardMaterial({ color: 0x242628, metalness: 0.25, roughness: 0.8 }),
   red: new THREE.MeshStandardMaterial({ color: 0x723537, roughness: 0.9 })
 };
+// Repeating worn-earth texture: generated only once, no network images.
+function createDirtTexture() {
+  const c=document.createElement('canvas');c.width=128;c.height=128;
+  const g=c.getContext('2d',{alpha:false});
+  g.fillStyle='#66665e';g.fillRect(0,0,128,128);
+  for(let i=0;i<1200;i++){
+    const x=hash(i*17+7)*128,y=hash(i*11+19)*128;
+    const tone=84+Math.floor(hash(i*23+31)*67);
+    g.fillStyle='rgb('+tone+','+tone+','+Math.round(tone*.94)+')';
+    g.fillRect(x,y,1+hash(i*5)*4,1+hash(i*3+2)*3);
+  }
+  for(let i=0;i<56;i++){
+    const x=hash(i*53+5)*128,y=hash(i*43+7)*128;
+    const size=4+hash(i*17)*14;
+    g.strokeStyle='rgba(25,26,25,.26)';g.lineWidth=.7;
+    g.beginPath();g.moveTo(x,y);g.lineTo(x+size*.6,y+size*.22);
+    g.lineTo(x+size,y-size*.12);g.stroke();
+  }
+  const tex=new THREE.CanvasTexture(c);
+  tex.colorSpace=THREE.SRGBColorSpace;
+  tex.wrapS=THREE.RepeatWrapping;tex.wrapT=THREE.RepeatWrapping;
+  tex.repeat.set(10,10);
+  tex.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+material.ground.map=createDirtTexture();
+material.ground.needsUpdate=true;
 const base = new THREE.Group();
 scene.add(base);
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), material.ground);
@@ -350,8 +377,9 @@ function rebuild() {
   plantGrass();
   lastCount.flora=floraCount;
   lastCount.ruins=ruinCount;
-  controls.target.set(0, 6, 0);
-  camera.position.set(43, 57, 70);
+  controls.target.set(0,ui.location.value==='castle'?13:7,0);
+  camera.position.set(43,ui.location.value==='castle'?69:53,68);
+  resize();
   controls.update();
 }
 
@@ -391,14 +419,20 @@ const postMaterial=new THREE.ShaderMaterial({
     'vec2 uv=(grid+.5)*uCell/uResolution;',
     'vec3 col=texture2D(uScene,uv).rgb;',
     'float lum=dot(col,vec3(.2126,.7152,.0722));',
+    'vec3 right=texture2D(uScene,uv+vec2(uCell.x/uResolution.x,0.)).rgb;',
+    'vec3 above=texture2D(uScene,uv+vec2(0.,uCell.y/uResolution.y)).rgb;',
+    'float edge=length(right-col)+length(above-col);',
     'float d=fract(sin(dot(grid,vec2(12.9898,78.233)))*43758.5453)-.5;',
-    'float level=clamp(lum*.96+d*.09,0.,1.);',
-    'float idx=floor(level*(uCount-1.)+.5);',
+    // Perceptual brightness prevents dark gothic PBR surfaces becoming blank.
+    'float lit=pow(max(0.,lum-.018)*2.1,.63);',
+    'float level=clamp(lit+edge*.47+d*.07,0.,1.);',
+    'float sceneMask=smoothstep(.035,.1,lum);',
+    'float idx=sceneMask<.08?0.:max(2.,floor(level*(uCount-1.)+.5));',
     'vec2 local=fract(pixel/uCell);',
     'vec2 guv=vec2((idx+local.x)/uCount,local.y);',
     'float stroke=texture2D(uGlyph,guv).r;',
-    'vec3 ink=mix(vec3(.46),vec3(.97),level);',
-    'vec3 outCol=vec3(.018)+stroke*ink*max(.12,level);',
+    'vec3 ink=mix(vec3(.52),vec3(1.),level);',
+    'vec3 outCol=vec3(.025)+stroke*ink*sceneMask;',
     'gl_FragColor=vec4(outCol,1.);',
     '}'
   ].join('\n'),
@@ -413,8 +447,13 @@ function resize() {
   renderer.setSize(w,h,false);
   rt.setSize(Math.round(w*pixelRatio),Math.round(h*pixelRatio));
   postMaterial.uniforms.uResolution.value.set(rt.width,rt.height);
-  postMaterial.uniforms.uCell.value.set(ui.quality.value==='low'?11:8,ui.quality.value==='low'?15:12);
-  const aspect=w/h,top=window.matchMedia('(max-width: 650px)').matches?44:47;
+  // Scale glyph cells by DPR: the previous fixed physical 8x12 pixels made
+  // all glyphs 2-3x smaller on retina iPhones and iPads.
+  const cellW=ui.quality.value==='low'?9:ui.quality.value==='high'?6.8:7.6;
+  const cellH=ui.quality.value==='low'?13:ui.quality.value==='high'?10.2:11.4;
+  postMaterial.uniforms.uCell.value.set(cellW*pixelRatio,cellH*pixelRatio);
+  const aspect=w/h,sceneHeights={gate:26,abbey:29,cloister:29,camp:34,castle:47};
+  const top=sceneHeights[ui.location.value]||32;
   camera.left=-top*aspect;camera.right=top*aspect;
   camera.top=top;camera.bottom=-top;
   camera.updateProjectionMatrix();
