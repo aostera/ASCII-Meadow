@@ -104,7 +104,7 @@ fs.mkdirSync(dir,{recursive:true});
      undefined,{timeout:90000});
    await page.evaluate(()=>edUndo());
    await page.waitForFunction(()=>MEADOW_MAP.ruins===null||
-     Math.abs(ruinSites()[1].yaw-(-.34))<.001,
+     Math.abs(ruinSites()[1].yaw-before.yaw)<.001,
      undefined,{timeout:90000});
    // Direct rotation by touching the actual grey ruin IN THE MAP.
    // Keep this distinct from the slider: Alt-drag must generate a single
@@ -124,11 +124,11 @@ fs.mkdirSync(dir,{recursive:true});
    await page.mouse.up();
    await page.keyboard.up('Alt');
    await page.waitForFunction(()=>
-     Math.abs(ruinSites()[1].yaw-(-.34))>.08,
+     Math.abs(ruinSites()[1].yaw-before.yaw)>.08,
      undefined,{timeout:90000});
    await page.evaluate(()=>edUndo());
    await page.waitForFunction(()=>MEADOW_MAP.ruins===null||
-     Math.abs(ruinSites()[1].yaw-(-.34))<.001,
+     Math.abs(ruinSites()[1].yaw-before.yaw)<.001,
      undefined,{timeout:90000});
    const restored=await page.evaluate(()=>({
      map:JSON.stringify(MEADOW_MAP),
