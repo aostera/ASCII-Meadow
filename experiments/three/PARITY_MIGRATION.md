@@ -71,3 +71,7 @@ The Three live game offers **Глубина 3D** as an opt-in engineering layer 
 
 ## 2026-10-14 — safe offscreen native glyph optimization
 No author visual changes. Opt-in testing uses one frozen original buffer for a pair of exact screenshot outputs, with and without conservative GPU glyph culling. Under parityTest=1, QA API setGlyphCullingForTest toggles the algorithm. Normal Three rendering defaults to culling. The pure layout packer preserves paint ordering and all vertex UV/alpha IDs; original input is not mutated. Test CPU upload/render median and p95 on SwiftShader with tools/check/three-performance.cjs. Validate with all prior static 8/8 and animated 10/10 pixel-parity tests. Real mobile-device GPU performance and Safari memory checks remain pending.
+
+
+## 2026-10-14 — opt-in original-driven 3D knight
+The experimental full-world page now offers 3D риг. It connects the original player x/y, eight d8 facings and walking, running, jumping to the real source knight 3D hierarchy, visible only within the existing diagnostic inset. No source 192-frame sprite is replaced, source colors and transparency do not change. The existing real Gothic depth and actor geometry share the original Three WebGLRenderer; no new GPU contexts. Automated QA tests preserve the authored map and every glyph outside the designated 3D inset. This 3D model is still a mechanical test; fine-grain character mesh visual parity and 3D cow/NPC assets require further work.
