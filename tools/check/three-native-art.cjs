@@ -32,6 +32,26 @@ fs.mkdirSync(shots,{recursive:true});
    const data=await page.evaluate(()=>{
      const original=JSON.stringify(MEADOW_MAP);
      const details=window.__ASCII_NATIVE_DETAILS__;
+     const full=window.__ASCII_NATIVE_COMPLETE_ARCH__;
+     if(!full)throw Error('Four Gothic buildings lack full geometry module');
+     const counts=full.features;
+     const essentialCastle=[
+       'rose','portal','lancets','buttresses',
+       'gargoylesAndSkyline','naveAndVaults'
+     ];
+     if(essentialCastle.some(k=>!(counts.castle[k]>=5)))
+       throw Error('Castle lost modeled sketch feature '+JSON.stringify(counts.castle));
+     const expected={
+       'broken-gate':'brokenGate',
+       'abbey-front':'abbeyRoseAndTracery',
+       'cloister-walk':'cloisterVaultsAndBays'
+     };
+     for(const [id,category] of Object.entries(expected)){
+       const f=counts.ruins[id];
+       if(!f||!(f.archAndKeystone>=8)||
+          !(f.weathering>=10)||!(f[category]>=6))
+         throw Error('Missing actual authored Gothic detail '+id+': '+JSON.stringify(f));
+     }
      const shadows=window.__ASCII_NATIVE_SHADOWS__;
      const bushes=window.__ASCII_NATIVE_BUSHES__;
      const shadowSample=new Float32Array(11*11);
@@ -59,6 +79,9 @@ fs.mkdirSync(shots,{recursive:true});
      if(variant.some(n=>n<20))
        throw Error('Ruin masonry relief was not baked in world');
      return {
+       sculptedArchitecture:counts,
+       castleReliefTotal:full.castleTotal,
+       distinctRuins:full.ruinTotals,
        castleRelief:details.castleRelief,
        ruinRelief:details.ruinRelief,
        sourceRuins:variant,
