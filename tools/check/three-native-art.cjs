@@ -60,7 +60,7 @@ fs.mkdirSync(shots,{recursive:true});
      const edgeL=shadows.edgeFilter(shadowSample,11,11,4,5);
      const edgeR=shadows.edgeFilter(shadowSample,11,11,5,5);
      const interior=shadows.edgeFilter(shadowSample,11,11,8,5);
-     if(!(edgeL>0&&edgeR<.38&&interior===.38))
+     if(!(edgeL>0&&edgeR<.38&&Math.abs(interior-.38)<1e-6))
        throw Error('Masonry penumbra still sharp or rectangular: '+
          JSON.stringify({edgeL,edgeR,interior}));
      const branch=(x,h)=>bushes.branchShift({
