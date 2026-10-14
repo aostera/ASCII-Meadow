@@ -39,7 +39,7 @@ fs.mkdirSync(out,{recursive:true});
    assert(animatedProgress>0,'Animation timeline did not run');
    await page.locator('#pause').click();
    assert.equal(await page.evaluate(()=>window.__ASHEN_VOW__.playing),false);
-   await page.locator('#scrub').fill('750');
+   await page.locator('#scrub').evaluate(el=>{el.value='750';el.dispatchEvent(new Event('input',{bubbles:true}));});
    assert.equal((await page.locator('#scrub-value').innerText()),'75%');
    await page.locator('#viewBack').click();
    const z=await page.evaluate(()=>window.__ASHEN_VOW__.model.parent===null?null:1);
