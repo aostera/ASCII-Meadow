@@ -296,6 +296,16 @@ window.__ASCII_PARITY__={
     if(action==='cow-graze'&&cows.length){
       Object.assign(cows[0],{state:'graze',gp:'down',at:0,gl:5});
     }
+    if(action==='cow-hop'&&cows.length){
+      Object.assign(cows[0],{state:'hop',at:.32,hv:[0,0]});
+    }
+    if(action==='cow-walk'&&cows.length){
+      const c=cows[0];
+      Object.assign(c,{state:'walk',at:0,tx:c.x+14,ty:c.y});
+    }
+    if(action==='cow-run'&&cows.length){
+      Object.assign(cows[0],{state:'run',at:0,rt:3});
+    }
     // Keep the real original simulation, atlas, rig and GL frame authoritative.
     referenceSimulate(dt);
     referenceRender();
