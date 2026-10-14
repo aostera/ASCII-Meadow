@@ -339,6 +339,7 @@ jobs:
           node --check experiments/three/native-gl.js
           node --check experiments/three/native.js
           node --check tools/check/three-native-game.cjs
+          node --check tools/check/three-native-recovery.cjs
           node --check experiments/three/native-bushes.js
           node --check tools/check/three-native-bush.cjs
           node --check experiments/three/native-npcs.js
@@ -383,6 +384,7 @@ jobs:
           trap 'kill $server 2>/dev/null || true' EXIT
           for i in $(seq 1 20); do curl -sf http://127.0.0.1:8181/experiments/three/parity.html > /dev/null && break; sleep 1; done
           node tools/check/three-native-game.cjs http://127.0.0.1:8181
+          node tools/check/three-native-recovery.cjs http://127.0.0.1:8181
           node tools/check/three-native-bush.cjs http://127.0.0.1:8181
           node tools/check/three-native-npcs.cjs http://127.0.0.1:8181
           node tools/check/three-native-depth.cjs http://127.0.0.1:8181
@@ -417,6 +419,7 @@ jobs:
             shots/three-device-profiler/
             shots/three-engine-comparison/
             shots/three-native-game/
+            shots/three-native-recovery/
             shots/three-native-bush/
             shots/three-native-npcs/
             shots/three-native-depth/
