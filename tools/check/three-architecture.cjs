@@ -43,6 +43,12 @@ const base=process.argv[2]||'http://127.0.0.1:8181';
        world.drawCalls>30)
       throw Error('Unified authored 3D world is incomplete: '+JSON.stringify(world));
     await page.screenshot({path:path.join(dir,'native-source-full-world.png'),timeout:60000});
+    await page.locator('#source-arch-focus').selectOption('broken-gate');
+    await page.waitForFunction(()=>document.getElementById('source-arch-focus')?.value==='broken-gate');
+    await page.screenshot({path:path.join(dir,'native-source-world-gate-focused.png'),timeout:60000});
+    const refocused=await page.evaluate(()=>window.__ASCII_SOURCE_3D__.focus('castle'));
+    if(!refocused)throw Error('Could not frame actual main castle in native world');
+    await page.screenshot({path:path.join(dir,'native-source-world-castle-focused.png'),timeout:60000});
     await page.locator('#source-arch-sync').click();
     if(await page.locator('#source-arch-sync').textContent()!=='Камера игры: вкл.')
       throw Error('Game-camera alignment toggle failed');
