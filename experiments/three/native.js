@@ -4,9 +4,10 @@
 // the complete authored glyph framebuffer; #g is a Canvas2D-only fallback.
 import {ThreeGlyphBackend} from './three-glyphs.js';
 import {NativeArchitectureDepth} from './native-architecture-depth.mjs';
+import {NativeGreyMapEditor} from './native-editor-models.mjs';
 
 const fallbackCanvas=document.getElementById('g');
-let backend=null,depthPass=null,disposed=false,fallbackReason=null,frames=0;
+let backend=null,depthPass=null,editorModels=null,disposed=false,fallbackReason=null,frames=0;
 let testDepthDisabled=false;
 // The player is the skinned 3D knight printed as the game's own glyphs (see
 // native-knight3d.mjs). ?knight3d=0 keeps the original baked ASCII knight; so does
@@ -32,9 +33,15 @@ if(knight3dOn){
     return originalDrawKnight(e,G,fcw,fch);
   };
 }
+let contextLostCount=0,contextRestoredCount=0,nativeFallbackFrames=0;
 // The source game remains the authoritative painter: collect only NPC spans.
 const originalNativeRender=render;
-render=function(){GB.nativeActorRanges=[];return originalNativeRender()};
+render=function(){
+  GB.nativeActorRanges=[];
+  const result=originalNativeRender();
+  if(!GL.ok&&!GL.lost&&GL.ctx2)nativeFallbackFrames++;
+  return result;
+};
 const nativeBridge=GL;
 const resizeFallback=GL.resize.bind(GL);
 
@@ -43,6 +50,7 @@ function enableFallback(error){
   console.error('Native Three runtime fell back to Canvas2D:',error);
   GL.ok=false;GL.lost=false;GL.gl=null;
   depthPass?.dispose();depthPass=null;
+  editorModels?.dispose();editorModels=null;
   GL.flush=()=>{};
   try{backend?.show(false)}catch(_){}
   fallbackCanvas.style.visibility='visible';
@@ -55,7 +63,8 @@ function flushNative(camx,camy,castle){
   if(!backend||backend.lost)return;
   try{
     const source={solids,ruinSites,ruinDetail,ruinRotateMesh,
-      cathedral,ruins,WS,MS,pitch:PITCH,worldGen};
+      cathedral,ruins,WS,MS,pitch:PITCH,worldGen,
+      flora,VARS,t3Tree,campTent,campFence,campTurn};
     const ranges=GB.nativeActorRanges||[];
     if(ranges.length){
       for(const a of ranges){
@@ -87,6 +96,12 @@ function flushNative(camx,camy,castle){
     if(testDepthDisabled)backend.actorDepthTexture=null;
     backend.actorDepthPitch=PITCH;
     backend.flush(GB,SPF,gput,CAST,camx,camy,castle,W,H,DPR,VZ,cathedral.cv);
+    // Re-enable the author's favourite grey 3D building models INSIDE the
+    // map editor, not on the production/game screen. They use the SAME
+    // Three renderer/context/camera, and ruin yaw is saved in MEADOW_MAP.
+    if(EDIT&&editing&&editorModels)
+      editorModels.render({W,H,DPR,VZ,CW,CH,camX:camx,camY:camy,pitch:PITCH});
+    else editorModels?.refreshUi();
     frames++;
   }catch(error){
     enableFallback(error);
@@ -121,15 +136,73 @@ try{
   };
   GL.flush=flushNative;
   GL.ok=true;
+  if(EDIT)editorModels=new NativeGreyMapEditor(
+    backend.renderer,
+    ()=>({solids,ruinSites,ruinDetail,ruinRotateMesh,cathedral,
+      WS,MS,pitch:PITCH,worldGen}),
+    {
+      isEditing:()=>editing,
+      selectedRuin:()=>{
+        if(!editing||ED.sel?.kind!=='ruins')return null;
+        const i=ED.sel.mi,r=MEADOW_MAP.ruins?.[i]||ruins[i];
+        if(!r)return null;
+        return {index:i,id:Array.isArray(r)?r[0]:r.id,
+          yaw:Array.isArray(r)?r[4]:r.yaw};
+      },
+      commit:(i,angle)=>{
+        if(!editing||ED.sel?.kind!=='ruins'||ED.sel.mi!==i)return;
+        const previous=MEADOW_MAP.ruins?.[i]?.[4]??ruins[i]?.yaw??0;
+        if(Math.abs(angle-previous)<.0001)return;
+        edBeginObjectEdit();edBakeRuins();
+        MEADOW_MAP.ruins[i][4]=Math.round(angle*10000)/10000;
+        applyObjects({ruins:1});edSyncUI();
+      }
+    }
+  );
   backend.renderer.domElement.addEventListener('webglcontextlost',e=>{
-    e.preventDefault();GL.lost=true;GL.ok=false;
-    depthPass?.dispose();depthPass=null;
+    e.preventDefault();
+    contextLostCount++;
+    // Source main.js intentionally stops animation while GL.lost is true
+    // because its original #g framebuffer *is* the lost WebGL canvas.
+    // Unlike production, native.html has an INDEPENDENT 2D #g backing;
+    // permit its normal simulation/flush2D to continue during GPU loss.
+    GL.ok=false;GL.lost=false;
     backend.actorDepthTexture=null;
+    editorModels?.refreshUi();
+    backend.show(false);
+    fallbackCanvas.style.visibility='visible';
+    // Do not dispose GPU resources during context loss: stale render targets
+    // will be freed and reconstructed only AFTER Three's restore event.
   });
   backend.renderer.domElement.addEventListener('webglcontextrestored',()=>{
-    GL.lost=false;GL.ok=true;
+    if(disposed)return;
+    contextRestoredCount++;
+    // The original CPU world atlas, source geometry and authored map remain
+    // intact. The GPU target and mesh resources are recreated lazily.
+    depthPass?.dispose();depthPass=null;
+    backend.actorDepthTexture=null;
     backend.sv=-1;backend.width=0;backend.height=0;
-    backend.show(true);fallbackCanvas.style.visibility='hidden';
+    for(const tex of [backend.atlas,backend.castleTexture,backend.uvTexture])
+      if(tex)tex.needsUpdate=true;
+    backend.show(true);
+    fallbackCanvas.style.visibility='hidden';
+    GL.ok=true;GL.lost=false;
+  });
+  // WebKit may restore automatically after a background tab resumes.
+  // When supported, explicitly request restoration; if unsupported, the
+  // Canvas2D game continues to run rather than leaving a black screen.
+  const requestRestore=()=>{
+    if(disposed||!backend?.lost||document.hidden)return;
+    try{
+      const gl=backend.renderer.getContext();
+      if(gl?.isContextLost())
+        gl.getExtension('WEBGL_lose_context')?.restoreContext();
+    }catch(error){console.warn('Native WebGL restore deferred:',error)}
+  };
+  window.addEventListener('pageshow',requestRestore);
+  window.addEventListener('focus',requestRestore);
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden)requestRestore();
   });
 }catch(err){enableFallback(err)}
 
@@ -149,7 +222,14 @@ window.__ASCII_NATIVE__={
   get renderer(){return backend?.renderer||null},
   get originalMap(){return MEADOW_MAP},
   get frameCount(){return frames},
+  get recovery(){return {
+    contextLostCount,contextRestoredCount,
+    fallbackFrames:nativeFallbackFrames,
+    runningOnFallback:!GL.ok&&!GL.lost&&!!GL.ctx2,
+    hasGpu:!!backend&&!backend.lost&&GL.ok
+  }},
   get nativeDepth(){return depthPass?.stats||{frames:0,builds:0,visible:false,activeActors:0}},
+  get greyEditor(){return editorModels?.stats||{enabled:false,frames:0,sites:[]}},
   // Strictly test-scoped: prove an actual GPU occlusion difference without
   // needing any user-facing renderer toggle or laboratory overlay.
   setDepthMaskForTest(disabled){
