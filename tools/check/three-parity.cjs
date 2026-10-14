@@ -46,9 +46,11 @@ fs.mkdirSync(shots,{recursive:true});
      map:JSON.stringify(window.__ASCII_PARITY__.map)
    }));
    if(after.map!==before.map)throw Error('Three.js mutated the real authored map!');
+   console.log((mobile?'MOBILE':'DESKTOP')+' GPU TRANSFORM',JSON.stringify(
+     await page.evaluate(()=>window.__ASCII_PARITY__.positionDiagnostics)));
    await page.screenshot({path:path.join(shots,mobile?'phone-three.png':'desktop-three.png')});
    // Compare geometry coverage, UV addressing, RGB atlas and alpha masks.
-   for(const [mode,label] of [[1,'geometry'],[2,'uv'],[3,'atlas-rgb'],[4,'atlas-alpha']]){
+   for(const [mode,label] of [[5,'clip-geometry'],[1,'geometry'],[2,'uv'],[3,'atlas-rgb'],[4,'atlas-alpha']]){
      await page.evaluate(mode=>window.__ASCII_PARITY__.debugForTest(mode),mode);
      await page.waitForTimeout(250);
      await page.screenshot({path:path.join(shots,(mobile?'phone':'desktop')+'-debug-'+label+'.png')});
