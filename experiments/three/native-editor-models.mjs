@@ -223,7 +223,9 @@ export class NativeGreyMapEditor {
     const scissorTest=r.getScissorTest();
     try{
       r.setRenderTarget(null);
-      r.setViewport(0,0,data.W*data.DPR,data.H*data.DPR);
+      // Three applies renderer.pixelRatio to screen-target viewport itself.
+      // Passing DPR-scaled dimensions here crops/misaligns grey models on phones.
+      r.setViewport(0,0,data.W,data.H);
       r.setScissorTest(false);
       r.autoClear=false;
       r.clearDepth();
