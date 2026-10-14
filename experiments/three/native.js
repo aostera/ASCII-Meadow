@@ -40,6 +40,8 @@ function flushNative(camx,camy,castle){
         // Farther north in the game map means farther from the camera.
         const z=12000+world[1]*WS*Math.cos(PITCH);
         a.depth=Math.max(0,Math.min(1,(z-.01)/39999.99));
+        if(new URLSearchParams(location.search).has('nativeDepthTest')&&
+           a.source._nativeForceFar)a.depth=.95;
         a.footY=(a.source.y+.7)*CH;
       }
     }
