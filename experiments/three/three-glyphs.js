@@ -7,13 +7,14 @@ const VERT = [
   'precision highp float; precision highp int;',
   'in vec3 position; in vec4 aRect; in vec2 aIdAlpha;',
   'uniform vec2 uCam,uView; uniform highp sampler2D uSprites;',
-  'uniform int uSpriteWidth;',
+  'uniform int uSpriteWidth; uniform int uDebugVertex;',
   'out vec2 vUv; out float vAlpha;',
   'void main(){',
   'int id=int(aIdAlpha.x+.5);',
   'vec4 uv=texelFetch(uSprites,ivec2(id%uSpriteWidth,id/uSpriteWidth),0);',
   'vec2 q=(mix(aRect.xy,aRect.zw,position.xy)-uCam)/uView*2.-1.;',
-  'gl_Position=vec4(q.x,-q.y,0.,1.);',
+  'if(uDebugVertex==1){q=position.xy*2.-1.;gl_Position=vec4(q,0.,1.);}',
+  'else{gl_Position=vec4(q.x,-q.y,0.,1.);}',
   'vUv=mix(uv.xy,uv.zw,position.xy);vAlpha=aIdAlpha.y;',
   '}'
 ].join('\n');
@@ -83,7 +84,7 @@ export class ThreeGlyphBackend {
     const layer=allocate(capacity);
     const uniforms={
       uCam:{value:new THREE.Vector2()},uView:{value:new THREE.Vector2(1,1)},
-      uSprites:{value:null},uSpriteWidth:{value:1},uTexture:{value:null},uDebugMode:{value:0}
+      uSprites:{value:null},uSpriteWidth:{value:1},uTexture:{value:null},uDebugMode:{value:0},uDebugVertex:{value:0}
     };
     const mat=new THREE.RawShaderMaterial({
       vertexShader:VERT,fragmentShader:FRAG,glslVersion:THREE.GLSL3,
@@ -192,9 +193,11 @@ export class ThreeGlyphBackend {
     GB.n=originalCount;
   }
   debug(mode) {
-    const n=Math.max(0,Math.min(4,mode|0));
-    this.glyphs.uniforms.uDebugMode.value=n;
-    this.castle.uniforms.uDebugMode.value=n;
+    const n=Math.max(0,Math.min(5,mode|0));
+    this.glyphs.uniforms.uDebugMode.value=n===5?1:n;
+    this.castle.uniforms.uDebugMode.value=n===5?1:n;
+    this.glyphs.uniforms.uDebugVertex.value=n===5?1:0;
+    this.castle.uniforms.uDebugVertex.value=n===5?1:0;
   }
   show(visible){this.renderer.domElement.style.display=visible?'block':'none';}
   dispose(){
