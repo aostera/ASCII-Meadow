@@ -51,7 +51,7 @@ fs.mkdirSync(dir,{recursive:true});
        // Freezing the source plant movement isolates geometry only. Render
        // the same plant with both methods and compare every leaf glyph id,
        // unchanged y and unchanged RGB/alpha. Only x may physically move.
-       f.sw=0;f.rust=0;f.flut=0;f.fade=1;
+       // A source bush at rest uses 14 atlas slices. Force its EXISTING\n       // per-leaf rustle route for a like-for-like glyph comparison.\n       f.sw=0;f.rust=1;f.flut=0;f.fade=1;
        GB.n=0;api.sourceDraw(f);
        const getLeaves=()=>Array.from({length:GB.n},(_,i)=>{
          const j=i*6,b=GB.buf;
