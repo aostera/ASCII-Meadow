@@ -350,6 +350,8 @@ jobs:
           node --check experiments/three/native-npcs.js
           node --check experiments/three/native-gothic-details.js
           node --check experiments/three/native-gothic-complete.js
+          node --check experiments/three/native-editor-models.mjs
+          node --check tools/check/three-native-grey-editor.cjs
           node --check experiments/three/native-shadow-soften.js
           node --check tools/check/three-native-art.cjs
           node --check experiments/three/native-architecture-depth.mjs
@@ -399,6 +401,7 @@ jobs:
           node tools/check/three-native-npcs.cjs http://127.0.0.1:8181
           node tools/check/three-native-depth.cjs http://127.0.0.1:8181
           node tools/check/three-native-art.cjs http://127.0.0.1:8181
+          node tools/check/three-native-grey-editor.cjs http://127.0.0.1:8181
           node tools/check/three-parity.cjs http://127.0.0.1:8181
           node tools/check/three-motion-parity.cjs http://127.0.0.1:8181
           node tools/check/three-performance.cjs http://127.0.0.1:8181
@@ -436,4 +439,5 @@ jobs:
             shots/three-native-npcs/
             shots/three-native-depth/
             shots/three-native-art/
+            shots/three-native-grey-editor/
           if-no-files-found: warn
