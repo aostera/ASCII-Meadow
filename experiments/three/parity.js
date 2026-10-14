@@ -183,12 +183,7 @@ async function setKnightMode(enabled){
       knightStartedArchitecture=false;
       knightButton.setAttribute('aria-pressed','false');
       knightButton.textContent='3D риг: выкл.';
-      cowButton.setAttribute('aria-pressed','false');
-      cowButton.textContent='3D корова: выкл.';
-      cowStartedArchitecture=false;
-    cowButton.setAttribute('aria-pressed','false');
-    cowButton.textContent='3D корова: выкл.';
-    cowStartedArchitecture=false;
+      // Do not reset an independent active cow when switching knight off.
       return true;
     }
     if(!liveArchitecture){
