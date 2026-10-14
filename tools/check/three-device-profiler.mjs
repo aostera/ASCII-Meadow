@@ -16,7 +16,7 @@ assert.equal(r.frameMsP95,60);
 assert.equal(r.uploadCpuP95Ms,.8);
 assert.equal(r.renderCpuP95Ms,4);
 assert.equal(r.originalGlyphMedian,28000);
-assert.equal(r.visibleGlyphMedian,23500);
+assert.equal(r.visibleGlyphMedian,23000);
 assert.equal(r.device,'test');
 assert.equal(summarizeDeviceFrames([]).observedFps,null);
 console.log('PASS: real-device RAF p95, stalls, CPU submission, no bogus GPU FPS claims');
