@@ -86,6 +86,12 @@ window.__ASCII_PARITY__={
   get canvas(){return backend?.renderer.domElement||null;},
   get ready(){return Boolean(GB.atlasCv&&GB.spr.length&&W&&H&&GB.n>1000);},
   get baselineGlyphs(){return GB.n;},
+  // Test-only deterministic frame comparison. Never available during normal play.
+  freezeForTest(){
+    if(!new URLSearchParams(location.search).has('parityTest'))return false;
+    window.simulate=()=>{};
+    return true;
+  },
   get map(){return MEADOW_MAP;},
   get originalWebGL(){return Boolean(GL.ok);},
   get playerLocation(){return [player?.x||0,player?.y||0];}
