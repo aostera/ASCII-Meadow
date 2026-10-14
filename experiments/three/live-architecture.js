@@ -66,9 +66,11 @@ export class LiveSourceArchitecture {
     if(this.disposed||!this.active||!(W>0&&H>0))return;
     const data=this.refresh();
     const rect=architectureInsetRect(W,H);
-    const dpr=this.renderer.getPixelRatio();
+    // WebGLRenderer.setViewport/setScissor convert CSS pixels to device
+    // pixels internally. Multiplying by DPR here would double-scale (and
+    // sometimes push the preview entirely off-screen on Retina iPads).
     const [w,h,x,y]=[rect.width,rect.height,rect.x,H-rect.top-rect.height]
-      .map(v=>Math.max(1,Math.round(v*dpr)));
+      .map(v=>Math.max(1,Math.round(v)));
     // The inset is a REAL camera on the SAME world, centred on the active
     // gameplay viewport, with a wider field so whole Gothic walls are seen.
     const zoom=VZ*.42;
