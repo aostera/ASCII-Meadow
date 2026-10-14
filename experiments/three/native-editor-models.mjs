@@ -247,6 +247,8 @@ export class NativeGreyMapEditor {
   get stats(){return {enabled:this.active,frames:this.frame,
     drawCalls:this.drawCalls,sites:this.world?.userData?.sourceSites||[],
     yawPreview:this.preview?.angle??null,
+    previewRotationY:this.selection&&this.world?
+      this.world.children[this.selection.index+1]?.rotation.y??null:null,
     selected:this.selection?.id||null}}
   dispose(){
     if(this.disposed)return;
