@@ -79,3 +79,15 @@ The user correctly rejected the reconstructed low-poly scene: it discarded origi
 - Keep PR #37 draft; absolutely no main or map modifications.
 
 See `experiments/three/PARITY_MIGRATION.md`.
+
+
+## 2026-10-14 — NEW OWNER PRIORITY ORDER (explicit instruction)
+
+The user wants the following **after** the previous migration checklist, not before. **Do not modify the original lighting brightness or transparency/alpha.** First complete: (1) 1:1 original-world renderer/art fidelity without a brightness/alpha creative adjustment; (2) materially improved high-detail real Three.js gothic geometry, still preserving authored composition; (3) faithful character/cow/NPC animations; (4) measured real-device performance. Only **after all four**: correct object/character shadows; implement physical bush branches parting around moving characters like the existing grass spring; fix NPCs incorrectly drawing over everything, ensuring tree/house/ruin/bush depth and occlusion. Avoid changing `main`, `src/data/map.js`, author maps, colors or alpha. Keep PR #37 draft and test in separate preview.
+
+Initial read of existing code, for that later phase:
+- `src/world/flora.js::updateFlora`: bush rustling currently measures **only `player`** and pointer; decays exponential, mostly per-leaf noise, no persistent sideways split vectors for nearby NPCs.
+- `src/world/flora.js::drawFlora`: animated `rs` mostly jitter/fade; split spring should affect positions of branches/leaves based on entity-to-plant direction, not edit original atlas.
+- `src/renderer/render.js`: dynamic `order` is grounded-y sorted and `occlude(e)` / `occludeRuins(e)` restore architecture, but `coverFloraWithArchitecture(f)` is vegetation-specific. Check the NPC `drawEntity(e)` and `geomOf(e)` bounding foot/depth calculations, avoid a blunt global zIndex; labels may be Canvas2D overlays and also need coherent treatment.
+- `src/world/shadows.js::castShadow` has contact + directional ground shadows of `ents`; reconcile with true scene depth and authored static shadows without changing overall brightness.
+- Any fixes must be scoped to the experiment first and have regression tests for near/far ordering and bushes being displaced by both player and an NPC. Do not implement these secondary tasks prematurely.
