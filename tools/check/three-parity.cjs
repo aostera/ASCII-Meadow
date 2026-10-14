@@ -58,8 +58,8 @@ const file=(mobile,name,mode)=>path.join(shots,(mobile?'phone':'desktop')+'-'+na
      console.log('CAPTURE '+(mobile?'PHONE':'DESKTOP')+' '+site,
        JSON.stringify({glyphs:verify.stats.glyphs,drawCalls:verify.stats.drawCalls,mapUnchanged:true}));
    }
-   // Bright lightning uses two original castle quads with DIFFERENT blend
-   // modes. A faithful Three port must match the source at every pixel.
+   // The source castle is now baked into individual stone glyphs; lightning
+   // brightens authored shades. The optional old CAST pass has separate GPU blending.
    const flashSetup=await page.evaluate(()=>{
      const p=window.__ASCII_PARITY__;
      p.visitForTest('castle');
@@ -68,10 +68,13 @@ const file=(mobile,name,mode)=>path.join(shots,(mobile?'phone':'desktop')+'-'+na
    });
    if(!flashSetup||flashSetup.glyphs<1000)
      throw Error('Source castle lightning frame absent');
-   await page.screenshot({path:file(mobile,'castle-flash','original'),timeout:60000,animations:'disabled'});
+   const flashReference=await page.screenshot({path:file(mobile,'castle-flash','original'),timeout:60000,animations:'disabled'});
+   const unlitReference=fs.readFileSync(file(mobile,'castle','original'));
+   if(flashReference.equals(unlitReference))
+     throw Error('Castle flash did not brighten the original authored stone');
    const flashThree=await page.evaluate(()=>window.__ASCII_PARITY__.captureThreeForTest());
-   if(!flashThree||flashThree.glyphs!==flashSetup.glyphs||flashThree.drawCalls<3)
-     throw Error('Three renderer lost additive source castle flash '+JSON.stringify(flashThree));
+   if(!flashThree||flashThree.glyphs!==flashSetup.glyphs||flashThree.drawCalls<1)
+     throw Error('Three renderer lost authored stone lightning '+JSON.stringify(flashThree));
    await page.screenshot({path:file(mobile,'castle-flash','three'),timeout:60000,animations:'disabled'});
    await page.evaluate(()=>{
      window.__ASCII_PARITY__.select('legacy');
