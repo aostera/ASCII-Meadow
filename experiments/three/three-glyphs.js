@@ -6,10 +6,11 @@ import {packVisibleGlyphs,glyphClipWindow} from './glyph-visibility.mjs';
 
 const VERT = [
   'precision highp float; precision highp int;',
-  'in vec3 position; in vec4 aRect; in vec2 aIdAlpha;',
+  'in vec3 position; in vec4 aRect; in vec2 aIdAlpha; in vec2 aActorInfo;',
   'uniform vec2 uCam,uView; uniform highp sampler2D uSprites;',
   'uniform int uSpriteWidth; uniform int uDebugVertex;',
-  'out vec2 vUv; out float vAlpha;',
+  'uniform float uActorDepthSlope;',
+  'out vec2 vUv; out float vAlpha; out float vActorDepth;',
   'void main(){',
   'int id=int(aIdAlpha.x+.5);',
   'vec4 uv=texelFetch(uSprites,ivec2(id%uSpriteWidth,id/uSpriteWidth),0);',
@@ -17,16 +18,23 @@ const VERT = [
   'if(uDebugVertex==1){q=position.xy*2.-1.;gl_Position=vec4(q,0.,1.);}',
   'else{gl_Position=vec4(q.x,-q.y,0.,1.);}',
   'vUv=mix(uv.xy,uv.zw,position.xy);vAlpha=aIdAlpha.y;',
+  'vActorDepth=aActorInfo.x<0.? -1.:aActorInfo.x+(mix(aRect.y,aRect.w,position.y)-aActorInfo.y)*uActorDepthSlope;',
   '}'
 ].join('\n');
 const FRAG = [
-  'precision mediump float;',
+  'precision highp float;',
   'uniform sampler2D uTexture; uniform int uDebugMode;',
-  'in vec2 vUv; in float vAlpha;',
+  'uniform sampler2D uArchitectureDepth; uniform int uDepthEnabled;',
+  'uniform vec2 uDepthViewport;',
+  'in vec2 vUv; in float vAlpha; in float vActorDepth;',
   'out vec4 outColor;',
   'void main(){',
   'if(uDebugMode==1){outColor=vec4(1.,1.,1.,1.);return;}',
   'if(uDebugMode==2){outColor=vec4(vUv.xy,0.,1.);return;}',
+  'if(uDepthEnabled==1 && vActorDepth>=0.){',
+  'float stone=texture(uArchitectureDepth,gl_FragCoord.xy/uDepthViewport).r;',
+  'if(stone+.00015 < vActorDepth)discard;',
+  '}',
   'vec4 col=texture(uTexture,vUv);',
   'if(uDebugMode==3){outColor=vec4(col.rgb,1.);return;}',
   'if(uDebugMode==4){outColor=vec4(col.aaa,1.);return;}',
@@ -41,13 +49,16 @@ function allocate(capacity) {
   geo.setAttribute('position',new THREE.Float32BufferAttribute([
     0,0,0, 1,0,0, 0,1,0, 1,0,0, 1,1,0, 0,1,0
   ],3));
-  const rect=new Float32Array(capacity*4),idAlpha=new Float32Array(capacity*2);
+  const rect=new Float32Array(capacity*4),idAlpha=new Float32Array(capacity*2),actorInfo=new Float32Array(capacity*2);
   const rectAttr=new THREE.InstancedBufferAttribute(rect,4);
   const idAttr=new THREE.InstancedBufferAttribute(idAlpha,2);
+  const actorAttr=new THREE.InstancedBufferAttribute(actorInfo,2);
   rectAttr.setUsage(THREE.DynamicDrawUsage);idAttr.setUsage(THREE.DynamicDrawUsage);
+  actorAttr.setUsage(THREE.DynamicDrawUsage);
   geo.setAttribute('aRect',rectAttr);geo.setAttribute('aIdAlpha',idAttr);
+  geo.setAttribute('aActorInfo',actorAttr);
   geo.instanceCount=0;
-  return {geo,rect,idAlpha,rectAttr,idAttr,capacity};
+  return {geo,rect,idAlpha,actorInfo,rectAttr,idAttr,actorAttr,capacity};
 }
 
 export class ThreeGlyphBackend {
@@ -84,6 +95,10 @@ export class ThreeGlyphBackend {
     this.stats={glyphs:0,drawCalls:0,triangles:0,frame:0};
     this.lost=false;
     this.cullingEnabled=true;
+    // Opt-in source-geometry depth is supplied only by the native runtime.
+    // The pixel-parity lab continues to submit the original untouched art.
+    this.actorDepthTexture=null;
+    this.actorDepthPitch=0;
     this.renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();this.lost=true;});
     this.renderer.domElement.addEventListener('webglcontextrestored',()=>{
       this.lost=false;this.sv=-1;this.width=0;this.height=0;
@@ -95,7 +110,9 @@ export class ThreeGlyphBackend {
     const layer=allocate(capacity);
     const uniforms={
       uCam:{value:new THREE.Vector2()},uView:{value:new THREE.Vector2(1,1)},
-      uSprites:{value:null},uSpriteWidth:{value:1},uTexture:{value:null},uDebugMode:{value:0},uDebugVertex:{value:0}
+      uSprites:{value:null},uSpriteWidth:{value:1},uTexture:{value:null},uDebugMode:{value:0},uDebugVertex:{value:0},
+      uArchitectureDepth:{value:null},uDepthEnabled:{value:0},
+      uDepthViewport:{value:new THREE.Vector2(1,1)},uActorDepthSlope:{value:0}
     };
     const mat=new THREE.RawShaderMaterial({
       vertexShader:VERT,fragmentShader:FRAG,glslVersion:THREE.GLSL3,
@@ -163,15 +180,21 @@ export class ThreeGlyphBackend {
     }
     layer.uniforms.uTexture.value=this[which];
   }
-  upload(layer,buf,start,count,clip=null) {
+  upload(layer,buf,start,count,clip=null,actorRanges=null) {
     this.grow(layer,Math.max(1,count));
-    const visible=packVisibleGlyphs(buf,start,count,layer.rect,layer.idAlpha,clip);
+    const visible=packVisibleGlyphs(buf,start,count,layer.rect,layer.idAlpha,clip,
+      this.actorDepthTexture?layer.actorInfo:null,actorRanges);
     layer.geo.instanceCount=visible;
     if(visible){
       layer.rectAttr.clearUpdateRanges();layer.idAttr.clearUpdateRanges();
       layer.rectAttr.addUpdateRange(0,visible*4);
       layer.idAttr.addUpdateRange(0,visible*2);
       layer.rectAttr.needsUpdate=true;layer.idAttr.needsUpdate=true;
+      if(this.actorDepthTexture){
+        layer.actorAttr.clearUpdateRanges();
+        layer.actorAttr.addUpdateRange(0,visible*2);
+        layer.actorAttr.needsUpdate=true;
+      }
     }
     return visible;
   }
@@ -191,13 +214,18 @@ export class ThreeGlyphBackend {
     const count=GB.n-extra;
     const uploadStart=performance.now();
     const clip=this.cullingEnabled?glyphClipWindow(camx,camy,W,H,VZ,4):null;
-    const visibleGlyphs=this.upload(this.glyphs,GB.buf,0,count,clip);
+    const ranges=this.actorDepthTexture?GB.nativeActorRanges||[]:null;
+    const visibleGlyphs=this.upload(this.glyphs,GB.buf,0,count,clip,ranges);
     this.upload(this.castle,GB.buf,count,extra?1:0);
     this.upload(this.castleFlash,GB.buf,count+1,extra===2?1:0);
     const uploadCpuMs=performance.now()-uploadStart;
     for(const layer of [this.glyphs,this.castle,this.castleFlash]){
       layer.uniforms.uCam.value.set(camx,camy);
       layer.uniforms.uView.value.set(W/VZ,H/VZ);
+      layer.uniforms.uArchitectureDepth.value=this.actorDepthTexture;
+      layer.uniforms.uDepthEnabled.value=layer===this.glyphs&&this.actorDepthTexture?1:0;
+      layer.uniforms.uDepthViewport.value.set(W*DPR,H*DPR);
+      layer.uniforms.uActorDepthSlope.value=Math.tan(this.actorDepthPitch)/39999.99;
     }
     // The source castle flash is a separate additive GPU layer.
     this.renderer.info.reset();
@@ -207,6 +235,8 @@ export class ThreeGlyphBackend {
     this.stats={
       glyphs:count,visibleGlyphs,culledGlyphs:count-visibleGlyphs,
       uploadCpuMs,renderCpuMs,
+      depthActorRanges:ranges?.length||0,
+      depthEnabled:!!this.actorDepthTexture,
       drawCalls:this.renderer.info.render.calls,
       triangles:this.renderer.info.render.triangles,frame:this.stats.frame+1
     };
