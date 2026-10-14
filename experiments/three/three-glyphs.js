@@ -4,7 +4,6 @@
 import * as THREE from 'three';
 
 const VERT = [
-  '#version 300 es',
   'precision highp float; precision highp int;',
   'in vec2 position; in vec4 aRect; in vec2 aIdAlpha;',
   'uniform vec2 uCam,uView; uniform highp sampler2D uSprites;',
@@ -19,7 +18,6 @@ const VERT = [
   '}'
 ].join('\n');
 const FRAG = [
-  '#version 300 es',
   'precision mediump float;',
   'uniform sampler2D uTexture;',
   'in vec2 vUv; in float vAlpha;',
