@@ -163,3 +163,24 @@ window.__ASCII_PARITY__={
   get playerLocation(){return [player?.x||0,player?.y||0];}
 };
 selectMode('legacy');
+
+// Dedicated opt-in geometry inspection mode. Never enters the pixel-perfect
+// original / Three glyph comparison unless explicitly requested in the URL.
+// It builds meshes from the REAL raycast source and is not the game's renderer.
+if(new URLSearchParams(location.search).get('geometry')==='1'){
+  const readyForSourceModel=()=>{
+    if(!GB.atlasCv||!solids.length){
+      requestAnimationFrame(readyForSourceModel);return;
+    }
+    import('./architecture-viewer.mjs')
+      .then(m=>m.openSourceArchitecture({
+        solids,ruinSites,ruinDetail,ruinRotateMesh,cathedral
+      }))
+      .catch(err=>{
+        console.error('Original-masonry Three.js view failed:',err);
+        safeStatus('Ошибка загрузки исходной 3D-геометрии: '+err.message);
+      });
+  };
+  requestAnimationFrame(readyForSourceModel);
+}
+
