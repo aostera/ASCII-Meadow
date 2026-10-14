@@ -100,6 +100,41 @@ fs.mkdirSync(shots,{recursive:true});
    await page.screenshot({
      path:path.join(shots,label+'-gothic-world.png'),timeout:60000
    });
+   // Four independently placed authored monuments MUST be visually sampled;
+   // a single screenshot at the player's spawn never proves those details
+   // were actually rendered on the castle, gate, abbey or cloister.
+   const places=await page.evaluate(()=>{
+     const points=[
+       {id:'castle',x:cathedral.kx/CW,y:cathedral.ky/CH-16},
+       ...ruins.map(r=>({id:r.id,x:r.cx/CW,y:r.cy/CH-11}))
+     ];
+     const sourceMap=JSON.stringify(MEADOW_MAP);
+     return {points,sourceMap};
+   });
+   if(places.points.length!==4)
+     throw Error('Expected one castle and three permanent Gothic landmarks');
+   for(const place of places.points){
+     const visit=await page.evaluate(p=>{
+       player.x=p.x;player.y=p.y;
+       player.tx=p.x;player.ty=p.y;
+       updateCamera(0,true);
+       render();
+       return {
+         glyphs:GB.n,
+         mode:window.__ASCII_NATIVE__.mode,
+         sourceMap:JSON.stringify(MEADOW_MAP),
+         rendererFrames:window.__ASCII_NATIVE__.frameCount
+       };
+     },place);
+     if(visit.sourceMap!==places.sourceMap||
+       visit.mode!=='three'||visit.glyphs<500)
+       throw Error(label+' missing rendered Gothic landmark '+place.id+
+         ' '+JSON.stringify(visit));
+     await page.screenshot({
+       path:path.join(shots,label+'-'+place.id+'.png'),
+       timeout:60000
+     });
+   }
    if(errors.length)throw Error(label+' JS exceptions '+errors.join('; '));
    console.log('NATIVE GOTHIC ART PASS '+label+' '+JSON.stringify(data));
    await ctx.close();
