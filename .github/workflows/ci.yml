@@ -343,6 +343,8 @@ jobs:
           node --check tools/check/three-architecture.cjs
           node --check experiments/three/live-architecture.js
           node --check tools/check/three-live-architecture.cjs
+          node --check experiments/three/architecture-depth.js
+          node --check tools/check/three-depth.cjs
           node tools/check/three-source-masonry.mjs
           node --check experiments/three/source-world.mjs
           node tools/check/three-world-projection.mjs
@@ -357,11 +359,16 @@ jobs:
           node tools/check/three-parity.cjs http://127.0.0.1:8181
           node tools/check/three-architecture.cjs http://127.0.0.1:8181
           node tools/check/three-live-architecture.cjs http://127.0.0.1:8181
+          node tools/check/three-depth.cjs http://127.0.0.1:8181
       - name: Report fixed-scene pixel differences / block empty Three output
-        run: python3 tools/check/three-pixel-parity.py shots/three-parity
+        run: |
+          python3 tools/check/three-pixel-parity.py shots/three-parity
+          python3 tools/check/three-depth-visibility.py shots/three-depth
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: full-world-three-parity
-          path: shots/three-parity/
+          path: |
+            shots/three-parity/
+            shots/three-depth/
           if-no-files-found: warn

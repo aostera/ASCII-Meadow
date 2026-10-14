@@ -48,3 +48,8 @@ Open `/experiments/three/?geometry=world` to see the combined original-world 3D 
 
 ## Native Gothic geometry in the live game (opt-in; 2026-10-14)
 Open `/experiments/three/`, press **Three.js**, then **3D архитектура**. This draws the *same authored four buildings* into a small 3D camera-aligned inset on the **same GPU renderer context** as the glyph world. Source meshes are rebuilt only on original game `worldGen` changes (resize/rebuild), and disposed on disable. The original 1:1 ASCII frame remains unchanged outside this opt-in inset, without modifying its brightness or alpha. This is a safe intermediate integration gate before final in-world depth occlusion. `tools/check/three-live-architecture.cjs` tests opt-in, mobile, shared context, map preservation and teardown. FPS improvements and shadow/bush/NPC work are not accepted yet.
+
+
+## 2026-10-14 — GPU source depth is now a live in-world resource
+
+The Three live game offers **Глубина 3D** as an opt-in engineering layer alongside **3D архитектура**. It renders actual authored Gothic architecture to a depth texture in the same GPU context, with the same camera and map and without allocating a second canvas. A diagnostic inset displays white for source stone and black for open space. Pixel-perfect original sprites, their brightness and transparency remain untouched. Depth values are now available for a future carefully tested glyph actor/building occlusion pass, not yet applied. The CI test pairs a frozen castle frame before/after enabling depth on phone and desktop, tests real stone/empty-space pixels, disables the layer and requires unchanged pixels outside the inset. This also checks no GPU context leaks.
