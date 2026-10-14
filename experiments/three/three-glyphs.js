@@ -2,6 +2,7 @@
 // No resynthesized geometry: the original simulation, art, map, renderer/render.js,
 // knight, cows, fog, trees, grass, lighting, collision and editor stay authoritative.
 import * as THREE from 'three';
+import {packVisibleGlyphs,glyphClipWindow} from './glyph-visibility.mjs';
 
 const VERT = [
   'precision highp float; precision highp int;',
@@ -155,21 +156,17 @@ export class ThreeGlyphBackend {
     }
     layer.uniforms.uTexture.value=this[which];
   }
-  upload(layer,buf,start,count) {
+  upload(layer,buf,start,count,clip=null) {
     this.grow(layer,Math.max(1,count));
-    const a=layer.rect,b=layer.idAlpha;
-    for(let i=0;i<count;i++){
-      const s=(start+i)*6,j=i*4,k=i*2;
-      a[j]=buf[s];a[j+1]=buf[s+1];a[j+2]=buf[s+2];a[j+3]=buf[s+3];
-      b[k]=buf[s+4];b[k+1]=buf[s+5];
-    }
-    layer.geo.instanceCount=count;
-    if(count){
+    const visible=packVisibleGlyphs(buf,start,count,layer.rect,layer.idAlpha,clip);
+    layer.geo.instanceCount=visible;
+    if(visible){
       layer.rectAttr.clearUpdateRanges();layer.idAttr.clearUpdateRanges();
-      layer.rectAttr.addUpdateRange(0,count*4);
-      layer.idAttr.addUpdateRange(0,count*2);
+      layer.rectAttr.addUpdateRange(0,visible*4);
+      layer.idAttr.addUpdateRange(0,visible*2);
       layer.rectAttr.needsUpdate=true;layer.idAttr.needsUpdate=true;
     }
+    return visible;
   }
   flush(GB,SPF,gput,CAST,camx,camy,castle,W,H,DPR,VZ,castleCanvas) {
     if(this.lost||!GB.atlasCv)return;
@@ -184,8 +181,11 @@ export class ThreeGlyphBackend {
       this.atlasTexture(this.castle,castleCanvas,'castle');
     }
     const count=GB.n-extra;
-    this.upload(this.glyphs,GB.buf,0,count);
+    const uploadStart=performance.now();
+    const clip=glyphClipWindow(camx,camy,W,H,VZ,4);
+    const visibleGlyphs=this.upload(this.glyphs,GB.buf,0,count,clip);
     this.upload(this.castle,GB.buf,count,extra);
+    const uploadCpuMs=performance.now()-uploadStart;
     for(const layer of [this.glyphs,this.castle]){
       layer.uniforms.uCam.value.set(camx,camy);
       layer.uniforms.uView.value.set(W/VZ,H/VZ);
@@ -193,9 +193,13 @@ export class ThreeGlyphBackend {
     // Unlike the old shader's one glyph program, the castle image has its own
     // mesh. An additive second flash quad is a future parity task.
     this.renderer.info.reset();
+    const renderStart=performance.now();
     this.renderer.render(this.scene,this.camera);
+    const renderCpuMs=performance.now()-renderStart;
     this.stats={
-      glyphs:count,drawCalls:this.renderer.info.render.calls,
+      glyphs:count,visibleGlyphs,culledGlyphs:count-visibleGlyphs,
+      uploadCpuMs,renderCpuMs,
+      drawCalls:this.renderer.info.render.calls,
       triangles:this.renderer.info.render.triangles,frame:this.stats.frame+1
     };
     GB.n=originalCount;

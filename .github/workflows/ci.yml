@@ -336,6 +336,8 @@ jobs:
         run: |
           node --check experiments/three/parity.js
           node --check experiments/three/three-glyphs.js
+          node --check experiments/three/glyph-visibility.mjs
+          node tools/check/three-glyph-visibility.mjs
           node --check tools/check/three-parity.cjs
           node --check tools/check/three-motion-parity.cjs
           node tools/check/three-source-sync.cjs
