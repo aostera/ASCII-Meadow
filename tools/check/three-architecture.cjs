@@ -30,6 +30,25 @@ const base=process.argv[2]||'http://127.0.0.1:8181';
     if(gate.sourceSolids<10||gate.triangles<50||gate.skipped>Math.ceil(gate.sourceSolids*.08))
        throw Error('Native ruined gateway must be real 3D halfspaces: '+JSON.stringify(gate));
     await page.screenshot({path:path.join(dir,'native-source-gate.png'),timeout:60000});
+    // Assemble castle AND every authored Gothic ruin in a single native 3D
+    // world, then align its orthographic camera with the original camera.
+    await page.locator('#source-arch-site').selectOption('world');
+    await page.waitForFunction(()=>window.__ASCII_SOURCE_3D__?.stats?.id==='world');
+    const world=await page.evaluate(()=>({
+      ...window.__ASCII_SOURCE_3D__.stats,
+      siteIds:window.__ASCII_SOURCE_3D__.sourceSites
+    }));
+    if(world.authoredSites!==4||world.siteIds.length!==4||
+       world.triangles<=before.castle.triangles+gate.triangles||
+       world.drawCalls>30)
+      throw Error('Unified authored 3D world is incomplete: '+JSON.stringify(world));
+    await page.screenshot({path:path.join(dir,'native-source-full-world.png'),timeout:60000});
+    await page.locator('#source-arch-sync').click();
+    if(await page.locator('#source-arch-sync').textContent()!=='Камера игры: вкл.')
+      throw Error('Game-camera alignment toggle failed');
+    await page.screenshot({path:path.join(dir,'native-source-game-camera.png'),timeout:60000});
+    await page.locator('#source-arch-sync').click();
+
     await page.locator('#source-arch-close').click();
     const restored=await page.evaluate(()=>({
       overlay:!!window.__ASCII_SOURCE_3D__,
@@ -39,6 +58,6 @@ const base=process.argv[2]||'http://127.0.0.1:8181';
     if(restored.overlay||restored.map!==before.map||restored.originalMode!=='legacy')
       throw Error('Architecture viewer failed to restore authored scene');
     if(errors.length)throw Error('Architecture viewer exceptions: '+errors.join('; '));
-    console.log('NATIVE GOTHIC SOURCE PASS '+JSON.stringify({castle:before.castle,gate,mapUnchanged:true,restored:true}));
+    console.log('NATIVE GOTHIC SOURCE PASS '+JSON.stringify({castle:before.castle,gate,world,mapUnchanged:true,restored:true}));
   }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exit(1)});
