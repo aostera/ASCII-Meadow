@@ -4,9 +4,10 @@
 // the complete authored glyph framebuffer; #g is a Canvas2D-only fallback.
 import {ThreeGlyphBackend} from './three-glyphs.js';
 import {NativeArchitectureDepth} from './native-architecture-depth.mjs';
+import {NativeGreyMapEditor} from './native-editor-models.mjs';
 
 const fallbackCanvas=document.getElementById('g');
-let backend=null,depthPass=null,disposed=false,fallbackReason=null,frames=0;
+let backend=null,depthPass=null,editorModels=null,disposed=false,fallbackReason=null,frames=0;
 let testDepthDisabled=false;
 let contextLostCount=0,contextRestoredCount=0,nativeFallbackFrames=0;
 // The source game remains the authoritative painter: collect only NPC spans.
@@ -25,6 +26,7 @@ function enableFallback(error){
   console.error('Native Three runtime fell back to Canvas2D:',error);
   GL.ok=false;GL.lost=false;GL.gl=null;
   depthPass?.dispose();depthPass=null;
+  editorModels?.dispose();editorModels=null;
   GL.flush=()=>{};
   try{backend?.show(false)}catch(_){}
   fallbackCanvas.style.visibility='visible';
@@ -69,6 +71,12 @@ function flushNative(camx,camy,castle){
     if(testDepthDisabled)backend.actorDepthTexture=null;
     backend.actorDepthPitch=PITCH;
     backend.flush(GB,SPF,gput,CAST,camx,camy,castle,W,H,DPR,VZ,cathedral.cv);
+    // Re-enable the author's favourite grey 3D building models INSIDE the
+    // map editor, not on the production/game screen. They use the SAME
+    // Three renderer/context/camera, and ruin yaw is saved in MEADOW_MAP.
+    if(EDIT&&editing&&editorModels)
+      editorModels.render({W,H,DPR,VZ,CW,CH,camX:camx,camY:camy,pitch:PITCH});
+    else editorModels?.refreshUi();
     frames++;
   }catch(error){
     enableFallback(error);
@@ -103,6 +111,29 @@ try{
   };
   GL.flush=flushNative;
   GL.ok=true;
+  if(EDIT)editorModels=new NativeGreyMapEditor(
+    backend.renderer,
+    ()=>({solids,ruinSites,ruinDetail,ruinRotateMesh,cathedral,
+      WS,MS,pitch:PITCH,worldGen}),
+    {
+      isEditing:()=>editing,
+      selectedRuin:()=>{
+        if(!editing||ED.sel?.kind!=='ruins')return null;
+        const i=ED.sel.mi,r=MEADOW_MAP.ruins?.[i]||ruins[i];
+        if(!r)return null;
+        return {index:i,id:Array.isArray(r)?r[0]:r.id,
+          yaw:Array.isArray(r)?r[4]:r.yaw};
+      },
+      commit:(i,angle)=>{
+        if(!editing||ED.sel?.kind!=='ruins'||ED.sel.mi!==i)return;
+        const previous=MEADOW_MAP.ruins?.[i]?.[4]??ruins[i]?.yaw??0;
+        if(Math.abs(angle-previous)<.0001)return;
+        edBeginObjectEdit();edBakeRuins();
+        MEADOW_MAP.ruins[i][4]=Math.round(angle*10000)/10000;
+        applyObjects({ruins:1});edSyncUI();
+      }
+    }
+  );
   backend.renderer.domElement.addEventListener('webglcontextlost',e=>{
     e.preventDefault();
     contextLostCount++;
@@ -112,6 +143,7 @@ try{
     // permit its normal simulation/flush2D to continue during GPU loss.
     GL.ok=false;GL.lost=false;
     backend.actorDepthTexture=null;
+    editorModels?.refreshUi();
     backend.show(false);
     fallbackCanvas.style.visibility='visible';
     // Do not dispose GPU resources during context loss: stale render targets
@@ -163,6 +195,7 @@ window.__ASCII_NATIVE__={
     hasGpu:!!backend&&!backend.lost&&GL.ok
   }},
   get nativeDepth(){return depthPass?.stats||{frames:0,builds:0,visible:false,activeActors:0}},
+  get greyEditor(){return editorModels?.stats||{enabled:false,frames:0,sites:[]}},
   // Strictly test-scoped: prove an actual GPU occlusion difference without
   // needing any user-facing renderer toggle or laboratory overlay.
   setDepthMaskForTest(disabled){
