@@ -9,6 +9,7 @@ import { GroundContacts } from './ground-contacts.js';
 import { createInstancedForest } from './forest.js';
 import { createLegacyKnight } from './knight-ascii.js';
 import { buildPrototypeCastle } from './castle.js';
+import { GpuFrameTimer } from './gpu-timing.js';
 
 const map = window.ASCII_MEADOW_MAP;
 if (!map || !Array.isArray(map.flora) || !Array.isArray(map.ruins)) {
@@ -40,6 +41,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.info.autoReset = false;
+const gpuTimer=new GpuFrameTimer(renderer);
 view.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -474,19 +476,23 @@ function frame(now) {
   grassMaterial.uniforms.uWind.value=ui.wind.checked?1:0;
   renderer.shadowMap.enabled=ui.shadows.checked;
   renderer.info.reset();
+  gpuTimer.start();
   if (ui.ascii.checked) {
     renderer.setRenderTarget(rt);
     renderer.render(scene,camera);
     renderer.setRenderTarget(null);
     renderer.render(post,postCamera);
   } else renderer.render(scene,camera);
+  gpuTimer.stop();
   cpuSamples.push(performance.now()-started);
   if(cpuSamples.length>120)cpuSamples.shift();
   frames++;
   if(now-lastStats>850) {
     const p50=percentile(samples,.5),p95=percentile(samples,.95),cpu95=percentile(cpuSamples,.95);
+    const gpu=gpuTimer.snapshot();
     ui.stats.textContent='FPS median: '+(p50?Math.round(1000/p50):0)+'  |  frame p95: '+p95.toFixed(1)+' ms\n'+
       'JS + GPU submit p95: '+cpu95.toFixed(1)+' ms  |  draws: '+renderer.info.render.calls+
+      '\nReal GPU p95: '+(gpu.p95ms===null?'— / unsupported':gpu.p95ms.toFixed(1)+' ms')+
       '\nTriangles: '+renderer.info.render.triangles.toLocaleString()+
       '  |  Grass: '+lastCount.grass.toLocaleString()+
       '\nMap objects nearby: '+lastCount.flora+'  |  ruins: '+lastCount.ruins+
@@ -500,6 +506,7 @@ function frame(now) {
       originalKnightFrames:window.ASCII_KNIGHT_FRAMES?.length||0,
       originalKnightFrame:legacyKnight?.userData.legacyState.frame??-1,
       hasGothicCastle:!!world.children.find(x=>x.userData.gothicContact?.type==='castle'),
+      gpuMsP95:gpu.p95ms,gpuTimerSupported:gpu.supported,
       characterMode:ui.character.value,
       fpsMedian:p50?1000/p50:0,frameP95ms:p95,submitP95ms:cpu95,
       drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,
@@ -520,8 +527,12 @@ ui.quality.addEventListener('change',()=>{plantGrass();resize();});
 window.addEventListener('resize',resize);
 document.addEventListener('visibilitychange',()=>{paused=document.hidden;previous=0;if(!paused)resize();});
 window.addEventListener('pageshow',resize);
-renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();contextLost=true;});
-renderer.domElement.addEventListener('webglcontextrestored',()=>{contextLost=false;previous=0;resize();});
+renderer.domElement.addEventListener('webglcontextlost',event=>{
+  event.preventDefault();contextLost=true;gpuTimer.lost();
+});
+renderer.domElement.addEventListener('webglcontextrestored',()=>{
+  contextLost=false;previous=0;gpuTimer.restore();resize();
+});
 window.addEventListener('error',event=>{
   const e=$('error');e.hidden=false;e.textContent='Three.js prototype error: '+(event.message||String(event.error));
 });
