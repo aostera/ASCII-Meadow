@@ -8,7 +8,7 @@ const originalCanvas=document.getElementById('g');
 const modeOriginal=document.getElementById('parity-legacy');
 const modeThree=document.getElementById('parity-three');
 const status=document.getElementById('parity-status');
-const legacyFlush=GL.flush;
+let legacyFlush=GL.flush;
 let backend=null,mode='legacy',lastError=null;
 let lastStats=0;
 const safeStatus=text=>{status.textContent=text;};
@@ -73,8 +73,13 @@ modeThree.addEventListener('click',()=>selectMode('three'));
 // Restored WebGL2 contexts reset GL.flush. Reinstall experimental backend
 // only after the old renderer's handler finished restoring its resources.
 originalCanvas.addEventListener('webglcontextrestored',()=>{
+  // src/renderer/webgl.js rebuilds its WebGL2 program and replaces GL.flush.
+  // The old function closes over deleted GPU handles, so NEVER restore it
+  // after tab suspension (especially on Safari/iPadOS).
   queueMicrotask(()=>{
-    if(mode==='three'&&GL.ok)GL.flush=renderThree;
+    if(!GL.ok)return;
+    if(GL.flush!==renderThree)legacyFlush=GL.flush;
+    if(mode==='three')GL.flush=renderThree;
   });
 });
 window.addEventListener('pagehide',()=>{});
