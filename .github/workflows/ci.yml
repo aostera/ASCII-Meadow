@@ -338,6 +338,8 @@ jobs:
           node --check experiments/three/three-glyphs.js
           node --check tools/check/three-parity.cjs
           node tools/check/three-source-sync.cjs
+          node --check experiments/three/source-masonry.mjs
+          node tools/check/three-source-masonry.mjs
       - name: Screenshot-diff dependency
         run: python3 -m pip install 'Pillow==12.0.0'
       - name: Render original full game through both rasterizers
