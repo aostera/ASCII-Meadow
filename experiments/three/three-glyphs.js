@@ -75,8 +75,12 @@ export class ThreeGlyphBackend {
     this.atlas=null;this.castleTexture=null;this.uvTexture=null;
     this.atlasSource=null;this.castleSource=null;this.sv=-1;this.sprCount=0;
     this.glyphs=this.makeLayer(65536,1);
-    this.castle=this.makeLayer(2,0);
-    this.scene.add(this.castle.mesh,this.glyphs.mesh);
+    this.castle=this.makeLayer(1,0);
+    // The real legacy castle lightning pass uses additive blending after
+    // the ordinary stone image, BEFORE drawing world glyphs. Without a
+    // separate mesh the flash changes brightness and breaks visual parity.
+    this.castleFlash=this.makeLayer(1,0.5,true);
+    this.scene.add(this.castle.mesh,this.castleFlash.mesh,this.glyphs.mesh);
     this.stats={glyphs:0,drawCalls:0,triangles:0,frame:0};
     this.lost=false;
     this.cullingEnabled=true;
@@ -87,7 +91,7 @@ export class ThreeGlyphBackend {
         if(tex)tex.needsUpdate=true;
     });
   }
-  makeLayer(capacity,order) {
+  makeLayer(capacity,order,additive=false) {
     const layer=allocate(capacity);
     const uniforms={
       uCam:{value:new THREE.Vector2()},uView:{value:new THREE.Vector2(1,1)},
@@ -100,8 +104,10 @@ export class ThreeGlyphBackend {
       // culls ALL original sprite quads as backfaces (the blank screen bug).
       uniforms,side:THREE.DoubleSide,transparent:true,depthTest:false,depthWrite:false,
       blending:THREE.CustomBlending,blendEquation:THREE.AddEquation,
-      blendSrc:THREE.OneFactor,blendDst:THREE.OneMinusSrcAlphaFactor,
-      blendSrcAlpha:THREE.OneFactor,blendDstAlpha:THREE.OneMinusSrcAlphaFactor,
+      blendSrc:THREE.OneFactor,
+      blendDst:additive?THREE.OneFactor:THREE.OneMinusSrcAlphaFactor,
+      blendSrcAlpha:THREE.OneFactor,
+      blendDstAlpha:additive?THREE.OneFactor:THREE.OneMinusSrcAlphaFactor,
       toneMapped:false
     });
     const mesh=new THREE.Mesh(layer.geo,mat);
@@ -137,7 +143,7 @@ export class ThreeGlyphBackend {
     tex.magFilter=THREE.NearestFilter;tex.minFilter=THREE.NearestFilter;
     tex.generateMipmaps=false;tex.flipY=false;tex.needsUpdate=true;
     this.uvTexture=tex;this.sv=GB.sv;this.sprCount=n;
-    for(const b of [this.glyphs,this.castle]){
+    for(const b of [this.glyphs,this.castle,this.castleFlash]){
       b.uniforms.uSprites.value=tex;b.uniforms.uSpriteWidth.value=w;
     }
   }
@@ -180,19 +186,20 @@ export class ThreeGlyphBackend {
       gput(CAST,castle.x,castle.y,castle.a);
       if(extra===2)gput(CAST,castle.x,castle.y,castle.flash);
       this.atlasTexture(this.castle,castleCanvas,'castle');
+      this.castleFlash.uniforms.uTexture.value=this.castleTexture;
     }
     const count=GB.n-extra;
     const uploadStart=performance.now();
     const clip=this.cullingEnabled?glyphClipWindow(camx,camy,W,H,VZ,4):null;
     const visibleGlyphs=this.upload(this.glyphs,GB.buf,0,count,clip);
-    this.upload(this.castle,GB.buf,count,extra);
+    this.upload(this.castle,GB.buf,count,extra?1:0);
+    this.upload(this.castleFlash,GB.buf,count+1,extra===2?1:0);
     const uploadCpuMs=performance.now()-uploadStart;
-    for(const layer of [this.glyphs,this.castle]){
+    for(const layer of [this.glyphs,this.castle,this.castleFlash]){
       layer.uniforms.uCam.value.set(camx,camy);
       layer.uniforms.uView.value.set(W/VZ,H/VZ);
     }
-    // Unlike the old shader's one glyph program, the castle image has its own
-    // mesh. An additive second flash quad is a future parity task.
+    // The source castle flash is a separate additive GPU layer.
     this.renderer.info.reset();
     const renderStart=performance.now();
     this.renderer.render(this.scene,this.camera);
@@ -209,13 +216,15 @@ export class ThreeGlyphBackend {
     const n=Math.max(0,Math.min(5,mode|0));
     this.glyphs.uniforms.uDebugMode.value=n===5?1:n;
     this.castle.uniforms.uDebugMode.value=n===5?1:n;
+    this.castleFlash.uniforms.uDebugMode.value=n===5?1:n;
     this.glyphs.uniforms.uDebugVertex.value=n===5?1:0;
     this.castle.uniforms.uDebugVertex.value=n===5?1:0;
+    this.castleFlash.uniforms.uDebugVertex.value=n===5?1:0;
   }
   show(visible){this.renderer.domElement.style.display=visible?'block':'none';}
   dispose(){
     this.renderer.dispose();this.renderer.domElement.remove();
-    for(const layer of [this.castle,this.glyphs]){
+    for(const layer of [this.castle,this.castleFlash,this.glyphs]){
       layer.geo.dispose();layer.mat.dispose();
     }
     for(const tex of [this.uvTexture,this.atlas,this.castleTexture])if(tex)tex.dispose();
