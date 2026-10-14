@@ -130,10 +130,10 @@ export function buildPrototypeCastle({THREE,parent,materials:M}) {
   const roofH=10;
   // Two pitched roof slabs and central ridge, leaving richly varied volume.
   for(const side of [-1,1]){
-    const roof=box(keepW/2+1.4,.9,keepD+1.4,side*keepW/4,33.5,keepZ,M.trim);
-    // Geometry is rotated about each slab centre.
+    // The pair of angled planes meet at the central ridge.
+    box(keepW/2+1.4,1.15,keepD+1.4,side*keepW/4,35,keepZ,M.trim,0,-side*.34);
   }
-  box(keepW+3,1.35,keepD+2,0,37,keepZ,M.shade);
+  box(1.2,1.4,keepD+2.1,0,37.55,keepZ,M.trim);
   for(const x of [-keepW/2,keepW/2]){
     cylinder(3.8,13,x,34.5,keepZ,M.stone,8);
     cone(4.6,10,x,46,keepZ,M.trim,8);
