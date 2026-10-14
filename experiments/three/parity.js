@@ -10,8 +10,10 @@ const modeThree=document.getElementById('parity-three');
 const architectureButton=document.getElementById('parity-architecture');
 const depthButton=document.getElementById('parity-depth');
 const knightButton=document.getElementById('parity-knight');
+const cowButton=document.getElementById('parity-cow');
 let depthStartedArchitecture=false;
 let knightStartedArchitecture=false;
+let cowStartedArchitecture=false;
 let liveArchitecture=null,architectureLoading=null,architectureWanted=false;
 const status=document.getElementById('parity-status');
 let legacyFlush=GL.flush;
@@ -85,6 +87,9 @@ function selectMode(next){
     depthButton.textContent='Глубина 3D: выкл.';
     knightButton.setAttribute('aria-pressed','false');
     knightButton.textContent='3D риг: выкл.';
+    cowButton.setAttribute('aria-pressed','false');
+    cowButton.textContent='3D корова: выкл.';
+    cowStartedArchitecture=false;
     knightStartedArchitecture=false;
     mode='legacy';
     safeStatus('Оригинальный движок: эталон 1:1 без каких-либо визуальных замен');
@@ -102,6 +107,9 @@ async function setLiveArchitecture(enabled){
     depthButton.textContent='Глубина 3D: выкл.';
     knightButton.setAttribute('aria-pressed','false');
     knightButton.textContent='3D риг: выкл.';
+    cowButton.setAttribute('aria-pressed','false');
+    cowButton.textContent='3D корова: выкл.';
+    cowStartedArchitecture=false;
     knightStartedArchitecture=false;
     architectureButton.setAttribute('aria-pressed','false');
     architectureButton.textContent='3D архитектура: выкл.';
@@ -121,7 +129,10 @@ async function setLiveArchitecture(enabled){
       WS,MS,pitch:PITCH,worldGen,
       player:{x:player.x,y:player.y,d8:player.d8,
         moving:player.moving,walk:player.walk,run:player.run,jump:player.jump},
-      gameTime:t,knightSourceHeight:KG.art*charDims(player).fch
+      gameTime:t,knightSourceHeight:KG.art*charDims(player).fch,
+      cows:cows.map(c=>({x:c.x,y:c.y,d8:c.d8,state:c.state,
+        at:c.at,gp:c.gp,wd:c.wd})),
+      cowSourceHeight:cows.length?CG.rows*charDims(cows[0]).fch*.75:0
     }));
     architectureButton.setAttribute('aria-pressed','true');
     architectureButton.textContent='3D архитектура: вкл.';
@@ -167,17 +178,30 @@ async function setKnightMode(enabled){
   try{
     if(!enabled){
       if(liveArchitecture)liveArchitecture.setKnightRig(false);
-      if(knightStartedArchitecture&&depthButton.getAttribute('aria-pressed')!=='true')
+      if(knightStartedArchitecture&&depthButton.getAttribute('aria-pressed')!=='true'&&cowButton.getAttribute('aria-pressed')!=='true')
         await setLiveArchitecture(false);
       knightStartedArchitecture=false;
       knightButton.setAttribute('aria-pressed','false');
       knightButton.textContent='3D риг: выкл.';
+      cowButton.setAttribute('aria-pressed','false');
+      cowButton.textContent='3D корова: выкл.';
+      cowStartedArchitecture=false;
+    cowButton.setAttribute('aria-pressed','false');
+    cowButton.textContent='3D корова: выкл.';
+    cowStartedArchitecture=false;
       return true;
     }
     if(!liveArchitecture){
       if(!(await setLiveArchitecture(true)))return false;
       knightStartedArchitecture=true;
     }else knightStartedArchitecture=false;
+    if(liveArchitecture?.cowEnabled){
+      liveArchitecture.setCowRig(false);
+      if(cowStartedArchitecture)knightStartedArchitecture=true;
+      cowStartedArchitecture=false;
+      cowButton.setAttribute('aria-pressed','false');
+      cowButton.textContent='3D корова: выкл.';
+    }
     if(!liveArchitecture?.setKnightRig(true))return false;
     knightButton.setAttribute('aria-pressed','true');
     knightButton.textContent='3D риг: вкл.';
@@ -190,7 +214,44 @@ async function setKnightMode(enabled){
   }finally{knightButton.disabled=false}
 }
 
+async function setCowMode(enabled){
+  cowButton.disabled=true;
+  try{
+    if(!enabled){
+      if(liveArchitecture)liveArchitecture.setCowRig(false);
+      cowButton.setAttribute('aria-pressed','false');
+      cowButton.textContent='3D корова: выкл.';
+      if(cowStartedArchitecture&&depthButton.getAttribute('aria-pressed')!=='true'&&
+         knightButton.getAttribute('aria-pressed')!=='true')
+        await setLiveArchitecture(false);
+      cowStartedArchitecture=false;
+      return true;
+    }
+    if(!liveArchitecture){
+      if(!(await setLiveArchitecture(true)))return false;
+      cowStartedArchitecture=true;
+    }else cowStartedArchitecture=false;
+    if(liveArchitecture?.knightEnabled){
+      liveArchitecture.setKnightRig(false);
+      if(knightStartedArchitecture)cowStartedArchitecture=true;
+      knightStartedArchitecture=false;
+      knightButton.setAttribute('aria-pressed','false');
+      knightButton.textContent='3D риг: выкл.';
+    }
+    if(!liveArchitecture?.setCowRig(true))return false;
+    cowButton.setAttribute('aria-pressed','true');
+    cowButton.textContent='3D корова: вкл.';
+    return true;
+  }catch(error){
+    console.error('Original-source Three cow diagnostic failed',error);
+    cowButton.setAttribute('aria-pressed','false');
+    cowButton.textContent='3D корова: ошибка';
+    return false;
+  }finally{cowButton.disabled=false}
+}
+
 architectureButton.addEventListener('click',()=>setLiveArchitecture(!architectureWanted));
+cowButton.addEventListener('click',()=>setCowMode(cowButton.getAttribute('aria-pressed')!=='true'));
 knightButton.addEventListener('click',()=>setKnightMode(knightButton.getAttribute('aria-pressed')!=='true'));
 depthButton.addEventListener('click',()=>setDepthMode(depthButton.getAttribute('aria-pressed')!=='true'));
 modeOriginal.addEventListener('click',()=>selectMode('legacy'));
@@ -222,6 +283,7 @@ window.__ASCII_PARITY__={
   setDepthMode,
   setLiveArchitecture,
   setKnightMode,
+  setCowMode,
   get error(){return lastError;},
   get canvas(){return backend?.renderer.domElement||null;},
   get ready(){return Boolean(GB.atlasCv&&GB.spr.length&&W&&H&&GB.n>1000);},
@@ -231,12 +293,19 @@ window.__ASCII_PARITY__={
       return null;
     if(!(dt>0&&dt<=.15))throw Error('Invalid live 3D animation dt');
     if(action==='jump')jump();
+    if(action==='cow-graze'&&cows.length){
+      Object.assign(cows[0],{state:'graze',gp:'down',at:0,gl:5});
+    }
     // Keep the real original simulation, atlas, rig and GL frame authoritative.
     referenceSimulate(dt);
     referenceRender();
     return {player:[player.x,player.y],jump:player.jump,
       motion:liveArchitecture?.stats.knightMotion||'off',
       feet:liveArchitecture?.stats.knightActorFoot||null,
+      cow:liveArchitecture?.stats.cowMotion||'off',
+      cowHead:liveArchitecture?.stats.cowHeadLowering||0,
+      cowFoot:liveArchitecture?.stats.cowActorFoot||null,
+      cowState:cows[0]?.state||null,
       sourceMap:JSON.stringify(MEADOW_MAP)};
   },
   setGlyphCullingForTest(enabled){
