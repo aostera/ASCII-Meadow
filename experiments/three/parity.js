@@ -86,6 +86,25 @@ window.__ASCII_PARITY__={
   get canvas(){return backend?.renderer.domElement||null;},
   get ready(){return Boolean(GB.atlasCv&&GB.spr.length&&W&&H&&GB.n>1000);},
   get baselineGlyphs(){return GB.n;},
+
+  // Only used in automated screenshot QA. Camera and player positions are
+  // temporary; the authored MEADOW_MAP and editor state are not mutated.
+  visitForTest(name) {
+    if(!new URLSearchParams(location.search).has('parityTest'))return null;
+    let coords=null;
+    if(name==='castle')coords=[0,-115];
+    else if(name!=='camp') {
+      const site=(MEADOW_MAP.ruins||[]).find(r=>r[0]===name);
+      if(!site)return null;
+      coords=[site[2],site[3]];
+    }
+    if(coords) {
+      [player.x,player.y]=mapToCell(coords[0],coords[1]);
+      player.tx=player.x;player.ty=player.y;player.moving=false;
+      updateCamera(0,true);
+    }
+    return {name,player:[player.x,player.y],camera:[camX,camY]};
+  },
   get positionDiagnostics(){
     if(!backend)return null;
     const layer=backend.glyphs,n=layer.geo.instanceCount;
