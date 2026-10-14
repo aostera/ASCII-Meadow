@@ -318,6 +318,15 @@ window.__ASCII_PARITY__={
     backend.cullingEnabled=Boolean(enabled);
     return true;
   },
+  // Test actual authored castle lightning, including the source's additive
+  // second pass. No brightness/alpha change to normal gameplay.
+  setSourceFlashForTest(strength){
+    if(!new URLSearchParams(location.search).has('parityTest'))return false;
+    if(!(strength>=0&&strength<=1))throw Error('Invalid source lightning');
+    flash=strength;
+    return true;
+  },
+
   // Produce ONE exact glyph buffer from the original scene, then render that
   // identical buffer in the independent Three.js backend. No second foliage
   // draw, no extra smoothing ticks, no perceptual brightness manipulation.
