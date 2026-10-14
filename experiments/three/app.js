@@ -8,6 +8,7 @@ import { createAnimatedKnight } from './knight-rig.js';
 import { GroundContacts } from './ground-contacts.js';
 import { createInstancedForest } from './forest.js';
 import { createLegacyKnight } from './knight-ascii.js';
+import { buildPrototypeCastle } from './castle.js';
 
 const map = window.ASCII_MEADOW_MAP;
 if (!map || !Array.isArray(map.flora) || !Array.isArray(map.ruins)) {
@@ -21,6 +22,7 @@ const view = $('viewport'), ui = {
 const SCALE = 0.12; // keep the authored world coordinate system; only display units change
 const LOCATIONS = {
   camp: { origin: map.start, label: 'лагерь' },
+  castle: { origin: Array.isArray(map.castle)?map.castle:[0,0], label: 'главный замок' },
   cloister: { origin: map.ruins.find(r => r[1] === 'cloister').slice(2, 4), label: 'галерея' },
   abbey: { origin: map.ruins.find(r => r[1] === 'abbey').slice(2, 4), label: 'аббатство' },
   gate: { origin: map.ruins.find(r => r[1] === 'gate').slice(2, 4), label: 'ворота' }
@@ -304,6 +306,17 @@ function rebuild() {
     world.add(group);
     ruinCount++;
   }
+  if(ui.location.value==='castle'){
+    const castle=new THREE.Group();
+    castle.name='Main gothic castle model (prototype, not original)';
+    buildPrototypeCastle({THREE,parent:castle,materials:material});
+    const origin=LOCATIONS.castle.origin;
+    const [xx,zz]=toLocal(origin[0],origin[1]);
+    castle.position.set(xx,0,zz);
+    // Map may move its castle; the model stays locally centred at that site's origin.
+    groundContacts.ruin(xx,zz,0,castle.userData.gothicContact);
+    world.add(castle);
+  }
   if (ui.stress.checked) {
     // Synthetic additions are NOT saved to map and must not be confused with map parity.
     for (let i = 0; i < 20; i++) {
@@ -486,6 +499,7 @@ function frame(now) {
       forestTrees:lastCount.forest?.trees||0,
       originalKnightFrames:window.ASCII_KNIGHT_FRAMES?.length||0,
       originalKnightFrame:legacyKnight?.userData.legacyState.frame??-1,
+      hasGothicCastle:!!world.children.find(x=>x.userData.gothicContact?.type==='castle'),
       characterMode:ui.character.value,
       fpsMedian:p50?1000/p50:0,frameP95ms:p95,submitP95ms:cpu95,
       drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,
