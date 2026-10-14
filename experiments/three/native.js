@@ -39,7 +39,8 @@ function flushNative(camx,camy,castle){
   if(!backend||backend.lost)return;
   try{
     const source={solids,ruinSites,ruinDetail,ruinRotateMesh,
-      cathedral,ruins,WS,MS,pitch:PITCH,worldGen};
+      cathedral,ruins,WS,MS,pitch:PITCH,worldGen,
+      flora,VARS,t3Tree};
     const ranges=GB.nativeActorRanges||[];
     if(ranges.length){
       for(const a of ranges){
