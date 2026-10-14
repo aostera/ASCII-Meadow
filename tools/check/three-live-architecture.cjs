@@ -44,6 +44,10 @@ fs.mkdirSync(out,{recursive:true});
           button:document.getElementById('parity-architecture').getAttribute('aria-pressed')
         };
       });
+      if(!enabled.camera?.viewport||
+         enabled.camera.viewport.top<(mobile?180:0)||
+         enabled.camera.viewport.top+enabled.camera.viewport.height> (mobile?844:740))
+        throw Error('3D inset clipped by mobile controls or viewport: '+JSON.stringify(enabled.camera));
       if(!enabled.active||enabled.sites!==4||enabled.sourceSolids<1000||
          enabled.triangles<1000||enabled.drawCalls>30||!enabled.threeRenderer||
          enabled.canvasCount!==before.canvasCount||enabled.map!==before.originalMap||

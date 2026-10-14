@@ -11,7 +11,10 @@ import {createNativeSourceWorld,configureNativeCamera} from './source-world.mjs'
 export function architectureInsetRect(width,height){
   const w=Math.max(100,Math.min(width*.41,340));
   const h=Math.max(75,Math.min(height*.32,230));
-  const x=Math.max(0,width-w-14),top=14;
+  const x=Math.max(0,width-w-14);
+  // The mobile settings toolbar spans the top of the scene; keep the native
+  // preview BELOW it so that tapping buttons never hides most of the 3D view.
+  const top=width<650?Math.min(194,Math.max(14,height-h-14)):14;
   return {x,top,width:w,height:h};
 }
 
@@ -73,7 +76,10 @@ export class LiveSourceArchitecture {
       .map(v=>Math.max(1,Math.round(v)));
     // The inset is a REAL camera on the SAME world, centred on the active
     // gameplay viewport, with a wider field so whole Gothic walls are seen.
-    const zoom=VZ*.42;
+    // Gothic source volumes range from hundreds to thousands of original
+    // screen pixels. A wider diagnostic FOV is necessary to reveal the
+    // complete ruins instead of a heavily clipped striped wall close-up.
+    const zoom=VZ*.14*Math.min(1,rect.width/340);
     const cx=camX+(W/(2*VZ)-rect.width/(2*zoom))/CW;
     const cy=camY+(H/(2*VZ)-rect.height/(2*zoom))/CH;
     const view=configureNativeCamera(THREE,this.camera,{
