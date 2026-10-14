@@ -58,7 +58,12 @@ export class ThreeGlyphBackend {
     this.renderer.domElement.style.display='none';
     this.renderer.domElement.setAttribute('aria-hidden','true');
     this.renderer.autoClear=true;
-    this.renderer.setClearColor(0x0c0c0c,1);
+    // The original GL clear is *linear* 12/255 in the framebuffer.
+    // Three.Color(hex) converts sRGB to linear (~1/255 for #0c0c0c),
+    // producing a darkened background and changing all semiopaque sprites.
+    this.renderer.setClearColor(
+      new THREE.Color().setRGB(12/255,12/255,12/255,THREE.LinearSRGBColorSpace),1
+    );
     this.renderer.outputColorSpace=THREE.LinearSRGBColorSpace;
     this.renderer.toneMapping=THREE.NoToneMapping;
     this.renderer.info.autoReset=false;
