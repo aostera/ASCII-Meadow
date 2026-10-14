@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0c">
+<title>ASHEN VOW — 3D Character Workshop · ASCII Meadow</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0c0e;--panel:#151719ef;--line:#444247;--muted:#a3a19f;--white:#e2dfd9;--red:#953c43}
+*{box-sizing:border-box}
+html,body{margin:0;overflow:hidden;width:100%;height:100%;background:var(--bg);color:var(--white);font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif}
+#stage{position:fixed;inset:0;touch-action:none}
+#stage canvas{display:block;width:100%;height:100%;outline:0}
+header{position:fixed;top:24px;left:26px;pointer-events:none;text-shadow:0 2px 16px #000}
+header .eyebrow{font-size:10px;letter-spacing:.27em;color:#b45b5e;font-weight:700}
+h1{font-family:Georgia,serif;font-weight:400;letter-spacing:.16em;font-size:clamp(24px,3vw,41px);margin:8px 0 6px}
+header small{display:block;color:#b6b1aa;letter-spacing:.05em}
+#panel{position:fixed;right:18px;top:18px;width:286px;max-height:calc(100dvh - 36px);overflow-y:auto;border:1px solid #5d5051;background:var(--panel);backdrop-filter:blur(18px);border-radius:12px;padding:18px;box-shadow:0 18px 60px #0008}
+.section-title{font-size:10px;letter-spacing:.17em;color:#ae9394;text-transform:uppercase;margin:0 0 12px;font-weight:700}
+.control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:16px}
+button{font:inherit;color:var(--white);background:#242528;border:1px solid #525055;border-radius:6px;min-height:39px;padding:8px 5px;cursor:pointer;transition:background .12s,border-color .12s}
+button:hover{background:#333034}button.active{background:#603038;border-color:#b25e61}
+button:focus-visible,input:focus-visible{outline:2px solid #cc7c77;outline-offset:2px}
+button.wide{grid-column:span 2}
+label{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:15px 0 6px;font-size:12px;color:#ccc7c1}
+label span:last-child{font-variant-numeric:tabular-nums;color:#e1d1cd}
+input[type=range]{display:block;width:100%;accent-color:#ae5b63;cursor:pointer}
+#status{font-size:12px;line-height:1.5;border-top:1px solid #504548;margin-top:13px;padding-top:11px;color:#bcb8b1}
+#status strong{color:#ded9d3}
+#footer{position:fixed;bottom:20px;left:25px;max-width:min(440px,calc(100vw - 340px));font-size:12px;color:#99938f;line-height:1.6;text-shadow:0 2px 12px #000}
+#footer b{color:#d8cbc7}
+#floating{position:fixed;bottom:16px;right:320px;display:flex;gap:7px}
+#floating button{font-size:12px;background:#19191dbb;border-color:#6e6161;min-height:40px;padding:0 12px}
+#notice{position:fixed;inset:0;display:none;place-items:center;padding:20px;background:#141416;color:#eee;text-align:center;z-index:20}
+@media(max-width:680px){
+header{top:12px;left:14px}header .eyebrow{font-size:8px}h1{font-size:22px;margin:3px 0}header small{font-size:10px}
+#panel{top:auto;bottom:0;left:0;right:0;width:100%;max-height:40dvh;border-radius:15px 15px 0 0;padding:12px 15px env(safe-area-inset-bottom);overflow:auto}
+#panel .section-title{margin-bottom:7px}
+.control-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-bottom:9px}
+button{font-size:11px;min-height:34px;padding:5px 1px}
+button.wide{grid-column:span 2}
+#panel label{margin:8px 0 4px}
+#footer{bottom:calc(40dvh + 9px);left:12px;max-width:60vw;font-size:10px}
+#floating{right:9px;bottom:calc(40dvh + 8px)}
+#floating button{padding:0 6px;min-height:31px;font-size:10px}
+}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="stage" aria-label="Интерактивный 3D-рыцарь, вращайте пальцем или мышью"></div>
+<header><div class="eyebrow">ASCII MEADOW / CHARACTER WORKSHOP 01</div><h1>THE ASHEN VOW</h1><small>Оригинальный концепт · интерактивная 3D-модель</small></header>
+<aside id="panel" aria-label="Управление персонажем">
+<p class="section-title">Анимации — живой просмотр</p>
+<div class="control-grid" id="clips">
+<button data-clip="idle" class="active">Покой</button><button data-clip="walk">Ходьба</button>
+<button data-clip="run">Бег</button><button data-clip="jump">Прыжок</button>
+<button data-clip="attack">Удар мечом</button><button data-clip="crouch">Приседание</button>
+<button data-clip="salute">Поклон</button><button data-clip="turn">Разворот</button>
+</div>
+<label for="scrub">Положение анимации <span id="scrub-value">0%</span></label><input type="range" id="scrub" min="0" max="1000" value="0">
+<label for="speed">Скорость <span id="speed-value">1.0×</span></label><input type="range" id="speed" min="0" max="200" value="100">
+<div class="control-grid" style="margin-top:14px">
+<button id="pause">Пауза</button><button id="reset">Сброс камеры</button>
+<button id="auto">Автовращение</button><button id="wire">Сетка</button>
+</div>
+<p id="status"><strong>3D-черновик:</strong> цельная объёмная модель, отдельные подвижные части, анимации в реальном времени. В игру не добавлена.</p>
+</aside>
+<div id="footer"><b>Осмотр:</b> проведите пальцем / ЛКМ для поворота, двумя пальцами / колесом для приближения. Это самостоятельная сцена, карта и прод не изменены.</div>
+<div id="floating"><button id="viewFront">Спереди</button><button id="viewBack">Сзади</button><button id="viewSide">Сбоку</button></div>
+<div id="notice">Не удалось запустить WebGL-сцену. Проверьте поддержку WebGL и обновите страницу.</div>
+<script type="module" src="./ashen-vow.js"></script>
+</body>
+</html>
