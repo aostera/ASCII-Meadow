@@ -301,6 +301,8 @@ jobs:
           node --check tools/check/three-unit.cjs
       - name: Ground and GPU timing unit tests
         run: node tools/check/three-unit.cjs
+      - name: Install screenshot inspector
+        run: python3 -m pip install 'Pillow==12.0.0'
       - name: Render actual 3D scene and preserve the author map
         run: |
           python3 -m http.server 8181 > /tmp/three-http.log 2>&1 &
@@ -308,6 +310,8 @@ jobs:
           trap 'kill $server 2>/dev/null || true' EXIT
           for i in $(seq 1 20); do curl -sf http://127.0.0.1:8181/experiments/three/ > /dev/null && break; sleep 1; done
           node tools/check/three-prototype.cjs http://127.0.0.1:8181
+      - name: Reject nearly blank ASCII screenshots
+        run: python3 tools/check/three-visibility.py shots/three/desktop.png shots/three/phone.png
       - uses: actions/upload-artifact@v4
         if: always()
         with:
