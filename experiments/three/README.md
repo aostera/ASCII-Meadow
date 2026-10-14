@@ -61,3 +61,7 @@ The main game at https://ascii-meadow.aloster36.workers.dev/ remains unchanged. 
 - `tools/check/three-prototype.cjs` checks authored scenes, real castle meshes and foundations, original-frame registration, toggled animation and control states. These are automated smoke tests, not user acceptance of visual quality.
 
 The link is for testing and may briefly show the previous build while Cloudflare updates branch previews. No GPU FPS improvement has been established.
+
+
+## Real GPU timing, when supported
+`gpu-timing.js` records asynchronous WebGL2 `EXT_disjoint_timer_query_webgl2` elapsed GPU milliseconds for the entire scene plus ASCII postprocessing. The HUD shows a GPU p95 (or unsupported), next to actual requestAnimationFrame interval and CPU submit duration. This is not a prediction of mobile FPS and requires equal-scene benchmarking. The timer never calls blocking GPU readback; it also drops pending queries after context loss. `tools/check/three-unit.cjs` validates timer lifecycle and oriented grass masks without Chromium.

@@ -53,3 +53,7 @@ The owner requested GPT to implement the originally planned Claude tasks during 
 - `tools/check/three-prototype.cjs`: asserts original frame count/animation, mapped gothic castle geometry, contacts and touch control.
 
 The permanent preview link (Cloudflare Workers Builds) is https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev/experiments/three/ . Main `src/data/map.js` and renderer must remain unchanged. DO NOT claim 200 FPS or parity without measurements, nor treat CI Chromium/SwiftShader as iPad Safari verification. When Claude returns, start with glTF art fidelity, dynamic 3D colliders, camera matching original scene, actual cinematic rig cloth and equal-detail GPU profiling.
+
+
+## GPU profiling added (2026-10-14)
+`gpu-timing.js` implements non-blocking optional WebGL2 disjoint timer queries. `app.js` includes GPU p95 in the diagnostic object and on-screen HUD; unavailable extensions report unsupported instead of making up numbers. Reinitialize GPU profiling following context restoration, and never confuse Chromium SwiftShader with actual iPhone/iPad measurements. New `tools/check/three-unit.cjs` verifies GPU async sample, missing extension, context loss/restoration and ground contacts.
