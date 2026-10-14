@@ -7,6 +7,7 @@ import {NativeArchitectureDepth} from './native-architecture-depth.mjs';
 
 const fallbackCanvas=document.getElementById('g');
 let backend=null,depthPass=null,disposed=false,fallbackReason=null,frames=0;
+let testDepthDisabled=false;
 // The source game remains the authoritative painter: collect only NPC spans.
 const originalNativeRender=render;
 render=function(){GB.nativeActorRanges=[];return originalNativeRender()};
@@ -57,6 +58,7 @@ function flushNative(camx,camy,castle){
         backend.actorDepthTexture=null;
       }
     }else backend.actorDepthTexture=null;
+    if(testDepthDisabled)backend.actorDepthTexture=null;
     backend.actorDepthPitch=PITCH;
     backend.flush(GB,SPF,gput,CAST,camx,camy,castle,W,H,DPR,VZ,cathedral.cv);
     frames++;
@@ -113,6 +115,13 @@ window.__ASCII_NATIVE__={
   get originalMap(){return MEADOW_MAP},
   get frameCount(){return frames},
   get nativeDepth(){return depthPass?.stats||{frames:0,builds:0,visible:false,activeActors:0}},
+  // Strictly test-scoped: prove an actual GPU occlusion difference without
+  // needing any user-facing renderer toggle or laboratory overlay.
+  setDepthMaskForTest(disabled){
+    if(!new URLSearchParams(location.search).has('nativeDepthTest'))return false;
+    testDepthDisabled=Boolean(disabled);
+    return true;
+  },
   get error(){return fallbackReason},
   // Explicitly off the production route; visual art review comes at the end.
   dispose(){
