@@ -13,11 +13,11 @@ export function projectedPixel(point,anchor,scale,pitch){
   return [anchor[0]+x*scale,anchor[1]-(y*Math.cos(pitch)+z*Math.sin(pitch))*scale];
 }
 
-export function anchorForSource(kind,site,cathedral,WS){
+export function anchorForSource(kind,site,cathedral,WS,pitch){
   if(kind==='castle')return [cathedral.kx,cathedral.ky];
   if(!site)throw Error('Author ruin site required');
   return [cathedral.ox+site.x*WS,
-          cathedral.oy-site.z*Math.sin(0.87)*WS];
+          cathedral.oy-site.z*Math.sin(pitch)*WS];
 }
 
 export function projectToNativeWorld(point,anchor,scale,pitch) {
@@ -61,7 +61,7 @@ export function createNativeSourceWorld(THREE,{
     group.add(mesh);
     ids.add(name);
   }
-  add('castle',solids,anchorForSource('castle',null,cathedral,WS),MS);
+  add('castle',solids,anchorForSource('castle',null,cathedral,WS,pitch),MS);
   const keep=solids.length;
   for(const site of ruinSites()){
     if(ids.has(site.id))throw Error('Duplicate authored ruin ID: '+site.id);
@@ -71,7 +71,7 @@ export function createNativeSourceWorld(THREE,{
       newParts=solids.slice(keep);
     }finally{solids.length=keep}
     ruinRotateMesh(newParts,site);
-    add(site.id,newParts,anchorForSource('ruin',site,cathedral,WS),WS);
+    add(site.id,newParts,anchorForSource('ruin',site,cathedral,WS,pitch),WS);
   }
   group.userData.sourceSites=[...ids];
   group.userData.sourceCounts=group.children.map(g=>({
