@@ -80,3 +80,7 @@ The experimental full-world page now offers 3D риг. It connects the original 
 ## 2026-10-14 — true native 3D cow movement diagnostic
 
 Optional `3D корова` in the experiment loads one source-driven articulated 3D cow in the existing shared Three renderer and focuses the diagnostic inset on its real position. The source herd, silhouettes, grazing atlas and editor never change. Native head-lowering follows real down/loop/up phases and hop/walk/run follow real simulation states. This is NOT a complete replacement or visually accepted 1:1 3D cow; preserve original art until user approval. The mode cleans GPU geometry and materials on disable and returns the original view untouched. CI tests desktop/mobile original sprite isolation and original herd state transitions.
+
+
+## 2026-10-14 — original-preserving real-device performance probe
+Use `/experiments/three/?profile=1` on the physical mobile/desktop device. The profiler is opt-in only and does not create another GPU context or touch the author scene's brightness, alpha or artwork. Ten-second recording measures user-observed vsync-limited RAF FPS, p95 frame pacing, long frame stalls, and CPU-side Three glyph upload/draw calls. Tap Copy JSON and provide results for hardware-specific optimizations. A physical screen running at 60/120Hz will cap observed RAF at 60/120 fps; 200+ real displayed frames requires higher-refresh hardware. Test mode `?profile=1&profileTest=1` is CI-only and runs for under one second.
