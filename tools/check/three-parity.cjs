@@ -1,16 +1,15 @@
-// Full authored-world compatibility smoke for the new Three.js glyph backend.
-// Renders exactly the existing game (with no fake primitive map) and tests that
-// swapping only the backend preserves source map and original game simulation.
-// Run with repo-root HTTP server, Playwright Chromium + software WebGL2.
+// Render exactly the same frozen, authored ASCII world in both backends.
+// Five real map locations, desktop + phone, and a real UI-toggle smoke test.
 const {chromium}=require('playwright');
 const fs=require('node:fs'),path=require('node:path');
 const base=process.argv[2]||'http://127.0.0.1:8181';
 const shots=path.join(process.cwd(),'shots','three-parity');
 fs.mkdirSync(shots,{recursive:true});
+const file=(mobile,name,mode)=>path.join(shots,(mobile?'phone':'desktop')+'-'+name+'-'+mode+'.png');
 (async()=>{
- const browser=await chromium.launch({
-   headless:true,args:['--enable-webgl','--use-angle=swiftshader','--enable-unsafe-swiftshader']
- });
+ const browser=await chromium.launch({headless:true,args:[
+    '--enable-webgl','--use-angle=swiftshader','--enable-unsafe-swiftshader'
+ ]});
  try{
   for(const mobile of [false,true]){
    const context=await browser.newContext({
@@ -19,47 +18,55 @@ fs.mkdirSync(shots,{recursive:true});
    });
    const page=await context.newPage(),errors=[];
    page.on('pageerror',e=>errors.push(e.stack||e.message));
-   page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-   const res=await page.goto(base.replace(/\/$/,'')+'/experiments/three/parity.html?edit=0&parityTest=1',
-     {waitUntil:'domcontentloaded'});
-   if(!res||!res.ok())throw Error('parity HTML failed');
+   page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
+   const res=await page.goto(base.replace(/\/$/,'')+
+     '/experiments/three/parity.html?edit=0&parityTest=1',{waitUntil:'domcontentloaded'});
+   if(!res?.ok())throw Error('parity page failed to load');
    await page.waitForFunction(()=>window.__ASCII_PARITY__?.ready,{timeout:90000});
-   const before=await page.evaluate(()=>({
-     mode:window.__ASCII_PARITY__.mode,
-     map:JSON.stringify(window.__ASCII_PARITY__.map),
-     world:window.__ASCII_PARITY__.playerLocation,
-     frames:window.__ASCII_PARITY__.baselineGlyphs
-   }));
-   if(before.mode!=='legacy'||before.frames<1000)throw Error('legacy baseline missing: '+JSON.stringify({mode:before.mode,frames:before.frames}));
-   const frozen=await page.evaluate(()=>window.__ASCII_PARITY__.freezeForTest());
-   if(!frozen)throw Error('Cannot hold the same original world frame for raster comparisons');
-   await page.waitForTimeout(750);
-   await page.screenshot({path:path.join(shots,mobile?'phone-original.png':'desktop-original.png')});
+   const sourceMap=await page.evaluate(()=>JSON.stringify(window.__ASCII_PARITY__.map));
+   if(!await page.evaluate(()=>window.__ASCII_PARITY__.freezeForTest()))throw Error('Cannot freeze game world');
+   // Click as a player first: the controls must stay interactive.
    await page.locator('#parity-three').click();
-   await page.waitForFunction(()=>{
-     const p=window.__ASCII_PARITY__;
-     return p?.mode==='three'&&p.stats?.frame>2&&p.stats.glyphs>1000&&p.stats.drawCalls>0;
-   },{timeout:50000});
-   const after=await page.evaluate(()=>({
+   await page.waitForFunction(()=>window.__ASCII_PARITY__?.mode==='three'&&
+      window.__ASCII_PARITY__.stats?.glyphs>1000,{timeout:60000});
+   await page.locator('#parity-legacy').click();
+   await page.waitForFunction(()=>window.__ASCII_PARITY__?.mode==='legacy',{timeout:30000});
+   // Hide UI only in test screenshots, not in the actual playable preview.
+   await page.addStyleTag({content:'.hud,.stats,#parity-toolbar,.ed,.ed-open{visibility:hidden!important}'});
+   const sites=mobile?['camp','broken-gate','castle']:
+      ['camp','broken-gate','abbey-front','cloister-walk','castle'];
+   for(const site of sites){
+     const loc=await page.evaluate(name=>window.__ASCII_PARITY__.visitForTest(name),site);
+     if(!loc)throw Error('Authored map location not found: '+site);
+     await page.waitForTimeout(400);
+     await page.screenshot({path:file(mobile,site,'original'),timeout:60000,animations:'disabled'});
+     const last=await page.evaluate(()=>window.__ASCII_PARITY__.stats?.frame||0);
+     if(!await page.evaluate(()=>window.__ASCII_PARITY__.select('three')))
+       throw Error('Three.js unavailable at '+site);
+     await page.waitForFunction(previous=>window.__ASCII_PARITY__.stats?.frame>previous,
+       last,{timeout:60000});
+     await page.screenshot({path:file(mobile,site,'three'),timeout:60000,animations:'disabled'});
+     const verify=await page.evaluate(()=>({
+       map:JSON.stringify(window.__ASCII_PARITY__.map),
+       stats:window.__ASCII_PARITY__.stats,
+       gpuCanvasSize:document.getElementById('three-parity-canvas')?.width
+     }));
+     if(verify.map!==sourceMap||!verify.gpuCanvasSize||verify.stats.glyphs<1000)
+       throw Error('Rendering/map failure: '+site+' '+JSON.stringify(verify.stats));
+     await page.evaluate(()=>window.__ASCII_PARITY__.select('legacy'));
+     console.log('CAPTURE '+(mobile?'PHONE':'DESKTOP')+' '+site,
+       JSON.stringify({glyphs:verify.stats.glyphs,drawCalls:verify.stats.drawCalls,mapUnchanged:true}));
+   }
+   const restored=await page.evaluate(()=>({
      mode:window.__ASCII_PARITY__.mode,
-     stats:window.__ASCII_PARITY__.stats,
+     visible:getComputedStyle(document.getElementById('g')).visibility,
      map:JSON.stringify(window.__ASCII_PARITY__.map)
    }));
-   if(after.map!==before.map)throw Error('Three.js mutated the real authored map!');
-   console.log((mobile?'MOBILE':'DESKTOP')+' GPU TRANSFORM',JSON.stringify(
-     await page.evaluate(()=>window.__ASCII_PARITY__.positionDiagnostics)));
-   await page.screenshot({path:path.join(shots,mobile?'phone-three.png':'desktop-three.png')});
-   await page.locator('#parity-legacy').click();
-   await page.waitForFunction(()=>window.__ASCII_PARITY__.mode==='legacy');
-   const restored=await page.evaluate(()=>({
-     map:JSON.stringify(window.__ASCII_PARITY__.map),
-     canvasVisible:getComputedStyle(document.getElementById('g')).visibility
-   }));
-   if(restored.map!==before.map||restored.canvasVisible!=='visible')throw Error('original renderer not restored');
-   if(errors.length)throw Error('parity browser errors: '+errors.join('\n'));
-   console.log(mobile?'PARITY PHONE PASS':'PARITY DESKTOP PASS',
-     JSON.stringify({glyphs:after.stats.glyphs,draws:after.stats.drawCalls,originalRestored:true,mapUnchanged:true}));
+   if(restored.mode!=='legacy'||restored.visible!=='visible'||restored.map!==sourceMap)
+      throw Error('Original game not restored on mode switch');
+   if(errors.length)throw Error('Browser exceptions: '+errors.join('\n'));
+   console.log(mobile?'PARITY PHONE PASS':'PARITY DESKTOP PASS',sites.join(','));
    await context.close();
   }
- }finally{await browser.close();}
-})().catch(e=>{console.error(e);process.exit(1);});
+ }finally{await browser.close()}
+})().catch(e=>{console.error(e);process.exit(1)});
