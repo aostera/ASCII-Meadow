@@ -237,4 +237,6 @@ Native game only (`/experiments/three/native.html`):
 
 **Проверки (локально, SwiftShader):** `three-native-knight3d.cjs` desktop/phone с GLB (Idle/Walk/Run/Jump, ~1000 глифов, клетки плаща) и без GLB (исходный рыцарь на месте); `three-native-game`, `-npcs`, `-depth`, `-bush`, `three-live-knight`, `three-source-sync`, `check:static` PASS. В SwiftShader рендер+чтение ~470 мс на кадр — программный GPU; на реальном железе не замерено.
 
-**Открыто:** GLB не в git (лицензия) — на Cloudflare будет исходный ASCII-рыцарь; слияние в `experiment/threejs-ascii-prototype`; художественная приёмка; замер на iPad.
+**Решение автора:** лицензию Fab проверил — GLB закоммичен; PR #38 сливается в `experiment/threejs-ascii-prototype`.
+
+**Открыто:** художественная приёмка; замер чтения пикселей на iPad.

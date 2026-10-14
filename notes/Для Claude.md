@@ -192,4 +192,4 @@ Native game only (`/experiments/three/native.html`):
 - Объект, привязанный к кости, не позиционировать через `matrix_world` — только identity `matrix_basis` + `matrix_parent_inverse` из покоя кости.
 - Основная картинка native-игры: игрок по умолчанию — 3D glTF-рыцарь, напечатанный глифами игры (`experiments/three/native-knight3d.mjs`: рендер в offscreen-цель → рецепт `tools/to_ascii.py` → `grect`/`gput` в общий батч с атласом рыцаря и огнём). `?knight3d=0`, отсутствие GLB или ошибка — исходный ASCII-рыцарь. Тест `tools/check/three-native-knight3d.cjs`. Лаборатория паритета (`parity.html`) не затронута.
 - Спрайт-камера рыцаря — своя (подъём 0,35 рад), не `PITCH` карты: с наклона карты глубина плаща раздувала фигуру в 1,5 раза.
-- Лицензия Fab на GLB в публичном репозитории не подтверждена — спроси автора, прежде чем коммитить `assets/knight/*.glb`.
+- GLB (`experiments/three/assets/knight/masked_knight.glb`) в git с 2026-10-14: автор проверил лицензию Fab и разрешил коммит. При пересборке заменяй файл целиком через `export_glb()`.
