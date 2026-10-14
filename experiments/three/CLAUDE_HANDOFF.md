@@ -62,3 +62,20 @@ The permanent preview link (Cloudflare Workers Builds) is https://experiment-thr
 ## 2026-10-14 — IMPORTANT: original black preview / actual screenshot QA
 User viewed branch preview and reported only a few symbols on almost black screen. This was reproduced by inspecting GitHub Actions 3D screenshots. Broken baseline main image pixels (excluding HUD): desktop >=48 intensity only 0.111%; phone 0.014%. Fixes in `app.js`: brighter lit materials/fog; dirt variation texture; more perceptual luminance transfer; final `#include <colorspace_fragment>` in custom ShaderMaterial (Three.js linear→sRGB); CSS-pixel-sized glyph cells corrected for DPR; closer camera. A temporary initialization regression (locally-called texture setup using later `const hash` before initialization) was caught by browser smoke and fixed with a local deterministic hash. For mobile, the controls HUD now collapses by default.
 Automated `tools/check/three-visibility.py` now rejects screenshots approximating the broken near-empty output; CI successful 38513859707: desktop >=48 brightness 11.165%, phone 8.799%, plus regular UI/scene checks. **But manual inspection found that ASCII still looks like broad random punctuation/noise, NOT an artistically acceptable gothic silhouette.** Unfiltered 3D scene demonstrates geometry, while full-screen glyph transfer visually obscures it. Next graphics work must separate ground/grass/architecture glyph treatment (object or depth/normal aware, not a single global brightness threshold), improve silhouettes, compare against original ASCII visual reference, and only then ask user to evaluate. Unfiltered scene and ASCII scene screenshots are in Actions run 38513859707 artifacts. Software SwiftShader FPS (3-5) is not actual GPU-performance evidence. Keep PR draft, main unaffected.
+
+
+## CRITICAL: Migration approach changed to fidelity-first (2026-10-14)
+
+The user correctly rejected the reconstructed low-poly scene: it discarded original art, map paint, animated grass and original occlusion. Do not pursue procedural `app.js` as the replacement game. Old model experiment still exists at `procedural.html`.
+
+**New public default** `experiments/three/index.html` (alias `parity.html`) loads the actual **47 original game scripts** and their exact authored map; it includes an "Оригинал / Three.js" toggle. It always opens with the original rendering. The module `parity.js` swaps only `GL.flush`; `three-glyphs.js` is a real Three.WebGLRenderer rasterizing existing `GB.buf` glyph instances via instanced geometry and original `SPF` sprite UV texture/`GB.atlasCv` glyph atlas. This ensures ALL source animation/environment/gameplay comes from the actual game, not invented 3D geometry. It has a safe fallback to original on Three errors. DO NOT assert actual Three 1:1 parity yet — measure it.
+
+**Quality gates**:
+- `tools/check/three-source-sync.cjs` ensures parity pages load all source scripts in the original order.
+- `tools/check/three-parity.cjs` uses real Playwright Chromium software WebGL2 and frozen same-game-state screenshots to check original/Three switching, map immutability, and restoration.
+- `tools/check/three-pixel-parity.py` measures visible errors and guards against catastrophic blank output. It does not yet declare full pixel equality.
+- Previous malformed CSS link was detected in browser smoke and fixed in both parity pages; never rely on syntax only for visual QA.
+- Next: resolve differences in GL data uploads, alpha premultiplication, sprite UV orientation, colorspace and blend order, then capture screenshot diffs on original vs Three at same frame, iPhone/iPad Safari real devices.
+- Keep PR #37 draft; absolutely no main or map modifications.
+
+See `experiments/three/PARITY_MIGRATION.md`.
