@@ -18,6 +18,34 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .hud kbd { font-family: inherit; color: var(--ink); }
 .stats { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; text-align: right; pointer-events: none; line-height: 1.5; white-space: pre; }
 
+/* Navigation only: the experimental engine runs on a separate branch.
+   Keep the original renderer, gameplay and source artwork completely intact. */
+.engine-preview-link {
+  position: fixed;
+  z-index: 12;
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  bottom: calc(75px + env(safe-area-inset-bottom, 0px));
+  padding: 9px 11px;
+  border: 1px solid #343434;
+  background: rgba(12, 12, 12, .86);
+  color: #d6d6d6;
+  text-decoration: none;
+  font: 500 12px/1.3 var(--ui);
+  white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.engine-preview-link:hover, .engine-preview-link:focus-visible {
+  color: var(--ink);
+  border-color: #909090;
+}
+@media (max-width: 640px) {
+  .engine-preview-link {
+    right: calc(10px + env(safe-area-inset-right, 0px));
+    bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* Map editor (only with ?edit): a panel on the right in the HUD's look, and a button to open it. */
 [hidden] { display: none !important; }
 .ed-open { position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding: 8px 10px; background: var(--hud); border: 1px solid var(--line); color: var(--ink); font: 500 12px/1 var(--ui); cursor: pointer; }
