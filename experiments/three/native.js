@@ -34,7 +34,9 @@ function flushNative(camx,camy,castle){
 
 try{
   backend=new ThreeGlyphBackend(fallbackCanvas);
-  if(!backend.renderer.capabilities.isWebGL2)
+  const gl=backend.renderer.getContext();
+  if(typeof WebGL2RenderingContext==='undefined'||
+     !(gl instanceof WebGL2RenderingContext))
     throw Error('Native renderer needs WebGL2');
   backend.show(true);
   fallbackCanvas.style.visibility='hidden';
