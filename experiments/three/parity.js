@@ -419,6 +419,26 @@ window.__ASCII_PARITY__={
 };
 selectMode('legacy');
 
+// Optional on-device measurements, never active in the ordinary game.
+// Includes vsync-capped RAF p50/p95 and actual JS submit timings. This is
+// the only way to collect genuine iPad/iPhone/desktop performance evidence.
+if(new URLSearchParams(location.search).get('profile')==='1'){
+  const readyForProfile=()=>{
+    if(!GB.atlasCv||!W||!H){
+      requestAnimationFrame(readyForProfile);return;
+    }
+    if(!selectMode('three'))return;
+    import('./device-profiler.mjs').then(m=>m.installDeviceProfiler({
+      getStats:()=>backend?.stats||null,
+      durationMs:new URLSearchParams(location.search).has('profileTest')?900:10000
+    })).catch(e=>{
+      console.error('Native Three device profiling failed',e);
+      safeStatus('Измерение кадров недоступно: '+e.message);
+    });
+  };
+  requestAnimationFrame(readyForProfile);
+}
+
 // Dedicated opt-in geometry inspection mode. Never enters the pixel-perfect
 // original / Three glyph comparison unless explicitly requested in the URL.
 // It builds meshes from the REAL raycast source and is not the game's renderer.
