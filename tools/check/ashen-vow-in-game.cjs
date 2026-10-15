@@ -72,6 +72,17 @@ fs.mkdirSync(output,{recursive:true});
    // Capture actual source player, source world, native glyphs (not the lab).
    await page.addStyleTag({content:'.hud,.stats,.ed,.ed-open{visibility:hidden!important}'});
    await shot('idle');
+   if(!(idle.bones>=20&&idle.skinnedMeshes>=3))
+     throw Error('Expected genuine multi-bone skinned 3D model: '+idle.bones+'/'+idle.skinnedMeshes);
+   if(!mobile){
+     // Also inspect the narrow ivory mask from the actual source game camera,
+     // not only the rear cloak at the map's north-facing spawn.
+     await page.evaluate(()=>{player.d8=0;});
+     await page.waitForTimeout(450);
+     await shot('face-front-in-game');
+     await page.evaluate(()=>{player.d8=4;});
+     await page.waitForTimeout(250);
+   }
    await page.waitForTimeout(350);
    if(!mobile){
      await page.keyboard.down('d');
