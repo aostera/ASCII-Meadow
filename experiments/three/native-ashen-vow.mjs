@@ -102,6 +102,8 @@ export class NativeKnightGlyphs {
       onLoad: rig => {
         this.stats.loaded = true;
         this.stats.geometry='Ashen Vow v12 original 3D mesh';
+        this.stats.bones=rig.userData.gltf.bones;
+        this.stats.skinnedMeshes=rig.userData.gltf.skinnedMeshes;
         this.stats.clips = ['Idle','Walk','Run','Jump'];
       },
       onError: err => { this.stats.error = String(err?.message || err); }
