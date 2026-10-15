@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-const ASSET="https://d2ol7oe51mr4n9.cloudfront.net/user_3DREk3h2KN9SwfHIFei2XoVxjD4/2dbd388d-14db-478a-8527-b8f74dd083ee.glb";
+const ASSET="https://d2ol7oe51mr4n9.cloudfront.net/user_3DREk3h2KN9SwfHIFei2XoVxjD4/e3c7aa2f-366a-4e54-9ec6-ee121ad3d8b6.glb";
 const $=id=>document.getElementById(id);
 const stage=$('stage');let renderer;
 try{
