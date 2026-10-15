@@ -196,6 +196,19 @@ window.__ASCII_NATIVE__={
     hasGpu:!!backend&&!backend.lost&&GL.ok
   }},
   get nativeDepth(){return depthPass?.stats||{frames:0,builds:0,visible:false,activeActors:0}},
+  // Test-only GPU readback: captures the depth-pass *colour* target after a
+  // physical scene render. Unlike reading actor RGB, this proves that moving
+  // branch geometry changes real pixels even in a dense thicket where another
+  // shrub still fully occludes the NPC. Not reachable without explicit query.
+  readNativeDepthForTest(){
+    if(!new URLSearchParams(location.search).has('nativeDepthTest')||
+       !depthPass?.target||!backend?.renderer||!depthPass.stats.visible)
+      return null;
+    const target=depthPass.target,width=target.width,height=target.height;
+    const pixels=new Uint8Array(width*height*4);
+    backend.renderer.readRenderTargetPixels(target,0,0,width,height,pixels);
+    return {width,height,pixels};
+  },
   get greyEditor(){return editorModels?.stats||{enabled:false,frames:0,sites:[]}},
   // Strictly test-scoped: prove an actual GPU occlusion difference without
   // needing any user-facing renderer toggle or laboratory overlay.
