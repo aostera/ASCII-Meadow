@@ -166,6 +166,13 @@ fs.mkdirSync(dir,{recursive:true});
      await page.waitForFunction(initialYaw=>MEADOW_MAP.ruins===null||
        Math.abs(ruinSites()[1].yaw-initialYaw)<.001,
        before.yaw,{timeout:90000});
+     // Undo clears selection. Choose the building again before clicking
+     // the control, exactly as the real editor interaction requires.
+     await page.evaluate(()=>{
+       ED.tool='select';ED.sel={kind:'ruins',mi:1};edSyncUI();
+     });
+     await page.waitForFunction(()=>
+       document.querySelector('.native-grey-rotation')?.hidden===false);
      await touchButton.click();
      if(await touchButton.getAttribute('aria-pressed')!=='false')
        throw Error('Touch rotation mode did not disable');
