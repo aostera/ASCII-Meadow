@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-const ASSET="https://d2ol7oe51mr4n9.cloudfront.net/user_3DREk3h2KN9SwfHIFei2XoVxjD4/a2504ebd-0b7c-41a4-b25b-0b14ffee6669.glb";
+const ASSET="https://d2ol7oe51mr4n9.cloudfront.net/user_3DREk3h2KN9SwfHIFei2XoVxjD4/b469dfb7-fc09-4571-b132-2e8eca1aa71c.glb";
 const $=id=>document.getElementById(id);
 const stage=$('stage');let renderer;
 try{
@@ -62,7 +62,7 @@ loader.load(ASSET,gltf=>{
  });
  repaint();
  $('load').textContent='GLB загружен · '+Math.round(triangles).toLocaleString('ru-RU')+' треугольников, '+meshes+' деталей';
- window.__ASHEN_REFERENCE__={ready:true,meshCount:meshes,triangles,gameIntegrated:false,hasRig:false,version:'v11',model};
+ window.__ASHEN_REFERENCE__={ready:true,meshCount:meshes,triangles,gameIntegrated:false,hasRig:false,version:'v12',model};
 },e=>{
  if(e?.total>0)$('load').textContent='Загрузка GLB '+Math.round(e.loaded/e.total*100)+'%';
 },e=>{
