@@ -11,3 +11,5 @@ print("TRIPO_ANIM_FAILURE_DIAG_JSON",json.dumps({
   "output":{k:v for k,v in (d.get("output") or {}).items() if "url" not in k.lower()},
   "extra_keys":list(d.keys())
 },ensure_ascii=False))
+
+# Safe read-only diagnostic triggered after workflow installation.
