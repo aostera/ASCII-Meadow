@@ -174,8 +174,18 @@ function setClip(name){
 }
 $('clips').onclick=e=>{const b=e.target.closest('[data-clip]');if(b)setClip(b.dataset.clip);};
 $('pause').onclick=()=>{playing=!playing;$('pause').textContent=playing?'Пауза':'Продолжить';};
-$('skeleton').onclick=()=>{skeleton.visible=!skeleton.visible;
- $('skeleton').classList.toggle('active',skeleton.visible);};
+$('skeleton').onclick=()=>{
+ if(!shell.mesh.visible)return; // skeleton-only mode already shows the bones
+ skeleton.visible=!skeleton.visible;
+ $('skeleton').classList.toggle('active',skeleton.visible);
+};
+$('onlyBones').onclick=()=>{
+ const next=shell.mesh.visible;
+ shell.mesh.visible=!next;
+ skeleton.visible=next;
+ $('skeleton').classList.toggle('active',false);
+ $('onlyBones').classList.toggle('active',next);
+};
 $('spin').onclick=()=>{controls.autoRotate=!controls.autoRotate;
  $('spin').classList.toggle('active',controls.autoRotate);};
 $('reset').onclick=()=>{camera.position.set(...initialCamera);controls.target.set(0,1.035,0);controls.update();};
@@ -217,6 +227,6 @@ window.__ASHEN_GLYPH_RIG__={
  get clip(){return current;},get frame(){return frame;},
  get boneCount(){return Object.keys(bones).length;},
  get ready(){return shell.glyphCount>2300&&Object.keys(bones).length>=28;},
- get debugVisible(){return skeleton.visible;},
+ get debugVisible(){return skeleton.visible;},get shellVisible(){return shell.mesh.visible;},
  get samplesWorld(){return shell.mesh.geometry.attributes.aWorld.array;}
 };
