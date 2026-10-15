@@ -80,6 +80,14 @@ export class NativeTreeDepth{
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.scene.add(this.mesh);
     this.matrix=new THREE.Matrix4();
+    // Recycle transform scratch storage: deadwood can have thousands of
+    // segments, so allocating Vector3/Quaternion per frame causes mobile GC.
+    this.deadA=new THREE.Vector3();
+    this.deadB=new THREE.Vector3();
+    this.deadDirection=new THREE.Vector3();
+    this.deadCentre=new THREE.Vector3();
+    this.deadScale=new THREE.Vector3();
+    this.deadRotation=new THREE.Quaternion();
     this.cache=new Map();
     this.generation=-1;
     this.stats={trees:0,deadTrees:0,deadSegments:0,woodInstances:0,leafInstances:0,instances:0};
@@ -120,23 +128,25 @@ export class NativeTreeDepth{
         const originX=-Math.round(tree.x)*CW;
         const originY=-tree.br*CH*c,originZ=-tree.br*CH*sin;
         const lean=(tree.sw||0)*6, height=Math.max(1,tree.v.crownH);
-        const toWorld=(x,y,z)=>{
+        const toWorld=(out,x,y,z)=>{
           const hf=clamp(-y/height,0,1);
           const sx=x+lean*hf*Math.sqrt(hf);
-          return new THREE.Vector3(originX-sx,
-            originY+(-y-z*sin)/c,originZ+z);
+          return out.set(originX-sx,originY+(-y-z*sin)/c,originZ+z);
         };
         let drawn=0;
         for(const [ax,ay,bx,by,w,z] of strokes){
           if(count>=this.capacity)break;
-          const a=toWorld(ax,ay,z),b=toWorld(bx,by,z);
-          const delta=b.clone().sub(a),length=delta.length();
+          const a=toWorld(this.deadA,ax,ay,z);
+          const b=toWorld(this.deadB,bx,by,z);
+          const direction=this.deadDirection.subVectors(b,a);
+          const length=direction.length();
           if(length<.00001)continue;
           const radius=Math.max(fd.fcw*.48,w*.5);
-          const rot=new THREE.Quaternion().setFromUnitVectors(
-            UP,delta.multiplyScalar(1/length));
-          this.matrix.compose(a.add(b).multiplyScalar(.5),rot,
-            new THREE.Vector3(radius,length*.5+radius,radius));
+          this.deadRotation.setFromUnitVectors(
+            UP,direction.multiplyScalar(1/length));
+          this.deadCentre.addVectors(a,b).multiplyScalar(.5);
+          this.deadScale.set(radius,length*.5+radius,radius);
+          this.matrix.compose(this.deadCentre,this.deadRotation,this.deadScale);
           this.mesh.setMatrixAt(count++,this.matrix);
           drawn++;
         }
