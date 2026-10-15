@@ -103,9 +103,9 @@ fs.mkdirSync(dir,{recursive:true});
      Math.abs(ruinSites()[1].yaw-75*Math.PI/180)<.001,
      undefined,{timeout:90000});
    await page.evaluate(()=>edUndo());
-   await page.waitForFunction(()=>MEADOW_MAP.ruins===null||
-     Math.abs(ruinSites()[1].yaw-before.yaw)<.001,
-     undefined,{timeout:90000});
+   await page.waitForFunction(initialYaw=>MEADOW_MAP.ruins===null||
+     Math.abs(ruinSites()[1].yaw-initialYaw)<.001,
+     before.yaw,{timeout:90000});
    // Direct rotation by touching the actual grey ruin IN THE MAP.
    // Keep this distinct from the slider: Alt-drag must generate a single
    // normal source editor undo entry, and never drag the ruin's world position.
@@ -127,9 +127,37 @@ fs.mkdirSync(dir,{recursive:true});
      Math.abs(ruinSites()[1].yaw-before.yaw)>.08,
      undefined,{timeout:90000});
    await page.evaluate(()=>edUndo());
-   await page.waitForFunction(()=>MEADOW_MAP.ruins===null||
-     Math.abs(ruinSites()[1].yaw-before.yaw)<.001,
-     undefined,{timeout:90000});
+   await page.waitForFunction(initialYaw=>MEADOW_MAP.ruins===null||
+     Math.abs(ruinSites()[1].yaw-initialYaw)<.001,
+     before.yaw,{timeout:90000});
+   if(mobile){
+     // Verify the browser's native touch pointer handler without keyboard.
+     // The first tap must select a ruin; gestures are explicitly opt-in.
+     const touchButton=page.locator('.native-grey-map-drag');
+     await touchButton.click();
+     if(await touchButton.getAttribute('aria-pressed')!=='true')
+       throw Error('Touch rotation mode was not enabled');
+     await page.evaluate(({x,y})=>{
+       const cv=document.querySelector('#c');
+       const opts={bubbles:true,cancelable:true,button:0,
+         pointerType:'touch',pointerId:91,clientX:x,clientY:y};
+       cv.dispatchEvent(new PointerEvent('pointerdown',opts));
+       window.dispatchEvent(new PointerEvent('pointermove',{
+         ...opts,clientX:x+90}));
+       window.dispatchEvent(new PointerEvent('pointerup',{
+         ...opts,clientX:x+90}));
+     },point);
+     await page.waitForFunction(initialYaw=>
+       Math.abs(ruinSites()[1].yaw-initialYaw)>.08,
+       before.yaw,{timeout:90000});
+     await page.evaluate(()=>edUndo());
+     await page.waitForFunction(initialYaw=>MEADOW_MAP.ruins===null||
+       Math.abs(ruinSites()[1].yaw-initialYaw)<.001,
+       before.yaw,{timeout:90000});
+     await touchButton.click();
+     if(await touchButton.getAttribute('aria-pressed')!=='false')
+       throw Error('Touch rotation mode did not disable');
+   }
    const restored=await page.evaluate(()=>({
      map:JSON.stringify(MEADOW_MAP),
      editor:window.__ASCII_NATIVE__.greyEditor,
@@ -154,6 +182,7 @@ fs.mkdirSync(dir,{recursive:true});
      rotatedByButtonDegrees:90,
      undoWorks:true,
      directAltDragOnMap:true,
+     touchDragOnSelectedRuin:mobile,
      singleThreeContext:true,
      inMap:true,
      sourceGameIntact:true
