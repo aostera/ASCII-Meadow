@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101015">
+<title>The Ashen Vow — настоящий Tripo H3.1 в 3D</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111116;color:#eae7e5;font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif}
+#viewer{position:absolute;inset:0;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+#title{position:absolute;top:23px;left:24px;pointer-events:none;text-shadow:0 1px 6px #050507}
+#title strong{font:normal 30px/1.2 Georgia,serif;letter-spacing:.06em}
+#title small{display:block;color:#b4a9a6;margin-top:4px}
+#panel{position:absolute;top:24px;right:24px;width:min(330px,calc(100vw - 48px));padding:16px;background:#1a191fdd;border:1px solid #61565b;border-radius:14px;backdrop-filter:blur(12px)}
+#panel h2{font-size:12px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;margin:0 0 9px;color:#d4a9a1}
+#panel p{font-size:12px;color:#b6adae;margin:8px 0}
+#panel .tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+button{font:inherit;font-size:12px;padding:8px 4px;color:#eee;background:#28262b;border:1px solid #555059;border-radius:7px;cursor:pointer}
+button.active{background:#5b3d4c;border-color:#b8767e}
+a{color:#dcb8b0}
+#info{position:absolute;bottom:20px;left:24px;max-width:490px;padding-right:12px;font-size:12px;color:#b0a8ad;text-shadow:0 1px 5px #000}
+@media(max-width:700px){
+#title{top:12px;left:14px}#title strong{font-size:19px}#title small{font-size:10px}
+#viewer{bottom:31dvh}
+#panel{top:auto;bottom:0;right:0;left:0;width:100%;border-radius:14px 14px 0 0;padding:12px 14px env(safe-area-inset-bottom);max-height:32dvh;overflow:auto}
+#panel h2{margin-bottom:6px}#panel p{margin:6px 0;font-size:11px}button{padding:6px 2px;font-size:11px}
+#info{left:14px;bottom:calc(32dvh + 10px);font-size:10px;max-width:64vw}
+}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="viewer"></div>
+<div id="title"><strong>THE ASHEN VOW</strong><small>Tripo H3.1 · реальная геометрия · без текстур</small></div>
+<section id="panel">
+ <h2>Просмотр модели Tripo</h2>
+ <div class="tools">
+ <button id="front">Спереди</button><button id="side">Сбоку</button><button id="back">Сзади</button>
+ <button id="turn">Вращение</button><button id="wire">Сетка</button><button id="reset">Сбросить</button>
+ </div>
+ <p id="status">Загружается настоящий GLB Tripo...</p>
+ <p>Это <b>оригинальная Tripo H3.1 генерация в облегчённой геометрии</b>, не прежний V12 и не нарисованный эскиз. Текстур, рига и анимаций здесь нет.</p>
+ <p><a href="https://github.com/aostera/ASCII-Meadow/actions/runs/38779571617" target="_blank" rel="noopener">Оригинальный GLB и задача Tripo</a></p>
+</section>
+<div id="info">Вращай пальцем или мышью · двумя пальцами или колесом приближай.</div>
+<script type="module" src="./ashen-tripo-viewer.js"></script>
+</body>
+</html>
