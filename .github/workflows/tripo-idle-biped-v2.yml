@@ -1,0 +1,28 @@
+name: Tripo Ashen Vow V2 - Explicit biped IDLE last compatibility test
+on:
+  push:
+    branches: [feat/tripo-ashen-rig-ready]
+    paths: [tools/tripo/approvals/idle-biped-v2.json]
+permissions: {contents: read}
+concurrency:
+  group: ashen-vow-tripo-v2-biped-idle-once
+  cancel-in-progress: false
+jobs:
+  idle:
+    if: github.event.head_commit.message == 'TRIPO_APPROVE_BIPED_IDLE_V2_10_CREDITS' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: ONE minimal Tripo idle retarget, max 10 credits
+        env:
+          TRIPO_API_KEY: ${{ secrets.TRIPO }}
+        run: python tools/tripo/tripo_idle_biped_v2.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ashen-tripo-v2-BIPED-IDLE-skeletal
+          path: artifacts/tripo-ashen-v2-biped-idle/
+          if-no-files-found: warn
