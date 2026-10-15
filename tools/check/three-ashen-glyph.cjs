@@ -65,8 +65,12 @@ fs.mkdirSync(out,{recursive:true});
      await page.locator('#side').click();
      await page.waitForTimeout(150);
      await page.screenshot({path:path.join(out,'desktop-side.png'),fullPage:true});
-     await page.locator('#skeleton').click();
+     await page.locator('#onlyBones').click();
+     assert.equal(await page.evaluate(()=>window.__ASHEN_GLYPH_RIG__.shellVisible),false,'Skeleton-only must hide glyphs');
+     assert.equal(await page.evaluate(()=>window.__ASHEN_GLYPH_RIG__.debugVisible),true);
      await page.screenshot({path:path.join(out,'desktop-skeleton.png'),fullPage:true});
+     await page.locator('#onlyBones').click();
+     assert.equal(await page.evaluate(()=>window.__ASHEN_GLYPH_RIG__.shellVisible),true);
    }
    if(errors.length)throw Error('WebGL errors: '+errors.join(' | '));
    console.log((phone?'Phone':'Desktop')+' OK '+JSON.stringify(stats).slice(0,250));
