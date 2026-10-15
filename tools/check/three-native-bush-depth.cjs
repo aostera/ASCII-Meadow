@@ -31,7 +31,22 @@ fs.mkdirSync(out,{recursive:true});
       const result=await page.evaluate(()=>{
         const n=window.__ASCII_NATIVE__,mapBefore=JSON.stringify(MEADOW_MAP);
         const npc=npcs.find(x=>x.actorType==='villager');
-        const bushes=flora.filter(x=>x.v.type==='bush'&&x.v.R>8);
+        // Dense thickets may legitimately hide the entire NPC even
+        // while moving. Test an isolated source bush first, where motion
+        // must open a visible slit instead of a second shrub filling it.
+        const bushes=flora.filter(x=>x.v.type==='bush'&&x.v.R>8)
+          .map(b=>{
+            let separation=Infinity;
+            for(const f of flora){
+              if(f===b||f.v.type==='lily')continue;
+              const dx=(b.x-f.x)*CW,dy=(b.br-f.br)*CH;
+              const clear=Math.hypot(dx,dy)-(b.v.R+f.v.R)*.8;
+              separation=Math.min(separation,clear);
+            }
+            return {b,separation};
+          })
+          .sort((a,b)=>b.separation-a.separation)
+          .map(x=>x.b);
         if(!npc||bushes.length<3)
           throw Error('Missing authored bushes or native NPC');
         const saveNpc={x:npc.x,y:npc.y,tx:npc.tx,ty:npc.ty,
