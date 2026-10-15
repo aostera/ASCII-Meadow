@@ -57,7 +57,17 @@ fs.mkdirSync(out,{recursive:true});
    await page.locator('#skeleton').click();
    await page.locator('[data-clip="idle"]').click();
    await page.waitForTimeout(250);
+   await page.screenshot({path:path.join(out,phone?'phone-back.png':'desktop-back.png'),fullPage:true});
+   await page.locator('#front').click();
+   await page.waitForTimeout(150);
    await page.screenshot({path:path.join(out,phone?'phone.png':'desktop.png'),fullPage:true});
+   if(!phone){
+     await page.locator('#side').click();
+     await page.waitForTimeout(150);
+     await page.screenshot({path:path.join(out,'desktop-side.png'),fullPage:true});
+     await page.locator('#skeleton').click();
+     await page.screenshot({path:path.join(out,'desktop-skeleton.png'),fullPage:true});
+   }
    if(errors.length)throw Error('WebGL errors: '+errors.join(' | '));
    console.log((phone?'Phone':'Desktop')+' OK '+JSON.stringify(stats).slice(0,250));
    await context.close();
