@@ -31,10 +31,14 @@ fs.mkdirSync(dir,{recursive:true});
      undefined,{timeout:100000});
    const scene=await page.evaluate(()=>{
      const source=JSON.stringify(MEADOW_MAP);
+     // The legacy map's v1 format omits "actors"; undo correctly normalizes
+     // that missing key to null in memory. The user-facing map export must
+     // remain byte-for-byte identical across undo, not the internal object.
+     const exported=mapFileText(),snapshot=JSON.stringify(mapSnapshot());
      openEditor();
      ED.tool='select';ED.sel={kind:'ruins',mi:1};edSyncUI();
      // Source map remains unchanged until user actually rotates.
-     return {source,editing,sites:ruinSites().map(r=>r.id),
+     return {source,exported,snapshot,editing,sites:ruinSites().map(r=>r.id),
        rootVisible:!ED.ui.root.hidden};
    });
    if(!scene.editing||scene.sites.length!==3||!scene.rootVisible)
@@ -103,9 +107,9 @@ fs.mkdirSync(dir,{recursive:true});
      Math.abs(ruinSites()[1].yaw-75*Math.PI/180)<.001,
      undefined,{timeout:90000});
    await page.evaluate(()=>edUndo());
-   await page.waitForFunction(()=>MEADOW_MAP.ruins===null||
-     Math.abs(ruinSites()[1].yaw-before.yaw)<.001,
-     undefined,{timeout:90000});
+   await page.waitForFunction(initialYaw=>MEADOW_MAP.ruins===null||
+     Math.abs(ruinSites()[1].yaw-initialYaw)<.001,
+     before.yaw,{timeout:90000});
    // Direct rotation by touching the actual grey ruin IN THE MAP.
    // Keep this distinct from the slider: Alt-drag must generate a single
    // normal source editor undo entry, and never drag the ruin's world position.
@@ -123,20 +127,65 @@ fs.mkdirSync(dir,{recursive:true});
    await page.mouse.move(point.x+74,point.y,{steps:6});
    await page.mouse.up();
    await page.keyboard.up('Alt');
-   await page.waitForFunction(()=>
-     Math.abs(ruinSites()[1].yaw-before.yaw)>.08,
-     undefined,{timeout:90000});
+   await page.waitForFunction(initialYaw=>
+     Math.abs(ruinSites()[1].yaw-initialYaw)>.08,
+     before.yaw,{timeout:90000});
    await page.evaluate(()=>edUndo());
-   await page.waitForFunction(()=>MEADOW_MAP.ruins===null||
-     Math.abs(ruinSites()[1].yaw-before.yaw)<.001,
-     undefined,{timeout:90000});
+   await page.waitForFunction(initialYaw=>MEADOW_MAP.ruins===null||
+     Math.abs(ruinSites()[1].yaw-initialYaw)<.001,
+     before.yaw,{timeout:90000});
+   if(mobile){
+     // Undo may clear the editor's selection; select the intended ruin
+     // explicitly before entering the guarded touch-rotation mode.
+     await page.evaluate(()=>{
+       ED.tool='select';ED.sel={kind:'ruins',mi:1};edSyncUI();
+     });
+     await page.waitForFunction(()=>
+       window.__ASCII_NATIVE__.greyEditor.selected==='abbey-front'&&
+       document.querySelector('.native-grey-map-drag')?.offsetWidth>0);
+     // Verify the browser's native touch pointer handler without keyboard.
+     // The first tap must select a ruin; gestures are explicitly opt-in.
+     const touchButton=page.locator('.native-grey-map-drag');
+     await touchButton.click();
+     if(await touchButton.getAttribute('aria-pressed')!=='true')
+       throw Error('Touch rotation mode was not enabled');
+     await page.evaluate(({x,y})=>{
+       const cv=document.querySelector('#c');
+       const opts={bubbles:true,cancelable:true,button:0,
+         pointerType:'touch',pointerId:91,clientX:x,clientY:y};
+       cv.dispatchEvent(new PointerEvent('pointerdown',opts));
+       window.dispatchEvent(new PointerEvent('pointermove',{
+         ...opts,clientX:x+90}));
+       window.dispatchEvent(new PointerEvent('pointerup',{
+         ...opts,clientX:x+90}));
+     },point);
+     await page.waitForFunction(initialYaw=>
+       Math.abs(ruinSites()[1].yaw-initialYaw)>.08,
+       before.yaw,{timeout:90000});
+     await page.evaluate(()=>edUndo());
+     await page.waitForFunction(initialYaw=>MEADOW_MAP.ruins===null||
+       Math.abs(ruinSites()[1].yaw-initialYaw)<.001,
+       before.yaw,{timeout:90000});
+     // Undo clears selection. Choose the building again before clicking
+     // the control, exactly as the real editor interaction requires.
+     await page.evaluate(()=>{
+       ED.tool='select';ED.sel={kind:'ruins',mi:1};edSyncUI();
+     });
+     await page.waitForFunction(()=>
+       document.querySelector('.native-grey-rotation')?.hidden===false);
+     await touchButton.click();
+     if(await touchButton.getAttribute('aria-pressed')!=='false')
+       throw Error('Touch rotation mode did not disable');
+   }
    const restored=await page.evaluate(()=>({
      map:JSON.stringify(MEADOW_MAP),
+     snapshot:JSON.stringify(mapSnapshot()),
+     exported:mapFileText(),
      editor:window.__ASCII_NATIVE__.greyEditor,
      native:window.__ASCII_NATIVE__.mode
    }));
-   if(restored.map!==scene.source)
-     throw Error(label+' rotating grey model broke editor undo source map');
+   if(restored.snapshot!==scene.snapshot||restored.exported!==scene.exported)
+     throw Error(label+' rotating grey model broke editor undo source map export');
    await page.locator('.native-grey-switch input').uncheck();
    await page.waitForFunction(()=>
      window.__ASCII_NATIVE__.greyEditor.enabled===false,
@@ -154,6 +203,7 @@ fs.mkdirSync(dir,{recursive:true});
      rotatedByButtonDegrees:90,
      undoWorks:true,
      directAltDragOnMap:true,
+     touchDragOnSelectedRuin:mobile,
      singleThreeContext:true,
      inMap:true,
      sourceGameIntact:true

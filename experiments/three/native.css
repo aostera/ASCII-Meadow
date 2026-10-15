@@ -63,6 +63,16 @@ html,body { overscroll-behavior: none; }
   touch-action:manipulation;
 }
 .native-grey-buttons button:hover { background:#353535; }
+.native-grey-map-drag {
+  width:100%;padding:9px 8px;
+  border:1px solid #727272;background:#292929;color:#e4e4e4;
+  font:500 12px/1.3 var(--ui);cursor:pointer;
+  touch-action:manipulation;
+}
+.native-grey-map-drag[aria-pressed="true"] {
+  background:#494949;border-color:#e0e0e0;
+}
+.native-grey-map-drag:focus-visible { outline:2px solid #eee;outline-offset:2px; }
 @media(max-width:650px){
   .native-grey-editor {
     width:min(236px,calc(100vw - 18px));

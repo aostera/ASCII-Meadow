@@ -34,7 +34,13 @@ fs.mkdirSync(out,{recursive:true});
     assert.equal(value,clip,'Clip switch failed');
    }
    await page.locator('[data-clip="walk"]').click();
-   await page.waitForTimeout(500);
+   // SwiftShader on a simulated phone can spend >500 ms drawing a single
+   // detailed character frame. Check actual progress instead of imposing
+   // a wall-clock delay that incorrectly fails healthy animation.
+   await page.waitForFunction(()=>{
+     const progress=Number(document.querySelector('#scrub')?.value);
+     return window.__ASHEN_VOW__?.playing&&progress>0;
+   },undefined,{timeout:60000,polling:100});
    const animatedProgress=Number(await page.locator('#scrub').inputValue());
    assert(animatedProgress>0,'Animation timeline did not run');
    await page.locator('#pause').click();

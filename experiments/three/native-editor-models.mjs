@@ -61,7 +61,8 @@ export class NativeGreyMapEditor {
           <button type="button" data-rotate="15">↷ +15°</button>
           <button type="button" data-reset="1">0°</button>
         </div>
-        <div class="native-grey-note">Перетаскивайте ползунок или используйте [ ] для шага 15°. Изменение попадёт в экспорт карты.</div>
+        <button type="button" class="native-grey-map-drag" aria-pressed="false">Вращать на карте касанием</button>
+        <div class="native-grey-note">Ползунок и [ ] вращают выбранное здание. На телефоне включите поворот касанием и проведите по модели; изменения попадут в экспорт карты.</div>
       </div>`;
     document.body.append(panel);
     this.panel=panel;
@@ -69,6 +70,14 @@ export class NativeGreyMapEditor {
     this.rotation=panel.querySelector('.native-grey-rotation');
     this.slider=panel.querySelector('input[type=range]');
     this.angle=panel.querySelector('output');
+    this.touchRotateEnabled=false;
+    this.mapDragButton=panel.querySelector('.native-grey-map-drag');
+    this.mapDragButton.addEventListener('click',()=>{
+      this.touchRotateEnabled=!this.touchRotateEnabled;
+      this.mapDragButton.setAttribute('aria-pressed',String(this.touchRotateEnabled));
+      this.mapDragButton.textContent=this.touchRotateEnabled
+        ?'Поворот касанием: включён':'Вращать на карте касанием';
+    });
     this.switch.addEventListener('change',()=>{
       this.active=this.switch.checked;
       this.refreshUi();
@@ -105,8 +114,9 @@ export class NativeGreyMapEditor {
         e.stopPropagation();
     });
   }
-  // Restore direct model rotation *on the map* (Alt+drag / Shift+drag),
-  // which the source editor replaced with only a 15-degree bracket control.
+  // Restore direct model rotation *on the map* (Alt/Shift-drag on
+  // desktop, opt-in one-finger drag on a selected ruin on touch devices).
+  // Normal map touch gestures remain unchanged with the toggle off.
   // Install a native-only delegate after removing that same source handler
   // from the capture phase; ordinary painting, dragging, zooming, placement
   // and undo pass through untouched to edPointer.
@@ -135,7 +145,8 @@ export class NativeGreyMapEditor {
       }
       if(e.type==='pointerdown'&&this.active&&
          this.controller.isEditing()&&e.target===cv&&e.button===0&&
-         (e.altKey||e.shiftKey)){
+         (e.altKey||e.shiftKey||
+          (this.touchRotateEnabled&&e.pointerType==='touch'))){
         // Prioritize actual grey 3D buildings over grass/flowers at their
         // feet; the normal source picker remains authoritative for plain
         // clicks and dragging all other map objects.
@@ -143,7 +154,12 @@ export class NativeGreyMapEditor {
           Math.abs(e.clientX-o.sx)<o.r&&
           e.clientY<o.sy+CH*1.5*VZ&&
           e.clientY>o.sy-o.top).sort((a,b)=>b.sy-a.sy)[0];
-        if(hovered){
+        // Touch requires a PRESELECTED ruin: an accidental swipe across
+        // another building must not rotate it or hijack normal panning.
+        const touchDrag=this.touchRotateEnabled&&e.pointerType==='touch'&&
+          !e.altKey&&!e.shiftKey;
+        if(hovered&&(!touchDrag||
+          (ED.sel?.kind==='ruins'&&ED.sel.mi===hovered.mi))){
           ED.tool='select';ED.sel={kind:'ruins',mi:hovered.mi};
           edSyncUI();this.refreshUi();
           const r=this.controller.selectedRuin();
