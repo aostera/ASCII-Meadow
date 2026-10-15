@@ -1,0 +1,28 @@
+name: Tripo Ashen Vow V2 - ONE sword-free geometry task
+on:
+  push:
+    branches: [feat/tripo-ashen-rig-ready]
+    paths: [tools/tripo/approvals/model-v2.json]
+permissions: {contents: read}
+concurrency:
+  group: tripo-ashen-v2-single-geometry-task
+  cancel-in-progress: false
+jobs:
+  create-model:
+    if: github.event.head_commit.message == 'TRIPO_APPROVE_RIG_MODEL_V2_20_CREDITS' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 27
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: ONE Tripo H3.1 standard geometry, max 20 credits, no texture/no rig
+        env:
+          TRIPO_API_KEY: ${{ secrets.TRIPO }}
+        run: python tools/tripo/tripo_rig_model_v2.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ashen-tripo-rig-v2-model-source-glb
+          path: artifacts/tripo-ashen-rig-v2-model/
+          if-no-files-found: warn
