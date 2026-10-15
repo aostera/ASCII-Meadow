@@ -8,8 +8,7 @@
 // All source map, collision, input, editor and native renderer code stay intact.
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 
-export const ASHEN_GLB_URL=
-  'https://d2ol7oe51mr4n9.cloudfront.net/user_3DREk3h2KN9SwfHIFei2XoVxjD4/b469dfb7-fc09-4571-b132-2e8eca1aa71c.glb';
+export const ASHEN_GLB_URL=new URL('./assets/ashen-vow/ashen_vow_v12.glb',import.meta.url).href;
 export const ASHEN_HEIGHT=2.04;
 const HEIGHT_IN_SOURCE_UNITS=8.9;
 const LIMB={thigh:.47,shin:.47};
