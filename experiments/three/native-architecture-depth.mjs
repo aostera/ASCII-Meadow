@@ -8,6 +8,7 @@ import {createNativeSourceWorld,configureNativeCamera} from './source-world.mjs'
 import {NativeTreeDepth,pickNativeActorTrees} from './native-tree-depth.mjs';
 import {NativePropDepth,pickNativeActorProps} from './native-props-depth.mjs';
 import {NativeStoneDepth,pickNativeActorStones} from './native-stone-depth.mjs';
+import {NativeBushDepth,pickNativeActorBushes} from './native-bush-depth.mjs';
 
 export function sourceArchitectureOverlaps(rect,source,CW,CH,margin=12){
   if(!rect)return false;
@@ -27,6 +28,7 @@ export class NativeArchitectureDepth{
     this.renderer=renderer;
     this.scene=new THREE.Scene();
     this.treeDepth=new NativeTreeDepth(this.scene);
+    this.bushDepth=new NativeBushDepth(this.scene);
     this.propDepth=new NativePropDepth(this.scene,
       new THREE.MeshBasicMaterial({color:0x808080}));
     this.stoneDepth=new NativeStoneDepth(this.scene,
@@ -53,7 +55,8 @@ export class NativeArchitectureDepth{
       activeActors:0,width:0,height:0,
       treeClusters:0,deadTrees:0,deadSegments:0,treeWood:0,treeLeaves:0,
       tents:0,fences:0,propTriangles:0,stones:0,stoneVariants:0,
-      stoneTriangles:0};
+      stoneTriangles:0,bushes:0,bushWood:0,bushLeaves:0,
+      bushInstances:0,bushMoved:0};
   }
   removeWorld(){
     if(!this.world)return;
@@ -84,16 +87,21 @@ export class NativeArchitectureDepth{
       source.flora||[],actorRanges,CW,CH);
     const nearStones=pickNativeActorStones(
       source.flora||[],actorRanges,CW,CH);
+    const nearBushes=pickNativeActorBushes(
+      source.flora||[],actorRanges,CW,CH);
     this.stats.activeActors=nearArchitecture.length+nearTrees.length+
-      nearProps.length+nearStones.length;
+      nearProps.length+nearStones.length+nearBushes.length;
     this.stats.visible=false;
     this.stats.treeClusters=0;this.stats.deadTrees=0;this.stats.deadSegments=0;
     this.stats.treeWood=0;this.stats.treeLeaves=0;
     this.stats.tents=0;this.stats.fences=0;this.stats.propTriangles=0;
     this.stats.stones=0;this.stats.stoneVariants=0;
     this.stats.stoneTriangles=0;
+    this.stats.bushes=0;this.stats.bushWood=0;
+    this.stats.bushLeaves=0;this.stats.bushInstances=0;
+    this.stats.bushMoved=0;
     if(!nearArchitecture.length&&!nearTrees.length&&!nearProps.length&&
-       !nearStones.length)return null;
+       !nearStones.length&&!nearBushes.length)return null;
     // Do not pay the castle+three-ruin geometry build/draw cost when only
     // tree contact is nearby. Tree trunks and branches use one InstancedMesh.
     if(nearArchitecture.length)this.ensureWorld(source);
@@ -105,6 +113,12 @@ export class NativeArchitectureDepth{
     this.stats.deadSegments=this.treeDepth.stats.deadSegments;
     this.stats.treeWood=this.treeDepth.stats.woodInstances;
     this.stats.treeLeaves=this.treeDepth.stats.leafInstances;
+    this.bushDepth.update(source,actorRanges,CW,CH);
+    this.stats.bushes=this.bushDepth.stats.bushes;
+    this.stats.bushWood=this.bushDepth.stats.wood;
+    this.stats.bushLeaves=this.bushDepth.stats.leaves;
+    this.stats.bushInstances=this.bushDepth.stats.instances;
+    this.stats.bushMoved=this.bushDepth.stats.moved;
     this.propDepth.update(source,actorRanges,CW,CH);
     this.stats.tents=this.propDepth.stats.tents;
     this.stats.fences=this.propDepth.stats.fences;
@@ -161,6 +175,7 @@ export class NativeArchitectureDepth{
     this.disposed=true;
     this.removeWorld();
     this.treeDepth.dispose();
+    this.bushDepth.dispose();
     this.propDepth.dispose();
     this.stoneDepth.dispose();
     this.target.dispose();
