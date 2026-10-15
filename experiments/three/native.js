@@ -40,7 +40,7 @@ function flushNative(camx,camy,castle){
   try{
     const source={solids,ruinSites,ruinDetail,ruinRotateMesh,
       cathedral,ruins,WS,MS,pitch:PITCH,worldGen,
-      flora,VARS,t3Tree,campTent,campFence,campTurn,hash,knightPx,charDims,player,fbm3,vnoise};
+      flora,VARS,t3Tree,campTent,campFence,campTurn,hash,knightPx,charDims,player,fbm3,vnoise,nativeBushBranchShift};
     const ranges=GB.nativeActorRanges||[];
     if(ranges.length){
       for(const a of ranges){
