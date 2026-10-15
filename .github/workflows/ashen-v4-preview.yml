@@ -2,7 +2,7 @@ name: Ashen Vow Original 3D Sculpt V11 Preview
 
 on:
   push:
-    branches: [feat/ashen-vow-ai-sculpt-v11]
+    branches: [feat/ashen-vow-ai-sculpt-v4]
   workflow_dispatch:
 
 permissions:
@@ -14,8 +14,8 @@ jobs:
     timeout-minutes: 12
     name: ASHEN VOW / actual 3D GLB and visual inspection
     steps:
-      - uses: actions/checkout@v11
-      - uses: actions/setup-node@v11
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -32,7 +32,7 @@ jobs:
           trap 'kill $server 2>/dev/null || true' EXIT
           for i in $(seq 1 25); do curl -sf http://127.0.0.1:8181/experiments/three/ashen-sculpt-v11.html >/dev/null && break; sleep 1; done
           node tools/check/ashen-v11-viewer.cjs
-      - uses: actions/upload-artifact@v11
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ashen-vow-v11-views
