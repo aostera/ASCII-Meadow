@@ -281,6 +281,104 @@ const medal=torus(body,.055,.011,brass,-.24,.31,.208);
 medal.rotation.x=.07;orb(body,[.018,.024,.012],enamel,-.24,.31,.224);
 line(body,[[-.24,.31,.22],[-.11,.23,.24],[.08,.04,.26]],0x8e7860,.0035);
 
+
+// FINAL-ART REFINEMENT — original geometry, not purchased / generated reference GLB.
+// Keep face, mantle, thorns and the sword distinct so the camera can inspect them.
+const ivoryWear=mat(0x847e76,.11,.89), toothSteel=mat(0x77716a,.7,.45);
+const redShadow=mat(0x351519,.03,.94,THREE.DoubleSide);
+const boneFleck=mat(0xc0b5a8,.08,.85);
+function jewel(p,r,m,x,y,z){
+  const e=new THREE.Mesh(new THREE.OctahedronGeometry(r,0),m);
+  e.position.set(x,y,z);e.castShadow=true;p.add(e);return e;
+}
+// Build ornate asymmetric silhouette on top of the separate face and real crown.
+shape(head,[[-.118,.182],[-.148,.128],[-.15,-.04],[-.119,-.145],[-.091,-.117],[-.104,.125]],ivoryWear,.200,.009);
+shape(head,[[.118,.182],[.148,.128],[.15,-.04],[.119,-.145],[.091,-.117],[.104,.125]],ivoryWear,.200,.009);
+shape(head,[[-.125,.20],[-.045,.239],[.043,.243],[.127,.195],[.076,.168],[-.087,.170]],boneFleck,.209,.008);
+for (const s of [-1,1]) {
+  line(head,[[s*.056,.23,.215],[s*.098,.17,.215],[s*.121,.095,.205],[s*.113,-.055,.194]],0x625b55,.002);
+  line(head,[[s*.038,.064,.252],[s*.079,-.01,.240],[s*.064,-.09,.218]],0x686159,.0018);
+  line(head,[[s*.100,-.062,.211],[s*.071,-.137,.182]],0x867b72,.0021);
+  shape(head,[[s*.18,.23],[s*.22,.09],[s*.20,-.06],[s*.13,-.15],[s*.15,.15]],redShadow,.048,.024);
+  const crestHorn=cyl(head,.009,.028,.17,steel,s*.126,.34,-.04,5);
+  crestHorn.rotation.z=s*.51;
+  crestHorn.rotation.x=s*.09;
+  const little=jewel(head,.027,brass,s*.178,.252,.07);
+  little.rotation.z=s*.5;
+}
+shape(head,[[-.135,.302],[-.03,.337],[.08,.32],[.17,.278],[.155,.182],[.095,.21],[-.095,.23]],darkWine,.058,.026);
+line(head,[[-.048,-.13,.214],[0,-.147,.227],[.049,-.134,.215]],0x504944,.0017);
+for (let i=0;i<9;i++) {
+  const angle=-Math.PI*.7+i*Math.PI/8.7;
+  const x=Math.sin(angle)*.149,z=Math.cos(angle)*.128;
+  const spike=cyl(head,.003,.013,.069+(i%3)*.031,toothSteel,x,.36,z,5);
+  spike.rotation.z=Math.sin(angle)*.44;
+}
+// Multi-layer articulated breast plate: fluted channels and raised iron tracery.
+for (const s of [-1,1]) {
+  shape(body,[[s*.09,.29],[s*.22,.32],[s*.26,.17],[s*.174,.06],[s*.11,.12]],edge,.214,.012);
+  shape(body,[[s*.12,.14],[s*.215,.10],[s*.15,-.08],[s*.064,-.17],[s*.083,.06]],steel,.254,.012);
+  for (let k=0;k<6;k++) {
+    const a=k/5;
+    line(body,[[s*(.12+a*.11),.245,.252],[s*(.105+a*.095),.14,.270],[s*(.07+a*.08),.014,.26]],0x8c7764,.0022);
+  }
+  torus(body,.046,.007,brass,s*.216,.302,.208,Math.PI/2);
+  jewel(body,.022,bronze,s*.216,.302,.233);
+  for (let k=0;k<4;k++) {
+    jewel(pelvis,.018,brass,s*(.075+.047*k),-.085,.183);
+  }
+}
+for (let k=0;k<12;k++) {
+  const a=k*2*Math.PI/12;
+  jewel(body,.011,brass,.19*Math.sin(a),.37+.05*Math.cos(a),.048);
+}
+line(body,[[-.17,.31,.263],[0,.39,.23],[.17,.31,.263]],0x7f6c64,.005);
+line(body,[[-.13,-.12,.256],[0,-.22,.245],[.13,-.12,.256]],0x9c8871,.004);
+for(const s of [-1,1]) {
+  for(let k=0;k<6;k++){
+    const x=s*(.018+.037*k);
+    jewel(body,.011,k%3===0?brass:seam,x,-.33-(k%2)*.014,.260);
+  }
+}
+// Heavy bronze collars and armoured fingers with scratched rivets.
+for(const s of [-1,1]){
+  const shoulder=arms[s<0?'left':'right'];
+  const elbow=elbows[s<0?'left':'right'];
+  for(let k=0;k<9;k++){
+    const a=k*2*Math.PI/9;
+    jewel(shoulder,.014,brass,s*.078+Math.sin(a)*.09,-.065+Math.cos(a)*.08,.149);
+  }
+  for(let k=0;k<7;k++) {
+    const xx=-.061+k*.021;
+    line(elbow,[[xx,-.056,.112],[xx,-.25,.135]],0x95857a,.0021);
+  }
+}
+// Intricate relief on aged sword crossguard and darker central ridge.
+for(let s of [-1,1]){
+  const wing=cyl(sword,.013,.036,.115,toothSteel,s*.18,-.191,-.006,7);
+  wing.rotation.z=s*.63;
+  jewel(sword,.026,brass,s*.19,-.144,.012);
+  line(sword,[[s*.027,-.25,.026],[s*.028,-.49,.027],[s*.021,-.73,.018]],0xdbd0bf,.0025);
+}
+jewel(sword,.043,brass,0,.099,0);
+jewel(sword,.022,ivoryWear,0,-.179,.08);
+// Side-slung scabbard and weathered shoulder strap; geometry rather than shader decals.
+const scabbard=new THREE.Group();body.add(scabbard);
+scabbard.position.set(-.233,-.15,-.086);scabbard.rotation.set(.14,.24,-.25);
+cyl(scabbard,.055,.09,.76,leather,0,-.38,-.01,8);
+box(scabbard,.113,.052,.062,brass,0,-.10,0);
+box(scabbard,.102,.037,.055,brass,0,-.67,0);
+for(let k=0;k<5;k++)torus(scabbard,.056,.007,brass,0,-.21-k*.08,0,Math.PI/2);
+line(body,[[-.29,.38,.15],[-.18,.09,.275],[-.26,-.29,.17]],0x7d5144,.025);
+// Ragged cape patches, pin holes and repaired seams; dynamic main cape still moves.
+for(let i=0;i<12;i++){
+  const x=((i*13)%17)/17-.5;
+  const y=-.28-((i*23)%17)/17*.60;
+  const z= -.16-(.30+(i%5)*.004)*((y+.28)/-.6);
+  const patch=shape(body,[[x-.035,y+.050],[x+.024,y+.042],[x+.041,y-.039],[x-.03,y-.066]],i%3===0?redShadow:darkWine,z,.003);
+  patch.rotation.y=.02;
+}
+
 // Stage easings are deterministic functions of clip time; any frame can be inspected.
 const motions={idle:3.2,walk:1.05,run:.72,jump:1.20,attack:1.05,crouch:1.8,salute:1.70,turn:2.4};
 let selected='idle',playing=true,clock=0,speed=1,wireframe=false;
