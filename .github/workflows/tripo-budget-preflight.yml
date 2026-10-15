@@ -16,6 +16,7 @@ jobs:
   free-balance-and-references:
     name: Free balance check, no generation
     runs-on: ubuntu-latest
+    environment: TRIPO
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +30,7 @@ jobs:
           TRIPO_API_KEY: ${{ secrets.TRIPO_API_KEY }}
         run: |
           if [ -z "$TRIPO_API_KEY" ]; then
-            echo "::warning title=Missing TRIPO_API_KEY::GitHub Actions received an EMPTY repository secret. Check Settings > Secrets and variables > Actions > Repository secrets for this exact repository."
+            echo "::warning title=Missing TRIPO_API_KEY::GitHub Actions received an EMPTY TRIPO environment secret. Open Settings > Environments > TRIPO > Environment secrets and create TRIPO_API_KEY, then rerun free preflight."
           else
             python tools/tripo/tripo_budget.py balance
           fi
