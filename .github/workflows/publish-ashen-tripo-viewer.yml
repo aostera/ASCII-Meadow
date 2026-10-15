@@ -1,0 +1,52 @@
+name: Tripo H3.1 - publish FREE mobile 3D model viewer
+
+on:
+  push:
+    branches: [feat/ashen-tripo-in-game]
+    paths:
+      - .github/workflows/publish-ashen-tripo-viewer.yml
+      - tools/tripo/mobile_preview.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Get original already-paid Tripo GLB (NO generation, NO credits)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/ashen-tripo-paid
+          gh run download 38779571617 \
+            --repo aostera/ASCII-Meadow \
+            --name ashen-tripo-one-paid-model-or-diagnostics \
+            --dir /tmp/ashen-tripo-paid
+          find /tmp/ashen-tripo-paid -name '*.glb' -ls
+      - name: Make lightweight game viewer geometry from original (FREE)
+        run: |
+          python -m pip install --disable-pip-version-check --quiet numpy trimesh pillow
+          src="$(find /tmp/ashen-tripo-paid -name 'The_Ashen_Vow_Tripo_H3_1_Base.glb' -print -quit)"
+          test -n "$src"
+          python tools/tripo/mobile_preview.py "$src" \
+            experiments/three/assets/ashen-vow/ashen_vow_tripo_mobile.glb
+          node --check experiments/three/ashen-tripo-viewer.js
+      - name: Commit actual Tripo derived 3D model for permanent public viewer
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add experiments/three/assets/ashen-vow/ashen_vow_tripo_mobile.glb
+          if ! git diff --cached --quiet; then
+            git commit -m 'assets(three): add real Tripo H3.1 model for 360-degree browser preview'
+            git push origin HEAD:feat/ashen-tripo-in-game
+          fi
