@@ -1,0 +1,45 @@
+name: Vendor Ashen Vow Real GLB Into Game Branch
+
+on:
+  push:
+    branches: [feat/three-ashen-vow-in-game]
+    paths:
+      - .github/workflows/vendor-ashen-vow-glb.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  vendor-actual-3d-asset:
+    name: Copy owner-based 3D geometry into game assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Download checked Ashen Vow v12 GLB and validate binary
+        run: |
+          mkdir -p experiments/three/assets/ashen-vow
+          curl --fail --location --retry 3 --silent --show-error \
+            'https://d2ol7oe51mr4n9.cloudfront.net/user_3DREk3h2KN9SwfHIFei2XoVxjD4/b469dfb7-fc09-4571-b132-2e8eca1aa71c.glb' \
+            --output experiments/three/assets/ashen-vow/ashen_vow_v12.glb
+          python3 - <<'PY'
+          import os,struct
+          p='experiments/three/assets/ashen-vow/ashen_vow_v12.glb'
+          data=open(p,'rb').read(20)
+          if len(data)<12 or data[:4]!=b'glTF':raise RuntimeError('Not a real GLB')
+          _,version,size=struct.unpack('<4sII',data[:12])
+          if version!=2 or size<1000000 or size!=os.path.getsize(p):
+            raise RuntimeError(f'Bad GLB version/size {version} {size}')
+          print('Verified binary game asset:',p,'size',size)
+          PY
+      - name: Commit real mesh file into feature branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add experiments/three/assets/ashen-vow/ashen_vow_v12.glb
+          git diff --cached --quiet && exit 0
+          git commit -m 'assets(three): vendor real Ashen Vow V12 GLB for local game rendering'
+          git push origin HEAD:feat/three-ashen-vow-in-game
