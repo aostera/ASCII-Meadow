@@ -83,13 +83,17 @@ fs.mkdirSync(out,{recursive:true});
             const resting=actorImage(rect);
             const stat=n.nativeDepth;
             const depthChange=pixelDelta(noMask,resting);
-            bush.nativeTwigs.fill(.95);bush.nativePart=1;
+            // Opposing boughs create a real, wide pass-through gap rather
+            // than sliding the entire crown horizontally as one solid blob.
+            for(let j=0;j<9;j++)
+              bush.nativeTwigs[j]=j<4?-1.5:1.5;
+            bush.nativePart=1;
             render();
             const bent=actorImage(rect);
             const movement=pixelDelta(resting,bent);
             const bendStat=n.nativeDepth;
-            if(depthChange>best.pixelDelta||
-               (depthChange===best.pixelDelta&&movement>best.movementPixels)){
+            if((movement>best.movementPixels&&depthChange>2)||
+               (movement===best.movementPixels&&depthChange>best.pixelDelta)){
               best={
                 pixelDelta:depthChange,movementPixels:movement,
                 bushes:stat.bushes,wood:stat.bushWood,
