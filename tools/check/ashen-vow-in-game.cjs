@@ -28,7 +28,7 @@ fs.mkdirSync(output,{recursive:true});
    const oldCanvasCount=await page.evaluate(()=>document.querySelectorAll('canvas').length);
    if(await page.evaluate(()=>window.__ASCII_NATIVE__.ashenVow)!==null)
      throw Error('3D player active after explicit opt-out');
-   if(requests.some(url=>url.includes('ashen-vow-game-model.mjs')||url.includes('b469dfb7-fc09')))
+   if(requests.some(url=>url.includes('ashen-vow-game-model.mjs')||url.includes('ashen_vow_v12.glb')))
      throw Error('Opt-out still downloaded GLB');
 
    await page.goto(base+'/experiments/three/native.html?edit=0&ashenVow=1',
@@ -49,11 +49,14 @@ fs.mkdirSync(output,{recursive:true});
    });
    const idle=await read();
    if(idle.error)throw Error('GLB/skin/ASCII player failed '+idle.error);
-   if(!idle.ready||idle.glyphs<90||idle.cells<idle.glyphs)
-     throw Error('No skinned in-game ASCII figure '+JSON.stringify(idle));
+   if(!idle.ready||idle.glyphs<300||idle.cells<idle.glyphs||
+      (idle.bounds?.[3]-idle.bounds?.[1])<28)
+     throw Error('Skinned in-game knight too small/absent '+JSON.stringify({
+       cells:idle.cells,glyphs:idle.glyphs,bounds:idle.bounds,error:idle.error,clip:idle.clip,
+       loaded:idle.loaded,cloth:idle.cloakCells}));
    if(idle.canvasCount!==oldCanvasCount)
      throw Error('3D scene created duplicate GPU canvas '+JSON.stringify(idle));
-   if(!requests.some(u=>u.includes('b469dfb7-fc09')))
+   if(!requests.some(u=>u.includes('ashen_vow_v12.glb')))
      throw Error('No original approved-model GLB request made');
    if(!(idle.cloakCells>3))
      throw Error('Cloak is not bone linked or is not read as cloth');
