@@ -54,7 +54,7 @@ fs.mkdirSync(out,{recursive:true});
         const savePlayer={x:player.x,y:player.y,tx:player.tx,ty:player.ty};
         const drawSource=drawFlora,affected=new Map();
         const gpu=n.renderer.getContext(),canvas=n.renderer.domElement;
-        let best={pixelDelta:0,movementPixels:0,bushes:0,leaves:0};
+        let best={pixelDelta:0,movementPixels:0,gpuMovementPixels:0,bushes:0,leaves:0};
         function actorImage(rect){
           const scale=VZ*DPR;
           const x=Math.max(0,Math.floor((rect.left-camX*CW)*scale));
@@ -96,6 +96,10 @@ fs.mkdirSync(out,{recursive:true});
             const noMask=actorImage(rect);
             n.setDepthMaskForTest(false);render();
             const resting=actorImage(rect);
+            // Read the actual Three depth render target as well. An NPC
+            // may stay fully hidden in a dense thicket after one bush bends,
+            // but geometry motion MUST change the real GPU depth pixels.
+            const restingGpu=n.readNativeDepthForTest();
             const stat=n.nativeDepth;
             const depthChange=pixelDelta(noMask,resting);
             // Opposing boughs create a real, wide pass-through gap rather
@@ -105,12 +109,20 @@ fs.mkdirSync(out,{recursive:true});
             bush.nativePart=1;
             render();
             const bent=actorImage(rect);
+            const bentGpu=n.readNativeDepthForTest();
             const movement=pixelDelta(resting,bent);
+            const gpuMovement=restingGpu&&bentGpu&&
+              restingGpu.width===bentGpu.width&&
+              restingGpu.height===bentGpu.height?
+              pixelDelta(restingGpu.pixels,bentGpu.pixels):-1;
             const bendStat=n.nativeDepth;
-            if((movement>best.movementPixels&&depthChange>2)||
-               (movement===best.movementPixels&&depthChange>best.pixelDelta)){
+            if((gpuMovement>best.gpuMovementPixels&&depthChange>2)||
+               (gpuMovement===best.gpuMovementPixels&&
+                (movement>best.movementPixels||
+                 (movement===best.movementPixels&&depthChange>best.pixelDelta)))){
               best={
                 pixelDelta:depthChange,movementPixels:movement,
+                gpuMovementPixels:gpuMovement,
                 bushes:stat.bushes,wood:stat.bushWood,
                 leaves:stat.bushLeaves,instances:stat.bushInstances,
                 movingClumps:bendStat.bushMoved,
@@ -120,10 +132,10 @@ fs.mkdirSync(out,{recursive:true});
             }
             // Keep the next candidate at rest until deliberately bent.
             bush.nativeTwigs.fill(0);bush.nativePart=0;
-            if(best.pixelDelta>4&&best.movementPixels>2&&
+            if(best.pixelDelta>4&&best.gpuMovementPixels>2&&
                best.movingClumps>5)break;
           }
-          if(best.pixelDelta<3||best.movementPixels<2||
+          if(best.pixelDelta<3||best.gpuMovementPixels<2||
              best.bushes<1||best.wood<1||best.leaves<1||
              best.movingClumps<5||best.drawCalls<1||
              best.contexts!==1)
