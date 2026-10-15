@@ -1,0 +1,46 @@
+name: Tripo V2 40-bone GLB — FREE Skin-preserving Game LOD
+on:
+  push:
+    branches: [feat/ashen-tripo-v2-game]
+    paths: [.github/workflows/ashen-tripo-v2-vendor.yml, tools/check/tripo-v2-skin-lod.cjs]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Download our paid Tripo skeleton once from existing GH artifact (NO Tripo API cost)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/ashen-tripo-v2
+          gh run download 38791076327 --repo aostera/ASCII-Meadow --name ashen-tripo-v2-SKELETON --dir /tmp/ashen-tripo-v2
+          test -s /tmp/ashen-tripo-v2/The_Ashen_Vow_TRIPO_V2_SKELETON.glb
+      - name: Install OSS mesh optimizer (FREE, not AI generation)
+        run: npm install --no-save --ignore-scripts @gltf-transform/cli@4.5.0
+      - name: Optimize real Tripo skinned GLB for native mobile WebGL with skeleton intact
+        run: |
+          mkdir -p experiments/three/assets/ashen-vow
+          npx gltf-transform optimize /tmp/ashen-tripo-v2/The_Ashen_Vow_TRIPO_V2_SKELETON.glb \
+            experiments/three/assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb \
+            --compress quantize --texture-compress false \
+            --simplify true --simplify-ratio 0.28 --simplify-error 0.012 \
+            --flatten false --join false --palette false
+          node tools/check/tripo-v2-skin-lod.cjs \
+            /tmp/ashen-tripo-v2/The_Ashen_Vow_TRIPO_V2_SKELETON.glb \
+            experiments/three/assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb
+      - name: Commit real 3D Tripo biped GLB to experimental game branch, not main
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add experiments/three/assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb
+          git diff --cached --quiet && exit 0
+          git commit -m 'assets(three): vendor Tripo V2 40-bone rigged knight playable LOD'
+          git push origin HEAD:feat/ashen-tripo-v2-game
