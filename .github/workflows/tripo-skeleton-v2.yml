@@ -1,0 +1,28 @@
+name: Tripo Ashen Vow V2 - FREE Rig Check + ONE skeleton
+on:
+  push:
+    branches: [feat/tripo-ashen-rig-ready]
+    paths: [tools/tripo/approvals/rig-v2.json]
+permissions: {contents: read}
+concurrency:
+  group: tripo-ashen-v2-biped-25-once
+  cancel-in-progress: false
+jobs:
+  biped:
+    if: github.event.head_commit.message == 'TRIPO_APPROVE_BIPED_RIG_V2_25_CREDITS' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: FREE rig check then ONE paid Tripo biped skin, at most 25 credits
+        env:
+          TRIPO_API_KEY: ${{ secrets.TRIPO }}
+        run: python tools/tripo/tripo_skeleton_v2.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ashen-tripo-v2-SKELETON
+          path: artifacts/tripo-ashen-rig-v2-skeleton/
+          if-no-files-found: warn
