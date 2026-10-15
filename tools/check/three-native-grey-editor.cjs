@@ -123,14 +123,22 @@ fs.mkdirSync(dir,{recursive:true});
    await page.mouse.move(point.x+74,point.y,{steps:6});
    await page.mouse.up();
    await page.keyboard.up('Alt');
-   await page.waitForFunction(()=>
-     Math.abs(ruinSites()[1].yaw-before.yaw)>.08,
-     undefined,{timeout:90000});
+   await page.waitForFunction(initialYaw=>
+     Math.abs(ruinSites()[1].yaw-initialYaw)>.08,
+     before.yaw,{timeout:90000});
    await page.evaluate(()=>edUndo());
    await page.waitForFunction(initialYaw=>MEADOW_MAP.ruins===null||
      Math.abs(ruinSites()[1].yaw-initialYaw)<.001,
      before.yaw,{timeout:90000});
    if(mobile){
+     // Undo may clear the editor's selection; select the intended ruin
+     // explicitly before entering the guarded touch-rotation mode.
+     await page.evaluate(()=>{
+       ED.tool='select';ED.sel={kind:'ruins',mi:1};edSyncUI();
+     });
+     await page.waitForFunction(()=>
+       window.__ASCII_NATIVE__.greyEditor.selected==='abbey-front'&&
+       document.querySelector('.native-grey-map-drag')?.offsetWidth>0);
      // Verify the browser's native touch pointer handler without keyboard.
      // The first tap must select a ruin; gestures are explicitly opt-in.
      const touchButton=page.locator('.native-grey-map-drag');
