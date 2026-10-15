@@ -7,6 +7,7 @@ import {makeSourceArchitecture} from './source-masonry.mjs';
 import {createNativeSourceWorld,configureNativeCamera} from './source-world.mjs';
 import {NativeTreeDepth,pickNativeActorTrees} from './native-tree-depth.mjs';
 import {NativePropDepth,pickNativeActorProps} from './native-props-depth.mjs';
+import {NativeStoneDepth,pickNativeActorStones} from './native-stone-depth.mjs';
 
 export function sourceArchitectureOverlaps(rect,source,CW,CH,margin=12){
   if(!rect)return false;
@@ -27,6 +28,8 @@ export class NativeArchitectureDepth{
     this.scene=new THREE.Scene();
     this.treeDepth=new NativeTreeDepth(this.scene);
     this.propDepth=new NativePropDepth(this.scene,
+      new THREE.MeshBasicMaterial({color:0x808080}));
+    this.stoneDepth=new NativeStoneDepth(this.scene,
       new THREE.MeshBasicMaterial({color:0x808080}));
     this.camera=new THREE.OrthographicCamera(-1,1,1,-1,.01,40000);
     this.material=new THREE.MeshDepthMaterial({side:THREE.DoubleSide});
@@ -49,7 +52,8 @@ export class NativeArchitectureDepth{
     this.stats={frames:0,builds:0,drawCalls:0,sites:0,visible:false,
       activeActors:0,width:0,height:0,
       treeClusters:0,deadTrees:0,deadSegments:0,treeWood:0,treeLeaves:0,
-      tents:0,fences:0,propTriangles:0};
+      tents:0,fences:0,propTriangles:0,stones:0,stoneVariants:0,
+      stoneTriangles:0};
   }
   removeWorld(){
     if(!this.world)return;
@@ -78,13 +82,18 @@ export class NativeArchitectureDepth{
       source.flora||[],actorRanges,CW,CH);
     const nearProps=pickNativeActorProps(
       source.flora||[],actorRanges,CW,CH);
+    const nearStones=pickNativeActorStones(
+      source.flora||[],actorRanges,CW,CH);
     this.stats.activeActors=nearArchitecture.length+nearTrees.length+
-      nearProps.length;
+      nearProps.length+nearStones.length;
     this.stats.visible=false;
     this.stats.treeClusters=0;this.stats.deadTrees=0;this.stats.deadSegments=0;
     this.stats.treeWood=0;this.stats.treeLeaves=0;
     this.stats.tents=0;this.stats.fences=0;this.stats.propTriangles=0;
-    if(!nearArchitecture.length&&!nearTrees.length&&!nearProps.length)return null;
+    this.stats.stones=0;this.stats.stoneVariants=0;
+    this.stats.stoneTriangles=0;
+    if(!nearArchitecture.length&&!nearTrees.length&&!nearProps.length&&
+       !nearStones.length)return null;
     // Do not pay the castle+three-ruin geometry build/draw cost when only
     // tree contact is nearby. Tree trunks and branches use one InstancedMesh.
     if(nearArchitecture.length)this.ensureWorld(source);
@@ -100,6 +109,10 @@ export class NativeArchitectureDepth{
     this.stats.tents=this.propDepth.stats.tents;
     this.stats.fences=this.propDepth.stats.fences;
     this.stats.propTriangles=this.propDepth.stats.triangles;
+    this.stoneDepth.update(source,actorRanges,CW,CH);
+    this.stats.stones=this.stoneDepth.stats.stones;
+    this.stats.stoneVariants=this.stoneDepth.stats.variants;
+    this.stats.stoneTriangles=this.stoneDepth.stats.triangles;
     // Half-screen pass limits fill rate on high-DPR iPads while maintaining
     // geometric depth in the actual game camera.
     const dw=Math.max(1,Math.ceil(W*.5));
@@ -149,10 +162,12 @@ export class NativeArchitectureDepth{
     this.removeWorld();
     this.treeDepth.dispose();
     this.propDepth.dispose();
+    this.stoneDepth.dispose();
     this.target.dispose();
     this.target.depthTexture.dispose();
     this.material.dispose();
     this.propDepth.material.dispose();
+    this.stoneDepth.material.dispose();
     this.filler.dispose();
     this.scene.clear();
   }
