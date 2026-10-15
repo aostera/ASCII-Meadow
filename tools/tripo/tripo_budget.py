@@ -203,8 +203,9 @@ def generate():
         "pbr": False,
         "geometry_quality": "standard",
         "quad": False,
-        "smart_low_poly": False,
-        "generate_parts": False,
+        "orthographic_projection": True,
+        # Required ordering by Tripo API: FRONT, LEFT, BACK, RIGHT.
+        # No paid add-ons and no unsupported image-to-model arguments.
         "files": files,
     }
     assert payload["texture"] is False and payload["pbr"] is False
