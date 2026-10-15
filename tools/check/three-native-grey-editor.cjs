@@ -31,10 +31,14 @@ fs.mkdirSync(dir,{recursive:true});
      undefined,{timeout:100000});
    const scene=await page.evaluate(()=>{
      const source=JSON.stringify(MEADOW_MAP);
+     // The legacy map's v1 format omits "actors"; undo correctly normalizes
+     // that missing key to null in memory. The user-facing map export must
+     // remain byte-for-byte identical across undo, not the internal object.
+     const exported=mapFileText(),snapshot=JSON.stringify(mapSnapshot());
      openEditor();
      ED.tool='select';ED.sel={kind:'ruins',mi:1};edSyncUI();
      // Source map remains unchanged until user actually rotates.
-     return {source,editing,sites:ruinSites().map(r=>r.id),
+     return {source,exported,snapshot,editing,sites:ruinSites().map(r=>r.id),
        rootVisible:!ED.ui.root.hidden};
    });
    if(!scene.editing||scene.sites.length!==3||!scene.rootVisible)
@@ -168,11 +172,13 @@ fs.mkdirSync(dir,{recursive:true});
    }
    const restored=await page.evaluate(()=>({
      map:JSON.stringify(MEADOW_MAP),
+     snapshot:JSON.stringify(mapSnapshot()),
+     exported:mapFileText(),
      editor:window.__ASCII_NATIVE__.greyEditor,
      native:window.__ASCII_NATIVE__.mode
    }));
-   if(restored.map!==scene.source)
-     throw Error(label+' rotating grey model broke editor undo source map');
+   if(restored.snapshot!==scene.snapshot||restored.exported!==scene.exported)
+     throw Error(label+' rotating grey model broke editor undo source map export');
    await page.locator('.native-grey-switch input').uncheck();
    await page.waitForFunction(()=>
      window.__ASCII_NATIVE__.greyEditor.enabled===false,
