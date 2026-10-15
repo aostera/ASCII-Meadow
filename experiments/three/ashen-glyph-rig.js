@@ -14,7 +14,10 @@ try{
 }catch(e){$('fail').style.display='grid';throw e;}
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x0d0c10);
 scene.fog=new THREE.Fog(0x0d0c10,7,15);
-const camera=new THREE.PerspectiveCamera(38,1,.06,70);camera.position.set(2.8,2.03,4.6);
+const camera=new THREE.PerspectiveCamera(38,1,.06,70);
+const phoneView=matchMedia('(max-width:690px)').matches;
+const initialCamera=phoneView?[3.55,2.12,5.9]:[2.8,2.03,4.6];
+camera.position.set(...initialCamera);
 const controls=new OrbitControls(camera,renderer.domElement);
 controls.target.set(0,1.035,0);controls.enableDamping=true;controls.dampingFactor=.075;
 controls.minDistance=1.2;controls.maxDistance=9;controls.maxPolarAngle=Math.PI*.89;
@@ -175,7 +178,7 @@ $('skeleton').onclick=()=>{skeleton.visible=!skeleton.visible;
  $('skeleton').classList.toggle('active',skeleton.visible);};
 $('spin').onclick=()=>{controls.autoRotate=!controls.autoRotate;
  $('spin').classList.toggle('active',controls.autoRotate);};
-$('reset').onclick=()=>{camera.position.set(2.8,2.03,4.6);controls.target.set(0,1.035,0);controls.update();};
+$('reset').onclick=()=>{camera.position.set(...initialCamera);controls.target.set(0,1.035,0);controls.update();};
 $('frame').oninput=e=>{
  playing=false;$('pause').textContent='Продолжить';frame=Number(e.target.value);
  playtime=frame/30;$('frameOut').textContent=(frame+1)+' / 60';pose(frame/59);
