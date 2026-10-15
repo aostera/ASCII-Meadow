@@ -48,7 +48,7 @@ export class NativeArchitectureDepth{
     this.world=null;this.generation=-1;this.disposed=false;
     this.stats={frames:0,builds:0,drawCalls:0,sites:0,visible:false,
       activeActors:0,width:0,height:0,
-      treeClusters:0,treeWood:0,treeLeaves:0,
+      treeClusters:0,deadTrees:0,deadSegments:0,treeWood:0,treeLeaves:0,
       tents:0,fences:0,propTriangles:0};
   }
   removeWorld(){
@@ -81,7 +81,8 @@ export class NativeArchitectureDepth{
     this.stats.activeActors=nearArchitecture.length+nearTrees.length+
       nearProps.length;
     this.stats.visible=false;
-    this.stats.treeClusters=0;this.stats.treeWood=0;this.stats.treeLeaves=0;
+    this.stats.treeClusters=0;this.stats.deadTrees=0;this.stats.deadSegments=0;
+    this.stats.treeWood=0;this.stats.treeLeaves=0;
     this.stats.tents=0;this.stats.fences=0;this.stats.propTriangles=0;
     if(!nearArchitecture.length&&!nearTrees.length&&!nearProps.length)return null;
     // Do not pay the castle+three-ruin geometry build/draw cost when only
@@ -91,6 +92,8 @@ export class NativeArchitectureDepth{
     if(this.world)this.world.visible=!!nearArchitecture.length;
     this.treeDepth.update(source,actorRanges,CW,CH);
     this.stats.treeClusters=this.treeDepth.stats.trees;
+    this.stats.deadTrees=this.treeDepth.stats.deadTrees;
+    this.stats.deadSegments=this.treeDepth.stats.deadSegments;
     this.stats.treeWood=this.treeDepth.stats.woodInstances;
     this.stats.treeLeaves=this.treeDepth.stats.leafInstances;
     this.propDepth.update(source,actorRanges,CW,CH);
