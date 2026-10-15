@@ -15,6 +15,7 @@ const LIMB={thigh:.47,shin:.47};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const smooth=x=>{const t=clamp(x,0,1);return t*t*(3-2*t)};
 
+function facialMetalness(name){return /cloth|cape|mask|rear/i.test(name)?.08:.47}
 export function createAshenSkeleton(THREE,source){
  const root=new THREE.Group();
  root.name='The Ashen Vow / original approved-character sculpture / rigged';
@@ -121,9 +122,29 @@ export function createAshenSkeleton(THREE,source){
    geom.applyMatrix4(old.matrixWorld); // source is a self-contained sculpt
    const N=geom.attributes.position.count;
    const si=new Uint16Array(N*4),sw=new Float32Array(N*4);
+   const vertexColor=new Float32Array(N*3);
    const p=geom.attributes.position;
+   const isWeapon=/sword|blade|grip|pommel|guard|quillon|fuller/i.test(old.name);
+   const isCrown=/crown|thorn|briar/i.test(old.name);
    for(let j=0;j<N;j++){
-     const ws=weights(p.getX(j),p.getY(j),p.getZ(j),old.name);
+     const x=p.getX(j),y=p.getY(j),z=p.getZ(j);
+     const ws=weights(x,y,z,old.name);
+     // Per-vertex MATERIAL REGIONS, not a photograph stamped onto the sprite.
+     // Especially the narrow ivory mask: it has its own light value in ASCII.
+     const ax=Math.abs(x),facial=y>1.675&&y<1.952&&ax<.096&&z>-.102;
+     const eye=facial&&y>1.782&&y<1.835&&ax>.029&&ax<.082;
+     const tabard=y>.47&&y<1.23&&ax<.155&&z>.032;
+     const cloth=z<(-.28-.11*smooth((1.56-y)/1.4))&&y<1.59;
+     let value=isWeapon?.92:isCrown?.55:eye?.055:facial?.93:
+       tabard?.71:cloth?.29:.40;
+     // Subtle forged-metal breakups using actual model coordinates:
+     // the exact pixels are rederived from the lit 3D mesh each frame.
+     if(!isWeapon&&!facial&&!tabard&&!cloth){
+       value+=.06*Math.sin(y*64+x*22)*Math.sin(z*49);
+     }
+     vertexColor[j*3]=clamp(value,0,1);
+     vertexColor[j*3+1]=clamp(value*(cloth?.90:1),0,1);
+     vertexColor[j*3+2]=clamp(value*(cloth?.92:1),0,1);
      let sum=0;
      for(let k=0;k<4;k++){
        const q=ws[k];
@@ -136,14 +157,13 @@ export function createAshenSkeleton(THREE,source){
    }
    geom.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(si,4));
    geom.setAttribute('skinWeight',new THREE.Float32BufferAttribute(sw,4));
+   geom.setAttribute('color',new THREE.Float32BufferAttribute(vertexColor,3));
    // Keep the model geometry; the game's own shader turns the render into glyphs.
    // Neutral surface values deliberately downplay unreliable photo-projected texture.
    const material=new THREE.MeshStandardMaterial({
-     color:/mask|ivory|porcelain/i.test(old.name)?0xb6b2aa:
-           /blade|sword/i.test(old.name)?0xa9a6a2:
-           /rear|cape|cloak/i.test(old.name)?0x6a5c60:0x767579,
-     metalness:/cloth|cape|mask/i.test(old.name)?.08:.48,
-     roughness:.76,
+     color:0xffffff,vertexColors:true,
+     metalness:isWeapon?.74:facialMetalness(old.name),
+     roughness:isWeapon?.42:.77,
      side:THREE.DoubleSide
    });
    const mesh=new THREE.SkinnedMesh(geom,material);
