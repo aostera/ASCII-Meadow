@@ -316,7 +316,7 @@ for (let i=0;i<9;i++) {
 }
 // Multi-layer articulated breast plate: fluted channels and raised iron tracery.
 for (const s of [-1,1]) {
-  shape(body,[[s*.09,.29],[s*.22,.32],[s*.26,.17],[s*.174,.06],[s*.11,.12]],edge,.214,.012);
+  shape(body,[[s*.09,.29],[s*.22,.32],[s*.26,.17],[s*.174,.06],[s*.11,.12]],rimSteel,.214,.012);
   shape(body,[[s*.12,.14],[s*.215,.10],[s*.15,-.08],[s*.064,-.17],[s*.083,.06]],steel,.254,.012);
   for (let k=0;k<6;k++) {
     const a=k/5;
