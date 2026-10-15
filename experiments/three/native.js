@@ -9,6 +9,33 @@ import {NativeGreyMapEditor} from './native-editor-models.mjs';
 const fallbackCanvas=document.getElementById('g');
 let backend=null,depthPass=null,editorModels=null,disposed=false,fallbackReason=null,frames=0;
 let testDepthDisabled=false;
+
+/*
+ * The actual ASHEN VOW 3D model is now rasterized into the native game atlas,
+ * in the same original player draw call, not a separate turntable or fake UI.
+ * ?ashenVow=0 restores the exact original sprite. WebGL loss / missing model
+ * automatically preserves the source game.
+ */
+const ashenVowOn=new URLSearchParams(location.search).get('ashenVow')!=='0';
+let ashenVow=null,ashenVowError=null;
+if(ashenVowOn){
+  const originalDrawKnight=drawKnight;
+  drawKnight=function nativeAshenDrawKnight(e,G,fcw,fch){
+    if(e===player&&!editing&&GL.ok&&!GL.lost&&ashenVow?.ready){
+      try{
+        ashenVow.draw(e,G,fcw,fch,{t,CW,CH,PITCH,KG,JUMP_T,AIR0,AIR1,
+          rampCode,grect,gput,KN0,KNS,fireLightAt,knightFireBlock});
+        drawTag(e,G.gx,G.gy);
+        return;
+      }catch(error){
+        ashenVowError=String(error?.message||error);
+        console.error('The Ashen Vow renderer failed; original knight restored:',error);
+        ashenVow?.dispose();ashenVow=null;
+      }
+    }
+    return originalDrawKnight(e,G,fcw,fch);
+  };
+}
 let contextLostCount=0,contextRestoredCount=0,nativeFallbackFrames=0;
 // The source game remains the authoritative painter: collect only NPC spans.
 const originalNativeRender=render;
@@ -182,6 +209,17 @@ try{
   });
 }catch(err){enableFallback(err)}
 
+if(ashenVowOn&&backend){
+  import('./native-ashen-vow.mjs').then(({NativeKnightGlyphs})=>{
+    if(!disposed&&backend)
+      ashenVow=new NativeKnightGlyphs(backend.renderer);
+  }).catch(error=>{
+    ashenVowError=String(error?.message||error);
+    console.error('The Ashen Vow 3D model unavailable. Original player retained:',error);
+  });
+}
+
+
 window.__ASCII_NATIVE__={
   get ready(){return Boolean(GB.atlasCv&&W&&H&&GB.n>1000)},
   get mode(){return GL.ok&&!GL.lost?'three':'canvas2d'},
@@ -197,6 +235,11 @@ window.__ASCII_NATIVE__={
   }},
   get nativeDepth(){return depthPass?.stats||{frames:0,builds:0,visible:false,activeActors:0}},
   get greyEditor(){return editorModels?.stats||{enabled:false,frames:0,sites:[]}},
+  get ashenVow(){return ashenVowOn?
+    {active:!!ashenVow,ready:!!ashenVow?.ready,
+      error:ashenVowError||ashenVow?.stats.error||null,
+      ...(ashenVow?.stats||{})}:null},
+
   // Strictly test-scoped: prove an actual GPU occlusion difference without
   // needing any user-facing renderer toggle or laboratory overlay.
   setDepthMaskForTest(disabled){
@@ -209,6 +252,7 @@ window.__ASCII_NATIVE__={
   dispose(){
     if(disposed)return;
     disposed=true;
+    ashenVow?.dispose();ashenVow=null;
     enableFallback('Native GPU bridge disposed');
     backend?.dispose();backend=null;
   }
