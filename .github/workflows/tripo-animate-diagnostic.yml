@@ -1,0 +1,17 @@
+name: Tripo Rig V2 - FREE Retarget Diagnostics ONLY
+on:
+  push:
+    branches: [feat/tripo-ashen-rig-ready]
+    paths: [tools/tripo/diagnose_retarget_v2.py]
+permissions: {contents: read}
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: Read-only failed task 56ec3a0c (FREE; no POST)
+        env:
+          TRIPO_API_KEY: ${{ secrets.TRIPO }}
+        run: python tools/tripo/diagnose_retarget_v2.py
