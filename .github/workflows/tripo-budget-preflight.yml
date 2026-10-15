@@ -27,10 +27,10 @@ jobs:
         run: python -m py_compile tools/tripo/tripo_budget.py
       - name: Read-only Tripo wallet
         env:
-          TRIPO_API_KEY: ${{ secrets.TRIPO_API_KEY }}
+          TRIPO_API_KEY: ${{ secrets.TRIPO }}
         run: |
           if [ -z "$TRIPO_API_KEY" ]; then
-            echo "::warning title=Missing TRIPO_API_KEY::GitHub Actions received an EMPTY TRIPO environment secret. Open Settings > Environments > TRIPO > Environment secrets and create TRIPO_API_KEY, then rerun free preflight."
+            echo "::warning title=Missing TRIPO_API_KEY::GitHub Actions did not receive the TRIPO repository secret."
           else
             python tools/tripo/tripo_budget.py balance
           fi
