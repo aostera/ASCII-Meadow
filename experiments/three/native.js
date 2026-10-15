@@ -17,6 +17,25 @@ let testDepthDisabled=false;
  * automatically preserves the source game.
  */
 const ashenVowOn=new URLSearchParams(location.search).get('ashenVow')!=='0';
+
+const ashenInspect=new URLSearchParams(location.search).get('ashenInspect')==='1';
+if(ashenVowOn&&ashenInspect){
+  // A CLOSE-UP OF THE REAL GAME, not a separate false render or new scene.
+  // The actual player, map, input and glyph batch are untouched. Only the
+  // source game's camera is centered/zoomed to inspect head and sword.
+  const originalCameraUpdate=updateCamera;
+  updateCamera=function(dt,snap){
+    originalCameraUpdate(dt,snap);
+    if(!editing){
+      VZ=1.72;
+      camX=Math.max(0,Math.min(COLS-VC/VZ,player.x-VC/(2*VZ)));
+      camY=Math.max(0,Math.min(ROWS-VR/VZ,
+        player.y-liftPx(player)/CH-VR*.74/VZ));
+      setView();
+    }
+  };
+}
+
 let ashenVow=null,ashenVowError=null;
 if(ashenVowOn){
   const originalDrawKnight=drawKnight;
@@ -235,6 +254,7 @@ window.__ASCII_NATIVE__={
   }},
   get nativeDepth(){return depthPass?.stats||{frames:0,builds:0,visible:false,activeActors:0}},
   get greyEditor(){return editorModels?.stats||{enabled:false,frames:0,sites:[]}},
+  get ashenInspect(){return ashenInspect},
   get ashenVow(){return ashenVowOn?
     {active:!!ashenVow,ready:!!ashenVow?.ready,
       error:ashenVowError||ashenVow?.stats.error||null,
