@@ -115,6 +115,13 @@ export class NativeKnightGlyphs {
     });
     this.scene.add(this.knight);
     this.clock = null; this.prev = null; this.disposed = false;
+    this.rasterClock = null;
+    // Mobile gets lower GPU readback frequency; 60+ distinct animation
+    // poses are still evaluated from the simulation's live time.
+    const slowDevice=window.matchMedia?.('(pointer:coarse)')?.matches;
+    this.rasterInterval=1/(slowDevice?18:24);
+    this.stats.rasterHz=slowDevice?18:24;
+    this.stats.rasterFrames=0;
   }
   get ready() { return !this.disposed && this.stats.loaded; }
 
@@ -145,8 +152,15 @@ export class NativeKnightGlyphs {
       jumpClipTime: NativeKnightGlyphs.jumpClipTime(e, src.JUMP_T, src.AIR0, src.AIR1)
     }, now);
     this.stats.clip = this.knight.userData.gltf.clip;
-    this.render(G, fcw, fch);
-    this.convert();
+    // Do not force an expensive GPU->CPU readback every simulation step.
+    // On intermediate frames the previous live 3D pose's glyphs remain
+    // world-anchored and depth-sorted, while the rig continues animating.
+    if(this.rasterClock===null||now-this.rasterClock>=this.rasterInterval){
+      this.render(G, fcw, fch);
+      this.convert();
+      this.rasterClock=now;
+      this.stats.rasterFrames++;
+    }
     this.emit(e, G, fcw, fch, src);
     this.stats.frames++;
   }
