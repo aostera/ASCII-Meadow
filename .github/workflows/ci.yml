@@ -278,6 +278,40 @@ jobs:
             exit 1
           fi
 
+
+  ashen-glyph-ik-preview:
+    name: ASHEN VOW skeletal ASCII character preview (desktop + mobile)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Check authored rig syntax
+        run: |
+          node --check experiments/three/ashen-glyph-rig.js
+          node --check experiments/three/ashen-glyph-shell.mjs
+          node --check tools/check/three-ashen-glyph.cjs
+      - name: Inspect standalone skeleton, active glyphs and foot IK
+        run: |
+          python3 -m http.server 8181 > /tmp/ashen-glyph-http.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8181/experiments/three/ashen-glyph-rig.html > /dev/null && break; sleep 1; done
+          node tools/check/three-ashen-glyph.cjs http://127.0.0.1:8181
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ashen-glyph-ik-preview
+          path: shots/three-ashen-glyph/
+          if-no-files-found: warn
+
+
   three-prototype:
     name: Three.js experiment (real WebGL, authored-map scene, phone viewport)
     if: github.event_name == 'pull_request'
