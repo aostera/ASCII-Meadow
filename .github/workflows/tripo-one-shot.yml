@@ -1,0 +1,45 @@
+name: Tripo Ashen Vow - ONE APPROVED Paid Request ONLY
+
+# Intentionally NOT triggered by code pushes and NOT scheduled.
+# This workflow stays dormant until the user expressly approves spending
+# 20 credits, after which the assistant adds ONE dedicated authorization
+# file on this feature branch with the exact commit message.
+on:
+  push:
+    branches:
+      - feat/tripo-ashen-budget-gated
+    paths:
+      - tools/tripo/approved-request.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ashen-vow-tripo-paid-single
+  cancel-in-progress: false
+
+jobs:
+  generate-once:
+    if: github.event.head_commit.message == 'TRIPO_APPROVE_ONCE_20_CREDITS' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Confirm 20-credit cap and upload reference
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python -m py_compile tools/tripo/tripo_budget.py
+      - name: Launch exactly ONE v3.1 multiview geometry task, NO TEXTURES
+        env:
+          TRIPO_API_KEY: ${{ secrets.TRIPO_API_KEY }}
+        run: |
+          python tools/tripo/tripo_budget.py generate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ashen-tripo-one-paid-model-or-diagnostics
+          path: artifacts/tripo-ashen-vow/
+          if-no-files-found: warn
