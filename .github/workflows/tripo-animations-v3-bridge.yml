@@ -1,0 +1,28 @@
+name: Tripo Ashen Vow V3 - Existing Rig Retarget Test
+on:
+  push:
+    branches: [feat/tripo-ashen-rig-ready]
+    paths: [tools/tripo/approvals/anims-v3-bridge.json]
+permissions: {contents: read}
+concurrency:
+  group: ashen-tripo-v3-four-animations-once
+  cancel-in-progress: false
+jobs:
+  v3:
+    if: github.event.head_commit.message == 'TRIPO_APPROVE_V3_ANIMS_BRIDGE_40_CREDITS' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: One v3 retarget with existing v2 rig only, max 40 credits
+        env:
+          TRIPO_API_KEY: ${{ secrets.TRIPO }}
+        run: python tools/tripo/tripo_animations_v3_bridge.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ashen-tripo-v3-animations-or-rejected-diagnostics
+          path: artifacts/tripo-ashen-v3-four-anims/
+          if-no-files-found: warn
