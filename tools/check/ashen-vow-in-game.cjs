@@ -114,6 +114,23 @@ fs.mkdirSync(output,{recursive:true});
    await page.evaluate(()=>window.__ASCII_NATIVE__.dispose());
    const after=await page.evaluate(()=>window.__ASCII_NATIVE__.ashenVow?.active);
    if(after)throw Error('3D player survived renderer dispose');
+   if(!mobile){
+     // User-facing optional close inspection is STILL the full real game.
+     await page.goto(base+'/experiments/three/native.html?edit=0&ashenVow=1&ashenInspect=1',
+       {waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>{
+       const n=window.__ASCII_NATIVE__;
+       return n?.ready&&n.ashenVow?.frames>1&&n.ashenInspect===true&&VZ>1.65;
+     },undefined,{timeout:90000});
+     const close=await page.evaluate(()=>({
+       z:VZ,x:(player.x-camX)*CW*VZ,width:W,
+       map:JSON.stringify(MEADOW_MAP),canvasCount:document.querySelectorAll('canvas').length
+     }));
+     if(Math.abs(close.x-close.width/2)>close.width*.10||close.map!==idle.map||
+        close.canvasCount!==oldCanvasCount)
+       throw Error('Real game closeup camera broke world parity '+JSON.stringify({z:close.z,x:close.x,w:close.width}));
+     await page.screenshot({path:path.join(output,'desktop-in-world-closeup.png'),timeout:60000});
+   }
    if(errors.length)throw Error('Page errors: '+errors.join('; '));
    console.log(label+' ASHEN VOW ACTUALLY PLAYABLE OK: '+
      JSON.stringify({glyphs:idle.glyphs,cloth:idle.cloakCells,frames:fin.frames,
