@@ -6,9 +6,39 @@
 import * as THREE from 'three';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const UP=new THREE.Vector3(0,1,0);
+
+// Mirrors the source dead-tree branch growth from flora.js::bakeVariant.
+// Returns thin wood segments, not solid silhouette cards or leafy crowns.
+export function nativeSourceDeadwood(seed,K,fw,fh,hash){
+  if(!(K>0&&fw>0&&fh>0)||typeof hash!=='function')return [];
+  const rnd=k=>hash(seed*31+k,977),strokes=[];
+  const grow=(x,y,a,len,w,depth,spread,branchId)=>{
+    let px=x,py=y,ang=a;
+    const steps=Math.max(2,Math.ceil(len/(fh*.7)));
+    // Shallow variation in scene depth; screen-space branch centres remain exact.
+    const z=(hash(seed*911+branchId*13,743)-.5)*Math.min(K*.16,fw*3);
+    for(let i=0;i<steps;i++){
+      ang+=(rnd(depth*97+i*13+x)-.5)*.35;
+      const nx=px+Math.sin(ang)*len/steps;
+      const ny=py-Math.cos(ang)*len/steps;
+      strokes.push([px,py,nx,ny,w*(1-i/steps*.35),z]);
+      px=nx;py=ny;
+    }
+    if(depth<=0)return;
+    const nb=2+(rnd(depth*7+len)>.55?1:0);
+    for(let k=0;k<nb;k++){
+      const angle=(k-(nb-1)/2)*spread+(rnd(depth*31+k+len)-.5)*.5;
+      grow(px,py,ang+angle,len*(.62+rnd(depth*11+k)*.2),
+        Math.max(fw*.7,w*.6),depth-1,spread*.95,branchId*3+k+1);
+    }
+  };
+  grow(0,0,(rnd(4)-.5)*.25,K*(.6+rnd(2)*.25),K*.08,5,.7,1);
+  return strokes;
+}
 
 export function nativeTreeOverlapsActor(tree,rect,CW,CH,margin=4){
-  if(!tree||tree.v?.type!=='tree'||!rect)return false;
+  if(!tree||!['tree','dead'].includes(tree.v?.type)||!rect)return false;
   const x=tree.x*CW,y=tree.br*CH,R=tree.v.R;
   const minX=x-R*1.2-margin,maxX=x+R*1.2+margin;
   const minY=y-tree.v.crownH-margin,maxY=y+CH+margin;
@@ -45,18 +75,18 @@ export class NativeTreeDepth{
     this.geometry=new THREE.IcosahedronGeometry(1,1);
     this.material=new THREE.MeshBasicMaterial({color:0x808080});
     this.mesh=new THREE.InstancedMesh(this.geometry,this.material,capacity);
-    this.mesh.name='original-3d-tree-branches-and-open-foliage-depth';
+    this.mesh.name='original-tree-and-deadwood-open-branches-depth';
     this.mesh.count=0;this.mesh.frustumCulled=false;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.scene.add(this.mesh);
     this.matrix=new THREE.Matrix4();
     this.cache=new Map();
     this.generation=-1;
-    this.stats={trees:0,woodInstances:0,leafInstances:0,instances:0};
+    this.stats={trees:0,deadTrees:0,deadSegments:0,woodInstances:0,leafInstances:0,instances:0};
   }
   reset(){
     this.mesh.count=0;
-    this.stats={trees:0,woodInstances:0,leafInstances:0,instances:0};
+    this.stats={trees:0,deadTrees:0,deadSegments:0,woodInstances:0,leafInstances:0,instances:0};
   }
   update(source,actorRanges,CW,CH){
     this.reset();
@@ -67,17 +97,58 @@ export class NativeTreeDepth{
     const trees=pickNativeActorTrees(
       source.flora,actorRanges,CW,CH,6);
     if(!trees.length)return 0;
-    const variants=source.VARS.filter(v=>v.type==='tree');
+    const variants={
+      tree:source.VARS.filter(v=>v.type==='tree'),
+      dead:source.VARS.filter(v=>v.type==='dead')
+    };
     const c=Math.cos(source.pitch),sin=Math.sin(source.pitch);
-    let count=0,wood=0,leaves=0;
+    const fd=source.charDims?.(source.player);
+    const K=source.knightPx?.(),hash=source.hash;
+    let count=0,wood=0,leaves=0,living=0,deadTrees=0,deadSegments=0;
     for(const tree of trees){
-      const variant=variants.indexOf(tree.v);
+      const type=tree.v.type;
+      const variant=variants[type].indexOf(tree.v);
       if(variant<0)continue;
-      let shape=this.cache.get(variant);
+      const key=type+':'+variant;
+      if(type==='dead'){
+        if(!(c>.1)||!fd||!K||!hash)continue;
+        let strokes=this.cache.get(key);
+        if(!strokes){
+          strokes=nativeSourceDeadwood(variant+21,K,fd.fcw,fd.fch,hash);
+          this.cache.set(key,strokes);
+        }
+        const originX=-Math.round(tree.x)*CW;
+        const originY=-tree.br*CH*c,originZ=-tree.br*CH*sin;
+        const lean=(tree.sw||0)*6, height=Math.max(1,tree.v.crownH);
+        const toWorld=(x,y,z)=>{
+          const hf=clamp(-y/height,0,1);
+          const sx=x+lean*hf*Math.sqrt(hf);
+          return new THREE.Vector3(originX-sx,
+            originY+(-y-z*sin)/c,originZ+z);
+        };
+        let drawn=0;
+        for(const [ax,ay,bx,by,w,z] of strokes){
+          if(count>=this.capacity)break;
+          const a=toWorld(ax,ay,z),b=toWorld(bx,by,z);
+          const delta=b.clone().sub(a),length=delta.length();
+          if(length<.00001)continue;
+          const radius=Math.max(fd.fcw*.48,w*.5);
+          const rot=new THREE.Quaternion().setFromUnitVectors(
+            UP,delta.multiplyScalar(1/length));
+          this.matrix.compose(a.add(b).multiplyScalar(.5),rot,
+            new THREE.Vector3(radius,length*.5+radius,radius));
+          this.mesh.setMatrixAt(count++,this.matrix);
+          drawn++;
+        }
+        if(drawn){deadTrees++;deadSegments+=drawn;}
+        continue;
+      }
+      let shape=this.cache.get(key);
       if(!shape){
         shape=source.t3Tree('tree',variant+1);
-        this.cache.set(variant,shape);
+        this.cache.set(key,shape);
       }
+      living++;
       const originX=-tree.x*CW;
       const originY=-tree.br*CH*c;
       const originZ=-tree.br*CH*sin;
@@ -99,8 +170,8 @@ export class NativeTreeDepth{
     }
     this.mesh.count=count;
     if(count)this.mesh.instanceMatrix.needsUpdate=true;
-    this.stats={trees:trees.length,woodInstances:wood,
-      leafInstances:leaves,instances:count};
+    this.stats={trees:living,deadTrees,deadSegments,
+      woodInstances:wood,leafInstances:leaves,instances:count};
     return count;
   }
   dispose(){
