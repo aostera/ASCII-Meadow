@@ -175,7 +175,29 @@ export function makeGlyphShell(THREE,scene,bones){
  const worldAttr=inst('aWorld',pos,3);inst('aInk',inks,3);inst('aLetter',indices,1);inst('aSize',sizes,1);
  geo.instanceCount=samples.length;
  const mesh=new THREE.Mesh(geo,material);mesh.name='Volumetric armored ASCII knight';
- mesh.frustumCulled=false;scene.add(mesh);
+ mesh.frustumCulled=false;mesh.renderOrder=5;scene.add(mesh);
+ // Invisible depth-prepass volumes: symbols on the backside of a body part cannot
+ // bleed through the front through empty letter shapes. There is NO visible solid mesh.
+ const depthMat=new THREE.MeshBasicMaterial({colorWrite:false,depthWrite:true,depthTest:true,side:THREE.DoubleSide});
+ const proxyGeo=new THREE.SphereGeometry(1,20,12);
+ const occluders=[];
+ function depth(bone,center,r){
+  const o=new THREE.Mesh(proxyGeo,depthMat);o.name='DEPTH_ONLY_'+bone;
+  o.position.set(...center);o.scale.set(...r);
+  o.renderOrder=-3;o.frustumCulled=false;
+  bones[bone].add(o);occluders.push(o);
+ }
+ depth('hips',[0,-.02,.0],[.228,.147,.148]);
+ depth('spine',[0,.25,.024],[.241,.265,.133]);
+ depth('head',[0,.015,-.042],[.183,.215,.161]);
+ for(const side of ['L','R']){
+  depth('upper'+side,[0,-.11,0],[.141,.171,.137]);
+  depth('fore'+side,[0,-.18,.0],[.089,.154,.087]);
+  depth('hand'+side,[0,-.012,0],[.082,.087,.08]);
+  depth('thigh'+side,[0,-.19,.0],[.11,.185,.108]);
+  depth('shin'+side,[0,-.21,0],[.086,.172,.095]);
+  depth('foot'+side,[0,-.048,.105],[.125,.075,.16]);
+ }
  const vector=new THREE.Vector3();
  function update(){
   for(let i=0;i<samples.length;i++){
@@ -185,5 +207,5 @@ export function makeGlyphShell(THREE,scene,bones){
   worldAttr.needsUpdate=true;
  }
  return {mesh,update,glyphCount:samples.length,material,atlas,
-  dispose(){geo.dispose();rect.dispose();material.dispose();atlas.dispose();}};
+  dispose(){geo.dispose();rect.dispose();material.dispose();atlas.dispose();proxyGeo.dispose();depthMat.dispose();}};
 }
