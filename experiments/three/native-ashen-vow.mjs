@@ -12,7 +12,10 @@ import {headingForSourceD8} from './source-motion.mjs';
 
 const COLS = 104, ROWS = 54, FX = 52, FY = 51.6, ART = 44.4;   // the source knight grid (KG)
 const SPRITE_ELEV = .35;                            // camera elevation of the sprite view, rad
-const MODEL_TOP = 2.08;                             // helmet top of the GLB, m
+const MODEL_TOP = 2.08; // approved Ashen Vow crown height, metres                             // helmet top of the GLB, m
+// Current GLB skin binding yields approximately 26% of the source rig-space height.
+// Restore the exact in-world silhouette height instead of rendering a tiny character.
+const ASHEN_SKIN_SCALE_CORRECTION=3.85;
 const SS = 4;                                       // render pixels per cell side
 const PW = COLS * SS, PH = ROWS * SS;               // offscreen target
 const GW = COLS * 2, GH = ROWS * 2;                 // to_ascii works on 2 x 2 samples per cell
@@ -154,7 +157,7 @@ export class NativeKnightGlyphs {
     const c = Math.cos(SPRITE_ELEV), s = Math.sin(SPRITE_ELEV);
     const pxPerM = ART * fch / (MODEL_TOP * c);
     this.knight.position.set(0, 0, 0);
-    this.knight.scale.setScalar(pxPerM * 1.9 / 8.9);   // knight-gltf scales 1.9 m to 8.9 units
+    this.knight.scale.setScalar(pxPerM * 1.9 / 8.9 * ASHEN_SKIN_SCALE_CORRECTION);   // knight-gltf scales 1.9 m to 8.9 units
     const dy = (FY - ROWS / 2) * fch, dx = (FX - COLS / 2) * fcw;   // foot point below/right of centre
     const cam = this.camera;
     cam.left = -COLS * fcw / 2; cam.right = COLS * fcw / 2;
