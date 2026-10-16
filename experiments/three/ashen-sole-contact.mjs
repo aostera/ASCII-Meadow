@@ -67,7 +67,10 @@ export function groundedSoleTarget(surfaces,restHeights,contacts,sourcePerMetre,
     count++;
   }
   const raw=count?-error/count*sourcePerMetre:0;
-  const target=Math.max(-maxCorrection,Math.min(maxCorrection,raw));
+  const bounded=Math.max(-maxCorrection,Math.min(maxCorrection,raw));
+  // A physically neutral sole height is +0, not IEEE -0. The latter
+  // breaks strict regression checks and creates needless state changes.
+  const target=bounded===0?0:bounded;
   return {target,raw,count,meanHeightError:count?error/count:null};
 }
 
