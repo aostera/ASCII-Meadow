@@ -80,6 +80,13 @@ fs.mkdirSync(dir,{recursive:true});
        // can make the third pass spuriously differ from the first.
        build();
        updateCamera(0,true);
+       // The source render amortizes cloud-shadow recomputation over 3
+       // frames via cloudTick. A forced full-world on/off/on QA cycle has
+       // no simulation time advance, yet otherwise reuses different cloud
+       // cache phases depending on preceding screenshot/RAF timing.
+       // Match the same freshly sampled cloud field in EACH test frame;
+       // never change the actual source runtime or game animation cadence.
+       cloudTick=2; // render() increments to 0, recomputing cloudBuf.
        render();
        const out=new Uint8Array(canvas.width*canvas.height*4);
        gl.readPixels(0,0,canvas.width,canvas.height,
