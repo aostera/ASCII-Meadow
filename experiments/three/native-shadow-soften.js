@@ -28,7 +28,12 @@ function nativeShadowEdgeFilter(source,width,height,x,y) {
   // Asymmetric per-cell antialiasing breaks rectangular silhouette steps
   // without inventing dark outlines or flattening the centre of a shadow.
   const edge=nativeShadowClamp((max-min-.095)/.23,0,1);
-  return nativeShadowClamp(v*(1-edge*.79)+filtered*(edge*.79),0,.7);
+  // Clamp local penumbra change: a thin arch opening must not become a
+  // heavy grey rectangle, and a dark stone contact core must remain dark.
+  // Source cast ray, light direction, authored palette are still authoritative.
+  const feather=v*(1-edge*.79)+filtered*(edge*.79);
+  return nativeShadowClamp(feather,
+    Math.max(0,v-.16),Math.min(.7,v+.16));
 }
 function nativeSoftShadowPatch(x0,y0,x1,y1){
   const xa=Math.max(4,Math.floor(x0)),ya=Math.max(4,Math.floor(y0));
