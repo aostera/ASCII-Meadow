@@ -22,11 +22,38 @@ let nativeMainPortalRecessEnabled=true;
 // T02: large physical opening to counter repetitive masonry at 100% play zoom.
 // Toggle is accessible ONLY to the QA page for identical-camera A/B.
 let nativeWidePortalSilhouetteEnabled=true;
+// The glyph reduction is a native-only stone surface treatment, not a decal.
+let nativeSparseGateAshlarEnabled=true;
 let nativeMainPortalRecessClear=true;
 let nativeCentralGablePortalClear=true;
 let nativeCentralGableProjects=false;
 let nativeOuterTowerReliefClear=true;
 let nativeOuterTowerIntrusions=[];
+
+// Large interrupted ashlar blocks on the PHYSICAL gatehouse masonry.
+// The source wall/door ray is resolved first by cast(); only that solid's
+// material glyph strength is affected. This leaves its depth, door carved
+// planks, RGB palette, map, camera, lighting and backing stone untouched.
+const nativeOriginalStoneOrnament=ornament;
+ornament=function nativeGateMasonryOrnament(x,y,z,n,so,base){
+  const v=nativeOriginalStoneOrnament(x,y,z,n,so,base);
+  if(!nativeSparseGateAshlarEnabled||!so?.meta?.nativeGateAshlar||
+    n[2]>=-.7||y<120+55||y>120+515)return v;
+  // The actual original oak leaves and their existing painted metalwork
+  // are authored geometry decoration, not part of this quieter ashlar.
+  if(so.meta.door&&pointedArch(x,y,0,so.meta.door.w,
+    so.meta.door.y,so.meta.door.h))return v;
+  // Broad, staggered world-space courses (56 high, 74 wide): retain a
+  // chipped mortar rim, leave the interior with sparse worn glyphs. Using
+  // physical hit coordinates rather than canvas rows prevents 2D stickers
+  // or view-specific noise. Stone remains occupied in raycast and depth.
+  const row=Math.floor((y-120)/56);
+  const h=((y-120)%56+56)%56;
+  const u=((x+160+(row&1)*37)%74+74)%74;
+  const mortar=h<5.5||h>50.5||u<5||u>69;
+  const weathered=vnoise(x*.067+z*.002,y*.071)>.77;
+  return mortar||weathered?v:Math.min(v,.036);
+};
 
 function nativeGothicBox(x0,x1,y0,y1,z0,z1,meta) {
   if(!(x1>x0&&y1>y0&&z1>z0))return;
@@ -134,6 +161,7 @@ function nativeRecessOriginalMainPortal(){
   function segment(original,x0,x1,y0,y1,z0,z1,withDoor=false){
     const meta={...original.meta};
     if(!withDoor)delete meta.door;
+    if(original===gate)meta.nativeGateAshlar=true;
     addBox(x0,x1,y0,y1,z0,z1,'wall',meta);
   }
   // The two VISIBLE masonry faces are 78 units apart in depth.
@@ -146,6 +174,7 @@ function nativeRecessOriginalMainPortal(){
     // pointed opening after combining two *convex* stone shoulders.
     const p=sign<0?[m,-1,0,-apex]:[-m,-1,0,-apex];
     const meta={...original.meta};delete meta.door;
+    if(original===gate)meta.nativeGateAshlar=true;
     solid('wall',[
       [1,0,0,x1],[-1,0,0,-x0],[0,1,0,roofY],
       [0,0,1,z1],[0,0,-1,-z0],p
@@ -654,6 +683,14 @@ window.__ASCII_NATIVE_COMPLETE_ARCH__={
   get facadeEnabled(){return nativeWestTraceryEnabled},
   get mainPortalRecessEnabled(){return nativeMainPortalRecessEnabled},
   get widePortalSilhouetteEnabled(){return nativeWidePortalSilhouetteEnabled},
+  get sparseGateAshlarEnabled(){return nativeSparseGateAshlarEnabled},
+  setSparseGateAshlarEnabledForTest(on){
+    const q=new URLSearchParams(location.search);
+    if(!q.has('nativeCastleFacadeTest')&&!q.has('nativeCastleFramedTest'))
+      return false;
+    nativeSparseGateAshlarEnabled=Boolean(on);
+    return true;
+  },
   setWidePortalSilhouetteEnabledForTest(on){
     const q=new URLSearchParams(location.search);
     if(!q.has('nativeCastleFacadeTest')&&!q.has('nativeCastleFramedTest'))
