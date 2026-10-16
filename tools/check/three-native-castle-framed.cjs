@@ -529,6 +529,93 @@ fs.mkdirSync(dir,{recursive:true});
      JSON.stringify(widthArt,null,2)+String.fromCharCode(10));
    console.log('NATIVE CASTLE WIDE PHYSICAL ARCH ART '+label+' '+
      JSON.stringify(widthArt));
+   // Native gate-only stone-glyph rhythm: original source geometry,
+   // depth, backing masonry, oak door, view and palette remain unchanged.
+   async function gateAshlarFrame(enabled,tag){
+     const data=await page.evaluate(({enabled,tag,pose})=>{
+       const a=window.__ASCII_NATIVE_COMPLETE_ARCH__,nat=window.__ASCII_NATIVE__;
+       if(!a.setSparseGateAshlarEnabledForTest(enabled))
+         throw Error('Gate-only material QA switch unavailable');
+       player.x=player.tx=pose.x;player.y=player.ty=pose.y;
+       player.h=player.hT=surfAt(pose.x,pose.y);
+       const map=JSON.stringify(MEADOW_MAP),old=Math.random;
+       try{
+         Math.random=()=>.513;build();VZ=1;updateCamera(0,true);
+         FG.tick=0;cloudTick=2;render();
+       }finally{Math.random=old}
+       const can=nat.renderer.domElement,gl=nat.renderer.getContext();
+       const pixels=new Uint8Array(can.width*can.height*4);
+       gl.readPixels(0,0,can.width,can.height,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+       const snap={enabled:a.sparseGateAshlarEnabled,pixels,
+         lum:new Float32Array(cathedral.lum),dep:new Float32Array(cathedral.dep),
+         glyph:new Int16Array(cathedral.glyph),camera:[camX,camY,VZ],
+         mapOK:map===JSON.stringify(MEADOW_MAP),
+         clear:a.mainPortalRecessClear,walkable:!blocked(player.x,player.y,player),
+         parts:a.features.castle.recessedMainPortal,
+         native:nat.mode==='three',
+         single:document.querySelectorAll('#three-parity-canvas').length===1};
+       (window.__ASCII_GATE_ASHLAR__ ||= {})[tag]=snap;
+       return {enabled:snap.enabled,mapOK:snap.mapOK,clear:snap.clear,
+         walkable:snap.walkable,parts:snap.parts,
+         native:snap.native,single:snap.single};
+     },{enabled,tag,pose:walkablePortal.best});
+     if(data.enabled!==enabled||!data.mapOK||!data.clear||!data.walkable||
+       !data.native||!data.single||data.parts<10)
+       throw Error('Physical gate material invariant '+JSON.stringify(data));
+     await page.addStyleTag({content:'.hud,.stats{visibility:hidden!important}'});
+     await page.screenshot({path:path.join(dir,
+       label+'-gate-ashlar-'+tag+'-gameplay.png'),timeout:60000});
+     await page.addStyleTag({content:'.hud,.stats{visibility:visible!important}'});
+   }
+   await gateAshlarFrame(true,'broad');
+   await gateAshlarFrame(false,'dense');
+   await gateAshlarFrame(true,'restored');
+   const ashlarArt=await page.evaluate(()=>{
+     const S=window.__ASCII_GATE_ASHLAR__,
+       a=S.broad,b=S.dense,c=S.restored;
+     let gpuChanged=0,gpuRestored=0,glyphChanged=0,
+       glyphRestored=0,occupiedChanged=0,depthChanged=0,removed=0;
+     for(let i=0;i<a.pixels.length;i+=4){
+       const different=(x,y)=>Math.max(Math.abs(x[i]-y[i]),
+         Math.abs(x[i+1]-y[i+1]),Math.abs(x[i+2]-y[i+2]))>8;
+       if(different(a.pixels,b.pixels))gpuChanged++;
+       if(different(a.pixels,c.pixels))gpuRestored++;
+     }
+     for(let i=0;i<a.glyph.length;i++){
+       if(a.glyph[i]!==b.glyph[i])glyphChanged++;
+       if(a.glyph[i]!==c.glyph[i]||
+         Math.abs(a.lum[i]-c.lum[i])>.01||
+         Math.abs(a.dep[i]-c.dep[i])>1)glyphRestored++;
+       if((a.lum[i]<0)!==(b.lum[i]<0))occupiedChanged++;
+       if(Math.abs(a.dep[i]-b.dep[i])>.01)depthChanged++;
+       if(a.glyph[i]===-1&&b.glyph[i]>=0&&a.lum[i]>=0)removed++;
+     }
+     const sameCamera=JSON.stringify(a.camera)===JSON.stringify(b.camera)&&
+       JSON.stringify(a.camera)===JSON.stringify(c.camera);
+     const res={gpuChanged,gpuRestored,glyphChanged,glyphRestored,
+       occupiedChanged,depthChanged,removed,sameCamera,
+       sameParts:a.parts===b.parts&&b.parts===c.parts,
+       cavityClear:a.clear&&b.clear&&c.clear,
+       collisionSafe:a.walkable&&b.walkable&&c.walkable,
+       mapUnchanged:a.mapOK&&b.mapOK&&c.mapOK,
+       native:[a,b,c].every(x=>x.native&&x.single&&x.camera[2]===1),
+       restored:a.enabled&&!b.enabled&&c.enabled};
+     delete window.__ASCII_GATE_ASHLAR__;
+     return res;
+   });
+   if(ashlarArt.gpuChanged<60||ashlarArt.glyphChanged<25||
+     ashlarArt.removed<25||ashlarArt.gpuRestored>150||
+     ashlarArt.glyphRestored!==0||ashlarArt.occupiedChanged!==0||
+     ashlarArt.depthChanged!==0||!ashlarArt.sameCamera||
+     !ashlarArt.sameParts||!ashlarArt.cavityClear||
+     !ashlarArt.collisionSafe||!ashlarArt.mapUnchanged||
+     !ashlarArt.native||!ashlarArt.restored)
+     throw Error('Physical gate ashlar not localized/reversible '+
+       JSON.stringify(ashlarArt));
+   fs.writeFileSync(path.join(dir,label+'-gate-ashlar-art.json'),
+     JSON.stringify(ashlarArt,null,2)+String.fromCharCode(10));
+   console.log('NATIVE CASTLE GATE BROAD ASHLAR '+label+' '+
+     JSON.stringify(ashlarArt));
    // The difference must be made by a real physical carve, not a
    // screen-space dark decal or an always-hidden solid. Compare the same
    // 100% playable gate-follow-camera before/after in one native WebGL2
