@@ -84,6 +84,16 @@ fs.mkdirSync(out,{recursive:true});
            Math.sin(target-a),Math.cos(target-a)))<.14;
        },degree*Math.PI/180,{timeout:5000});
      }
+     // Unlike the source 8-way sprites, the real 3D rig supports every
+     // heading. Exercise an angle that is deliberately NOT a preset.
+     await page.locator('#yaw').fill('137');
+     await page.waitForFunction(()=>{
+       const lab=window.__ASHEN_ANIMATION_LAB__;
+       const a=lab?.state?.heading,target=137*Math.PI/180;
+       return Number.isFinite(a)&&Math.abs(Math.atan2(
+         Math.sin(target-a),Math.cos(target-a)))<.14;
+     },undefined,{timeout:5000});
+     assert.equal(await page.locator('#yaw-value').textContent(),'137°');
      await page.locator('[data-view="back"]').click();
      await page.screenshot({path:path.join(out,name+'-run-back.png')});
 
@@ -119,7 +129,7 @@ fs.mkdirSync(out,{recursive:true});
      if(errors.length)throw Error(name+' page errors: '+errors.join(' | '));
      console.log('TRIPO WORKSHOP '+name+' OK: '+JSON.stringify({
        bones:s.bones,skinnedMeshes:s.skinnedMeshes,
-       sampledHeadings:8,motions:['Idle','Walk','Run','Jump'],
+       sampledHeadings:'8 presets + 137° custom',motions:['Idle','Walk','Run','Jump'],
        jumpHeight:jumping.jumpHeight,steppedFrame:stepped.frame
      }));
      await ctx.close();
