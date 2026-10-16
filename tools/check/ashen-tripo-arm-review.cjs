@@ -571,8 +571,10 @@ fs.mkdirSync(out,{recursive:true});
      transitionProbe.lastClip!=='Idle')
     throw Error('Real skinned knight clip transition / wall stop broke: '+
       JSON.stringify(transitionProbe));
-  // Save a REAL 60 Hz Run gait as 12 sequence frames, not a still chosen
-  // at a flattering moment. The screenshots use the actual Tripo GPU skin.
+  // Save ONE FULL continuous 60-frame / 60 Hz Run pose sequence.
+  // Unlike the old 12 screenshots separated by three poses, this reveals
+  // one-frame ankle, knee, wrist and cloth discontinuities in the actual
+  // 40-bone GPU-skinned Tripo mesh as replayable sequential PNGs.
   await page.locator('[data-motion="Run"]').click();
   await page.locator('[data-view="side"]').click();
   await page.evaluate(()=>{
@@ -582,13 +584,20 @@ fs.mkdirSync(out,{recursive:true});
       {speed:15,run:true,heading:0},i/60);
   });
   const poseSamples=[];
-  for(let i=0;i<12;i++){
-    for(let j=0;j<3;j++)await page.locator('#frame').click();
+  for(let i=0;i<60;i++){
+    await page.locator('#frame').click();
     const pose=await page.evaluate(()=>window.__ASHEN_ANIMATION_LAB__.state);
     poseSamples.push({
       phase:pose.phase,shoulder:pose.armPose.shoulderSwing,
-      elbow:pose.armPose.leftElbow,rightElbow:pose.armPose.rightElbow
+      swordShoulder:pose.armPose.rightShoulderSwing,
+      elbow:pose.armPose.leftElbow,rightElbow:pose.armPose.rightElbow,
+      knee:pose.kneeBend,ankle:pose.anklePitch,
+      soleCorrection:pose.contactCorrection,planted:pose.footContact
     });
+    // Advance through a full browser render before capturing the newly
+    // stepped REAL skinned mesh, not the previous WebGL frame.
+    await page.evaluate(()=>new Promise(resolve=>
+      requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     await page.screenshot({
       path:path.join(out,'run-cycle-'+String(i).padStart(2,'0')+'.png'),
       clip:{x:300,y:92,width:415,height:635},timeout:30000
@@ -598,9 +607,23 @@ fs.mkdirSync(out,{recursive:true});
     Math.min(...poseSamples.map(p=>p.shoulder));
   const elbowRange=Math.max(...poseSamples.map(p=>p.rightElbow))-
     Math.min(...poseSamples.map(p=>p.rightElbow));
-  if(swingRange<.17||elbowRange<.035)
-    throw Error('Rigid arm run cycle: '+JSON.stringify({swingRange,elbowRange,poseSamples}));
-  console.log('12 true 60 Hz run-swing images OK: '+JSON.stringify({swingRange,elbowRange}));
+  let maxKneeTick=0,maxAnkleTick=0,maxContactTick=0;
+  for(let i=1;i<poseSamples.length;i++){
+    const before=poseSamples[i-1],after=poseSamples[i];
+    if(after.phase<=before.phase)throw Error('Run cycle phase jumped backwards');
+    maxKneeTick=Math.max(maxKneeTick,...after.knee.map((v,j)=>Math.abs(v-before.knee[j])));
+    maxAnkleTick=Math.max(maxAnkleTick,...after.ankle.map((v,j)=>Math.abs(v-before.ankle[j])));
+    maxContactTick=Math.max(maxContactTick,Math.abs(after.soleCorrection-before.soleCorrection));
+  }
+  if(poseSamples.length!==60||swingRange<.17||elbowRange<.035||
+     maxKneeTick>.5||maxAnkleTick>.3||
+     maxContactTick>.18/60+.00001)
+    throw Error('60-frame real skinned Run gait discontinuity: '+
+      JSON.stringify({swingRange,elbowRange,maxKneeTick,maxAnkleTick,
+        maxContactTick,poseSamples}));
+  console.log('60 sequential TRUE TRIPO 60 Hz Run poses saved: '+
+    JSON.stringify({swingRange,elbowRange,maxKneeTick,maxAnkleTick,
+      maxContactTick,frames:poseSamples.length}));
   await browser.close();
  }catch(e){await browser.close();throw e}
 })().catch(e=>{console.error(e);process.exitCode=1});
