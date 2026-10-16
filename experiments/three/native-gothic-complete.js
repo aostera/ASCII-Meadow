@@ -158,7 +158,57 @@ function nativeBuildCompleteCastle(){
     }
     nativeGothicBox(-8,8,Y+655,Y+673,z-12,z+12);
   }
-  feature.naveAndVaults=solids.length-before;
+  feature.naveAndVaults=solids.length-before;before=solids.length;
+
+  // Four physically projecting west-front lancet canopies. The gate is
+  // deliberately NOT a billboard: each hood has stone jambs, two ascending
+  // ogival ribs, an offset keystone, relief bosses and broken sill courses.
+  // These start beyond |x|=150 and y>=Y+155: the original central gateway
+  // (|x|<75), its grounded collision and every passage remain unchanged.
+  // Deliberately non-uniform rise and missing coping pieces prevent the
+  // uniform horizontal rows seen in the baseline ASCII facade captures.
+  for(const side of [-1,1])for(let bay=0;bay<2;bay++){
+    const cx=side*(174+bay*72),z=95-bay*5;
+    const base=Y+155+bay*15,shoulder=base+118+bay*9;
+    const peak=shoulder+51+bay*8;
+    const jamb=bay===0?19:23;
+    for(const edge of [-1,1]){
+      const x=cx+edge*jamb;
+      nativeGothicBox(x-5,x+5,base,shoulder+6,z-5,z+7,{
+        courses:[base+29,base+68,base+101]
+      });
+      // Splintered, high-relief stones descend the vertical edge; they do
+      // not fill the window gap or paint a rectangular dark decal.
+      for(let k=0;k<3;k++){
+        if((k+bay+(side>0?1:0))%4===0)continue;
+        const yy=base+19+k*31;
+        nativeGothicBox(x+edge*4-4,x+edge*4+4,
+          yy,yy+7+(k%2)*5,z-11,z-4,{
+            courses:[yy+4]
+          });
+      }
+      nativeGothicBeam(cx+edge*jamb,shoulder,
+        cx,peak,z-5,5);
+      // Projected ribs run just proud of the masonry, casting real source
+      // shadows rather than changing the global material lightness.
+      nativeGothicBeam(cx+edge*(jamb+8),shoulder-4,
+        cx,peak+9,z-12,4);
+    }
+    nativeGothicBox(cx-6,cx+6,peak-3,peak+13,z-14,z+4,{
+      courses:[peak+7]
+    });
+    for(let k=0;k<4;k++){
+      const ox=(k-1.5)*13;
+      if(k===bay+(side>0?1:0))continue;
+      const yy=base-15+(k%2)*3;
+      nativeGothicBox(cx+ox-6,cx+ox+5,yy,yy+8,
+        z-12,z+7,{courses:[yy+3]});
+    }
+    // Narrow single stone corbel below each bay, never at ground level.
+    nativeGothicBox(cx-12,cx+12,base-23,base-15,
+      z-16,z+8,{courses:[base-20]});
+  }
+  feature.portalSideTracery=solids.length-before;
 
   for(let i=start;i<solids.length;i++){
     const s=solids[i],b=s.bb;
