@@ -24,6 +24,7 @@ function setupBones(model){
   // skin.joints INDEX order, weights and inverse-bind matrices. Use exact
   // original Tripo skin indices as stable animation bindings.
   const sets={
+    pelvis:find('tripo::Root',0),
     spine:find('tripo::Spine_0',1),
     chest:find('tripo::Spine_1',2),
     head:find('tripo::Head_0',4),
@@ -64,7 +65,30 @@ function setupBones(model){
       iy:modelAxes[1].clone().applyQuaternion(inverseWorld).normalize(),
       iz:modelAxes[2].clone().applyQuaternion(inverseWorld).normalize()});
   }
-  return {meshes,skin,sets,rest};
+  // Never assume straight source legs. Actual Tripo knee pivots (bones 32,
+  // 27) are already in FRONT of hip pivots, while ankles (33,28) turn
+  // slightly backwards: solving an absolute 2D leg IK on top of these
+  // curved rest bones double-bends knees.
+  const sc=model.getWorldScale(new THREE.Vector3()).x;
+  const sourceLeg=(bones)=>{
+    const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();
+    bones[0].getWorldPosition(a);bones[1].getWorldPosition(b);
+    bones[2].getWorldPosition(c);
+    const first=b.clone().sub(a),second=c.clone().sub(b);
+    const toXY=v=>[v.dot(modelAxes[0])/sc,v.dot(modelAxes[1])/sc];
+    const [ax,ay]=toXY(first),[bx,by]=toXY(second);
+    return {
+      thigh: bones[1].position.length(),
+      shin: bones[2].position.length(),
+      restHip: Math.atan2(ax,-ay),
+      restShin: Math.atan2(bx,-by),
+      restX:ax+bx,restY:ay+by
+    };
+  };
+  const legCalibration={
+    left:sourceLeg(sets.leftLeg),right:sourceLeg(sets.rightLeg)
+  };
+  return {meshes,skin,sets,rest,legCalibration};
 }
 // The sword needs to pass through the ACTUAL weighted glove/palm surface,
 // not through the centre of a skeleton joint which can sit outside the mesh.
@@ -106,7 +130,7 @@ function locateRightPalm(meshes,wrist){
 // Anatomical, phase-continuous walk/run with stance/swing foot targets.
 // Every joint below deforms the authentic Tripo SKIN rather than a fake puppet.
 function animateRig(model,source,root,weapon){
-  const {sets,rest}=source,axisQ=new THREE.Quaternion();
+  const {sets,rest,legCalibration}=source,axisQ=new THREE.Quaternion();
   const wristWorldQ=new THREE.Quaternion(),rootWorldQ=new THREE.Quaternion();
   const swordCantQ=new THREE.Quaternion();
   function twist(b,axes){
@@ -125,45 +149,58 @@ function animateRig(model,source,root,weapon){
     leftFootLift:0,rightFootLift:0,leftFootX:0,rightFootX:0,
     weaponAttached:true,footContact:[true,true],kneeBend:[0,0]};
   const pos=sets.spine.position.clone();
-  const L1=.209, L2=.169; // approximate Tripo rest-pose segment lengths in source units
-  function legPose(bones,offset,weight,jumpWeight,run){
+  const pelvisRest=sets.pelvis.position.clone();
+  const lastContacts=[false,false];
+  // Footstrike is just after the swing foot reaches forward. Walking has
+  // bilateral double support; running has two brief airborne intervals.
+  // A stationary studio uses treadmill targets; an independently moving
+  // game root can later use world-space anchors with the same 2-bone IK.
+  function legPose(bones,cal,offset,weight,jumpWeight,run,pelvisBob){
     const p=((phase/(2*Math.PI)+offset)%1+1)%1;
-    const stance=run>.5?.50:.61;
+    const stance=.63-run*.21;
     const inStance=p<stance;
     const u=inStance?p/stance:(p-stance)/(1-stance);
-    // The previous run step (.163) and high foot lift (.117) made a
-    // two-bone IK target fold the shin into the thigh at >90 degrees.
-    // Keep a restrained cadence until real foot planting/root motion exists.
-    const step=.075+run*.030;
-    const back=step*(inStance?1-2*u:2*smooth(u)-1);
-    const lift=inStance?0:(.045+run*.027)*Math.sin(Math.PI*u);
-    // Tripo anatomical forward is +X; feet remain on the sagittal plane.
-    const x=weight*back*(1-.76*jumpWeight)+(offset?.022:-.022)*jumpWeight;
-    const y=-.375+weight*lift*(1-.6*jumpWeight)+.078*jumpWeight;
-    const rawLen=Math.hypot(x,y);
-    // Hard-stop excessive knee flexion in the sprint swing phase.
-    // Keeping the target *within* the allowed IK annulus avoids
-    // folding the knee sharply or clamping acos into an inverted limb.
-    const kneeLimit=.80+run*.22+Math.min(1,jumpWeight)*.20;
+    const step=.071+run*.026;
+    // Heel strike in front, mid-stance over pelvis, toe-off behind.
+    // The weight shift is predictable and continuous at touchdown.
+    const travel=inStance?1-2*u:2*smooth(u)-1;
+    const x=cal.restX+weight*step*travel*(1-.78*jumpWeight);
+    const lift=inStance?0:(.041+run*.020)*Math.sin(Math.PI*u);
+    const y=cal.restY-pelvisBob+weight*lift*(1-.57*jumpWeight)+
+      .067*jumpWeight;
+    const L1=cal.thigh,L2=cal.shin;
+    const kneeLimit=.82+run*.22+Math.min(1,jumpWeight)*.20;
     const minReach=Math.sqrt(Math.max(0,
       L1*L1+L2*L2+2*L1*L2*Math.cos(kneeLimit)));
-    const len=clamp(rawLen,minReach,L1+L2-.001);
+    const rawLen=Math.hypot(x,y),len=clamp(rawLen,minReach,L1+L2-.0008);
     const theta=Math.atan2(x,-y);
     const alpha=Math.acos(clamp((L1*L1+len*len-L2*L2)/(2*L1*len),-1,1));
     const knee=Math.PI-Math.acos(clamp(
       (L1*L1+L2*L2-len*len)/(2*L1*L2),-1,1));
-    // IMPORTANT: two-bone IK admits TWO mirrored solutions. Old
-    // hip=theta-alpha / knee=+knee put the bend behind the knight
-    // when +X is forward. The anatomical branch makes the knee point
-    // FORWARD: thigh=theta+alpha, shin bends back by -knee.
-    const hip=theta+alpha;
-    const shin=-knee;
-    twist(bones[0],[['iz',hip]]);
-    twist(bones[1],[['iz',shin]]);
-    twist(bones[2],[['iz',-hip-shin*.76]]);
-    twist(bones[3],[]);
-    return {lift:weight*lift,x,knee,hip,
-      contact:jumpWeight<.15&&(weight<.08||inStance)};
+    // Target anatomical angles must be RELATIVE to each leg's real rest
+    // orientation, not relative to a hypothetical straight T-pose leg.
+    const absoluteThigh=theta+alpha,absoluteShin=absoluteThigh-knee;
+    const hipDelta=absoluteThigh-cal.restHip;
+    const kneeDelta=(absoluteShin-absoluteThigh)-
+      (cal.restShin-cal.restHip);
+    const heelStrike=inStance?-.030*(1-smooth(u*5)):0;
+    const toeOff=inStance?.12*smooth((u-.78)/.22):0;
+    const flightPitch=inStance?0:-.038*Math.sin(Math.PI*u);
+    const footPitch=(heelStrike+toeOff+flightPitch)*weight*
+      (1-.7*jumpWeight);
+    const contact=jumpWeight<.15&&(weight<.08||inStance);
+    // Idle restores exact source rest quaternions. Preserve original
+    // unmodified knee/ankle curvature and natural feet-on-ground.
+    if(weight<.02&&jumpWeight<.02){
+      for(const bone of bones)twist(bone,[]);
+    }else{
+      twist(bones[0],[['iz',hipDelta]]);
+      twist(bones[1],[['iz',kneeDelta]]);
+      twist(bones[2],[['iz',-hipDelta-kneeDelta+footPitch]]);
+      twist(bones[3],[['iz',Math.max(0,toeOff)*.19*weight]]);
+    }
+    return {lift:weight*lift,x:x-cal.restX,y,knee,hip:hipDelta,
+      anklePitch:footPitch,contact,stance:inStance,phase:p};
   }
   function update(dt,motion,now){
     const d=clamp(Number(dt)||1/60,0,1/15);
@@ -179,7 +216,9 @@ function animateRig(model,source,root,weapon){
     const arc=airborne?Math.max(0,Math.sin(Math.PI*clamp(jumpTime/1.49,0,1))):0;
     const jumpWeight=Math.max(arc*.94,airMix*.32);
     // phase must NEVER reset when moving between Idle/Walk/Run.
-    const hz=(1.45+1.20*runMix)*Math.min(1.45,Math.max(.7,speed));
+    // Gait cycles per second (2 steps per cycle): ~1.7 walking steps/s
+    // and ~3.5 running steps/s, rather than the previous ~7.7/s.
+    const hz=(.86+.56*runMix)*clamp(Math.sqrt(Math.max(.35,speed)),.8,1.25);
     phase+=d*2*Math.PI*hz*(stride>.03?1:.02);
     const swing=Math.sin(phase);
     const armAmplitude=(.19+runMix*.20)*stride*(1-.78*airMix);
@@ -214,11 +253,22 @@ function animateRig(model,source,root,weapon){
     // hilt. Fingers are not independently rigged: never imply a true grasp.
     const wristTurn=-.10-.04*runMix+Math.sin(phase)*stride*.025;
     twist(sets.rightArm[3],[['iy',wristTurn]]);
-    const left=legPose(sets.leftLeg,0,stride,jumpWeight,runMix);
-    const right=legPose(sets.rightLeg,.5,stride,jumpWeight,runMix);
-    twist(sets.spine,[['iz',.028*runMix+.022*arc],['ix',.012*Math.sin(phase)*stride]]);
+    // Controlled weight loading and spring-like rise at alternating
+    // strides. The real Tripo pelvis bone is the common parent of both
+    // legs and torso; compensating ankle Y preserves the stance ground.
+    const bounce=stride*(.003+.010*runMix)*(1-Math.cos(2*phase))*.5;
+    const pelvisBob=bounce-.002*stride*runMix;
+    sets.pelvis.position.copy(pelvisRest);
+    sets.pelvis.position.y+=pelvisBob;
+    const left=legPose(sets.leftLeg,legCalibration.left,0,
+      stride,jumpWeight,runMix,pelvisBob);
+    const right=legPose(sets.rightLeg,legCalibration.right,.5,
+      stride,jumpWeight,runMix,pelvisBob);
+    twist(sets.spine,[['iz',-.016*stride-.044*runMix-.012*arc],
+      ['ix',.015*Math.sin(phase)*stride]]);
     twist(sets.chest,[['iz',-.012*runMix],['ix',.012*Math.sin(bodyClock*1.75)]]);
-    twist(sets.head,[['ix',.012*Math.sin(bodyClock*1.1)],['iy',.015*Math.cos(bodyClock*.7)]]);
+    twist(sets.head,[['ix',.012*Math.sin(bodyClock*1.1)],
+      ['iy',.015*Math.cos(bodyClock*.7)],['iz',.022*runMix]]);
     sets.spine.position.copy(pos);
     sets.spine.position.y+=.004*Math.sin(bodyClock*1.8)*(1-stride)+
       Math.abs(Math.cos(phase))*stride*.012;
@@ -256,13 +306,17 @@ function animateRig(model,source,root,weapon){
       leftFootLift:left.lift,rightFootLift:right.lift,
       leftFootX:left.x,rightFootX:right.x,
       kneeBend:[left.knee,right.knee],
+      legCalibration,stepFrequencyHz:hz,pelvisBob,
+      anklePitch:[left.anklePitch,right.anklePitch],
+      stancePhase:[left.stance,right.stance],
+      footY:[left.y,right.y],
       capeDeflection:capeRoll.map((roll,i)=>[roll,capeYaw[i]]),
       weaponAttached:!!weapon?.parent,
       armPose:{shoulderDown,shoulderSwing:leftSwing,rightShoulderSwing:rightSwing,
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v7-forward-knee-limits'
+      animationVersion:'Tripo-IK-v8-rest-calibrated-gait'
     };
     return clip.toLowerCase();
   }
