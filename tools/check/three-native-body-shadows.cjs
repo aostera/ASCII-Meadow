@@ -27,11 +27,16 @@ fs.mkdirSync(out,{recursive:true});
     const api=window.__ASCII_NATIVE_BODY_SHADOWS__;
     const before=JSON.stringify(MEADOW_MAP);
     const soft=shadeCapsule;
+    // Contact patch + faint sun cast only: fire and lightning casts keep the
+    // source profile and are checked separately below.
     const sample=fn=>{
-      shadeCapsule=fn;
-      shadow.fill(0,SBY0*COLS,SBY1*COLS);
-      castShadow(player);
-      return shadow.slice();
+      const fires=braziers.splice(0),bolt=flash;
+      shadeCapsule=fn;flash=0;
+      try{
+        shadow.fill(0,SBY0*COLS,SBY1*COLS);
+        castShadow(player);
+        return shadow.slice();
+      }finally{braziers.push(...fires);flash=bolt}
     };
     let source,refined;
     try{
@@ -55,8 +60,26 @@ fs.mkdirSync(out,{recursive:true});
       throw Error('Contact patch still a full-strength block '+
         JSON.stringify({srcBlock,newBlock}));
     if(peakNew<peakSrc*.8)throw Error('Contact shadow lost its core');
+    // Sun, fire and lightning casts (non-zero fade) keep the source profile:
+    // the lightning shadow is meant to stay hard.
+    const cast=(fn,fade)=>{
+      shadow.fill(0,SBY0*COLS,SBY1*COLS);
+      const x=player.x*CW,y=(player.y+.3)*CH;
+      fn(x,y,x+40*CW/8,y-20*CH/8,3*CW,1.6*CW,.6,fade,1.3);
+      return shadow.slice();
+    };
+    let castCells=0;
+    for(const fade of [.65,.5,.35]){
+      const a=cast(api.source,fade),b=cast(soft,fade);
+      for(let i=0;i<a.length;i++){
+        if(a[i]!==b[i])throw Error('Directional cast changed (fade '+fade+') at '+i);
+        if(a[i]>0)castCells++;
+      }
+    }
+    if(castCells<10)throw Error('Directional cast sample empty');
+    shadow.fill(0,SBY0*COLS,SBY1*COLS);
     if(JSON.stringify(MEADOW_MAP)!==before)throw Error('Map modified');
-    return {srcCells,newCells,srcBlock,newBlock,peakSrc,peakNew};
+    return {srcCells,newCells,srcBlock,newBlock,peakSrc,peakNew,castCells};
    });
    await page.screenshot({path:path.join(out,label+'.png'),timeout:60000});
    if(errors.length)throw Error(label+' browser exceptions: '+errors.join(' | '));

@@ -6,9 +6,13 @@
 // smoothly with distance from the centre (smoothstep of 1-r): the same capsule, the same
 // peak and direction, but the blades fade out towards the rim instead of
 // stopping on a cell boundary. Source shadows.js stays unchanged.
+// Only the contact patch is softened. castShadow() draws it with fade 0;
+// every directional cast (sun, fire, the deliberately hard lightning shadow)
+// goes through castAlong() with a non-zero fade and keeps the source profile.
 const nativeSourceShadeCapsule=shadeCapsule;
 let nativeBodyShadowCells=0;
 shadeCapsule=function(ax,ay,bx,by,r0,r1,s,fade,ky){
+  if(fade!==0)return nativeSourceShadeCapsule(ax,ay,bx,by,r0,r1,s,fade,ky);
   const r=Math.max(r0,r1);
   const x0=Math.max(SBX0,Math.floor((Math.min(ax,bx)-r)/CW)),x1=Math.min(SBX1-1,Math.ceil((Math.max(ax,bx)+r)/CW));
   const y0=Math.max(SBY0,Math.floor((Math.min(ay,by)-r/ky)/CH)),y1=Math.min(SBY1-1,Math.ceil((Math.max(ay,by)+r/ky)/CH));
