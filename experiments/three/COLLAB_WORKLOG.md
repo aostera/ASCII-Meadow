@@ -47,3 +47,26 @@
 3. T02 remains pending external art/mobile review; T03 draft remains stacked; далее отдельная проверка T04 shadows и реальных устройств. Claude параллельно занимается собственным ассетным пайплайном и отмечает handoff в PR.
 
 **Ссылки:** [PR #54](https://github.com/aostera/ASCII-Meadow/pull/54) · [PR #58](https://github.com/aostera/ASCII-Meadow/pull/58) · [T03 source screenshots](https://github.com/aostera/ASCII-Meadow/actions/runs/38928898895/artifacts/12057678635) · [T03 old green run](https://github.com/aostera/ASCII-Meadow/actions/runs/38928898895).
+
+
+## 2026-10-16 — T03: результат multi-angle / source-shadow QA (LATEST)
+
+**GPT, [кодовый коммит 3bd541c2](https://github.com/aostera/ASCII-Meadow/commit/3bd541c275ffcda060d8a63259b06900b009ddbd)**, [GitHub Actions 38944493834](https://github.com/aostera/ASCII-Meadow/actions/runs/38944493834): **SUCCESS**. Пакет содержит 18 `native.html` скриншотов (3 типа × front/side/back × PC/phone), 2 JSON физических отчёта и первоначальные PC/phone и GL/2D fallback кадры. [Полный artifact](https://github.com/aostera/ASCII-Meadow/actions/runs/38944493834/artifacts/12065945739).
+
+### Проверенная геометрия, проходы и тени
+
+| Руина | Новые convex элементы | Максимальный Y против старого raster ceiling | Новая видимость front/side (source hits) | Изменённых солнечных world-ray теней |
+|---|---:|---:|---:|---:|
+| Разрушенные ворота | 6 | 330.72 ≤ 336.96 | 41 / 13 | 1 272 |
+| Аббатство | 6 | 361.20 ≤ 371.52 | 32 / 17 | 1 138 |
+| Клуатр | 8 | 274.80 ≤ 280.80 | 49 / 12 | 277 |
+
+Это значения тестового исходного рейтрейсинга на текущей кодовой версии (не FPS и не количество уникальных кадров). В обоих viewport все три архитектурных пробных yaw (авторский + ±π/5) сохраняют сквозные пустые арки с обеих сторон и физический каменный простенок; нет инверсии выпуклых плоскостей; исходная `MEADOW_MAP` неизменна, один Three GPU canvas. Старые native художественные тесты и оригинальные GL / Canvas2D collision/inspection tests **PASS**.
+
+**Причина первого красного CI** [38943882845](https://github.com/aostera/ASCII-Meadow/actions/runs/38943882845): тест неверно предполагал +x/+z локальную ориентацию теней, тогда как реальные yaw в пользовательской карте, например gate ~2.998 рад, почти поворачивают её на 180°. В [3bd541c2](https://github.com/aostera/ASCII-Meadow/commit/3bd541c275ffcda060d8a63259b06900b009ddbd) пробы теперь вычисляются из **повёрнутых actual convex bb**, под проекцией источника `LGT`; подтверждены реальные sunlight intersections. Не «понижали порог ради зелёного теста». Корректировка высоты новых нативных готических фрагментов — [3edd6c2a](https://github.com/aostera/ASCII-Meadow/commit/3edd6c2a17b95e1a0dd88d1c1bb3f2534c065fed), без изменения production `src/world/ruins.js`.
+
+**Художественный контроль:** в настоящем игровом phone (390×844 DPR2 в Chromium) стены и деревья по-прежнему очень тёмные и плотные, некоторые боковые кадры не показывают здание целиком при `VZ=1`. Это **открытая mobile-framing / T07 задача**, а не доказательство полного визуального соответствия. Ракурсы QA — **тестовая постановка игрока для камеры**, а не реальный маршрут через мир. Физический iPhone/Android и арт-приёмка референсов отсутствуют. Не переводить T03 из **IN_PROGRESS** в DONE и не мержить PR #58 в PR #54/main.
+
+**Просмотр скриншотов для владельца:** PDF-альбом из 18 отдельных страниц, каждая может масштабироваться; отдельные оригинальные PNG фронт/бок/зад доступны в скачанном artifact GitHub. Не вставлять листы коллажа в тело чата как единственный способ просмотра.
+
+**Следующее для GPT:** after high-detail 3D geometry T03 QA, перейти к адресному T04 shadow/ground-collision тестированию (исходные прозрачные отверстия в проёмах, отсутствие прямоугольной тени, ghost-after-undo), используя одноразовые source snapshots и не изменяя глобальную яркость. **Следующее для Claude:** продолжить своё направление (оригинальные glTF/анимации рыцаря и коровы, минимум 60 кадров если requested sprite sheet), без правок этих архитектурных файлов; перед началом смотреть актуальный PR #58 HEAD и этот журнал.
