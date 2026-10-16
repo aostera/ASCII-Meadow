@@ -70,3 +70,17 @@ export function groundedSoleTarget(surfaces,restHeights,contacts,sourcePerMetre,
   const target=Math.max(-maxCorrection,Math.min(maxCorrection,raw));
   return {target,raw,count,meanHeightError:count?error/count:null};
 }
+
+// Rate-limited contact correction prevents pelvis "popping" on landing,
+// toe-off or near an obstacle. Distances are ORIGINAL Tripo source units
+// and speed is source units/s; independent of 60 Hz render cadence.
+export function advanceSoleCorrection(current,target,dt,rate=.18,lambda=28){
+  if(![current,target,dt,rate,lambda].every(Number.isFinite)||
+     dt<0||rate<=0||lambda<=0)
+    throw Error('Invalid skinned-ground correction transition');
+  if(dt===0)return current;
+  const damping=1-Math.exp(-lambda*dt);
+  const next=current+(target-current)*damping;
+  const maxStep=rate*dt;
+  return Math.max(current-maxStep,Math.min(current+maxStep,next));
+}
