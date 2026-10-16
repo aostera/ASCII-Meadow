@@ -41,6 +41,8 @@ fs.mkdirSync(out,{recursive:true});
    const data=await inspect();
    // Always retain a genuine render even when an anatomy assertion fails.
    await page.screenshot({path:path.join(out,mode.toLowerCase()+'-'+view+'.png')});
+   if(data.pose.animationVersion!=='Tripo-IK-v6-arm-followthrough')
+      throw Error('Wrong shoulder/elbow controller: '+data.pose.animationVersion);
    if(mode==='Idle'){
     if(!data.anchor.valid||data.anchor.count<12)
       throw Error('Weapon did not find weighted wrist vertices: '+JSON.stringify(data));
