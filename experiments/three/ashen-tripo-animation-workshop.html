@@ -165,6 +165,11 @@ ui.frame.addEventListener('click',()=>{
 ui.palette.addEventListener('click',()=>{
   if(!palette)return;
   const enabled=palette.setEnabled(!palette.enabled);
+  // Preserve wireframe inspector state after switching material instances.
+  rig?.traverse(o=>{if(o.isSkinnedMesh){
+    for(const m of (Array.isArray(o.material)?o.material:[o.material]))
+      m.wireframe=wire;
+  }});
   ui.palette.setAttribute('aria-pressed',String(enabled));
   status(enabled?'Экспериментальная палитра включена. GLB и игровые материалы не изменены.':
     'Исходные материалы GLB восстановлены для сравнения.');
