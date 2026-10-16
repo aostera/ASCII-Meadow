@@ -527,11 +527,10 @@ fs.mkdirSync(dir,{recursive:true});
    // genuinely see the carved doorway. Match its exact logged camera
    // and take unmodified GPU frames before/after. These art inspection
    // screenshots must NEVER be labeled as normal follow-camera gameplay.
-   const originalMapForMedium=await page.evaluate(()=>JSON.stringify(MEADOW_MAP));
    const gateMedium=mediumMetrics.find(x=>x.id==='gate-and-rose');
-   const mediumState=await page.evaluate(()=>{window.__ASCII_PORTAL_MEDIUM__={};return true});
+   await page.evaluate(()=>{window.__ASCII_PORTAL_MEDIUM__={}});
    async function mediumShot(enabled,tag){
-     const stats=await page.evaluate(({enabled,cam})=>{
+     const stats=await page.evaluate(({enabled,cam,tag})=>{
        const arch=window.__ASCII_NATIVE_COMPLETE_ARCH__;
        if(!arch.setMainPortalRecessEnabledForTest(enabled))
          throw Error('Medium QA-only recess switch missing');
