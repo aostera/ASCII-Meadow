@@ -197,6 +197,16 @@ fs.mkdirSync(output,{recursive:true});
      configuredHz:fin.rasterHz,
      simulationFrames:fin.gameFrames-idle.gameFrames
    }));
+   if(!(fin.glyphBuilds>idle.glyphBuilds&&
+        fin.glyphCacheHits>idle.glyphCacheHits&&
+        fin.glyphBuilds<=fin.rasterFrames+1))
+     throw Error('Game kept rebuilding unchanged ASCII geometry: '+
+       JSON.stringify({builds:fin.glyphBuilds,hits:fin.glyphCacheHits,
+         rasterFrames:fin.rasterFrames}));
+   console.log('Native ASCII glyph cache:',JSON.stringify({
+     builds:fin.glyphBuilds,hits:fin.glyphCacheHits,
+     rasterFrames:fin.rasterFrames
+   }));
    await page.screenshot({path:path.join(output,label+'-whole-game.png'),timeout:60000});
    await page.evaluate(()=>window.__ASCII_NATIVE__.dispose());
    const after=await page.evaluate(()=>window.__ASCII_NATIVE__.ashenVow?.active);
