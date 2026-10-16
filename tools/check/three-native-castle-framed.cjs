@@ -152,6 +152,88 @@ fs.mkdirSync(dir,{recursive:true});
    });
    console.log('NATIVE CASTLE WINGS FULLFRAME '+label+' '+
      JSON.stringify(wingTest));
+   // Compare at IDENTICAL native view with two actual PLAYER distances.
+   // drawCathedral() deliberately fades distant masonry according to
+   // player.y, independently from the viewport. Previous wide captures
+   // kept the knight at world spawn, exaggerating the dark silhouette.
+   // Do not change game fade formula/lighting globally: move only the
+   // temporary test actor, then capture with original renderer.
+   const near=await page.evaluate(()=>{
+     const c=cathedral,beforePlayer={x:player.x,y:player.y},
+       source=JSON.stringify(MEADOW_MAP);
+     const fade=()=>{
+       const far=Math.max(0,Math.min(1,
+         ((player.y+.7)*CH-c.ky)/(H*2.4)));
+       return {far,originalCastleAlpha:1-far*.55};
+     };
+     const distant=fade();
+     const fixedCamera={x:camX,y:camY,z:VZ};
+     player.x=c.kx/CW;player.y=c.ky/CH-16;
+     player.tx=player.x;player.ty=player.y;
+     const close=fade();
+     // Camera is still the full-framed inspection view: no updateCamera()
+     // call after player movement, since gameplay-follow movement would
+     // defeat before/after art comparison.
+     cloudTick=2;setView();render();
+     const unchanged=JSON.stringify(MEADOW_MAP)===source&&
+       camX===fixedCamera.x&&camY===fixedCamera.y&&VZ===fixedCamera.z;
+     if(!unchanged||close.originalCastleAlpha<distant.originalCastleAlpha)
+       throw Error('Distance-controlled screenshot changed map/camera or fade');
+     return {distant,close,beforePlayer,
+       nearPlayer:{x:player.x,y:player.y},
+       mapAndCameraUnchanged:unchanged};
+   });
+   await page.screenshot({path:path.join(dir,label+'-full-near-clean.png'),
+     timeout:60000});
+   console.log('NATIVE CASTLE DISTANCE COMPARISON '+label+' '+
+     JSON.stringify(near));
+   // A full 13-14% silhouette shot is useful for coverage but too small
+   // for reading masonry, while the authored editor already has 35% zoom.
+   // Inspect the upper central towers, flank wings and great gate at the
+   // EXISTING editor stop (0.35), again using the native source renderer.
+   const mediumViews=[
+     {id:'upper-center',fx:.5,fy:.22},
+     {id:'upper-left',fx:.29,fy:.30},
+     {id:'upper-right',fx:.71,fy:.30},
+     {id:'gate-and-rose',fx:.5,fy:.76}
+   ];
+   const mediumMetrics=[];
+   for(const view of mediumViews){
+     const metrics=await page.evaluate(({fx,fy,id})=>{
+       const b=cathedral,z=.35;
+       const source=JSON.stringify(MEADOW_MAP);
+       const full=[b.cx0,b.cy0,b.cx0+b.BW-1,b.cy0+b.BH-1];
+       const cx=full[0]+(full[2]-full[0])*fx;
+       const cy=full[1]+(full[3]-full[1])*fy;
+       VZ=z;camX=Math.max(0,Math.min(Math.max(0,COLS-VC/VZ),
+         cx-VC/(2*VZ)));
+       camY=Math.max(0,Math.min(Math.max(0,ROWS-VR/VZ),
+         cy-VR/(2*VZ)));
+       setView();cloudTick=2;render();
+       let occupied=0;
+       for(let k=0;k<b.lum.length;k++){
+         if(b.lum[k]<0)continue;
+         const x=b.cx0+(k%b.BW),y=b.cy0+Math.floor(k/b.BW);
+         if(x>=VX0&&x<=VX1&&y>=VY0&&y<=VY1)occupied++;
+       }
+       const data={id,zoom:VZ,camera:[camX,camY],
+         view:[VX0,VY0,VX1,VY1],sourceOccupiedInView:occupied,
+         mapUnchanged:source===JSON.stringify(MEADOW_MAP),
+         threeMode:window.__ASCII_NATIVE__.mode};
+       if(data.zoom!==.35||occupied<500||!data.mapUnchanged||
+          data.threeMode!=='three')
+         throw Error('Medium castle art viewport invalid '+JSON.stringify(data));
+       return data;
+     },view);
+     await page.screenshot({
+       path:path.join(dir,label+'-medium-'+view.id+'.png'),timeout:60000
+     });
+     mediumMetrics.push(metrics);
+   }
+   fs.writeFileSync(path.join(dir,label+'-medium.json'),
+     JSON.stringify({near,mediumMetrics},null,2)+'\n');
+   console.log('NATIVE CASTLE MEDIUM INSPECTION '+label+' '+
+     JSON.stringify(mediumMetrics));
    fs.writeFileSync(path.join(dir,label+'-framing.json'),
      JSON.stringify(data,null,2)+'\n');
    if(errors.length)throw Error(label+' browser exception '+errors.join(' | '));
