@@ -92,6 +92,14 @@ platform.position.y=-.08;platform.receiveShadow=true;scene.add(platform);
 const edge=new THREE.Mesh(new THREE.TorusGeometry(1.1,.009,8,100),
   new THREE.MeshStandardMaterial({color:0x8f6462,metalness:.7,roughness:.38}));
 edge.rotation.x=-Math.PI/2;edge.position.y=-.036;scene.add(edge);
+// Studio-only visual ground contact indicator: never part of the native game.
+// Its size and opacity track the jump parabola and are NOT collision evidence.
+const contactShadow=new THREE.Mesh(new THREE.CircleGeometry(.33,48),
+  new THREE.MeshBasicMaterial({color:0x0a080c,transparent:true,opacity:.29,
+    depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1}));
+contactShadow.rotation.x=-Math.PI/2;
+contactShadow.position.y=-.034;
+scene.add(contactShadow);
 
 const camera=new THREE.PerspectiveCamera(36,1,.03,80);
 const viewPositions={front:[0,1.65,4.4],side:[4.4,1.65,0],back:[0,1.65,-4.4]};
@@ -112,6 +120,9 @@ const status=message=>ui.status.textContent=message;
 function setMotion(next){
   if(!['Idle','Walk','Run','Jump'].includes(next))return;
   mode=next;jumpClock=0;
+  // This offset is solely for studio previews. The native game already
+  // moves its player with its own jump physics: do not lift the shared rig.
+  if(rig)rig.position.y=0;
   document.querySelectorAll('[data-motion]').forEach(el=>
     el.setAttribute('aria-pressed',String(el.dataset.motion===mode)));
   if(!paused)status('Режим '+mode+' · живые движения 40 костей, без готовых клипов Tripo.');
@@ -151,6 +162,7 @@ const diagnostics={
   get state(){return rig?.userData.pose?.()||null},
   get bones(){return rig?.userData.gltf.bones||0},
   get weaponAttached(){return Boolean(rig?.userData.weapon?.parent)},
+  get jumpHeight(){return rig?.position.y||0},
   get error(){return error},
 };
 window.__ASHEN_ANIMATION_LAB__=diagnostics;
@@ -201,6 +213,14 @@ function animateFrame(now){
       run:mode==='Run',heading,jumpClipTime
     },stepTime);
   }
+  // Visually lift the WHOLE skinned model during flight. Only the
+  // inspector sets its root position; the game continues using the
+  // original player jump and world-space ground contact.
+  const liftPhase=mode==='Jump'&&jumpClock<1.49?
+    Math.max(0,Math.sin(Math.PI*jumpClock/1.49)):0;
+  if(rig)rig.position.y=.36*liftPhase;
+  contactShadow.scale.setScalar(1+.30*liftPhase);
+  contactShadow.material.opacity=.29-.18*liftPhase;
   controls.update();
   renderer.render(scene,camera);
   if(now-displayClock>170){
@@ -209,9 +229,10 @@ function animateFrame(now){
     ui.metrics.textContent=rig?.userData.gltf.loaded?
       'Клип: '+rig.userData.gltf.clip+'   ·   FPS: '+Math.round(smoothFps)+
       '\nОбновлений скелета: '+simulatedFrames+' · Костей: '+rig.userData.gltf.bones+
-      '\nКонтакт ног: '+(pose?.footContact||[]).map(v=>v?'●':'○').join(' / ')+
+      '\nОпора (расчёт): '+(pose?.footContact||[]).map(v=>v?'●':'○').join(' / ')+
       ' · Колени: '+(pose?.kneeBend||[]).map(v=>v.toFixed(2)).join(' / ')+
       '\nМеч в кисти: '+(pose?.weaponAttached?'да':'нет')+
+      ' · Прыжок: '+(rig.position.y).toFixed(2)+' м'+
       ' · Режим: '+mode:'Ожидание модели Tripo V2…';
   }
 }
