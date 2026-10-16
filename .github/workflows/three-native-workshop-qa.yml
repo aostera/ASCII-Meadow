@@ -21,7 +21,7 @@ jobs:
   touch-editor-and-character:
     name: Native map editing + animated 3D character (desktop and touch)
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,6 +34,8 @@ jobs:
         run: |
           node --check experiments/three/native-editor-models.mjs
           node --check tools/check/three-native-grey-editor.cjs
+          node --check experiments/three/native-editor-touch.js
+          node --check tools/check/three-native-editor-touch.cjs
           node --check tools/check/three-ashen-vow.cjs
       - name: Run actual WebGL2 map-editor touch, rotation and undo tests
         run: |
@@ -45,6 +47,7 @@ jobs:
             sleep 1
           done
           node tools/check/three-native-grey-editor.cjs http://127.0.0.1:8181
+          node tools/check/three-native-editor-touch.cjs http://127.0.0.1:8181
           node tools/check/three-ashen-vow.cjs http://127.0.0.1:8181
       - uses: actions/upload-artifact@v4
         if: always()
@@ -52,5 +55,6 @@ jobs:
           name: three-native-editor-character-shots
           path: |
             shots/three-native-grey-editor
+            shots/three-native-editor-touch
             shots/three-ashen-vow
           if-no-files-found: warn
