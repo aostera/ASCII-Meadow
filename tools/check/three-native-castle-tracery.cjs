@@ -83,24 +83,39 @@ fs.mkdirSync(dir,{recursive:true});
        // Fog banks otherwise have new random seeds on each rebuild.
        // Freeze this source of timing noise, not the user's world map.
        Math.random=()=>.513;
+       // Discard one complete initial world rebuild: the first renderer
+       // frame can also upload new textures / warm native WebGL resources.
+       const warmup=snapshot(true);
        const on=snapshot(true);
+       const onFeatures=gothic.features.castle.portalSideTracery;
        const off=snapshot(false);
+       const offFeatures=gothic.features.castle.portalSideTracery;
        const restored=snapshot(true);
-       let changed=0,restoreErrors=0;
+       const restoredFeatures=gothic.features.castle.portalSideTracery;
+       let changed=0,restoreErrors=0,offToRestored=0,warmupToOn=0;
        for(let i=0;i<on.length;i+=4){
-         if(Math.max(Math.abs(on[i]-off[i]),
-           Math.abs(on[i+1]-off[i+1]),
-           Math.abs(on[i+2]-off[i+2]))>8)changed++;
-         if(Math.max(Math.abs(on[i]-restored[i]),
-           Math.abs(on[i+1]-restored[i+1]),
-           Math.abs(on[i+2]-restored[i+2]))>8)restoreErrors++;
+         function different(a,b){
+           return Math.max(Math.abs(a[i]-b[i]),
+             Math.abs(a[i+1]-b[i+1]),
+             Math.abs(a[i+2]-b[i+2]))>8;
+         }
+         if(different(on,off))changed++;
+         if(different(on,restored))restoreErrors++;
+         if(different(off,restored))offToRestored++;
+         if(different(warmup,on))warmupToOn++;
        }
+       if(!(onFeatures>=52&&offFeatures===0&&restoredFeatures>=52))
+         throw Error('QA toggle did not actually rebuild source solids '+JSON.stringify({
+           onFeatures,offFeatures,restoredFeatures
+         }));
        if(!gothic.westCurtainProjects||!gothic.westPortalReliefClear||
           !gothic.facadeEnabled)
          throw Error('Castle features not physically restored');
        if(JSON.stringify(MEADOW_MAP)!==mapOriginal)
          throw Error('QA-only castle rebuild touched authored map');
        return {changedPixels:changed,restoreErrors,
+         warmupToOn,offToRestored,
+         onFeatures,offFeatures,restoredFeatures,
          canvas:[canvas.width,canvas.height],
          portalClear:gothic.westPortalReliefClear,
          projects:gothic.westCurtainProjects,
