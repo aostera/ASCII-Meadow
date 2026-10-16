@@ -177,3 +177,9 @@ This pass remains **experimental and deliberately unmerged** in draft PR #56. Th
 - Standalone zero-WebGL `ashen-tripo-sole-contact.cjs` uses synthetic weighted input to verify genuine left and right boot selection, heel/toe separation and safe missing-mesh handling. Both GitHub Actions workflows include this check and trigger when its code changes. The isolated pure-sampler function passed its direct test in the code execution environment.
 
 **Still pending:** an accessible complete Playwright/SwiftShader CI success, real screenshots at each angle, a physical phone performance pass, approved ankle/heel/ground contact limits and an all-body sword/cloth collision review. Github Actions check status for the newest commits was not externally available from this session. Keep PR #56 as draft and do not merge or modify the original map.
+
+### v16 — 2026-10-16: real boot contact and sword envelope
+
+The actual weighted heel/toe mesh sample now contributes to a bounded pelvis correction (limit 0.045 original Tripo units) during ground stance; the original toe-pivot solver is retained as fallback. Idle and Jump do not engage the sampled grounded correction. The neutral reference is measured on the authentic original Tripo skin. This is flat-ground support only, not terrain collision.
+
+The separate Gothic sword and its penetration test share the same eight taper stations and true diamond cross-section. The sampled right-boot test now flags points inside the sword volume, not only near its centerline. This is not exhaustive triangle-triangle collision testing. Standalone pure-function tests passed; complete WebGL browser, visual and physical mobile QA remain unconfirmed. PR #56 remains draft and the game map/main remain untouched.
