@@ -298,6 +298,9 @@ function animateFrame(now){
       '\nОбновлений скелета: '+simulatedFrames+' · Костей: '+rig.userData.gltf.bones+
       '\nОпора (расчёт): '+(pose?.footContact||[]).map(v=>v?'●':'○').join(' / ')+
       ' · Колени: '+(pose?.kneeBend||[]).map(v=>v.toFixed(2)).join(' / ')+
+      '\nФиксация стоп: '+(pose?.travelSource===null?'тест на месте':
+        (pose?.footPinned||[]).map(v=>v?'зафиксирована':'свободна').join(' / '))+
+      ' · Коррекция таза: '+((pose?.contactCorrection||0)*100).toFixed(1)+' см'+
       '\nМеч на запястье: '+(pose?.weaponAttached?'да':'нет')+
       ' · Ладонь: '+(pose?.palmAnchorValid?'точка по '+pose.palmVertexCount+' вершинам':'резервная привязка')+
       '\nПальцы: без отдельного рига · Прыжок: '+(rig.position.y).toFixed(2)+' м'+
