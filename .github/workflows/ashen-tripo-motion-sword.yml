@@ -5,12 +5,17 @@ on:
     paths:
       - experiments/three/ashen-tripo-native-rig.mjs
       - experiments/three/ashen-tripo-animation-workshop.html
+      - experiments/three/ashen-vow-gothic-palette.mjs
       - experiments/three/ashen-gothic-longsword.mjs
       - experiments/three/native-tripo-v2.mjs
       - tools/check/ashen-tripo-motion-sword.cjs
       - tools/check/ashen-tripo-animation-workshop.cjs
       - .github/workflows/ashen-tripo-motion-sword.yml
   workflow_dispatch:
+# Repeated animation revisions should not consume four simultaneous GPU runners.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions: {contents: read}
 jobs:
   gameplay:
@@ -26,6 +31,7 @@ jobs:
       - name: Static syntax
         run: |
           node --check experiments/three/ashen-tripo-native-rig.mjs
+          node --check experiments/three/ashen-vow-gothic-palette.mjs
           node --check experiments/three/ashen-gothic-longsword.mjs
           node --check experiments/three/native-tripo-v2.mjs
           node --check tools/check/ashen-tripo-motion-sword.cjs
