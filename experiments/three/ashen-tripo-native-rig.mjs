@@ -18,28 +18,31 @@ function setupBones(model){
   const skin=meshes[0]?.skeleton;
   if(!skin||skin.bones.length<40)throw Error('Tripo V2 is missing the genuine 40-joint skinned skeleton');
   const bones=new Map(skin.bones.map(b=>[b.name,b]));
-  const find=n=>{const b=bones.get(n);if(!b)throw Error('Missing Tripo rig bone '+n);return b;};
+  const find=(n,index)=>{const b=bones.get(n)||skin.bones[index];if(!b)throw Error('Missing Tripo rig joint '+n+' / '+index);return b;};
+  // glTF-Transform's mesh optimizer can rename GLB bones while preserving
+  // skin.joints INDEX order, weights and inverse-bind matrices. Use exact
+  // original Tripo skin indices as stable animation bindings.
   const sets={
-    spine:find('tripo::Spine_0'),
-    chest:find('tripo::Spine_1'),
-    head:find('tripo::Head_0'),
+    spine:find('tripo::Spine_0',1),
+    chest:find('tripo::Spine_1',2),
+    head:find('tripo::Head_0',4),
     leftArm:[
-      find('tripo::0_Left_Limb_1'), find('tripo::0_Left_Limb_2'),
-      find('tripo::0_Left_Limb_3'),find('tripo::0_Left_Limb_4')
+      find('tripo::0_Left_Limb_1',6), find('tripo::0_Left_Limb_2',7),
+      find('tripo::0_Left_Limb_3',8),find('tripo::0_Left_Limb_4',9)
     ],
     rightArm:[
-      find('bone_16'),find('bone_17'),find('bone_18'),find('bone_19')
+      find('bone_16',16),find('bone_17',17),find('bone_18',18),find('bone_19',19)
     ],
     leftLeg:[
-      find('tripo::1_Left_Limb_0'),find('tripo::1_Left_Limb_1'),
-      find('tripo::1_Left_Limb_2'),find('tripo::1_Left_Limb_3')
+      find('tripo::1_Left_Limb_0',31),find('tripo::1_Left_Limb_1',32),
+      find('tripo::1_Left_Limb_2',33),find('tripo::1_Left_Limb_3',34)
     ],
     rightLeg:[
-      find('tripo::1_Right_Limb_0'),find('tripo::1_Right_Limb_1'),
-      find('tripo::1_Right_Limb_2'),find('tripo::1_Right_Limb_3')
+      find('tripo::1_Right_Limb_0',26),find('tripo::1_Right_Limb_1',27),
+      find('tripo::1_Right_Limb_2',28),find('tripo::1_Right_Limb_3',29)
     ],
-    cape:[find('tripo::0_Right_Limb_0'),find('tripo::0_Right_Limb_1'),
-          find('tripo::0_Right_Limb_2')]
+    cape:[find('tripo::0_Right_Limb_0',36),find('tripo::0_Right_Limb_1',37),
+          find('tripo::0_Right_Limb_2',38)]
   };
   model.updateMatrixWorld(true);
   // Record rest transforms once. World -> each bone's LOCAL space, so
