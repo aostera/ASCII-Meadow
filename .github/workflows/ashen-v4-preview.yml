@@ -1,0 +1,40 @@
+name: Ashen Vow Original 3D Sculpt V12 Clean Preview
+
+on:
+  push:
+    branches: [feat/ashen-vow-ai-sculpt-v4]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-real-3d:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    name: ASHEN VOW / actual 3D GLB and visual inspection
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Check preview JS
+        run: |
+          node --check experiments/three/ashen-sculpt-v12.js
+          node --check tools/check/ashen-v12-viewer.cjs
+      - name: Browser load real 3-view GLB, render screenshots and rotate
+        run: |
+          python3 -m http.server 8181 >/tmp/ashen-sculpt.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 25); do curl -sf http://127.0.0.1:8181/experiments/three/ashen-sculpt-v12.html >/dev/null && break; sleep 1; done
+          node tools/check/ashen-v12-viewer.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ashen-vow-v12-views
+          path: shots/ashen-vow-v12/
+          if-no-files-found: warn
