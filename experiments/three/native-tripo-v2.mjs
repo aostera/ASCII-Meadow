@@ -177,14 +177,17 @@ export class NativeKnightGlyphs {
     this.clock = now;
     // ground speed in source pixels per second, for the clip cadence
     const fx = e.x * src.CW, fy = (e.y + .7) * src.CH;
-    let speed = 0;
     const dx=this.prev?fx-this.prev[0]:0;
     const dy=this.prev?fy-this.prev[1]:0;
     const travelPixels=Math.hypot(dx,dy);
     this.prev = [fx, fy];
     const walking = !(e.jump > 0) && (e.walk || 0) > .5;
-    if(dt>0)speed=travelPixels/dt/10;
-    if (walking) speed = Math.max(speed, (e.run || 0) > .5 ? 15 : 8); else speed = 0;
+    // Input intent is NOT ground speed. If the player holds Run against
+    // a wall, dx=dy=0 and the skinned actor must return toward Idle,
+    // rather than freezing a full running stance mid-stride.
+    // Calibrate cadence exclusively from actual source-map displacement.
+    const speed=walking&&travelPixels>.001&&dt>0?
+      Math.min(36,travelPixels/dt/10):0;
     const pxPerMetre=src.KG.art*fch/1.9;
     this.knight.userData.pxPerMeter=pxPerMetre;
     // Original actor x/y is the actual MAP position, unlike the fixed
