@@ -59,20 +59,23 @@ function cloakAttribute(mesh) {
     // The Tripo mesh is longitudinal along +X, with the mask in the
     // face-facing +X half. Positions are in source 1-metre skin units.
     const x=pos.getX(v),y=pos.getY(v),z=pos.getZ(v),w=Math.abs(z);
-    const face=y>.785&&y<.973&&x>.077&&w<.115;
-    const eyes=face&&y>.858&&y<.905&&w>.027&&w<.091;
+    const face=y>.795&&y<.966&&x>.052&&w<.132;
+    const eyes=face&&y>.857&&y<.902&&w>.033&&w<.090;
     const apron=y>.29&&y<.66&&x>.085&&w<.15;
-    const cape=(x<-.070&&y>.13&&y<.81&&w<.30);
+    // Restrict red cloak to LOWER OUTER fabric: the old wide region made
+    // a flat red rectangle covering the entire chest in native ASCII.
+    const cape=(x<-.080&&y>.13&&y<.60&&w>.13&&w<.37);
     let weight=0;
     if(si&&sw){
       for(let k=0;k<4;k++)if(clothBones[si.getComponent(v,k)])
         weight+=sw.getComponent(v,k);
     }
-    cover[v]=cape?Math.max(.65,weight):weight*.25;
+    cover[v]=cape?Math.max(.69,weight):
+      y<.48&&w>.11?weight*.77:weight*.11;
     // This material separation changes REAL rasterized 3D luminance,
     // not a pasted 2D sticker. Pale bone mask, dark eye slits, ashen
     // apron, black engraved armour and dark trailing cloth.
-    accent[v]=eyes?-.34:face?.33:apron?.20:cape?-.22:
+    accent[v]=eyes?-.40:face?.42:apron?.16:cape?-.17:
       y>.60&&y<.83?-.035:0;
   }
   g.setAttribute('cloak',new THREE.BufferAttribute(cover,1));
