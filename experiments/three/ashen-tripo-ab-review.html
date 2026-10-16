@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Ashen Vow · одинаковый свет · оригинал против анимации</title>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
+<style>
+:root{color-scheme:dark;font:14px/1.4 system-ui,sans-serif;background:#15151b;color:#f0eeee}
+*{box-sizing:border-box}body{margin:0}canvas{width:100%;height:100%;display:block}
+#viewport{position:fixed;inset:0}#labels{position:fixed;left:0;right:0;top:12px;display:grid;grid-template-columns:1fr 1fr;pointer-events:none;text-align:center;text-shadow:0 2px 6px #000}
+#labels strong{display:block;font-size:clamp(12px,1.5vw,19px)}#labels span{font-size:11px;color:#d4bdbd}
+#divider{position:fixed;top:0;bottom:0;left:50%;width:1px;background:#80727a77;pointer-events:none}
+#tools{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#191920ee;padding:12px 16px;border:1px solid #594b53;border-radius:12px;max-width:min(95vw,820px);box-shadow:0 10px 35px #0008}
+button{background:#343039;color:inherit;border:1px solid #6c626a;border-radius:7px;padding:8px 13px;margin:3px;cursor:pointer}
+button[aria-pressed=true]{background:#754551;border-color:#a27d88}
+small{display:block;color:#c8bec2;margin-top:6px;font-size:11px}
+#status{max-width:800px;text-align:center}
+</style>
+</head><body>
+<div id="viewport"></div><div id="divider"></div>
+<div id="labels"><div><strong>ЭТАЛОН: нетронутый Tripo GLB</strong><span>Исходная bind/T-pose · 40 костей · исходные материалы</span></div>
+<div><strong>РЕАЛЬНАЯ АНИМАЦИЯ: тот же GLB</strong><span>Одинаковый масштаб, камера, свет · отдельно добавлен меч</span></div></div>
+<div id="tools"><div id="buttons">
+<button data-mode="Bind" aria-pressed="true">Сверить bind-позу</button>
+<button data-mode="Idle" aria-pressed="false">Idle</button>
+<button data-mode="Walk" aria-pressed="false">Walk</button>
+<button data-mode="Run" aria-pressed="false">Run</button>
+<button data-mode="Jump" aria-pressed="false">Jump</button>
+<button id="turn">Ракурс 0°</button></div>
+<small id="status">Загружаю две копии оригинального 40-костного GLB. Никаких экспериментальных перекрасок.</small></div>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createGltfKnight,TRIPO_V2_GLB} from './ashen-tripo-native-rig.mjs';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x15151b);
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.6));
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.1;
+document.getElementById('viewport').append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xd1c9cb,0x35333c,2.3));
+for(const [color,intensity,p] of [[0xffeee8,2.4,[-3,5,6]],[0xc4c2e3,1.1,[3,3,-2]]]){
+ const lamp=new THREE.DirectionalLight(color,intensity);lamp.position.set(...p);scene.add(lamp);
+}
+const camera=new THREE.OrthographicCamera(-3.25,3.25,2.6,-.55,.01,100);
+camera.position.set(0,1.3,9);camera.lookAt(0,1.02,0);
+const sourceRoot=new THREE.Group();sourceRoot.position.x=-1.57;scene.add(sourceRoot);
+const animRoot=createGltfKnight(THREE,{
+ url:TRIPO_V2_GLB,
+ onLoad:()=>{
+  rightReady=true;finish();
+ },
+ onError:e=>fail('Animated Tripo GLB: '+e.message)
+});
+animRoot.position.x=1.57;scene.add(animRoot);
+let rightReady=false,leftReady=false,source=null,mode='Bind',heading=0,
+    deltaMax=null,materialsMatch=null,simulated=0,clock=0,last=0,error=null;
+const status=document.getElementById('status');
+function fail(message){error=String(message);status.textContent=error;}
+const meshes=o=>{const a=[];o.traverse(x=>{if(x.isSkinnedMesh)a.push(x);});return a;};
+new GLTFLoader().load(TRIPO_V2_GLB,gltf=>{
+ try{
+  source=gltf.scene;
+  const bounds=new THREE.Box3().setFromObject(source);
+  const size=bounds.getSize(new THREE.Vector3());
+  const factor=2.04/size.y;
+  source.scale.setScalar(factor);
+  source.position.set(-bounds.getCenter(new THREE.Vector3()).x*factor,
+    -bounds.min.y*factor,-bounds.getCenter(new THREE.Vector3()).z*factor);
+  const oriented=new THREE.Group();oriented.rotation.y=-Math.PI/2;
+  oriented.add(source);sourceRoot.add(oriented);
+  leftReady=true;finish();
+ }catch(e){fail('Source Tripo GLB: '+String(e))}
+},undefined,fail);
+const materialSig=m=>{
+ const mats=Array.isArray(m)?m:[m];
+ return mats.map(x=>({
+  color:x?.color?.getHexString()||null,
+  roughness:x?.roughness??null,
+  metalness:x?.metalness??null,
+  transparent:!!x?.transparent,
+  map:!!x?.map,normalMap:!!x?.normalMap,vertexColors:!!x?.vertexColors
+ }));
+};
+function compareRest(){
+ const l=meshes(source),r=meshes(animRoot);
+ if(l.length!==r.length||!l.length)throw Error('Original and animated SkinnedMesh sets differ');
+ materialsMatch=l.every((m,i)=>JSON.stringify(materialSig(m.material))===
+   JSON.stringify(materialSig(r[i].material)));
+ let max=0,samples=0;
+ const a=new THREE.Vector3(),b=new THREE.Vector3();
+ sourceRoot.updateMatrixWorld(true);animRoot.updateMatrixWorld(true);
+ for(let j=0;j<l.length;j++){
+  const lm=l[j],rm=r[j];
+  if(lm.geometry.attributes.position.count!==rm.geometry.attributes.position.count)
+    throw Error('Vertex counts differ in original Tripo skin');
+  const n=lm.geometry.attributes.position.count;
+  for(let i=0;i<n;i+=Math.max(1,Math.floor(n/64))){
+   lm.getVertexPosition(i,a).applyMatrix4(lm.matrixWorld).sub(sourceRoot.position);
+   rm.getVertexPosition(i,b).applyMatrix4(rm.matrixWorld).sub(animRoot.position);
+   max=Math.max(max,a.distanceTo(b));samples++;
+  }
+ }
+ deltaMax=max;
+ if(!materialsMatch||max>0.001)
+  throw Error('Original GLB bind geometry/materials differ: '+JSON.stringify({max,materialsMatch}));
+ return samples;
+}
+function finish(){
+ if(!leftReady||!rightReady)return;
+ try{
+  const samples=compareRest();
+  status.textContent='Сверка bind-позы: '+samples+' точек · max Δ '+
+    deltaMax.toFixed(6)+' м · материалы идентичны. Выбери анимацию справа.';
+ }catch(e){fail(String(e))}
+}
+document.querySelectorAll('[data-mode]').forEach(button=>
+ button.addEventListener('click',()=>{
+   const next=button.dataset.mode;
+   if(next==='Bind'){location.reload();return;}
+   mode=next;
+   document.querySelectorAll('[data-mode]').forEach(b=>
+     b.setAttribute('aria-pressed',String(b.dataset.mode===mode)));
+ }));
+document.getElementById('turn').addEventListener('click',()=>{
+ const value=(Number(document.getElementById('turn').dataset.angle||0)+45)%360;
+ document.getElementById('turn').dataset.angle=String(value);
+ document.getElementById('turn').textContent='Ракурс '+value+'°';
+ heading=value*Math.PI/180;
+ sourceRoot.rotation.y=heading;
+ // Match the ORIGINAL static reference's heading with the genuine
+ // animated rig's horizontal orientation, rather than camera trickery.
+ animRoot.rotation.y=heading;
+});
+function resize(){
+ const w=innerWidth,h=innerHeight;
+ renderer.setSize(w,h);
+ const ratio=w/h,halfHeight=1.75;
+ camera.left=-halfHeight*ratio;camera.right=halfHeight*ratio;
+ camera.top=halfHeight;camera.bottom=-halfHeight;
+ camera.updateProjectionMatrix();
+}
+addEventListener('resize',resize);resize();
+function animate(now){
+ requestAnimationFrame(animate);
+ const dt=last?Math.min(.05,(now-last)/1000):1/60;last=now;
+ if(leftReady&&rightReady&&!error&&mode!=='Bind'){
+  clock+=dt;
+  let jumpClipTime;
+  if(mode==='Jump')jumpClipTime=(clock%1.35);
+  animRoot.userData.animate(Math.min(dt,1/30),{
+    speed:mode==='Walk'?8:mode==='Run'?15:0,
+    run:mode==='Run',heading:0,jumpClipTime,
+    inspectSoles:false
+  },clock);
+  simulated++;
+ }
+ renderer.render(scene,camera);
+}
+requestAnimationFrame(animate);
+window.__ASHEN_AB_COMPARE__={
+ get ready(){return leftReady&&rightReady&&!error},
+ get error(){return error},get mode(){return mode},
+ get materialMatch(){return materialsMatch},get bindMaxDelta(){return deltaMax},
+ get frames(){return simulated},get source(){return source},
+ get animated(){return animRoot}
+};
+</script></body></html>
