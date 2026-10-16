@@ -23,7 +23,9 @@ let nativeMainPortalRecessEnabled=true;
 // Toggle is accessible ONLY to the QA page for identical-camera A/B.
 let nativeWidePortalSilhouetteEnabled=true;
 // The glyph reduction is a native-only stone surface treatment, not a decal.
-let nativeSparseGateAshlarEnabled=true;
+// Rejected by PC/phone PNG art review: blocky black rectangular patches.
+// Keep experiment behind QA-only toggle, NEVER enabled in normal gameplay.
+let nativeSparseGateAshlarEnabled=false;
 let nativeMainPortalRecessClear=true;
 let nativeCentralGablePortalClear=true;
 let nativeCentralGableProjects=false;
