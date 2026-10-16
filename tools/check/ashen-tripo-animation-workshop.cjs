@@ -35,7 +35,7 @@ fs.mkdirSync(out,{recursive:true});
        return {ready:q.ready,error:q.error,bones:q.bones,
          frame:q.frame,mode:q.mode,pose:q.state,
          weapon:q.weaponAttached,jumpHeight:q.jumpHeight,
-         paletteActive:q.paletteActive,
+         paletteActive:q.paletteActive,autoTurn:q.autoTurn,headingTarget:q.headingTarget,
          clip:q.model?.userData.gltf?.clip,
          skinnedMeshes:q.model?.userData.gltf?.skinnedMeshes,
          canvasCount:document.querySelectorAll('#viewport canvas').length
@@ -96,6 +96,18 @@ fs.mkdirSync(out,{recursive:true});
          Math.sin(target-a),Math.cos(target-a)))<.14;
      },undefined,{timeout:5000});
      assert.equal(await page.locator('#yaw-value').textContent(),'137°');
+     // Automatic full-body turn must advance heading in the actual skin rig,
+     // and stop without overriding the user's manually chosen angle.
+     const headingBefore=(await lab()).headingTarget;
+     await page.locator('#turn').click();
+     await page.waitForFunction(previous=>{
+       const q=window.__ASHEN_ANIMATION_LAB__;
+       return q?.autoTurn&&Number.isFinite(q.headingTarget)&&
+         Math.abs(Math.atan2(Math.sin(q.headingTarget-previous),
+           Math.cos(q.headingTarget-previous)))>.25;
+     },headingBefore,{timeout:15000});
+     await page.locator('#turn').click();
+     assert.equal((await lab()).autoTurn,false);
      await page.locator('[data-view="back"]').click();
      await page.screenshot({path:path.join(out,name+'-run-back.png')});
 
