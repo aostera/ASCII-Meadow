@@ -230,6 +230,105 @@ fs.mkdirSync(dir,{recursive:true});
      });
      mediumMetrics.push(metrics);
    }
+   // T02 acceptance must also include what the PLAYER ACTUALLY SEES at
+   // game zoom 1.0 and the original follow camera, not only inspector
+   // panoramas (0.13) / editor zoom (0.35). All three shots use actual
+   // traversable map coordinates, normal camera and the native renderer.
+   await page.addStyleTag({
+     content:'.hud,.stats{visibility:visible!important}'
+   });
+   const gameplayViews=[
+     {id:'road-approach',distanceFactor:.85,sideFactor:0},
+     {id:'gate-threshold',distanceFactor:.30,sideFactor:0},
+     {id:'outer-arch-angle',distanceFactor:.52,sideFactor:.22}
+   ];
+   const gameplayMetrics=[];
+   for(const target of gameplayViews){
+     const metrics=await page.evaluate(({id,distanceFactor,sideFactor})=>{
+       const c=cathedral,oldMap=JSON.stringify(MEADOW_MAP);
+       const expectedSource=cathedral.lum.length;
+       const originalData={
+         cameraZoom:VZ,playerX:player.x,playerY:player.y,
+         userEditing:editing
+       };
+       // Search for an ACTUAL walkable point near the gate route. The
+       // knight is never staged inside a solid facade just for a nice shot.
+       const desiredY=c.gateRow+Math.max(6,VR*distanceFactor);
+       const desiredX=c.kx/CW+VC*sideFactor;
+       let placed=null;
+       for(let oy=0;oy<=65&&!placed;oy++){
+         for(const dy of (oy===0?[0]:[oy,-oy])){
+           const y=desiredY+dy;
+           for(const ox of [0,-3,3,-7,7,-13,13,-20,20]){
+             const x=desiredX+ox,h=surfAt(x,y);
+             if(!Number.isFinite(h))continue;
+             const oldHT=player.hT;player.hT=h;
+             const ok=!blocked(x,y,player);
+             player.hT=oldHT;
+             if(ok){placed={x,y,h};break}
+           }
+           if(placed)break;
+         }
+       }
+       if(!placed)throw Error('No traversable gameplay player spot '+id);
+       player.x=placed.x;player.y=placed.y;
+       player.tx=placed.x;player.ty=placed.y;
+       player.h=placed.h;player.hT=placed.h;
+       VZ=1;
+       updateCamera(0,true); // exact original follow-camera, no QA pan
+       cloudTick=2;render();
+       let sourceVisible=0,sourceTotal=0;
+       for(let k=0;k<c.lum.length;k++){
+         if(c.lum[k]<0)continue;
+         sourceTotal++;
+         const x=c.cx0+k%c.BW,y=c.cy0+Math.floor(k/c.BW);
+         if(x>=VX0&&x<=VX1&&y>=VY0&&y<=VY1)
+           sourceVisible++;
+       }
+       const far=Math.max(0,Math.min(1,
+         ((player.y+.7)*CH-c.ky)/(H*2.4)));
+       const result={
+         id,viewport:[W,H],originalPlayer:originalData,
+         knight:[placed.x,placed.y],walkable:!blocked(player.x,player.y,player),
+         originalCastleAlpha:1-far*.55,originalFarFactor:far,
+         zoom:VZ,followCamera:[camX,camY],
+         visibleWindow:[VX0,VY0,VX1,VY1],
+         sourceStoneCellsVisible:sourceVisible,
+         sourceStoneCellsTotal:sourceTotal,
+         glyphCount:GB.n,
+         sourceGridLengthUnchanged:cathedral.lum.length===expectedSource,
+         mapUnchanged:JSON.stringify(MEADOW_MAP)===oldMap,
+         oneWebGLCanvas:document.querySelectorAll('#three-parity-canvas').length===1,
+         nativeThree:window.__ASCII_NATIVE__.mode==='three'
+       };
+       if(!result.walkable||VZ!==1||sourceVisible<100||
+         !result.sourceGridLengthUnchanged||!result.mapUnchanged||
+         !result.oneWebGLCanvas||!result.nativeThree||result.glyphCount<500)
+         throw Error('Actual playable Gothic art view invalid '+
+           JSON.stringify(result));
+       return result;
+     },target);
+     await page.screenshot({
+       path:path.join(dir,label+'-gameplay-'+target.id+'-hud.png'),
+       timeout:60000
+     });
+     await page.addStyleTag({
+       content:'.hud,.stats{visibility:hidden!important}'
+     });
+     await page.evaluate(()=>{cloudTick=2;render()});
+     await page.screenshot({
+       path:path.join(dir,label+'-gameplay-'+target.id+'-clean.png'),
+       timeout:60000
+     });
+     await page.addStyleTag({
+       content:'.hud,.stats{visibility:visible!important}'
+     });
+     gameplayMetrics.push(metrics);
+   }
+   fs.writeFileSync(path.join(dir,label+'-gameplay.json'),
+     JSON.stringify(gameplayMetrics,null,2)+'\n');
+   console.log('NATIVE CASTLE REAL GAMEPLAY ART '+label+' '+
+     JSON.stringify(gameplayMetrics));
    fs.writeFileSync(path.join(dir,label+'-medium.json'),
      JSON.stringify({near,mediumMetrics},null,2)+'\n');
    console.log('NATIVE CASTLE MEDIUM INSPECTION '+label+' '+
