@@ -47,7 +47,7 @@ fs.mkdirSync(out,{recursive:true});
         version:p.animationVersion,weapon:p.weaponAttached,
         soleReads:p.soleVertexReads,contact:p.footContact};
     });
-    if(state.version!=='Tripo-IK-v18-sampled-stance-fastpath'||
+    if(state.version!=='Tripo-IK-v20-art-review-gait'||
        !state.weapon||state.bones!==40||
        !Number.isInteger(state.soleReads)||state.soleReads>64)
       throw Error(mode+' wrong authentic Tripo rig/per-frame skinning: '+JSON.stringify(state));
