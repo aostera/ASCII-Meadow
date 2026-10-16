@@ -3,12 +3,12 @@
 // an approved character skin. Existing GLB textures, bones and skin weights stay intact.
 import * as THREE from 'three';
 
-const STEEL=new THREE.Color(0x4b4852);
-const DARK_STEEL=new THREE.Color(0x28272e);
-const BURGUNDY=new THREE.Color(0x4d2431);
-const HOOD=new THREE.Color(0x42222d);
-const BONE=new THREE.Color(0xd8cdbb);
-const CLOTH=new THREE.Color(0xbeb4a5);
+const STEEL=new THREE.Color(0x88838d);
+const DARK_STEEL=new THREE.Color(0x716d7b);
+const BURGUNDY=new THREE.Color(0x9b6275);
+const HOOD=new THREE.Color(0x865663);
+const BONE=new THREE.Color(0xffeee0);
+const CLOTH=new THREE.Color(0xf4e5d7);
 const LEATHER=new THREE.Color(0x6b4a3f);
 const EYES=new THREE.Color(0x130f14);
 const smooth=(a,b,v)=>{
@@ -44,14 +44,14 @@ function shadeVertices(mesh){
     const rear=1-smooth(-.19,-.02,x);
     const cape=Math.max(clothJoint*.9,rear*smooth(.08,.19,width))*
       (1-smooth(.69,.80,y));
-    blend(col,BURGUNDY,cape*.93);
+    blend(col,BURGUNDY,cape*.83);
     // Old white tabard is a vertical cloth plane in front of armour.
-    const tabard=smooth(.06,.13,x)*(1-smooth(.125,.19,width))*
-      smooth(.18,.28,y)*(1-smooth(.69,.78,y));
-    blend(col,CLOTH,tabard*.92);
+    const tabard=smooth(.015,.075,x)*(1-smooth(.17,.23,width))*
+      smooth(.14,.20,y)*(1-smooth(.72,.78,y));
+    blend(col,CLOTH,tabard);
     // Parchment mask and black eye sockets preserve the locked silhouette.
-    const face=smooth(.035,.065,x)*(1-smooth(.11,.165,width))*
-      smooth(.79,.825,y)*(1-smooth(.955,.99,y));
+    const face=smooth(.006,.045,x)*(1-smooth(.12,.18,width))*
+      smooth(.78,.82,y)*(1-smooth(.955,.99,y));
     blend(col,BONE,face);
     const eyes=face*smooth(.845,.86,y)*(1-smooth(.905,.925,y))*
       smooth(.025,.038,width)*(1-smooth(.089,.104,width));
