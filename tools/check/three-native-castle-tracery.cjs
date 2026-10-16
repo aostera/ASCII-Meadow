@@ -56,8 +56,9 @@ fs.mkdirSync(dir,{recursive:true});
    if(stats.glyphs<500||stats.gpuCanvases!==1||
       !stats.mapUnchanged||stats.ruinSites.length!==3)
      throw Error(mode+' castle art regression '+JSON.stringify(stats));
-   await page.screenshot({path:path.join(dir,mode+'-castle-tracery.png'),
-     timeout:60000});
+   // The initial gate-area camera deliberately does NOT show the west
+   // facade on many aspect ratios. Reframe after measuring the true source
+   // raster footprint rather than accepting an off-screen pixel test.
    const comparison=await page.evaluate(()=>{
      const gothic=window.__ASCII_NATIVE_COMPLETE_ARCH__;
      const native=window.__ASCII_NATIVE__;
@@ -94,11 +95,11 @@ fs.mkdirSync(dir,{recursive:true});
        // Discard one complete initial world rebuild: the first renderer
        // frame can also upload new textures / warm native WebGL resources.
        const warmup=snapshot(true);
-       const on=snapshot(true);
+       let on=snapshot(true);
        const onFeatures=gothic.features.castle.portalSideTracery;
-       const off=snapshot(false);
+       let off=snapshot(false);
        const offFeatures=gothic.features.castle.portalSideTracery;
-       const restored=snapshot(true);
+       let restored=snapshot(true);
        const restoredFeatures=gothic.features.castle.portalSideTracery;
        let changed=0,restoreErrors=0,offToRestored=0,warmupToOn=0;
        let sourceChanged=0,sourceVisibleChanged=0,sourceChangedBounds=null;
@@ -122,6 +123,31 @@ fs.mkdirSync(dir,{recursive:true});
            sourceChangedBounds[3]=Math.max(cy,sourceChangedBounds[3]);
          }
        }
+       // Keep test viewport in the real game's follow-camera. Aim the
+       // temporary player at the detected stone-glyph rows; never alter the
+       // authored map, production camera formula or test screenshot with
+       // separate standalone 3D rendering.
+       let sourceVisibleAfterFocus=sourceVisibleChanged;
+       if(sourceChangedBounds){
+         const focusRow=(sourceChangedBounds[1]+sourceChangedBounds[3])*.5;
+         const focusCol=(sourceChangedBounds[0]+sourceChangedBounds[2])*.5;
+         player.y=focusRow+VR*.4;player.ty=player.y;
+         player.x=focusCol;player.tx=player.x;
+         updateCamera(0,true);
+         snapshot(true); // warm native GPU caches on the focused view
+         on=snapshot(true);
+         off=snapshot(false);
+         restored=snapshot(true);
+         const vis=on.source.viewport;
+         for(let k=0;k<on.source.lum.length;k++){
+           const a=on.source,b=off.source;
+           if(Math.abs(a.lum[k]-b.lum[k])<.01&&a.glyph[k]===b.glyph[k]&&
+              Math.abs(a.dep[k]-b.dep[k])<1)continue;
+           const cx=a.left+k%a.width,cy=a.top+Math.floor(k/a.width);
+           if(cx>=vis[0]&&cx<=vis[1]&&cy>=vis[2]&&cy<=vis[3])
+             sourceVisibleAfterFocus++;
+         }
+       }
        for(let i=0;i<on.pixels.length;i+=4){
          function different(a,b){
            return Math.max(Math.abs(a[i]-b[i]),
@@ -143,7 +169,8 @@ fs.mkdirSync(dir,{recursive:true});
        if(JSON.stringify(MEADOW_MAP)!==mapOriginal)
          throw Error('QA-only castle rebuild touched authored map');
        return {changedPixels:changed,restoreErrors,
-         sourceChanged,sourceVisibleChanged,sourceChangedBounds,
+         sourceChanged,sourceVisibleChanged,sourceVisibleAfterFocus,
+         sourceChangedBounds,
          warmupToOn,offToRestored,
          onFeatures,offFeatures,restoredFeatures,
          canvas:[canvas.width,canvas.height],
@@ -158,7 +185,10 @@ fs.mkdirSync(dir,{recursive:true});
        }
      }
    });
-   if(comparison.changedPixels<(mobile?30:100)||
+   await page.screenshot({path:path.join(dir,mode+'-castle-tracery.png'),
+     timeout:60000});
+   if(comparison.sourceChanged<100||comparison.sourceVisibleAfterFocus<100||
+      comparison.changedPixels<(mobile?30:100)||
       comparison.restoreErrors>120)
      throw Error(mode+' castle geometry does not make stable visible GPU pixels '+JSON.stringify(comparison));
    console.log('NATIVE CASTLE TRACERY VISIBLE '+mode+' '+JSON.stringify(comparison));
