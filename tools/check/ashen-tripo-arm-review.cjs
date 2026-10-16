@@ -243,8 +243,8 @@ fs.mkdirSync(out,{recursive:true});
   // clearance, but deliberately weaker than exhaustive triangle collision:
   // thin edges, cape and plate tassets still need visual/art acceptance.
   const bladeBootProbe=await page.evaluate(async()=>{
-    const {locateBootSoleVertices}=await import('./ashen-sole-contact.mjs');
-    const {pointBladeGap}=await import('./ashen-blade-envelope.mjs');
+    const {locateBootSoleVertices}=await import('/experiments/three/ashen-sole-contact.mjs');
+    const {pointBladeGap}=await import('/experiments/three/ashen-blade-envelope.mjs');
     const root=window.__ASHEN_ANIMATION_LAB__.model;
     const meshes=[];root.traverse(o=>{if(o.isSkinnedMesh)meshes.push(o);});
     const bones=meshes[0].skeleton.bones;
