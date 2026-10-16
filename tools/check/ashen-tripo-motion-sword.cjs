@@ -51,7 +51,7 @@ fs.mkdirSync(output,{recursive:true});
    if(!mobile){
      // Probe true actor displacement, rather than trusting the Run key.
      const runIntoWall=await page.evaluate(async()=>{
-       const {NativeKnightGlyphs}=await import('./native-tripo-v2.mjs');
+       const {NativeKnightGlyphs}=await import('/experiments/three/native-tripo-v2.mjs');
        const samples=[];
        const stub={clock:null,prev:null,travelSource:0,groundX:0,groundZ:0,
          stats:{frames:0},rasterClock:0,rasterInterval:Infinity,
