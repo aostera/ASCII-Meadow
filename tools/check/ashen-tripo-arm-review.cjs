@@ -34,6 +34,21 @@ fs.mkdirSync(out,{recursive:true});
         local:sword.userData.palmLocal},
       pose:root.userData.pose()};
   });
+  // Diagnosis: inspect the real bone pivots/ancestry, since a theoretical IK
+  // limb length is not evidence of the GLB's actual knee/ankle hierarchy.
+  const legSkeleton=await page.evaluate(()=>{
+    const root=window.__ASHEN_ANIMATION_LAB__.model;
+    let bones;root.traverse(o=>{if(!bones&&o.isSkinnedMesh)bones=o.skeleton.bones;});
+    const V=bones[0].position.constructor;
+    const d=(i)=>{
+      const bone=bones[i],v=new V();bone.getWorldPosition(v);
+      return {id:i,name:bone.name,parent:bone.parent?.name||'none',
+        p:v.toArray().map(n=>+n.toFixed(5)),local:bone.position.toArray().map(n=>+n.toFixed(5))};
+    };
+    return {left:[31,32,33,34].map(d),right:[26,27,28,29].map(d),
+      spine:d(1),pelvis:d(0)};
+  });
+  console.log('REAL TRIPO LEG BONE GEOMETRY '+JSON.stringify(legSkeleton));
   for(const [mode,view] of [['Idle','front'],['Walk','front'],['Run','side'],['Jump','front']]){
    await page.locator('[data-motion="'+mode+'"]').click();
    await page.locator('[data-view="'+view+'"]').click();
