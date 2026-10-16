@@ -65,3 +65,12 @@ export function emitCachedTripoGlyphs(e, G, fcw, fch, src, {COLS, ROWS, BAYER, G
         left + K.cx[j] * fcw, top + K.cy[j] * fch, 1);
     }
 }
+
+// Adaptive GPU raster budget for the native game. Visual sampling is not
+// the same as 60Hz skeleton pose evaluation and must stay bounded on phones.
+export function chooseNativeRasterHz({gpuReadMs=20,glyphConvertMs=4,touch=false}={}){
+ const total=gpuReadMs+glyphConvertMs;
+ if(!Number.isFinite(total)||total<0)return touch?12:20;
+ if(touch)return total<10?20:total<18?16:12;
+ return total<10?30:total<19?24:20;
+}
