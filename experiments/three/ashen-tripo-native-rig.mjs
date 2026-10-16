@@ -258,9 +258,17 @@ function animateRig(model,source,root,weapon){
     const stanceRatio=.63-runMix*.21;
     const stepLength=.076+runMix*.052;
     const cycleDistance=2*stepLength/stanceRatio;
-    phase+=hasTravel&&travelDelta>.00001?
+    // If the player presses Run against a wall but doesn't move, do
+    // NOT moonwalk: only actual map displacement advances native footsteps.
+    phase+=hasTravel?
       2*Math.PI*travelDelta/cycleDistance:
       d*2*Math.PI*hz*(stride>.03?1:.02);
+    // The scalar pin follows forward travel only. Replant on major turns
+    // rather than pretending this is a full planar world-space IK solver.
+    if(hasTravel&&Number.isFinite(motion?.heading)&&
+       Math.abs(Math.atan2(Math.sin(motion.heading-heading),
+         Math.cos(motion.heading-heading)))>.24)
+      pin.forEach(p=>p.contact=false);
     const swing=Math.sin(phase);
     const armAmplitude=(.19+runMix*.20)*stride*(1-.78*airMix);
     // The source Tripo shoulder bones rest in a near T-pose along +/-Z.
