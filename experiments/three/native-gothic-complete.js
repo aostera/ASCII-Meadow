@@ -12,6 +12,51 @@
 const nativeBeforeFullCastle=buildModel;
 const nativeBeforeFullRuin=ruinDetail;
 const nativeFullArchitecturalCounts={castle:{},ruins:{}};
+let nativeWestPortalReliefClear=true,nativeWestCurtainProjects=false;
+let nativeWestTraceryEnabled=true;
+let nativeOuterTowerReliefEnabled=true;
+let nativeCentralGableEnabled=true;
+let nativeMonumentalPortalFrameEnabled=true;
+let nativeMonumentalPortalFrameClear=true;
+let nativeHighFlyingArchesEnabled=true;
+let nativeHighFlyingArchesClear=true;
+let nativeMainPortalRecessEnabled=true;
+// T02: large physical opening to counter repetitive masonry at 100% play zoom.
+// Toggle is accessible ONLY to the QA page for identical-camera A/B.
+let nativeWidePortalSilhouetteEnabled=true;
+// The glyph reduction is a native-only stone surface treatment, not a decal.
+// Rejected by PC/phone PNG art review: blocky black rectangular patches.
+// Keep experiment behind QA-only toggle, NEVER enabled in normal gameplay.
+let nativeSparseGateAshlarEnabled=false;
+let nativeMainPortalRecessClear=true;
+let nativeCentralGablePortalClear=true;
+let nativeCentralGableProjects=false;
+let nativeOuterTowerReliefClear=true;
+let nativeOuterTowerIntrusions=[];
+
+// Large interrupted ashlar blocks on the PHYSICAL gatehouse masonry.
+// The source wall/door ray is resolved first by cast(); only that solid's
+// material glyph strength is affected. This leaves its depth, door carved
+// planks, RGB palette, map, camera, lighting and backing stone untouched.
+const nativeOriginalStoneOrnament=ornament;
+ornament=function nativeGateMasonryOrnament(x,y,z,n,so,base){
+  const v=nativeOriginalStoneOrnament(x,y,z,n,so,base);
+  if(!nativeSparseGateAshlarEnabled||!so?.meta?.nativeGateAshlar||
+    n[2]>=-.7||y<120+55||y>120+515)return v;
+  // The actual original oak leaves and their existing painted metalwork
+  // are authored geometry decoration, not part of this quieter ashlar.
+  if(so.meta.door&&pointedArch(x,y,0,so.meta.door.w,
+    so.meta.door.y,so.meta.door.h))return v;
+  // World-coordinate weather erosion: continuous low-frequency pockets
+  // with irregularly chipped edges. Avoid the previous regular rectangular
+  // glyph holes, which looked like a broken sprite on actual phone PNGs.
+  // Cast ray, stone silhouette, rear oak door and physical Z remain intact.
+  const longWear=vnoise(x*.021+z*.003,y*.028);
+  const chipping=vnoise(x*.105+z*.001,y*.097);
+  const pits=vnoise(x*.19-11,y*.17+9);
+  const eroded=longWear>.62&&chipping>.46&&pits>.34;
+  return eroded?Math.min(v,.036):v;
+};
 
 function nativeGothicBox(x0,x1,y0,y1,z0,z1,meta) {
   if(!(x1>x0&&y1>y0&&z1>z0))return;
@@ -80,26 +125,117 @@ function nativeGothicGargoyles(positions,y){
     nativeGothicBox(x-3,x+3,y-32,y-21,z-34,z-24);
   }
 }
+// Turn the original *painted* great door into a real deep Gothic portal.
+// In the inherited castle the near gatehouse box (-160..160, z100..240)
+// and its curtain wall cover the whole entrance in physical source depth.
+// Carve ONLY their forward masonry; a full slab with the exact original
+// authored door meta stays at the BACK of the reveal (z178..240). This is
+// a true 78-unit recessed arch with open side reveals, not a black decal.
+// The original closed oak door still blocks movement: NO new passage, map
+// change, contact shadow override, color/alpha edit or added ground wall.
+function nativeRecessOriginalMainPortal(){
+  if(!nativeMainPortalRecessEnabled){
+    nativeMainPortalRecessClear=true;
+    return 0;
+  }
+  const Y=120;
+  const isBox=(so,x0,x1,y0,y1,z0,z1)=>so?.kind==='wall'&&
+    so.bb[0]===x0&&so.bb[1]===x1&&
+    so.bb[2]===y0&&so.bb[3]===y1&&
+    so.bb[4]===z0&&so.bb[5]===z1;
+  const gateIndex=solids.findIndex(s=>
+    isBox(s,-160,160,Y,Y+560,100,240)&&s.meta?.door);
+  const wallIndex=solids.findIndex(s=>
+    isBox(s,-540,540,Y,Y+300,140,205));
+  if(gateIndex<0||wallIndex<0)
+    throw Error('Missing original gatehouse and curtain solids for recess');
+  const gate=solids[gateIndex],curtain=solids[wallIndex];
+  // Remove only the two identified full boxes. All other original source
+  // castle and already modeled masonry, and the original oak door meta,
+  // remain physically present. IDs are rebuilt by nativeBuildCompleteCastle.
+  for(const i of [gateIndex,wallIndex].sort((a,b)=>b-a))
+    solids.splice(i,1);
+  const start=solids.length;
+  const half=nativeWidePortalSilhouetteEnabled?100:76;
+  const base=Y+137,tip=Y+(nativeWidePortalSilhouetteEnabled?329:287);
+  // The original curtain is only 300 tall; its physical pointed void must
+  // remain below that wall's top even when the taller porch projects in front.
+  const curtainTip=Math.min(tip,Y+296);
+  function segment(original,x0,x1,y0,y1,z0,z1,withDoor=false){
+    const meta={...original.meta};
+    if(!withDoor)delete meta.door;
+    if(original===gate)meta.nativeGateAshlar=true;
+    addBox(x0,x1,y0,y1,z0,z1,'wall',meta);
+  }
+  // The two VISIBLE masonry faces are 78 units apart in depth.
+  // The back retains ALL original door planks, iron and ring-pull glyphs.
+  segment(gate,-160,160,Y,Y+560,178,240,true);
+  function archShoulder(original,sign,z0,z1,roofY,apex=tip){
+    const x0=sign<0?-half:0,x1=sign<0?0:half;
+    const m=(apex-base)/half;
+    // Upper half-space y >= tip - m*abs(x) forms a real concave
+    // pointed opening after combining two *convex* stone shoulders.
+    const p=sign<0?[m,-1,0,-apex]:[-m,-1,0,-apex];
+    const meta={...original.meta};delete meta.door;
+    if(original===gate)meta.nativeGateAshlar=true;
+    solid('wall',[
+      [1,0,0,x1],[-1,0,0,-x0],[0,1,0,roofY],
+      [0,0,1,z1],[0,0,-1,-z0],p
+    ],[x0,x1,base,roofY,z0,z1],meta);
+  }
+  // Gatehouse frontage: flank masonry + pointed open vault ahead of
+  // the recessed door, including real faces for cast() and GPU Z depth.
+  segment(gate,-160,-half,Y,Y+560,100,178);
+  segment(gate,half,160,Y,Y+560,100,178);
+  segment(gate,-half,half,tip,Y+560,100,178);
+  archShoulder(gate,-1,100,178,tip);
+  archShoulder(gate,1,100,178,tip);
+  // The other culprit is the full-width curtain immediately behind the
+  // porch. Physically pierce its exact same doorway, with the continuous
+  // wall, window pattern and blind arcades preserved to left and right.
+  segment(curtain,-540,-half,Y,Y+300,140,205);
+  segment(curtain,half,540,Y,Y+300,140,205);
+  segment(curtain,-half,half,curtainTip,Y+300,140,205);
+  archShoulder(curtain,-1,140,205,Y+300,curtainTip);
+  archShoulder(curtain,1,140,205,Y+300,curtainTip);
+  function stoneAt(x,y,z){
+    return solids.some(so=>so.pl.every(p=>
+      p[0]*x+p[1]*y+p[2]*z<=p[3]+1e-6));
+  }
+  const air=[
+    [0,Y+75,112],[0,Y+75,158],
+    [-33,Y+75,112],[33,Y+75,158],
+    [0,Y+160,112]
+  ];
+  nativeMainPortalRecessClear=air.every(([x,y,z])=>!stoneAt(x,y,z))&&
+    stoneAt(0,Y+75,207)&&stoneAt(half+18,Y+75,112)&&
+    stoneAt(0,Y+365,112);
+  if(!nativeMainPortalRecessClear)
+    throw Error('Carved portal has blocked void, lost oak door or lost roof');
+  return solids.length-start;
+}
 function nativeBuildCompleteCastle(){
   nativeBeforeFullCastle();
+  const recessedMainPortal=nativeRecessOriginalMainPortal();
   const start=solids.length,Y=120,front=330;
-  const feature={};
+  const feature={recessedMainPortal};
   let before=solids.length;
   // The west facade: a raised 24-piece rose-window stone ring, outer
   // tracery, 12 flying spokes and central boss; existing glass still exists.
   nativeGothicRose(0,Y+580,110,front-23);
   feature.rose=solids.length-before;before=solids.length;
 
-  // Deep front portal: four offset lintels, pointed rib pairs and carved
-  // voussoir joints. All lower blocks live OUTSIDE |x|<75 walk corridor.
+  // Deep front portal: chunky physical ribs FOLLOW the new opening, rather
+  // than crossing its negative space. This is source stone, not a decal.
   for(const side of [-1,1])for(let step=0;step<4;step++){
-    const off=87+step*14,z=95-step*5;
+    const off=(nativeWidePortalSilhouetteEnabled?106:87)+step*14,z=95-step*5;
     nativeGothicBox(side*off-6,side*off+6,Y+40,
-      Y+270+step*13,z-4,z+7,{
+      Y+(nativeWidePortalSilhouetteEnabled?305:270)+step*13,z-4,z+7,{
         courses:[Y+106,Y+184,Y+247],corbels:Y+259
       });
-    nativeGothicBeam(side*off,Y+278+step*11,0,
-      Y+359+step*11,z-2,6);
+    nativeGothicBeam(side*off,
+      Y+(nativeWidePortalSilhouetteEnabled?316:278)+step*11,0,
+      Y+(nativeWidePortalSilhouetteEnabled?401:359)+step*11,z-2,6);
   }
   for(let x=-152;x<=152;x+=21){
     if(Math.abs(x)<72)continue;
@@ -107,6 +243,33 @@ function nativeBuildCompleteCastle(){
       82,100,{courses:[Y+392]});
   }
   feature.portal=solids.length-before;before=solids.length;
+  // Monumental, truly projecting pointed arch in front of the dark gate.
+  // Large source convex pieces, not glyph decoration or screen overlays.
+  // Broad jambs are outside the walkable corridor; diagonal ribs rise well
+  // above the original closed oak door and join to one pointed apex.
+  if(nativeMonumentalPortalFrameEnabled){
+    for(const sign of [-1,1]){
+      const x=sign*132;
+      nativeGothicBox(x-15,x+15,Y+25,Y+270,31,74,{
+        courses:[Y+118,Y+233]
+      });
+      nativeGothicBox(x-22,x+22,Y+262,Y+288,25,78);
+    }
+    // addBeam needs ascending x0,x1 (not mirrored reversed bounds).
+    addBeam(-132,0,29,70,Y+300,Y+431,24,'wall');
+    addBeam(0,132,29,70,Y+431,Y+300,24,'wall');
+  }
+  feature.monumentalPortalFrame=solids.length-before;
+  const monumental=solids.slice(before);
+  const clearPoints=[-75,0,75].flatMap(x=>
+    [Y+55,Y+160,Y+250].map(y=>[x,y,48]));
+  nativeMonumentalPortalFrameClear=monumental.length===0||
+    (monumental.length===6&&monumental.every(so=>so.bb[4]<85)&&
+      clearPoints.every(([x,y,z])=>!monumental.some(so=>
+        so.pl.every(p=>p[0]*x+p[1]*y+p[2]*z<=p[3]+1e-6))));
+  if(!nativeMonumentalPortalFrameClear)
+    throw Error('Monumental porch intrudes on original passage');
+  before=solids.length;
 
   // Side towers and cathedral west front: actual thin window jambs,
   // gothic hood mouldings and multiple upper tracery bays.
@@ -158,11 +321,285 @@ function nativeBuildCompleteCastle(){
     }
     nativeGothicBox(-8,8,Y+655,Y+673,z-12,z+12);
   }
-  feature.naveAndVaults=solids.length-before;
+  feature.naveAndVaults=solids.length-before;before=solids.length;
 
-  for(let i=start;i<solids.length;i++){
+  // Four physically projecting west-front lancet canopies. The gate is
+  // deliberately NOT a billboard: each hood has stone jambs, two ascending
+  // ogival ribs, an offset keystone, relief bosses and broken sill courses.
+  // These start beyond |x|=150 and y>=Y+155: the original central gateway
+  // (|x|<75), its grounded collision and every passage remain unchanged.
+  // Deliberately non-uniform rise and missing coping pieces prevent the
+  // uniform horizontal rows seen in the baseline ASCII facade captures.
+  if(nativeWestTraceryEnabled)for(const side of [-1,1])for(let bay=0;bay<2;bay++){
+    // Inter-buttress bays of the outer curtain. Nearer z (towards the
+    // camera) than the original front wall at z=140; never embedded in
+    // existing gatehouse prisms centered x=+/-172, z=108, radius 52.
+    const cx=side*(342+bay*81),z=103-bay*4;
+    const base=Y+155+bay*15,shoulder=base+118+bay*9;
+    const peak=shoulder+51+bay*8;
+    const jamb=bay===0?19:23;
+    for(const edge of [-1,1]){
+      const x=cx+edge*jamb;
+      nativeGothicBox(x-5,x+5,base,shoulder+6,z-5,z+7,{
+        courses:[base+29,base+68,base+101]
+      });
+      // Splintered, high-relief stones descend the vertical edge; they do
+      // not fill the window gap or paint a rectangular dark decal.
+      for(let k=0;k<3;k++){
+        if((k+bay+(side>0?1:0))%4===0)continue;
+        const yy=base+19+k*31;
+        nativeGothicBox(x+edge*4-4,x+edge*4+4,
+          yy,yy+7+(k%2)*5,z-11,z-4,{
+            courses:[yy+4]
+          });
+      }
+      nativeGothicBeam(cx+edge*jamb,shoulder,
+        cx,peak,z-5,5);
+      // Projected ribs run just proud of the masonry, casting real source
+      // shadows rather than changing the global material lightness.
+      nativeGothicBeam(cx+edge*(jamb+8),shoulder-4,
+        cx,peak+9,z-12,4);
+    }
+    nativeGothicBox(cx-6,cx+6,peak-3,peak+13,z-14,z+4,{
+      courses:[peak+7]
+    });
+    for(let k=0;k<4;k++){
+      const ox=(k-1.5)*13;
+      if(k===bay+(side>0?1:0))continue;
+      const yy=base-15+(k%2)*3;
+      nativeGothicBox(cx+ox-6,cx+ox+5,yy,yy+8,
+        z-12,z+7,{courses:[yy+3]});
+    }
+    // Narrow single stone corbel below each bay, never at ground level.
+    nativeGothicBox(cx-12,cx+12,base-23,base-15,
+      z-16,z+8,{courses:[base-20]});
+  }
+  feature.portalSideTracery=solids.length-before;
+  // Guard the actual new 3D halfspaces, not a flat-screen impression.
+  const curtainDetails=solids.slice(before);
+  nativeWestPortalReliefClear=curtainDetails.every(so=>
+    so.bb[1]<=-300||so.bb[0]>=300);
+  nativeWestCurtainProjects=[-423,-342,342,423].every(x=>
+    curtainDetails.some(so=>so.bb[0]<x+8&&so.bb[1]>x-8&&
+      so.bb[4]<115));
+
+  // The two forward corner towers are existing octagonal source masonry.
+  // Add genuinely projecting, intentionally sparse tower silhouettes: two
+  // narrow blind lancet hoods in each front face, a chipped crown and
+  // discontinuous crockets following the sloped conical roof. A broad
+  // repeating band would make the already noisy ASCII wall less legible.
+  // These stones sit outside |x|>480 and far ABOVE the walkable entrance;
+  // none alters the underlying tower, source palette or the main gate.
+  before=solids.length;
+  if(nativeOuterTowerReliefEnabled)for(const side of [-1,1]){
+    const tx=side*560,tz=170,lipZ=44,roofBase=Y+760+36;
+    for(const [slot,offset] of [[0,-31],[1,31]]){
+      const cx=tx+offset,base=Y+365+slot*25;
+      const shoulder=base+164-slot*18,peak=shoulder+49+slot*5;
+      // Physical face reveals, not solid black cards. A gap remains
+      // between the raised jambs, framed by the original stone wall.
+      for(const edge of [-1,1]){
+        const jx=cx+edge*15;
+        nativeGothicBox(jx-5,jx+5,base,shoulder,lipZ-10,lipZ+11,{
+          courses:[base+41,base+113]
+        });
+        nativeGothicBeam(jx,shoulder,cx,peak,lipZ-9,6);
+      }
+      nativeGothicBox(cx-8,cx+8,peak-4,peak+11,lipZ-18,lipZ+7,{
+        courses:[peak+4]
+      });
+      if(slot===0)nativeGothicBox(cx-18,cx+18,base-19,base-11,
+        lipZ-21,lipZ+7);
+    }
+    // Keep the cornice discontinuous, with missing stones and uneven
+    // heights: distinct protrusions instead of a single bright stripe.
+    for(let k=0;k<9;k++){
+      if(k===2||k===6)continue;
+      const x=tx-82+k*20,yy=roofBase-17+(k%3)*5;
+      nativeGothicBox(x-7,x+7,yy,yy+12+(k%2)*12,
+        46-(k%2)*9,70,{courses:[yy+5]});
+    }
+    // Four sparse pairs of stone crockets trace the REAL sloping spire.
+    // At normalized height t its eight-sided cone shrinks with (1-t).
+    // Project only slightly beyond that radius, so the main silhouette
+    // breaks into individual Gothic finials rather than a sawtooth band.
+    for(const [tier,t] of [0.17,0.32,0.48,0.65].entries()){
+      const y=roofBase+620*t,rad=108*(1-t);
+      for(const edge of [-1,1]){
+        const x=tx+edge*(rad+13);
+        nativeGothicBox(x-6,x+6,y-13,y+9,
+          tz-17,tz+10,{courses:[y-4]});
+        nativeGothicBeam(tx+edge*(rad-6),y-10,
+          x+edge*13,y+21,tz-5,5);
+        if((tier+(side>0?1:0))%3!==0)
+          addCone(x+edge*7,tz-6,7,4,y+9,y+38,'spire');
+      }
+    }
+    // Stepped, chipped shoulders on the OUTER silhouette, not on the
+    // face covering the pier's arrow-slits. This breaks tower symmetry.
+    for(let i=0;i<3;i++){
+      if(side>0&&i===1)continue;
+      const x=tx+side*(87+i*10);
+      const y=Y+445+i*79+(side>0?13:0);
+      nativeGothicBox(x-7,x+7,y,y+42-i*8,
+        tz-17-i*7,tz+9,{courses:[y+11]});
+    }
+  }
+  feature.outerTowerRelief=solids.length-before;
+  // Lower crockets follow the 108-unit spire radius, extending to
+  // |x|>=~443; guard |x|>420 while protecting the |x|<300 gateway.
+  nativeOuterTowerIntrusions=solids.slice(before)
+    .filter(so=>!(so.bb[1]<-420||so.bb[0]>420))
+    .map(so=>so.bb.slice());
+  nativeOuterTowerReliefClear=nativeOuterTowerIntrusions.length===0;
+
+  // The GREAT GATE and the actual cathedral front need two DIFFERENT
+  // vertical masses. Broken, projected ogival ribs distinguish the foreground
+  // gatehouse (z<100) from the elevated rose gable (z~295); neither is a
+  // painted window card, uniform bright stripe or solid door plug.
+  before=solids.length;
+  if(nativeCentralGableEnabled){
+    for(const side of [-1,1]){
+      // Foreground gate canopy. A tall asymmetric stone pier supports the
+      // broken pointed arch above the existing door. At y>=Y+392 no part
+      // of these stones can alter the pedestrian portal/ground passage.
+      const x=side*116,z=59;
+      nativeGothicBox(x-12,x+12,Y+392,Y+538,z-9,z+15,{
+        courses:[Y+429,Y+494],corbels:Y+523
+      });
+      nativeGothicBox(x-20,x+20,Y+529,Y+544,z-18,z+18,{
+        courses:[Y+535]
+      });
+      // Two large true diagonals, intentionally DISCONNECTED. Their air
+      // gap is readable even in low-resolution ASCII raycast captures.
+      nativeGothicBeam(side*116,Y+543,side*78,Y+614,z-10,13);
+      nativeGothicBeam(side*63,Y+634,side*18,Y+684,z-10,11);
+      nativeGothicBeam(side*133,Y+500,side*109,Y+559,z-19,8);
+      for(const [n,yy] of [[0,Y+566],[1,Y+605],[2,Y+649]]){
+        if((side>0&&n===1)||(side<0&&n===2))continue;
+        const bx=side*(109-n*27);
+        nativeGothicBox(bx-8,bx+8,yy,yy+18-n*2,
+          z-19,z+1,{courses:[yy+8]});
+      }
+      // The tympanum's lateral stone lips add a second visible face but
+      // never bridge the middle of the dark doorway.
+      nativeGothicBox(side*87-7,side*87+7,Y+440,Y+473,
+        z-20,z-8,{courses:[Y+455]});
+
+      // Background west-front gable: individual elevated flying ribs
+      // bordering the existing rose-window masonry at z=330. All spans
+      // are separated by true gaps; do not add an infill slab or mask.
+      const zRose=289;
+      nativeGothicBox(side*151-11,side*151+11,Y+757,Y+880,
+        zRose-11,zRose+16,{courses:[Y+797,Y+841]});
+      nativeGothicBox(side*151-18,side*151+18,Y+869,Y+886,
+        zRose-14,zRose+19);
+      nativeGothicBeam(side*149,Y+892,side*110,Y+959,
+        zRose-12,15);
+      nativeGothicBeam(side*99,Y+977,side*28,Y+1088,
+        zRose-12,13);
+      // Crooked surviving finials atop the gable shoulder; one absent on
+      // the right, to break the massive mirrored upper stone silhouette.
+      nativeGothicBox(side*161-9,side*161+9,Y+882,Y+920,
+        zRose-13,zRose+14,{courses:[Y+899]});
+      if(side<0)addCone(side*161,zRose,12,5,
+        Y+920,Y+986,'spire',{axis:[side*161,zRose],n:5});
+    }
+    // The high outer stone boss belongs to the NEW open frame, not to the
+    // rose's inner glyph lighting. It is deliberately detached from both
+    // diagonals and never spans the existing portal below.
+    nativeGothicBox(-14,14,Y+1090,Y+1112,
+      274,300,{courses:[Y+1099]});
+    addCone(0,286,13,6,Y+1112,Y+1156,'spire',{
+      axis:[0,286],n:6
+    });
+    nativeGothicBox(-13,13,Y+680,Y+705,39,73,{
+      courses:[Y+694]
+    });
+  }
+  feature.centralBrokenGables=solids.length-before;
+  const centralDetails=solids.slice(before);
+  // The original doorway is below y=Y+290. A 60-unit safety margin
+  // protects ALL solids in the walking corridor from this new stage.
+  nativeCentralGablePortalClear=centralDetails.every(so=>
+    so.bb[2]>Y+350);
+  nativeCentralGableProjects=centralDetails.some(so=>
+    so.bb[4]<70&&so.bb[3]>Y+600)&&
+    centralDetails.some(so=>so.bb[4]<295&&so.bb[3]>Y+1050);
+
+  // HIGH WEST-FRONT FLYING BUTTRESS WINGS (real stone, not painted
+  // shading). Existing full-frame art tests revealed that tiny decorative
+  // ribs disappear at 13-14% zoom. These large detached load-bearing
+  // profiles make negative-space arches between the paired cathedral
+  // spires and outer front towers. Keep the middle sky and lower gate open.
+  // Z<280 projects AHEAD of the west-front masonry at z=300; Y>Y+875
+  // ensures no new collision in the great gate or its upper gallery.
+  before=solids.length;
+  if(nativeHighFlyingArchesEnabled)for(const side of [-1,1]){
+    const bz=229,outer=side*445,inner=side*356;
+    // Massive staggered masonry base: the outer pier is intentionally
+    // split into three vertical courses so its top reads as a battered,
+    // once-load-bearing support rather than another parallel wall strip.
+    nativeGothicBox(outer-23,outer+23,Y+878,Y+1024,
+      bz-20,bz+18,{courses:[Y+921,Y+985]});
+    nativeGothicBox(outer-18,outer+18,Y+1044,Y+1110,
+      bz-17,bz+20,{courses:[Y+1082]});
+    nativeGothicBox(outer-22,outer+22,Y+1130,Y+1200,
+      bz-17,bz+19,{courses:[Y+1166]});
+    nativeGothicBox(outer-34,outer+34,Y+1190,Y+1211,
+      bz-24,bz+24);
+    // True flying arch: two non-parallel diagonals form a large open
+    // pointed void. Their missing apex is the deliberate broken skyline.
+    nativeGothicBeam(inner,Y+1050,outer,Y+1191,bz-19,22);
+    nativeGothicBeam(side*331,Y+1181,side*389,Y+1306,
+      bz-24,19);
+    nativeGothicBeam(side*411,Y+1323,outer,Y+1230,
+      bz-23,18);
+    // Second *short* flying rib reveals a different depth level. It has
+    // a large real gap before the higher arch and never plugs the void.
+    nativeGothicBeam(side*358,Y+1106,side*415,Y+1188,
+      bz-38,11);
+    nativeGothicBeam(side*404,Y+1242,side*450,Y+1314,
+      bz-35,12);
+    nativeGothicBox(side*409-15,side*409+15,Y+1284,Y+1321,
+      bz-31,bz+12,{courses:[Y+1304]});
+    // Outer broken pinnacle offsets anchor both the 3D silhouette and
+    // the recognizable Gothic buttress rhythm at tiny source zoom.
+    nativeGothicBox(outer-17,outer+17,Y+1320,Y+1377,
+      bz-26,bz+17,{courses:[Y+1347]});
+    if(side<0){
+      addCone(outer,bz,21,6,Y+1377,Y+1492,'spire',{
+        axis:[outer,bz],n:6
+      });
+      nativeGothicBeam(side*425,Y+1380,side*481,Y+1442,
+        bz-25,14);
+    }else{
+      // The right finial broke off: two surviving oblique blocks instead.
+      nativeGothicBox(outer+side*17-9,outer+side*17+9,
+        Y+1400,Y+1438,bz-28,bz+11);
+      nativeGothicBeam(side*438,Y+1378,side*477,Y+1413,
+        bz-26,12);
+    }
+    // Three large surviving brackets, spaced and omitted asymmetrically.
+    for(let k=0;k<3;k++){
+      if(side>0&&k===1)continue;
+      const x=outer+side*(27+k*19),y=Y+953+k*95;
+      nativeGothicBox(x-15,x+15,y,y+25+(k%2)*11,
+        bz-31-k*2,bz+10,{courses:[y+12]});
+    }
+  }
+  feature.highFlyingArches=solids.length-before;
+  nativeHighFlyingArchesClear=solids.slice(before).every(s=>
+    s.bb[2]>=Y+870&&(s.bb[1]<-310||s.bb[0]>310));
+  // Keep original authored IDs on untouched stone: changing these IDs
+  // modifies window-light identifiers far away from the carved gate.
+  // Allocate only NEW convex solids beyond the old max instead.
+  let nextId=solids.reduce((m,s)=>
+    Math.max(m,Number.isInteger(s.id)?s.id:-1),-1)+1;
+  for(let i=0;i<solids.length;i++){
     const s=solids[i],b=s.bb;
-    s.id=i;s.cx=(b[0]+b[1])*.5;
+    if(!Number.isInteger(s.id))s.id=nextId++;
+    s.cx=(b[0]+b[1])*.5;
     s.cy=(b[2]+b[3])*.5;s.cz=(b[4]+b[5])*.5;
   }
   nativeFullArchitecturalCounts.castle=feature;
@@ -271,6 +708,76 @@ ruinDetail=function(site){
 };
 window.__ASCII_NATIVE_COMPLETE_ARCH__={
   get features(){return JSON.parse(JSON.stringify(nativeFullArchitecturalCounts))},
+  get westPortalReliefClear(){return nativeWestPortalReliefClear},
+  get westCurtainProjects(){return nativeWestCurtainProjects},
+  get facadeEnabled(){return nativeWestTraceryEnabled},
+  get monumentalPortalFrameEnabled(){return nativeMonumentalPortalFrameEnabled},
+  get monumentalPortalFrameClear(){return nativeMonumentalPortalFrameClear},
+  setMonumentalPortalFrameEnabledForTest(on){
+    const q=new URLSearchParams(location.search);
+    if(!q.has('nativeCastleFacadeTest')&&!q.has('nativeCastleFramedTest'))
+      return false;
+    nativeMonumentalPortalFrameEnabled=Boolean(on);
+    return true;
+  },
+  get mainPortalRecessEnabled(){return nativeMainPortalRecessEnabled},
+  get widePortalSilhouetteEnabled(){return nativeWidePortalSilhouetteEnabled},
+  get sparseGateAshlarEnabled(){return nativeSparseGateAshlarEnabled},
+  setSparseGateAshlarEnabledForTest(on){
+    const q=new URLSearchParams(location.search);
+    if(!q.has('nativeCastleFacadeTest')&&!q.has('nativeCastleFramedTest'))
+      return false;
+    nativeSparseGateAshlarEnabled=Boolean(on);
+    return true;
+  },
+  setWidePortalSilhouetteEnabledForTest(on){
+    const q=new URLSearchParams(location.search);
+    if(!q.has('nativeCastleFacadeTest')&&!q.has('nativeCastleFramedTest'))
+      return false;
+    nativeWidePortalSilhouetteEnabled=Boolean(on);
+    return true;
+  },
+  get mainPortalRecessClear(){return nativeMainPortalRecessClear},
+  setMainPortalRecessEnabledForTest(on){
+    const q=new URLSearchParams(location.search);
+    if(!q.has('nativeCastleFacadeTest')&&!q.has('nativeCastleFramedTest'))
+      return false;
+    nativeMainPortalRecessEnabled=Boolean(on);
+    return true;
+  },
+  get highFlyingArchesEnabled(){return nativeHighFlyingArchesEnabled},
+  get highFlyingArchesClear(){return nativeHighFlyingArchesClear},
+  setHighFlyingArchesEnabledForTest(on){
+    const q=new URLSearchParams(location.search);
+    if(!q.has('nativeCastleFacadeTest')&&!q.has('nativeCastleFramedTest'))
+      return false;
+    nativeHighFlyingArchesEnabled=Boolean(on);
+    return true;
+  },
+  get centralGableEnabled(){return nativeCentralGableEnabled},
+  get centralGablePortalClear(){return nativeCentralGablePortalClear},
+  get centralGableProjects(){return nativeCentralGableProjects},
+  setCentralGableEnabledForTest(on){
+    if(!new URLSearchParams(location.search).has('nativeCastleFacadeTest'))
+      return false;
+    nativeCentralGableEnabled=Boolean(on);
+    return true;
+  },
+  get outerTowerReliefEnabled(){return nativeOuterTowerReliefEnabled},
+  get outerTowerReliefClear(){return nativeOuterTowerReliefClear},
+  get outerTowerIntrusions(){return nativeOuterTowerIntrusions.map(a=>a.slice())},
+  setOuterTowerReliefEnabledForTest(on){
+    if(!new URLSearchParams(location.search).has('nativeCastleFacadeTest'))
+      return false;
+    nativeOuterTowerReliefEnabled=Boolean(on);
+    return true;
+  },
+  setFacadeEnabledForTest(on){
+    if(!new URLSearchParams(location.search).has('nativeCastleFacadeTest'))
+      return false;
+    nativeWestTraceryEnabled=Boolean(on);
+    return true;
+  },
   get castleTotal(){return Object.values(nativeFullArchitecturalCounts.castle)
     .reduce((a,b)=>a+b,0)},
   get ruinTotals(){return Object.fromEntries(Object.entries(nativeFullArchitecturalCounts.ruins)

@@ -1,0 +1,48 @@
+name: Three Native Castle Walkable Gate Route QA
+
+on:
+  push:
+    branches:
+      - 'feat/three-castle-*'
+  pull_request:
+    branches:
+      - experiment/threejs-ascii-prototype
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: three-native-castle-route-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  route:
+    name: Original knight walks every castle stair to portal
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: node --check tools/check/three-native-castle-route.cjs
+      - name: Simulate original stairs and gate on PC and phone
+        run: |
+          python3 -m http.server 8181 >/tmp/three-native-route-http.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8181/experiments/three/native.html >/dev/null && break
+            sleep 1
+          done
+          node tools/check/three-native-castle-route.cjs http://127.0.0.1:8181
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: three-native-castle-route
+          path: shots/three-native-castle-route
+          if-no-files-found: warn
