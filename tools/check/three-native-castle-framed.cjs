@@ -377,6 +377,79 @@ fs.mkdirSync(dir,{recursive:true});
        throw Error('Invalid physical portal ray audit '+JSON.stringify(result));
      return result;
    });
+   // T02 art diagnostic: search REAL walkable gate-adjacent positions
+   // where the original zoom=1 follow-camera contains the pointed portal.
+   // These independent walkable samples do NOT establish route continuity.
+   const walkablePortal=await page.evaluate(samples=>{
+     const c=cathedral,map=JSON.stringify(MEADOW_MAP);
+     const centerX=c.kx/CW;
+     let checked=0,walkable=0,best=null;
+     for(let y=c.gateRow-VR*.75;y<=c.gateRow+VR*1.65;y+=3){
+       for(const dx of [0,-3,3,-8,8,-14,14,-22,22]){
+         checked++;
+         const x=centerX+dx,h=surfAt(x,y);
+         if(!Number.isFinite(h))continue;
+         const last=player.hT;player.hT=h;
+         const valid=!blocked(x,y,player);
+         player.hT=last;
+         if(!valid)continue;
+         walkable++;
+         player.x=player.tx=x;player.y=player.ty=y;
+         player.h=player.hT=h;
+         VZ=1;updateCamera(0,true);
+         const visible=samples.filter(s=>
+           s.cell[0]>=VX0&&s.cell[0]<=VX1&&
+           s.cell[1]>=VY0&&s.cell[1]<=VY1);
+         const upper=visible.filter(s=>s.height>=215);
+         const score=visible.length+upper.length*2-Math.abs(dx)*.01;
+         if(!best||score>best.score)best={
+           score,x,y,h,dx,visibleSamples:visible.length,
+           upperArchSamples:upper.length,totalSamples:samples.length,
+           visibleRays:visible.map(s=>({x:s.x,height:s.height})),
+           camera:[camX,camY],window:[VX0,VY0,VX1,VY1],
+           relativeToGateRows:y-c.gateRow
+         };
+       }
+     }
+     if(!best)throw Error('No walkable castle gate audit location');
+     player.x=player.tx=best.x;player.y=player.ty=best.y;
+     player.h=player.hT=best.h;
+     VZ=1;updateCamera(0,true);FG.tick=0;cloudTick=2;render();
+     const result={
+       checked,walkable,best,sourcePortalSamples:samples.length,
+       topOfPortalInView:best.upperArchSamples>0,
+       majorityOfPortalInView:best.visibleSamples>samples.length/2,
+       mapUnchanged:map===JSON.stringify(MEADOW_MAP),
+       zoom:VZ,
+       nativeThree:window.__ASCII_NATIVE__.mode==='three',
+       oneWebGLCanvas:document.querySelectorAll('#three-parity-canvas').length===1,
+       note:'Independent walkable points, not a path or an art approval'
+     };
+     if(!result.mapUnchanged||result.zoom!==1||!result.nativeThree||
+       !result.oneWebGLCanvas)
+       throw Error('Walkable portal camera QA invariant '+JSON.stringify(result));
+     return result;
+   },portalAudit.samples.filter(s=>s.intendedDoor).map(s=>({
+     x:s.x,height:s.height,cell:s.screenCell
+   })));
+   await page.screenshot({path:path.join(dir,
+     label+'-portal-best-walkable-gameplay-hud.png'),timeout:60000});
+   await page.addStyleTag({
+     content:'.hud,.stats{visibility:hidden!important}'
+   });
+   await page.evaluate(()=>{cloudTick=2;render()});
+   await page.screenshot({path:path.join(dir,
+     label+'-portal-best-walkable-gameplay-clean.png'),timeout:60000});
+   await page.addStyleTag({
+     content:'.hud,.stats{visibility:visible!important}'
+   });
+   fs.writeFileSync(path.join(dir,label+'-portal-walkable-audit.json'),
+     JSON.stringify(walkablePortal,null,2)+'\\n');
+   console.log('NATIVE CASTLE WALKABLE PORTAL CAMERA '+label+' '+
+     JSON.stringify(walkablePortal));
+   if(!walkablePortal.topOfPortalInView)
+     console.warn('T02 ART BLOCKER: no walkable sample frames pointed '+
+       'portal upper arch in zoom=1 source follow-camera ('+label+')');
    // The difference must be made by a real physical carve, not a
    // screen-space dark decal or an always-hidden solid. Compare the same
    // 100% playable gate-follow-camera before/after in one native WebGL2
