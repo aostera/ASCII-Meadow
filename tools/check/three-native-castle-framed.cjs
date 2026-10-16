@@ -616,6 +616,20 @@ fs.mkdirSync(dir,{recursive:true});
      JSON.stringify(ashlarArt,null,2)+String.fromCharCode(10));
    console.log('NATIVE CASTLE GATE BROAD ASHLAR '+label+' '+
      JSON.stringify(ashlarArt));
+   // The QA experiment was visually REJECTED: repeated rectangular black
+   // patches read as a broken texture, not Gothic masonry. Return to the
+   // approved previous dense gate before any later screenshot or QA stage.
+   await page.evaluate(()=>{
+     const a=window.__ASCII_NATIVE_COMPLETE_ARCH__;
+     if(!a.setSparseGateAshlarEnabledForTest(false))
+       throw Error('Cannot restore rejected ashlar experiment to default off');
+     const was=Math.random;Math.random=()=>.513;
+     try{build();VZ=1;updateCamera(0,true);FG.tick=0;cloudTick=2;render()}
+     finally{Math.random=was}
+     if(a.sparseGateAshlarEnabled)
+       throw Error('Rejected gate stone test remained enabled');
+   });
+
    // The difference must be made by a real physical carve, not a
    // screen-space dark decal or an always-hidden solid. Compare the same
    // 100% playable gate-follow-camera before/after in one native WebGL2
