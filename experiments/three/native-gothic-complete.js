@@ -16,6 +16,7 @@ let nativeWestPortalReliefClear=true,nativeWestCurtainProjects=false;
 let nativeWestTraceryEnabled=true;
 let nativeOuterTowerReliefEnabled=true;
 let nativeOuterTowerReliefClear=true;
+let nativeOuterTowerIntrusions=[];
 
 function nativeGothicBox(x0,x1,y0,y1,z0,z1,meta) {
   if(!(x1>x0&&y1>y0&&z1>z0))return;
@@ -287,8 +288,10 @@ function nativeBuildCompleteCastle(){
     }
   }
   feature.outerTowerRelief=solids.length-before;
-  nativeOuterTowerReliefClear=solids.slice(before).every(so=>
-    so.bb[1]<-460||so.bb[0]>460);
+  nativeOuterTowerIntrusions=solids.slice(before)
+    .filter(so=>!(so.bb[1]<-460||so.bb[0]>460))
+    .map(so=>so.bb.slice());
+  nativeOuterTowerReliefClear=nativeOuterTowerIntrusions.length===0;
 
   for(let i=start;i<solids.length;i++){
     const s=solids[i],b=s.bb;
@@ -406,6 +409,7 @@ window.__ASCII_NATIVE_COMPLETE_ARCH__={
   get facadeEnabled(){return nativeWestTraceryEnabled},
   get outerTowerReliefEnabled(){return nativeOuterTowerReliefEnabled},
   get outerTowerReliefClear(){return nativeOuterTowerReliefClear},
+  get outerTowerIntrusions(){return nativeOuterTowerIntrusions.map(a=>a.slice())},
   setOuterTowerReliefEnabledForTest(on){
     if(!new URLSearchParams(location.search).has('nativeCastleFacadeTest'))
       return false;
