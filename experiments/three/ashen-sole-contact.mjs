@@ -47,3 +47,26 @@ export function locateBootSoleVertices(meshes,legSets){
     return best;
   });
 }
+
+// Compute a bounded *pelvis-local* adjustment from real skinned boot
+// surface heights, not the joint pivot. Input heights are in normalized
+// root world metres. The target is returned in original Tripo bone units.
+// Pure math enables a deterministic test before a WebGL rig is available.
+export function groundedSoleTarget(surfaces,restHeights,contacts,sourcePerMetre,
+  maxCorrection=.045){
+  if(!Number.isFinite(sourcePerMetre)||sourcePerMetre<=0||
+     !Number.isFinite(maxCorrection)||maxCorrection<=0)
+    throw Error('Invalid original Tripo sole correction scale');
+  let error=0,count=0;
+  for(let i=0;i<2;i++){
+    if(!contacts?.[i])continue;
+    const current=surfaces?.[i],baseline=restHeights?.[i];
+    if(!current||!(current.sampleCount>=6)||
+       !Number.isFinite(current.minY)||!Number.isFinite(baseline))continue;
+    error+=current.minY-baseline;
+    count++;
+  }
+  const raw=count?-error/count*sourcePerMetre:0;
+  const target=Math.max(-maxCorrection,Math.min(maxCorrection,raw));
+  return {target,raw,count,meanHeightError:count?error/count:null};
+}
