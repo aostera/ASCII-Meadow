@@ -56,7 +56,7 @@ a{color:#e8b8ae}a:focus-visible{outline:2px solid #e8b8ae}
  <div class="group"><div class="pills"><button id="pause" aria-pressed="false">Пауза</button><button id="frame" type="button">+1 кадр</button><button id="skeleton" aria-pressed="false">Кости</button><button id="wire" aria-pressed="false">Сетка</button></div></div>
  <div class="group"><div class="pills">
   <button id="turn" aria-pressed="false" type="button">Авто 360°</button>
-  <button id="palette" aria-pressed="true" type="button">Готическая палитра · эксперимент</button>
+  <button id="palette" aria-pressed="false" type="button">Экспериментальная перекраска · выкл</button>
  </div></div>
  <div class="group"><label>Осмотр модели</label><div class="tiles views"><button data-view="front">Спереди</button><button data-view="side">Сбоку</button><button data-view="back">Сзади</button></div></div>
  <div class="meta" id="metrics" aria-live="off">Загрузка GLB…</div>
@@ -186,8 +186,10 @@ ui.palette.addEventListener('click',()=>{
       m.wireframe=wire;
   }});
   ui.palette.setAttribute('aria-pressed',String(enabled));
-  status(enabled?'Экспериментальная палитра включена. GLB и игровые материалы не изменены.':
-    'Исходные материалы GLB восстановлены для сравнения.');
+  ui.palette.textContent=enabled?
+    'Экспериментальная перекраска · вкл':'Экспериментальная перекраска · выкл';
+  status(enabled?'ВНИМАНИЕ: непроверенная перекраска. Исходный GLB только для сравнения.':
+    'Оригинальные материалы и текстуры Tripo восстановлены.');
 });
 ui.skeleton.addEventListener('click',()=>{
   showSkeleton=!showSkeleton;if(boneHelper)boneHelper.visible=showSkeleton;
@@ -222,7 +224,10 @@ try{
   rig=createGltfKnight(THREE,{
     onLoad:root=>{
       const data=root.userData.gltf;
-      palette=createGothicPalettePreview(root,{enabled:true});
+      // Never modify source GLB textures or visible materials by default.
+      // Previous screenshots showed an UNAPPROVED vertex-color study,
+      // not the authentic original character. Opt-in only for comparison.
+      palette=createGothicPalettePreview(root,{enabled:false});
       ui.palette.setAttribute('aria-pressed',String(palette.enabled));
       boneHelper=new THREE.SkeletonHelper(root);
       boneHelper.material.depthTest=false;
