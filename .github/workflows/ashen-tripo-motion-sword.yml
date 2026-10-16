@@ -1,0 +1,45 @@
+name: Ashen Vow Tripo — Anatomical Gait and Gothic Sword In Game
+on:
+  push:
+    branches: [feat/ashen-tripo-v2-motion-sword]
+    paths:
+      - experiments/three/ashen-tripo-native-rig.mjs
+      - experiments/three/ashen-gothic-longsword.mjs
+      - experiments/three/native-tripo-v2.mjs
+      - tools/check/ashen-tripo-motion-sword.cjs
+      - .github/workflows/ashen-tripo-motion-sword.yml
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  gameplay:
+    name: Real Tripo knight IK + independent wrist sword · desktop/phone
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22',cache: npm}
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Static syntax
+        run: |
+          node --check experiments/three/ashen-tripo-native-rig.mjs
+          node --check experiments/three/ashen-gothic-longsword.mjs
+          node --check experiments/three/native-tripo-v2.mjs
+          node --check tools/check/ashen-tripo-motion-sword.cjs
+      - name: Real skinned player, attached separate Gothic longsword, planted walk and jump
+        run: |
+          python3 -m http.server 8181 >/tmp/ashen-motion-http.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8181/experiments/three/native.html >/dev/null && break
+            sleep 1
+          done
+          node tools/check/ashen-tripo-motion-sword.cjs http://127.0.0.1:8181
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ashen-tripo-gait-gothic-sword-real-game
+          path: shots/ashen-tripo-v2-motion-sword/
+          if-no-files-found: warn
