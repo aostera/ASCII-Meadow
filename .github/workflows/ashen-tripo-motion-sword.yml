@@ -1,7 +1,7 @@
 name: Ashen Vow Tripo — Anatomical Gait and Gothic Sword In Game
 on:
   push:
-    branches: [feat/ashen-tripo-v2-motion-sword, feat/ashen-tripo-animation-workshop-20261016]
+    branches: [feat/ashen-tripo-v2-motion-sword]
     paths:
       - experiments/three/ashen-tripo-native-rig.mjs
       - experiments/three/source-motion.mjs
@@ -18,6 +18,17 @@ on:
       - tools/check/ashen-native-glyph-cache.cjs
       - tools/check/ashen-tripo-motion-sword.cjs
       - tools/check/ashen-tripo-animation-workshop.cjs
+      - .github/workflows/ashen-tripo-motion-sword.yml
+  pull_request:
+    branches: [feat/ashen-tripo-v2-motion-sword]
+    paths:
+      - experiments/three/ashen-tripo-native-rig.mjs
+      - experiments/three/ashen-glyph-emitter.mjs
+      - experiments/three/native-tripo-v2.mjs
+      - experiments/three/ashen-sole-contact.mjs
+      - experiments/three/ashen-blade-envelope.mjs
+      - tools/check/ashen-native-glyph-cache.cjs
+      - tools/check/ashen-tripo-motion-sword.cjs
       - .github/workflows/ashen-tripo-motion-sword.yml
   workflow_dispatch:
 # Repeated animation revisions should not consume four simultaneous GPU runners.
