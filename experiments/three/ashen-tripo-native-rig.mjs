@@ -213,7 +213,9 @@ function animateRig(model,source,root,weapon){
     const stance=.63-run*.21,inStance=p<stance;
     const u=inStance?p/stance:(p-stance)/(1-stance);
     const groundBlend=clamp(1-4*jumpWeight,0,1);
-    const step=.076+run*.052;
+    // Slightly longer SWING reach only. Source XZ stance anchors below
+    // remain authoritative; planted feet never get an artificial push.
+    const step=.079+run*.065;
     const travel=inStance?1-2*u:2*smooth(u)-1;
     let x=cal.restX+weight*step*travel*(1-.78*jumpWeight);
     const anchored=hasTravel&&weight>.2&&jumpWeight<.15&&inStance;
@@ -229,7 +231,10 @@ function animateRig(model,source,root,weapon){
       }
       if(!planar)x=pin[footId].x-(travelSource-pin[footId].travel);
     }else pin[footId].contact=false;
-    const lift=inStance?0:(.041+run*.020)*Math.sin(Math.PI*u);
+    // The heavy front tabard obscured the moving boot in the old gait.
+    // Boost only the airborne swing arc, keeping true stance soles at zero.
+    // This is constrained below by the existing original-bone IK limits.
+    const lift=inStance?0:(.050+run*.035)*Math.sin(Math.PI*u);
     const y=cal.restY-pelvisBob+weight*lift*(1-.57*jumpWeight)+
       .067*jumpWeight;
     const L1=cal.thigh,L2=cal.shin;
@@ -590,7 +595,7 @@ function animateRig(model,source,root,weapon){
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v18-sampled-stance-fastpath'
+      animationVersion:'Tripo-IK-v20-art-review-gait'
     };
     return clip.toLowerCase();
   }
