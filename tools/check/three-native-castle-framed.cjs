@@ -450,6 +450,85 @@ fs.mkdirSync(dir,{recursive:true});
    if(!walkablePortal.topOfPortalInView)
      console.warn('T02 ART BLOCKER: no walkable sample frames pointed '+
        'portal upper arch in zoom=1 source follow-camera ('+label+')');
+   // Isolate T02's *wider* physical pointed gate from the earlier narrow
+   // recess at one actual walkable gameplay pose. No camera or material hacks.
+   async function gateWidthFrame(wide,tag){
+     const q=await page.evaluate(({wide,tag,pose})=>{
+       const a=window.__ASCII_NATIVE_COMPLETE_ARCH__,nat=window.__ASCII_NATIVE__;
+       if(!a.setWidePortalSilhouetteEnabledForTest(wide))
+         throw Error('Gate width QA-only control missing');
+       player.x=player.tx=pose.x;player.y=player.ty=pose.y;
+       player.h=player.hT=surfAt(pose.x,pose.y);
+       const old=Math.random,map=JSON.stringify(MEADOW_MAP);
+       try{
+         Math.random=()=>.513;build();VZ=1;updateCamera(0,true);
+         cloudTick=2;FG.tick=0;render();
+       }finally{Math.random=old}
+       const can=nat.renderer.domElement,gl=nat.renderer.getContext();
+       const pixels=new Uint8Array(can.width*can.height*4);
+       gl.readPixels(0,0,can.width,can.height,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+       const snap={pixels,lum:new Float32Array(cathedral.lum),
+         dep:new Float32Array(cathedral.dep),glyph:new Int16Array(cathedral.glyph),
+         camera:[camX,camY,VZ],mapOK:map===JSON.stringify(MEADOW_MAP),
+         clear:a.mainPortalRecessClear,walkable:!blocked(player.x,player.y,player),
+         parts:a.features.castle.recessedMainPortal,
+         wide:a.widePortalSilhouetteEnabled,
+         native:nat.mode==='three',
+         oneContext:document.querySelectorAll('#three-parity-canvas').length===1};
+       (window.__ASCII_GATE_WIDTH__ ||= {})[tag]=snap;
+       return {wide:snap.wide,mapOK:snap.mapOK,clear:snap.clear,
+         walkable:snap.walkable,parts:snap.parts,
+         native:snap.native,oneContext:snap.oneContext};
+     },{wide,tag,pose:walkablePortal.best});
+     if(q.wide!==wide||!q.mapOK||!q.clear||!q.walkable||
+       !q.native||!q.oneContext||q.parts<10)
+       throw Error('Physical gate width invalid '+JSON.stringify(q));
+     await page.addStyleTag({content:'.hud,.stats{visibility:hidden!important}'});
+     await page.screenshot({path:path.join(dir,
+       label+'-gate-width-'+tag+'-gameplay.png'),timeout:60000});
+     await page.addStyleTag({content:'.hud,.stats{visibility:visible!important}'});
+   }
+   await gateWidthFrame(true,'wide');
+   await gateWidthFrame(false,'narrow');
+   await gateWidthFrame(true,'restored');
+   const widthArt=await page.evaluate(()=>{
+     const s=window.__ASCII_GATE_WIDTH__,a=s.wide,b=s.narrow,c=s.restored;
+     let gpu=0,restoreGPU=0,stone=0,restoreStone=0;
+     for(let k=0;k<a.pixels.length;k+=4){
+       const diff=(u,v)=>Math.max(Math.abs(u[k]-v[k]),
+         Math.abs(u[k+1]-v[k+1]),Math.abs(u[k+2]-v[k+2]))>8;
+       if(diff(a.pixels,b.pixels))gpu++;
+       if(diff(a.pixels,c.pixels))restoreGPU++;
+     }
+     for(let k=0;k<a.lum.length;k++){
+       const diff=(u,v)=>Math.abs(u.lum[k]-v.lum[k])>.01||
+         u.glyph[k]!==v.glyph[k]||Math.abs(u.dep[k]-v.dep[k])>1;
+       if(diff(a,b))stone++;
+       if(diff(a,c))restoreStone++;
+     }
+     const sameCamera=JSON.stringify(a.camera)===JSON.stringify(b.camera)&&
+       JSON.stringify(a.camera)===JSON.stringify(c.camera);
+     const result={gpu,restoreGPU,stone,restoreStone,sameCamera,
+       partsUnchanged:a.parts===b.parts&&b.parts===c.parts,
+       geometryClear:a.clear&&b.clear&&c.clear,
+       sameWalkable:a.walkable&&b.walkable&&c.walkable,
+       mapUnchanged:a.mapOK&&b.mapOK&&c.mapOK,
+       singleRenderer:a.oneContext&&b.oneContext&&c.oneContext,
+       nativeThree:a.native&&b.native&&c.native,
+       wideRestored:a.wide&&!b.wide&&c.wide};
+     delete window.__ASCII_GATE_WIDTH__;
+     return result;
+   });
+   if(widthArt.gpu<100||widthArt.stone<100||widthArt.restoreGPU>150||
+     widthArt.restoreStone!==0||!widthArt.sameCamera||
+     !widthArt.partsUnchanged||!widthArt.geometryClear||
+     !widthArt.sameWalkable||!widthArt.mapUnchanged||
+     !widthArt.singleRenderer||!widthArt.nativeThree||!widthArt.wideRestored)
+     throw Error('New gate outline not reversible/visible '+JSON.stringify(widthArt));
+   fs.writeFileSync(path.join(dir,label+'-gate-width-art.json'),
+     JSON.stringify(widthArt,null,2)+String.fromCharCode(10));
+   console.log('NATIVE CASTLE WIDE PHYSICAL ARCH ART '+label+' '+
+     JSON.stringify(widthArt));
    // The difference must be made by a real physical carve, not a
    // screen-space dark decal or an always-hidden solid. Compare the same
    // 100% playable gate-follow-camera before/after in one native WebGL2
