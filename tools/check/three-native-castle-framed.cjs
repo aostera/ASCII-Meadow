@@ -325,6 +325,67 @@ fs.mkdirSync(dir,{recursive:true});
      });
      gameplayMetrics.push(metrics);
    }
+   // Audit ORIGINAL convex source raycast at the great-portal carving.
+   // The map's gatehouse uses meta.door on a full 320-wide masonry box;
+   // a dark carved doorway does NOT by itself remove its physics or depth.
+   // Cast along EXACT original baked cathedral camera rays (same PITCH)
+   // and record which real stone is in FRONT of the projected entrance.
+   const portalAudit=await page.evaluate(()=>{
+     const c=cathedral,saved=JSON.stringify(MEADOW_MAP);
+     const frontFace=c.kx,gateFrontZ=100,Y=120;
+     const rows=[45,95,155,215,285,335];
+     const positions=[-90,-55,-20,0,20,55,90];
+     const samples=[];
+     for(const h of rows)for(const x of positions){
+       const y=Y+h;
+       const sx=c.kx+x*MS,sy=c.ky-(y*COSP+gateFrontZ*SINP)*MS;
+       const px=(sx-c.kx)/MS,py=-(sy-c.ky)/MS*COSP,
+         pz=-(sy-c.ky)/MS*SINP;
+       const ox=px,oy=py+6000*SINP,oz=pz-6000*COSP;
+       const ray=cast(ox,oy,oz,0,-SINP,COSP,0,
+         BINS.view(px,py,pz));
+       const so=ray?.so;
+       const actual=ray?[
+         ox,oy-ray.t*SINP,oz+ray.t*COSP
+       ]:null;
+       const portalTexture=pointedArch(x,y,0,150,Y,290);
+       samples.push({x,height:h,screenCell:[
+           Math.round(sx/CW),Math.round(sy/CH)
+         ],intendedDoor:portalTexture,
+         hit:so?{id:so.id,kind:so.kind,
+           bb:so.bb.map(v=>Math.round(v*100)/100),
+           isDoorTextured:Boolean(so.meta?.door),
+           physicalPosition:actual?.map(v=>Math.round(v*10)/10)}:null});
+     }
+     const intended=samples.filter(s=>s.intendedDoor);
+     const obstructed=intended.filter(s=>s.hit);
+     const nearGate=intended.filter(s=>s.hit?.isDoorTextured);
+     const curtain=intended.filter(s=>s.hit?.bb?.[4]>=135&&
+       s.hit?.bb?.[5]<=210);
+     const result={
+       sampleCount:samples.length,intendedDoorSamples:intended.length,
+       solidFrontHits:obstructed.length,texturedSolidHits:nearGate.length,
+       innerCurtainHits:curtain.length,samples,
+       mapUnchanged:saved===JSON.stringify(MEADOW_MAP),
+       oneContext:document.querySelectorAll('#three-parity-canvas').length===1,
+       nativeMode:window.__ASCII_NATIVE__.mode
+     };
+     if(intended.length<8||!result.mapUnchanged||!result.oneContext||
+        result.nativeMode!=='three')
+       throw Error('Invalid physical portal ray audit '+JSON.stringify(result));
+     return result;
+   });
+   fs.writeFileSync(path.join(dir,label+'-portal-ray-audit.json'),
+     JSON.stringify(portalAudit,null,2)+'\n');
+   console.log('NATIVE CASTLE PORTAL RAY AUDIT '+label+' '+
+     JSON.stringify({sampleCount:portalAudit.sampleCount,
+       intendedDoorSamples:portalAudit.intendedDoorSamples,
+       solidFrontHits:portalAudit.solidFrontHits,
+       texturedSolidHits:portalAudit.texturedSolidHits,
+       innerCurtainHits:portalAudit.innerCurtainHits,
+       intended:portalAudit.samples.filter(p=>p.intendedDoor)
+         .map(p=>({x:p.x,height:p.height,
+           firstHit:p.hit?.id,box:p.hit?.bb}))}));
    fs.writeFileSync(path.join(dir,label+'-gameplay.json'),
      JSON.stringify(gameplayMetrics,null,2)+'\n');
    console.log('NATIVE CASTLE REAL GAMEPLAY ART '+label+' '+
