@@ -206,10 +206,16 @@ function animateRig(model,source,root,weapon){
     // rocker, nearly level midfoot support, then toe rocker at push-off.
     // Curves overlap slightly but never kick both hinges at once.
     // The original Tripo boot/toe joints deform; no mesh replacements.
-    const heelLoad=inStance?(1-smooth(u/.23))*groundBlend:0;
-    const toeLoad=inStance?smooth((u-.72)/.28)*groundBlend:0;
+    // Both rocker envelopes MUST return to zero at stance boundaries.
+    // Previously heel jumped directly to 1 at heel strike, while toe
+    // jumped from 1 to 0 at liftoff (a 0.052 rad one-frame toe snap).
+    // Zero-at-boundary C1 curves keep the true toe bone continuous.
+    const heelLoad=inStance?
+      smooth(u/.12)*(1-smooth((u-.21)/.22))*groundBlend:0;
+    const toeLoad=inStance?
+      smooth((u-.55)/.23)*(1-smooth((u-.88)/.12))*groundBlend:0;
     const midLoad=inStance?
-      smooth(u/.26)*(1-smooth((u-.68)/.30))*groundBlend:0;
+      smooth(u/.19)*(1-smooth((u-.68)/.30))*groundBlend:0;
     const flightPitch=inStance?0:-.028*Math.sin(Math.PI*u);
     const heelPitch=-.047*heelLoad;
     const toeRocker=.115*toeLoad;
