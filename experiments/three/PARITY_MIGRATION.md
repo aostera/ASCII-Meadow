@@ -117,3 +117,26 @@ The normal native `render()` now resets `GB.nativeActorRanges` at frame start. `
 `tools/check/three-native-depth.cjs` validates desktop and mobile the actual *GPU* clipping in the normal native game after disabling source CPU masonry re-overlay in a test fixture, with no map mutation or new contexts, then restores the old functions. A test-only `?nativeDepthTest=1` gate toggles the depth-mask for proofs; the player is never shown a compare UI. The 3D-prepass test runs in the `three-parity` CI job along with static parity and earlier native bushes/NPC. Source actor Z is ortho near/far 0.01/40000 and projective world north direction, including apparent sprite vertical height: active only when native depth texture is available. Native depth terrain/tree/camp 3D geometry and full lighting remain later migration tasks.
 
 **CI status must be checked for the current head** `ac4f2378` (and successive documentation commits): do NOT claim tests passed or full migration completed until results are verified. Previous last fully green CI head `35b4f626`. Shader validation on real mobile Safari is still pending and software SwiftShader browser timings MUST NOT be called actual device FPS. Preserve original release and avoid asking the user to review incomplete intermediate work.
+
+
+## 2026-10-16 — Shadow-layer order and environment migration register
+
+The current authoritative environment stage-by-stage ledger is
+[ENVIRONMENT_MIGRATION_LOG.md](ENVIRONMENT_MIGRATION_LOG.md): PRs #46–#49,
+map preservation, exact browser QA evidence, known phone thicket occlusion,
+and outstanding real-device art/performance acceptance. `main` remains isolated.
+
+Native architectural penumbra refinement now runs immediately after
+`buildWorld()`, **before** flora shades are painted or the editor freezes
+`bshadeCastle`. The source castle/ruin raycast is still authoritative;
+this changes only where the native-only edge filter is applied. Individual
+cell adjustments are capped at 0.16 of the 0–0.7 ambient shadow scale so
+large bands cannot swallow genuine Gothic arch openings. The source map,
+source sprites, other game routes and artist color/alpha are not edited.
+
+Regressions: `tools/check/three-native-shadow-layer.cjs` and
+`.github/workflows/three-shadow-layer-qa.yml` compare raw 3D raycasts with
+native feathering, untouched bright and dark interiors, architecture/foliage
+layer ordering, editor shadow snapshot parity, exported map and single WebGL
+context on desktop and phone simulation. **Visual review on real Android/iOS
+and removing all remaining rectangular shadows are still pending.**

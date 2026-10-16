@@ -1,8 +1,10 @@
 // Native-only sculpted ground shadow edges for source castle and ruins.
 // The original 3D raycasts are authoritative. This refines just their hard,
-// single-cell shadow boundaries after a world bake; no global brightness,
-// alpha, light direction, character shadow or source map changes.
-const nativeSourceBuildForShadows=build;
+// single-cell shadow boundaries immediately after architectural rays, BEFORE
+// foliage/stones add their own shadows. The editor snapshots bshadeCastle
+// after this exact pass: rebuild, move, undo and redo remain consistent.
+// No global brightness, alpha, light direction, character shadow or map edits.
+const nativeSourceBuildForShadows=buildWorld;
 const nativeShadowClamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
 function nativeShadowEdgeFilter(source,width,height,x,y) {
@@ -26,9 +28,14 @@ function nativeShadowEdgeFilter(source,width,height,x,y) {
   // Asymmetric per-cell antialiasing breaks rectangular silhouette steps
   // without inventing dark outlines or flattening the centre of a shadow.
   const edge=nativeShadowClamp((max-min-.095)/.23,0,1);
-  return nativeShadowClamp(v*(1-edge*.79)+filtered*(edge*.79),0,.7);
+  // Clamp local penumbra change: a thin arch opening must not become a
+  // heavy grey rectangle, and a dark stone contact core must remain dark.
+  // Source cast ray, light direction, authored palette are still authoritative.
+  const feather=v*(1-edge*.79)+filtered*(edge*.79);
+  return nativeShadowClamp(feather,
+    Math.max(0,v-.16),Math.min(.7,v+.16));
 }
-function nativeSoftShadowPatch(x0,y0,x1,y1){
+function nativeSoftShadowPatch(x0,y0,x1,y1,original){
   const xa=Math.max(4,Math.floor(x0)),ya=Math.max(4,Math.floor(y0));
   const xb=Math.min(COLS-5,Math.ceil(x1)),yb=Math.min(ROWS-5,Math.ceil(y1));
   if(xb<=xa||yb<=ya)return 0;
@@ -37,7 +44,7 @@ function nativeSoftShadowPatch(x0,y0,x1,y1){
   for(let y=0;y<h;y++){
     const wy=ya-padding+y;
     const from=wy*COLS+xa-padding;
-    src.set(bshade.subarray(from,from+w),y*w);
+    src.set(original.subarray(from,from+w),y*w);
   }
   let edits=0;
   for(let y=ya;y<=yb;y++)for(let x=xa;x<=xb;x++){
@@ -52,28 +59,37 @@ function nativeSoftShadowPatch(x0,y0,x1,y1){
 }
 function nativeSoftenGothicShadows(){
   if(!bshade||!bshade.length||!cathedral?.cv)return 0;
+  // Every castle/ruin patch reads the SAME raw source. Otherwise overlapping
+  // bounding regions apply the blur twice, darkening slender open portals.
+  const original=bshade.slice();
   const C=cathedral;
   const margin=Math.ceil((210*WS)/CW)+10;
   let edits=nativeSoftShadowPatch(C.cx0-margin,C.cy0-margin,
-    C.cx0+C.BW+margin,C.cy0+C.BH+margin);
+    C.cx0+C.BW+margin,C.cy0+C.BH+margin,original);
   // Ruin rays already exclude missing walls and open arch spans. Feather the
   // actual penumbra at the boundary of those shadows, not each ruin's box.
   for(const r of ruins){
     const extra=Math.ceil((r.height*.8*WS)/CW)+12;
     edits+=nativeSoftShadowPatch(r.x0-extra,r.y0-extra,
-      r.x1+extra,r.y1+extra);
+      r.x1+extra,r.y1+extra,original);
   }
   return edits;
 }
-let nativeShadowEdits=0;
-build=function(){
+let nativeShadowEdits=0,nativeShadowBakes=0;
+buildWorld=function(){
+  // The source first resets bshade to zero and raycasts castle/ruin solids.
+  // This hook runs exactly once for each architecture rebuild, *before*
+  // source buildFlora/rebuildFlora add forest shadows and make bshadeCastle.
   const result=nativeSourceBuildForShadows();
   nativeShadowEdits=nativeSoftenGothicShadows();
+  nativeShadowBakes++;
   return result;
 };
 window.__ASCII_NATIVE_SHADOWS__={
   edgeFilter:nativeShadowEdgeFilter,
   get changedCells(){return nativeShadowEdits},
+  get bakes(){return nativeShadowBakes},
+  get phase(){return 'after-buildWorld-before-buildFlora'},
   refine:nativeSoftenGothicShadows,
-  sourceBuild:nativeSourceBuildForShadows
+  sourceBuildWorld:nativeSourceBuildForShadows
 };
