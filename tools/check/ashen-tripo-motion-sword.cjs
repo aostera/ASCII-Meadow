@@ -174,6 +174,20 @@ fs.mkdirSync(output,{recursive:true});
    if(!mobile&&fin.pose?.speed<0&&fin.pose?.heading===undefined)
      throw Error('Bad gameplay pose state');
    if(fin.gameFrames<=idle.gameFrames)throw Error('Original game loop stalled');
+   // The genuine Three rig advances on each simulation frame while
+   // expensive 3D-to-ASCII GPU readback is currently deliberately slower.
+   // Verify that the user-visible GLYPH image actually refreshes; do not
+   // mislabel the 60 Hz bone-pose rate as 60 visible rendered FPS.
+   if(!(fin.rasterFrames>idle.rasterFrames&&
+        Number.isFinite(fin.rasterHz)&&fin.rasterHz>=10))
+     throw Error('Animated ASCII knight stopped updating visible raster frames: '+
+       JSON.stringify({initial:idle.rasterFrames,final:fin.rasterFrames,
+         configuredHz:fin.rasterHz}));
+   console.log('Native visible ASCII raster frames:',JSON.stringify({
+     mode:label,initial:idle.rasterFrames,final:fin.rasterFrames,
+     configuredHz:fin.rasterHz,
+     simulationFrames:fin.gameFrames-idle.gameFrames
+   }));
    await page.screenshot({path:path.join(output,label+'-whole-game.png'),timeout:60000});
    await page.evaluate(()=>window.__ASCII_NATIVE__.dispose());
    const after=await page.evaluate(()=>window.__ASCII_NATIVE__.ashenVow?.active);
