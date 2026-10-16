@@ -13,7 +13,8 @@ import {headingForSourceD8} from './source-motion.mjs';
 const COLS = 104, ROWS = 54, FX = 52, FY = 51.6, ART = 44.4;   // the source knight grid (KG)
 const SPRITE_ELEV = .35;                            // camera elevation of the sprite view, rad
 const MODEL_TOP = 2.04; // normalized runtime character model height, metres
-// Tripo V2 is an authentic skeletal GLB normalized to 2.04 metres by its own loader.\nconst SS = 4;                                       // render pixels per cell side
+// Tripo V2 is an authentic skeletal GLB normalized to 2.04 metres by its own loader.
+const SS = 4;                                       // render pixels per cell side
 const PW = COLS * SS, PH = ROWS * SS;               // offscreen target
 const GW = COLS * 2, GH = ROWS * 2;                 // to_ascii works on 2 x 2 samples per cell
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16 - .5);
