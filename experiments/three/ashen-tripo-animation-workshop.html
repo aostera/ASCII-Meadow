@@ -54,6 +54,7 @@ a{color:#e8b8ae}a:focus-visible{outline:2px solid #e8b8ae}
  <input id="yaw" type="range" min="0" max="359" step="1" value="0" aria-label="Угол поворота персонажа от 0 до 359 градусов"></div>
  <div class="group"><label for="tempo">Темп анимации</label><div class="inline"><input id="tempo" type="range" min="0.5" max="1.5" step="0.05" value="1"><span id="tempo-value">1.00×</span></div></div>
  <div class="group"><div class="pills"><button id="pause" aria-pressed="false">Пауза</button><button id="frame" type="button">+1 кадр</button><button id="skeleton" aria-pressed="false">Кости</button><button id="wire" aria-pressed="false">Сетка</button></div></div>
+ <div class="group"><button id="palette" aria-pressed="true" type="button" style="width:100%">Готическая палитра · эксперимент</button></div>
  <div class="group"><label>Осмотр модели</label><div class="tiles views"><button data-view="front">Спереди</button><button data-view="side">Сбоку</button><button data-view="back">Сзади</button></div></div>
  <div class="meta" id="metrics" aria-live="off">Загрузка GLB…</div>
  <p class="status" id="status" role="status">Ожидание модели со скелетом. Дополнительные кредиты Tripo не расходуются.</p>
@@ -65,12 +66,14 @@ a{color:#e8b8ae}a:focus-visible{outline:2px solid #e8b8ae}
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {createGltfKnight} from './ashen-tripo-native-rig.mjs';
+import {createGothicPalettePreview} from './ashen-vow-gothic-palette.mjs';
 
 const $=id=>document.getElementById(id);
 const ui={viewport:$('viewport'),status:$('status'),metrics:$('metrics'),
   tempo:$('tempo'),tempoValue:$('tempo-value'),direction:$('direction'),
   yaw:$('yaw'),yawValue:$('yaw-value'),
-  pause:$('pause'),frame:$('frame'),skeleton:$('skeleton'),wire:$('wire')};
+  pause:$('pause'),frame:$('frame'),skeleton:$('skeleton'),wire:$('wire'),
+  palette:$('palette')};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const mobile=matchMedia('(max-width:760px)').matches;
 const renderer=new THREE.WebGLRenderer({antialias:!mobile,alpha:false,powerPreference:'high-performance'});
@@ -116,7 +119,7 @@ controls.update();
 
 let mode='Idle',heading=0,tempo=1,paused=false;
 let simulatedFrames=0,jumpClock=0,last=0,displayClock=0,stepTime=0;
-let boneHelper=null,wire=false,showSkeleton=false,rig=null,error=null;
+let boneHelper=null,wire=false,showSkeleton=false,rig=null,error=null,palette=null;
 let smoothFps=0,alive=true,accumulator=0;
 const SIM_STEP=1/60;
 const status=message=>ui.status.textContent=message;
@@ -159,6 +162,13 @@ ui.frame.addEventListener('click',()=>{
   setPaused(true);
   advanceSimulation();
 });
+ui.palette.addEventListener('click',()=>{
+  if(!palette)return;
+  const enabled=palette.setEnabled(!palette.enabled);
+  ui.palette.setAttribute('aria-pressed',String(enabled));
+  status(enabled?'Экспериментальная палитра включена. GLB и игровые материалы не изменены.':
+    'Исходные материалы GLB восстановлены для сравнения.');
+});
 ui.skeleton.addEventListener('click',()=>{
   showSkeleton=!showSkeleton;if(boneHelper)boneHelper.visible=showSkeleton;
   ui.skeleton.setAttribute('aria-pressed',String(showSkeleton));
@@ -183,6 +193,7 @@ const diagnostics={
   get bones(){return rig?.userData.gltf.bones||0},
   get weaponAttached(){return Boolean(rig?.userData.weapon?.parent)},
   get jumpHeight(){return rig?.position.y||0},
+  get paletteActive(){return palette?.enabled??false},
   get error(){return error},
 };
 window.__ASHEN_ANIMATION_LAB__=diagnostics;
@@ -190,6 +201,8 @@ try{
   rig=createGltfKnight(THREE,{
     onLoad:root=>{
       const data=root.userData.gltf;
+      palette=createGothicPalettePreview(root,{enabled:true});
+      ui.palette.setAttribute('aria-pressed',String(palette.enabled));
       boneHelper=new THREE.SkeletonHelper(root);
       boneHelper.material.depthTest=false;
       boneHelper.material.transparent=true;
@@ -263,7 +276,7 @@ function animateFrame(now){
 }
 requestAnimationFrame(animateFrame);
 window.addEventListener('pagehide',()=>{
-  alive=false;rig?.userData.dispose?.();boneHelper?.geometry?.dispose();
+  alive=false;palette?.dispose();rig?.userData.dispose?.();boneHelper?.geometry?.dispose();
   controls.dispose();renderer.dispose();
 },{once:true});
 
