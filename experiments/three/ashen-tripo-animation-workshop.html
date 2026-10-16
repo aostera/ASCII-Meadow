@@ -48,8 +48,10 @@ a{color:#e8b8ae}a:focus-visible{outline:2px solid #e8b8ae}
    <button type="button" data-motion="Run" aria-pressed="false">Run</button>
    <button type="button" data-motion="Jump" aria-pressed="false">Jump</button>
  </div>
- <div class="group"><label for="direction">Направление движения</label>
+ <div class="group"><label for="direction">Быстрые направления (8)</label>
  <select id="direction"><option value="0">Вперёд · 0°</option><option value="45">45°</option><option value="90">Вправо · 90°</option><option value="135">135°</option><option value="180">Назад · 180°</option><option value="225">225°</option><option value="270">Влево · 270°</option><option value="315">315°</option></select></div>
+ <div class="group"><label for="yaw">Точный поворот · <span id="yaw-value">0°</span></label>
+ <input id="yaw" type="range" min="0" max="359" step="1" value="0" aria-label="Угол поворота персонажа от 0 до 359 градусов"></div>
  <div class="group"><label for="tempo">Темп анимации</label><div class="inline"><input id="tempo" type="range" min="0.5" max="1.5" step="0.05" value="1"><span id="tempo-value">1.00×</span></div></div>
  <div class="group"><div class="pills"><button id="pause" aria-pressed="false">Пауза</button><button id="frame" type="button">+1 кадр</button><button id="skeleton" aria-pressed="false">Кости</button><button id="wire" aria-pressed="false">Сетка</button></div></div>
  <div class="group"><label>Осмотр модели</label><div class="tiles views"><button data-view="front">Спереди</button><button data-view="side">Сбоку</button><button data-view="back">Сзади</button></div></div>
@@ -67,6 +69,7 @@ import {createGltfKnight} from './ashen-tripo-native-rig.mjs';
 const $=id=>document.getElementById(id);
 const ui={viewport:$('viewport'),status:$('status'),metrics:$('metrics'),
   tempo:$('tempo'),tempoValue:$('tempo-value'),direction:$('direction'),
+  yaw:$('yaw'),yawValue:$('yaw-value'),
   pause:$('pause'),frame:$('frame'),skeleton:$('skeleton'),wire:$('wire')};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const mobile=matchMedia('(max-width:760px)').matches;
@@ -134,7 +137,14 @@ function setPaused(next){
 $('motions').addEventListener('click',ev=>{
   const button=ev.target.closest('button[data-motion]');if(button)setMotion(button.dataset.motion);
 });
-ui.direction.addEventListener('change',()=>{heading=Number(ui.direction.value)*Math.PI/180});
+function setHeading(degrees){
+  const value=clamp(Number(degrees)||0,0,359);
+  heading=value*Math.PI/180;
+  ui.yaw.value=String(value);
+  ui.yawValue.textContent=value+'°';
+}
+ui.direction.addEventListener('change',()=>setHeading(ui.direction.value));
+ui.yaw.addEventListener('input',()=>setHeading(ui.yaw.value));
 ui.tempo.addEventListener('input',()=>{
   tempo=Number(ui.tempo.value);ui.tempoValue.textContent=tempo.toFixed(2)+'×';
 });
@@ -158,6 +168,7 @@ const diagnostics={
   get ready(){return Boolean(rig?.userData.gltf.loaded)},
   get model(){return rig},
   get mode(){return mode},
+  get headingTarget(){return heading},
   get frame(){return simulatedFrames},
   get state(){return rig?.userData.pose?.()||null},
   get bones(){return rig?.userData.gltf.bones||0},
