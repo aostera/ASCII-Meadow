@@ -1,41 +1,30 @@
-# ASCII Meadow — инструкции для Claude
+# ASCII Meadow — правила для GPT и Claude
 
-## ОБЯЗАТЕЛЬНО: маршрут разработки после 14.10.2026 — НОВЫЙ движок
+**Актуализация 2026-10-16.** Это единый маршрут независимо от того, кто исполняет задачу. При разногласиях сначала проверяйте фактический GitHub head/PR/CI и [живой статус Three](https://github.com/aostera/ASCII-Meadow/blob/experiment/threejs-ascii-prototype/experiments/three/STATUS.md).
 
-**Главная цель проекта сейчас — завершить полный перенос ASCII Meadow на Three.js.** Все НОВЫЕ визуальные изменения, объекты, 3D-геометрия, модели, риги, клипы, кадры анимаций (рыцарь, коровы, NPC), эффекты, освещение, тени, физика растений и связанные игровые функции направляются **только в новую ветку движка**, а не в оригинальный прод.
+## Две ветки, одно правило изоляции
 
-- Репозиторий: `aostera/ASCII-Meadow`. **Базовая ветка нового движка:** `experiment/threejs-ascii-prototype`. Для отдельных задач делай дочернюю ветку **от неё**, PR направляй **в неё**, не в `main`. Не публикуй новые возможности в оригинальный прод.
-- **Код нового движка:** `experiments/three/`. **Рабочая игровая страница нового движка:** `experiments/three/native.html` и `experiments/three/native.js` (с подключаемыми `native-*.js`/`*.mjs`). `experiments/three/index.html` — лаборатория 1:1/сравнения; `procedural.html` — исторический прототип, не целевая игра. Реализованная функция обязана работать в `native.html`, а не только в тестовом viewer, inset или в старой игре.
-- **Новый публичный предпросмотр:** https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev/experiments/three/native.html . Диагностика и сравнение: https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev/experiments/three/ .
-- **Старый прод:** https://ascii-meadow.aloster36.workers.dev/ (`main`, корневой `index.html`, `src/`, исходные `assets/`). Это **замороженный визуальный эталон**, а НЕ адрес деплоя нового контента. `src/data/map.js` и пользовательские координаты/расстановку объектов не менять и не перегенерировать. Исходные игровые скрипты и анимации допустимо читать из нового рантайма для совместимости, но **не класть новые анимации/модели обратно в старый `src/data/knight-frames.js`, `src/entities/knight.js` и аналогичные production-файлы**.
-- **Куда класть новые анимации:** runtime/интеграция — `experiments/three/`; ассеты рыцаря — `experiments/three/assets/knight/`, других персонажей — `experiments/three/assets/<actor>/`; исходники, скрипты экспорта и риггинга допускаются в `blender/` в той же feature-ветке; тесты — `tools/check/three-*`. Новые спрайтовые кадры также должны загружаться и показываться только экспериментальным рантаймом, не менять старые атласы. Обеспечить плавность, масштаб персонажа, направления движения почти на 360° и минимум 60 кадров на требуемые sprite-анимации (ходьба/бег/прыжок по запросу автора); не выдавать 20–36-кадровые glTF-клипы за готовые 60-кадровые спрайты.
-- **Статус нового 3D-рыцаря:** PR #38 `feat/three-gltf-knight` направлен в `experiment/threejs-ascii-prototype`, НЕ в `main`. Код `knight-gltf.js`, `native-knight3d.mjs`, Blender pipeline уже существует в этой ветке; файл `experiments/three/assets/knight/masked_knight.glb` (1 992 524 байта) **уже закоммичен в `feat/three-gltf-knight`**, коммит `64150f4` («licence confirmed by the author»). **В `main` и базовой ветке эксперимента GLB ещё нет.** PR #38 остаётся draft. Не заявляй, что модель уже работает на публичном preview базовой ветки: сначала слить/интегрировать feature в эксперимент после CI и визуальной проверки поведения/клипов в `native.html`, и только затем сверить публичный branch-preview. Сохраняй fallback и ни при каких условиях не публикуй новый риг в `main`.
-- **QA:** проверь именно новый публичный branch-preview после CI/deploy, а не только локальный тест: desktop + Android Chrome + iPhone/iPad Safari (реальные устройства, когда доступны), управление/анимации/порядок слоёв, сохранность `MEADOW_MAP`, работу Canvas2D fallback, тени и корректные контакты с окружением. Отчёт всегда указывает ветку, коммит, URL, проверенные устройства и что ещё не подтверждено. Не менять общую яркость/alpha исходного изображения ради маскировки дефектов.
-- **Порядок приёмки:** не предлагать пользователю принимать промежуточные сравнительные прототипы как завершённую миграцию; сперва собрать и проверить целостный новый игровой движок. **Мерж в `main` и переключение исходного прода только по отдельному явному решению автора**, не автоматически.
+- **`main`** = стабильная исходная игра, https://ascii-meadow.aloster36.workers.dev/, корневой `index.html` и `src/`. Поддержка только по отдельному прямому запросу. Не менять там визуал/спрайты/карту ради переноса.
+- **`experiment/threejs-ascii-prototype`** = работа над новым движком. Feature-ветка от свежего tip, PR **в experiment**, не в `main`. Целевой экран `experiments/three/native.html` (публичный [preview](https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev/experiments/three/native.html)).
+- `experiments/three/index.html` и `parity.html` — только лаборатории; `procedural.html` — старый визуальный прототип. Фича готова к проверке, когда интегрирована именно в `native.html`.
+- Код/ассеты нового движка под `experiments/three/`, QA под `tools/check/three-*`; производственные `src/data/knight-frames.js`, `src/data/cow-frames.js`, `src/data/map.js` использовать read-only.
 
-**Правило при противоречиях:** этот раздел приоритетнее всех старых инструкций в `notes/Для Claude.md`, README и прежних чек-листах, где предлагается разрабатывать/выкладывать новые анимации в `main`. Те инструкции относятся только к поддержке оригинального движка по отдельному запросу автора.
+## Самая свежая очередь — не здесь
 
-Проект: `aostera/ASCII-Meadow`, ветка `main`. Не предполагай, что успешный локальный CI автоматически означает, что пользователь видит актуальный прод.
+**Начинать с:** [STATUS.md](https://github.com/aostera/ASCII-Meadow/blob/experiment/threejs-ascii-prototype/experiments/three/STATUS.md), затем [AUTO_ROADMAP.md](https://github.com/aostera/ASCII-Meadow/blob/experiment/threejs-ascii-prototype/experiments/three/AUTO_ROADMAP.md), [issue #53](https://github.com/aostera/ASCII-Meadow/issues/53), открытых PR и последних Actions. Краткие состояния на 16 октября: T00/T01 done, T04 needs acceptance after #59/#60, T05/T06/T07/T08 active, T02/T03 parked, T09 todo. **Статус может измениться.**
 
-## Прочитай перед каждым изменением
-1. `notes/Для Claude.md` — требования автора, стиль игры, правила и handoff.
-2. `notes/Сессия 2026-10-13.md` — актуальные баги с тенями, травой, слоем деревьев и публикацией.
-3. `notes/Техническая архитектура.md` — порядок подключения систем, управление сценой и физикой.
-4. `notes/Хронология.md` — прошлые решения и отказы.
-5. `notes/Бэклог.md` — незавершённые задачи.
+Персонажи/Ashen Vow и glTF/Tripo — отдельная очередь и draft PR. Не запускать платные генерации без явного разрешения. Для заказанных sprite-анимаций движения `walk/run/jump` — не меньше 60 кадров на требуемый ракурс и почти круговой набор направлений; не выдавать наличие короткой glTF-анимации за соответствие спрайтовому требованию.
 
-## Контракт работы
-- Вся графика — согласованное монохромное готическое ASCII. Ни один новый объект не должен выглядеть отдельно наклеенным слоем.
-- `src/data/map.js` — вручную созданная карта автора. Нельзя регенерировать координаты, стирать объекты или подменять её произвольной тестовой картой. Отдельно проверяй её наличие в **публичном production**.
-- Отрисовка: depth для замка/руин, Y-sorted 3D tree/tent/fence, ближний объект закрывает дальний; трава физически взаимодействует со всеми объектами и сохраняет корни у подножий. Тени должны опираться на `LGT`, реальную геометрию и ground projection.
-- Любые изменения должны работать в WebGL2 и Canvas2D, на мобильном экране, в редакторе и после resize/undo/redo.
-- Успешный `Workers Builds` означает только успешный процесс Cloudflare. **Обязательно** сверяй реальный endpoint: `node tools/check/production-parity.cjs` (нужен `dist/` после `sh tools/build_site.sh dist`) и браузерные проверки.
-- `tools/build_site.sh` проставляет уникальный revision query для каждого JS/CSS и создаёт `build.json` и `_headers`. Не удалять это без эквивалентной защиты от старой карты в браузерном кеше.
-- Не путать «код внесён», «CI зелёный», «прод отдаёт нужные ресурсы» и «сцена визуально соответствует запросу» — это разные уровни проверки.
-- По окончании каждого значимого пакета обновить `notes/Для Claude.md`, `notes/Хронология.md`, `notes/Техническая архитектура.md`, `notes/Бэклог.md`, `notes/Сессия YYYY-MM-DD.md`: проблема, причина, решение, файлы/функции, проверки, что ещё не подтверждено.
+## Неприкосновенные вещи
 
+- Авторская `src/data/map.js`, расстановка, исходные атласы и геометрия — без перегенерации и произвольной подмены.
+- Визуал — почти монохромная мёртвая готика; объём, корректный Z/depth, открытые арки, локальные источники света, правдоподобная жёсткость анимаций и физический контакт растений. Не маскировать проблемы общей яркостью/alpha или плоскими прямоугольными накладками.
+- В native один WebGL2 context; Canvas2D fallback, input/resize, editor export/undo и context restore сохранять.
+- Каждый PR: исходная карта неизменна, Chromium WebGL2 desktop+phone, профильный тест, визуальная проверка **реальных пикселей**, CI ссылки и отметка, какой device **не** тестировался. Реальный Android/iOS/Safari и измерения физического GPU — отдельный release gate.
+- **Никакого переключения production и merge PR #37 в `main` без отдельного прямого решения владельца.**
 
-## Three.js experiment (2026-10-13)
-- Branch `experiment/threejs-ascii-prototype`, draft PR #37; this does not replace `main` or alter the map. Claude handoff: `experiments/three/CLAUDE_HANDOFF.md`.
-- `gothic.js` real 3D arches/buttresses/batched stone, `knight-rig.js` test idle/walk/run/jump/cape, `ground-contacts.js` approximate grass/structure contacts; all isolated.
-- No claim of full sprite, world or performance parity. Must inspect browser screenshots and test real iPad Safari before merging.
+## Взаимодействие
+
+GPT и Claude **равноправны, работу делить 50/50**, без самоназначенного арт-директора. Не править одни документы/модули одновременно. После каждого блока — история `Txx | что сделано | PR/ветка/commit | тесты | что осталось | следующий исполнитель`, обновить STATUS/roadmap и issue при изменении статуса. Не вставлять трудно открываемые мелкие скриншоты; передавать полноразмерные GitHub artifacts/прямые ссылки.
+
+[Текущая документация](notes/README.md) · [история](notes/Хронология.md) · [визуальные правила](notes/Визуальное%20направление.md).
