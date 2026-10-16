@@ -53,6 +53,54 @@ fs.mkdirSync(out,{recursive:true});
    }
    console.log(mode+' anatomical frame',JSON.stringify(data));
   }
+  // One 60 Hz pose scan per movement and compass heading. No reliance
+  // on screenshots or labels alone: evaluate the actual wrist socket and
+  // complete separate sword mesh in player-local/world space. These
+  // clearances are conservative proxies, not mesh-triangle collision tests.
+  await page.locator('#pause').click();
+  const clearances=await page.evaluate(()=>{
+    const root=window.__ASHEN_ANIMATION_LAB__.model;
+    const tipY=root.userData.weapon.userData.tipLocalY;
+    const V=root.position.constructor;
+    const tipWorld=new V(),hiltWorld=new V();
+    const samples=[];
+    const specs=[['Idle',0,false],['Walk',8,false],['Run',15,true],['Jump',0,false]];
+    for(const [mode,speed,run] of specs){
+      for(const deg of [0,45,90,135,180,225,270,315]){
+        let lowestTip=Infinity,minClearance=Infinity,minVertical=Infinity;
+        const total=mode==='Jump'?90:60;
+        for(let i=0;i<total;i++){
+          const t=(i+1)/60;
+          root.position.y=mode==='Jump'?.36*Math.sin(Math.PI*Math.min(t,1.49)/1.49):0;
+          root.userData.animate(1/60,{
+            speed,run,heading:deg*Math.PI/180,
+            jumpClipTime:mode==='Jump'?t:undefined
+          },t);
+          const weapon=root.userData.weapon;
+          weapon.getWorldPosition(hiltWorld);
+          weapon.localToWorld(tipWorld.set(0,tipY,0));
+          const tipLocal=root.worldToLocal(tipWorld.clone());
+          const hiltLocal=root.worldToLocal(hiltWorld.clone());
+          lowestTip=Math.min(lowestTip,tipWorld.y);
+          minClearance=Math.min(minClearance,-hiltLocal.x,-tipLocal.x);
+          minVertical=Math.min(minVertical,hiltWorld.y-tipWorld.y);
+        }
+        samples.push({mode,deg,lowestTip,minClearance,minVertical});
+      }
+    }
+    root.position.y=0;
+    return samples;
+  });
+  for(const scan of clearances){
+    if(scan.lowestTip<.01||scan.minClearance<.16||scan.minVertical<.62)
+      throw Error('Sword crossed right-side clearance envelope or floor: '+
+        JSON.stringify(scan));
+  }
+  console.log('32 sword-clearance sweeps OK: '+JSON.stringify({
+    minTipY:Math.min(...clearances.map(x=>x.lowestTip)),
+    minHipDistance:Math.min(...clearances.map(x=>x.minClearance)),
+    minBladeDrop:Math.min(...clearances.map(x=>x.minVertical))
+  }));
   await browser.close();
  }catch(e){await browser.close();throw e}
 })().catch(e=>{console.error(e);process.exitCode=1});
