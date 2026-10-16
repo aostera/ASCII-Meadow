@@ -181,10 +181,18 @@ function animateRig(model,source,root,weapon){
     // 1.28 folded both gloves onto the belt and moved the sword into the
     // groin. 0.98 keeps natural clearance between forearms and tassets.
     const shoulderDown=.98;
-    twist(sets.leftArm[0],[['ix',-shoulderDown],['iy',-swing*armAmplitude]]);
-    twist(sets.rightArm[0],[['ix',shoulderDown],['iy',-swing*armAmplitude*.38]]);
-    const leftElbow=-.20-.11*stride*Math.max(0,-swing);
-    const rightElbow=.24+.10*stride*Math.max(0,swing);
+    // Delayed, phase-continuous hand arcs rather than one stiff swinging
+    // shoulder. The sword arm deliberately has a shorter travel than the
+    // free arm, while the elbows bend noticeably during the running phase.
+    // In flight both hands move slightly forward to balance the landing.
+    const leftSwing=-swing*armAmplitude+arc*.15;
+    const rightSwing=-swing*armAmplitude*.41-arc*.075;
+    twist(sets.leftArm[0],[['ix',-shoulderDown],['iy',leftSwing]]);
+    twist(sets.rightArm[0],[['ix',shoulderDown],['iy',rightSwing]]);
+    const leftElbow=-.20-.10*stride*Math.max(0,-swing)-
+      .13*runMix-.20*arc;
+    const rightElbow=.24+.08*stride*Math.max(0,swing)+
+      .12*runMix+.10*arc;
     twist(sets.leftArm[1],[['iy',leftElbow]]);
     twist(sets.rightArm[1],[['iy',rightElbow]]);
     twist(sets.leftArm[2],[['iy',-.018+Math.sin(bodyClock*1.4)*.015]]);
@@ -238,11 +246,11 @@ function animateRig(model,source,root,weapon){
       kneeBend:[left.knee,right.knee],
       capeDeflection:capeRoll.map((roll,i)=>[roll,capeYaw[i]]),
       weaponAttached:!!weapon?.parent,
-      armPose:{shoulderDown,shoulderSwing:-swing*armAmplitude,
+      armPose:{shoulderDown,shoulderSwing:leftSwing,rightShoulderSwing:rightSwing,
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v5-palm-bound-wrist'
+      animationVersion:'Tripo-IK-v6-arm-followthrough'
     };
     return clip.toLowerCase();
   }
