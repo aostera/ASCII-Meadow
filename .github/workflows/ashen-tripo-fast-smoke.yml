@@ -8,6 +8,7 @@ on:
       - experiments/three/ashen-blade-envelope.mjs
       - experiments/three/ashen-gothic-longsword.mjs
       - experiments/three/native-tripo-v2.mjs
+      - experiments/three/ashen-glyph-emitter.mjs
       - tools/check/ashen-native-glyph-cache.cjs
       - experiments/three/ashen-tripo-animation-workshop.html
       - tools/check/ashen-tripo-smoke.cjs
@@ -30,6 +31,7 @@ jobs:
       - run: |
           node --check experiments/three/ashen-tripo-native-rig.mjs
           node --check tools/check/ashen-tripo-smoke.cjs
+          node --check experiments/three/ashen-glyph-emitter.mjs
           node --check tools/check/ashen-native-glyph-cache.cjs
           node tools/check/ashen-native-glyph-cache.cjs
       - name: Original 40-joint knight and four 3D motion screenshots
