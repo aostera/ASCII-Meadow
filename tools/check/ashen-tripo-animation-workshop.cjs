@@ -88,12 +88,15 @@ fs.mkdirSync(out,{recursive:true});
        assert.ok(idleAnatomy[side].drop>.24,
          side+' wrist should be BELOW shoulder, not in a T-pose: '+
          JSON.stringify(idleAnatomy));
-       assert.ok(idleAnatomy[side].spread<.46,
-         side+' wrist should be close to the hips, not extended sideways: '+
+       assert.ok(idleAnatomy[side].spread>.35&&idleAnatomy[side].spread<.59,
+         side+' glove should hang BESIDE the hips, neither T-pose nor folded onto groin: '+
          JSON.stringify(idleAnatomy));
      }
      assert.ok(idleAnatomy.swordDrop>.28,
        'Sword blade must hang below the right fist: '+JSON.stringify(idleAnatomy));
+     assert.ok(idleAnatomy.swordHilt.x<-.17,
+       'Right-hand sword must hang outside the abdomen, not over the belt buckle: '+
+       JSON.stringify(idleAnatomy));
      await page.screenshot({path:path.join(out,name+'-idle-front.png')});
 
      await page.locator('[data-motion="Walk"]').click();
