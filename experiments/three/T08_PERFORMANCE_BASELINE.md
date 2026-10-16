@@ -1,0 +1,94 @@
+# T08 — измеримый профиль реальной Three.js игры
+
+**Автор:** GPT · **база:** `experiment/threejs-ascii-prototype` commit `c1f12b64` · **ветка:** `feat/three-t08-performance-baseline-20261016`. Это самостоятельный технический поток без правок текущего T07 у Claude.
+
+## Что делаем
+
+Первый этап **T08 IN_PROGRESS** — аудит фактических узких мест на настоящей `experiments/three/native.html`, исходной карте, без синтетических замков и без изменений дизайна. Отдельный Playwright script `tools/check/three-native-t08-profile.cjs` замеряет:
+
+- Четыре исходные игровую позы (замок + `broken-gate`, `abbey-front`, `cloister-walk`) при точном `VZ=1`; PC 1100×740 DPR1 и emulated phone 390×844 DPR2.
+- По 2 прогревочных + 8 последовательных `render()` в каждом случае. Отчёты в JSON, полноразмерные PNG отдельно (не коллаж).
+- p50/p95 *CPU submission wall time*, внутренние CPU upload/renderer.render timings, общее и реально видимое число glyphs, отношение отсечённых вне камеры глифов, инстанс-байты за кадр (приближённый объём потоковых атрибутов), draw calls, triangles и подсистему actor 3D-depth.
+- Проверки исходной `MEADOW_MAP`, ровно одного WebGL canvas, физического `renderer` и наличия NPC/glyphs.
+- Результат каждого прогона — ссылка GitHub Actions на исходные JSON+PNG, чтобы Claude мог воспроизвести на том же SHA.
+
+## Чего это НЕ доказывает
+
+- Software Chromium SwiftShader не равен физическому iPhone Safari или Android Chrome. Его CPU измерения не являются временем GPU; 60/120 Гц vsync ограничивает наблюдаемую частоту кадров.
+- `renderer.info.memory` показывает число отслеживаемых Three текстур и геометрий, **не** реальный VRAM; оценка 24–32 байт на видимый glyph не включает фактические буферы драйвера и depth textures.
+- Первое измерение — **базовая точка**. Порогов «нужно 60/200 FPS» без данных об устройствах не ставим. После базовой точки исследовать call/memory hot spots и делать строго измеряемую on/off оптимизацию без изменения карты и рендера.
+
+## Параллельная работа
+
+- **Claude:** T07 mobile/editor; T04 тени [merged PR #59](https://github.com/aostera/ASCII-Meadow/pull/59) и [merged PR #60](https://github.com/aostera/ASCII-Meadow/pull/60) уже присутствуют в эксперименте.
+- **T05 и T06:** по словам владельца, вероятно сделаны, но в загруженной `AUTO_ROADMAP.md` статусы ещё `IN_PROGRESS`. Не менять их код до сверки фактических коммитов/QA.
+- **GPT:** только T08 отдельная ветка; T02/#54 и T03/#58 остаются не слиты, поскольку требуют внешнего арт-контроля. Не изменять `main`, `src/data/map.js`, глобальную яркость, атлас, персонажей и файлы Claude.
+- **Совместные записи:** этот файл + [T02/T03 `COLLAB_WORKLOG.md`](../three/COLLAB_WORKLOG.md) в соответствующей ветке, PR #58 и GitHub issue #53. Они не синхронизируют живые чаты автоматически.
+
+## Хронология
+
+- **2026-10-16 — T08 начат GPT:** исходная база `c1f12b64`, код профайлера и отдельный CI добавлены; результаты фиксировать только после успешного прогона.
+
+
+## 2026-10-16 — Результаты первого полного T08 профиля
+
+[Кодовый SHA 66318f9f](https://github.com/aostera/ASCII-Meadow/commit/66318f9fdcc389bd297cbadd376c6545c8198aad) · **[профильный CI 38948936337 SUCCESS](https://github.com/aostera/ASCII-Meadow/actions/runs/38948936337)** · [исходные desktop/phone JSON + 8 отдельных PNG](https://github.com/aostera/ASCII-Meadow/actions/runs/38948936337/artifacts/12067730636). На том же кодовом SHA **все 5 из 5 профильных CI SUCCESS**, включая тени, флору, персонажей/редактор и мёртвые деревья.
+
+**PC Chromium 1100×740 DPR1 на SwiftShader, zoom 1**:
+
+| Авторская сцена | Всего / видно glyph (median) | Отсечено viewport | CPU upload p95 | CPU renderer.render p95 | Glyph / depth draw calls |
+|---|---:|---:|---:|---:|---:|
+| Замок | 32 767 / 28 779 | 12.2% | 0.80 мс | 1.40 мс | 1 / 7 |
+| Разрушенные ворота | 59 276 / 53 211 | 10.2% | 0.80 мс | 447.3 мс | 1 / 8 |
+| Аббатство | 65 805 / 58 029 | 11.8% | 0.90 мс | 426.8 мс | 1 / 8 |
+| Клуатр | 48 140 / 41 677 | 13.4% | 0.70 мс | 475.7 мс | 1 / 5 |
+
+**Chromium emulated-phone 390×844 DPR2 на том же SwiftShader, zoom 1**:
+
+| Авторская сцена | Всего / видно glyph (median) | Отсечено viewport | CPU upload p95 | CPU renderer.render p95 | Glyph / depth draw calls |
+|---|---:|---:|---:|---:|---:|
+| Замок | 20 432 / 14 817 | 27.5% | 0.60 мс | 0.40 мс | 1 / 3 |
+| Разрушенные ворота | 26 358 / 21 784 | 17.4% | 0.50 мс | 749.8 мс | 1 / 6 |
+| Аббатство | 32 615 / 27 127 | 16.8% | 0.60 мс | 256.8 мс | 1 / 5 |
+| Клуатр | 23 947 / 19 288 | 19.5% | 0.50 мс | 1.60 мс | 1 / 5 |
+
+**Строгое толкование:** на измеренных кадрах CPU-упаковка glyph обычно занимает ≤0.9 мс (p95). Очень большие и нестабильные задержки `renderer.render()` в неаппаратном SwiftShader выглядят как GPU/driver wait и **не являются** оценкой настоящего FPS игры на Android/iOS. Отрисовка glyph уже сведена до **1 draw call**, тогда как 3D-depth-прокси выполняет **3–8 дополнительных** вызовов. `renderer.info.memory` показывает 4 отслеживаемые текстуры и 8–19 геометрий по пройденным местам, но это счётчик Three объектов, **не реальный VRAM**. Карта не менялась, один WebGL canvas, исходный full-world `native.html` во всех 8 прогонах.
+
+### Что оптимизировать следующим (T08 всё ещё IN_PROGRESS)
+
+1. Приоритет: измерить и уменьшить стоимость **native actor-Z depth prepass**, так как он выполняет больше draw calls, чем glyph pass, не ломая дерево/камень/NPC occlusion и не меняя визуальную яркость.
+2. Проверить **емкость и lifetime glyph instance arrays** в `ThreeGlyphBackend.grow`: текущий вызов `grow(layer,count)` использует **исходное количество** символов до viewport-culling. Desktop abbey дает 65 805 source glyph при 58 029 видимых: этот кейс на шаге >65 536 переводит buffer capacity из 65 536 сразу в 131 072, потенциально бессмысленно. Это вывод из исходного кода, ещё НЕ измеренное сокращение памяти — не заявлять savings до парного on/off CI.
+3. Перед изменением общих файлов `three-glyphs.js` и `native-architecture-depth.mjs` обязательно проверить ветку Claude T07, чтобы не было двойного редактирования. Отдельное активное железо позволит измерить GPU timer query или хотя бы реальный vsync/CPU split. До этого T08 **не DONE**.
+
+
+## 2026-10-16 — T08 следующий пакет: невидимые glyph больше не расширяют память (в тестировании)
+
+**Причина:** `experiments/three/three-glyphs.js::ThreeGlyphBackend.upload()` передает в `grow()` исходное количество `count`, а `packVisibleGlyphs` потом выбрасывает внеэкранные элементы. Аббатство в исходном игровом профиле: **65 805 source glyphs**, но только **58 029 visible**. До патча емкость трёх `Float32Array` атрибутов увеличивается с 65 536 сразу до **131 072** из-за 269 внеэкранных элементов за пределом порога. Это лишние **2 097 152 байта** (65536 × 32) резервирования CPU-атрибутов glyph (величина расчётная), а не подтверждённый VRAM.
+
+**Что меняется:** только когда `count > layer.capacity` **и** задана область viewport clip, выполнять предварительный `countVisibleGlyphs()` с теми же граничными условиями; расширять `grow()` по числу действительно видимых glyph. В обычных кадрах, когда ёмкости хватает, **дополнительного прохода нет**. `packVisibleGlyphs` разрешает меньший массив исключительно при активном отсечении и строго проверяет границу записываемого видимого glyph; при отсутствии clip оставляет старую строгую проверку. Ничего не меняется в shader, палитре, alpha, масштабировании, map, physics, персонажах, WebGL контексте и Canvas2D fallback. Дополнительные `glyphCapacity` и `glyphInstanceAttributeBytes` поля выдаются как диагностическая телеметрия. Это **CPU-typed array capacity**, не GPU allocation/VRAM measurement.
+
+**Tests:** `tools/check/three-glyph-visibility.mjs` строит 65 549 source glyphs, сохраняет только 52 439 в окне и требует идентичности всех байтов `aRect`, `aIdAlpha` (ID/alpha) и `aActorInfo` (depth/feet) старой полной vs новой компактной упаковки, сохранности source + rejects для реально маленьких выходных массивов. Проверка настоящего `native.html` desktop abbey требует >65 536 source / ≤65 536 visible и **glyphCapacity=65 536**, тогда как старый код оставлял 131 072; PC и phone, 1 WebGL, map immutable. Также запускается `tools/check/three-native-game.cjs` на GPU/Canvas2D fallback.
+
+**Ограничения:** пока не прошли кодовый CI и снимки сравнения, указывать статус **TESTING, T08 IN_PROGRESS**, не утверждать экономию VRAM/FPS. Сохранить профильное ПО в PR #61; Claude занят T07 и не должен параллельно редактировать `three-glyphs.js` / `glyph-visibility.mjs` без согласования. Код T02/T03 в других draft PR не переносится в этот пакет.
+
+
+## 2026-10-16 — T08 memory patch accepted technically: 5/5 CI SUCCESS
+
+**Код:** [8c0bfc7c](https://github.com/aostera/ASCII-Meadow/commit/8c0bfc7ccaab3fbc212aad50a16628d283e6ea69) · **профильный [CI 38950952659 — SUCCESS](https://github.com/aostera/ASCII-Meadow/actions/runs/38950952659)** · [оригинальные PC/phone PNG+JSON](https://github.com/aostera/ASCII-Meadow/actions/runs/38950952659/artifacts/12068832087). На том же кодовом SHA пять отдельных специализированных workflows **5/5 SUCCESS**, включая `Three Native Editor and Character`, `Foundation Grass`, `Deadwood Depth`, `Architectural Shadow Layers`, `T08 Performance Baseline`. `tools/check/three-native-game.cjs` прошёл именно в новом `native.html` на desktop и emulated phone, включая отдельный Canvas2D fallback.
+
+### Достоверное до/после
+
+| Измерение | Старый код (до) | Новый код (после) | Смысл |
+|---|---:|---:|---|
+| Desktop abbey исходных glyph | 65 805 (первый профиль) | 65 820 | Кадры недетерминированно меняются между прогонами; оба **> 65 536** |
+| Desktop abbey видимых glyph | 58 029 | 57 934 | Оба **≤ 65 536**, значит дополнительная GPU-ёмкость не нужна |
+| Выделенная ёмкость glyph атрибутов | **131 072** при старом `grow(count)` (следует непосредственно из кода) | **65 536** (из `n.stats.glyphCapacity` в реальной сцене) | **минус 50% capacity** в этой сцене |
+| Объём typed arrays `aRect + aIdAlpha + aActorInfo` | 4 194 304 байт, расчёт из структуры старого `allocate` | **2 097 152 байт**, измеренный `n.stats.glyphInstanceAttributeBytes` | **2 МиБ меньше CPU атрибутной ёмкости**; не называем VRAM |
+| Main source ASCII pass | 1 draw call | **1 draw call** | Draw call и качество не менялись |
+| Отдельный актёрский 3D-depth | 3–8 вызовов по базовому профилю | **3–8 вызовов** по текущим PC/phone сценам | Оптимизация глубины не входила в этот пакет |
+
+Синтетический **65 549 source → 52 439 visible** тест сохраняет байт-в-байт `aRect`, `aIdAlpha`, `aActorInfo`, исходный glyph-буфер, source alpha, actor foot Y и source order по сравнению с полной выделенной ёмкостью. Нехватка памяти для реально видимых glyph или actor metadata по-прежнему выбрасывает ошибку. Вместе с тестом реального native и fallback это является технической проверкой патча; внешняя арт-приёмка и реальные устройства не заявляются.
+
+**Ограничение по FPS:** CPU `renderer.render()` на SwiftShader сильно колебался между прогонами (в новой desktop abbey один p95 `renderCpu` **4.2 мс**, но общий frame submission p95 **1340.6 мс**, в соседних сценах большие задержки). Сравнивать их как устойчивый FPS или заявлять рост производительности нельзя. Патч касается **memory over-allocation в редком моменте роста**, а не оптимизации каждого кадра.
+
+**Следующее T08 IN_PROGRESS:** фокусированный on/off анализ 3D-depth draw calls; затем безопасное уменьшение геометрических обновлений или LOD только после измерений и координации с T07 Claude. При этом ни код/ветки T04–T07 Claude, ни `main`, `src/data/map.js`, цвета и альфа не менялись. **PR #61 остаётся draft**, техническая часть памяти проверена, но весь T08 не объявлен DONE.
