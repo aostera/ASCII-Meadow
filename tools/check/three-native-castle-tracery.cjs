@@ -104,6 +104,7 @@ fs.mkdirSync(dir,{recursive:true});
        let changed=0,restoreErrors=0,offToRestored=0,warmupToOn=0;
        let sourceChanged=0,sourceVisibleChanged=0,sourceChangedBounds=null;
        const ac=on.source,bc=off.source;
+       const changedCols=new Uint32Array(ac.width);
        if(ac.width!==bc.width||ac.height!==bc.height||
           ac.left!==bc.left||ac.top!==bc.top)
          throw Error('Castle source-grid moved during reversible QA');
@@ -112,6 +113,7 @@ fs.mkdirSync(dir,{recursive:true});
             ac.glyph[k]===bc.glyph[k]&&
             Math.abs(ac.dep[k]-bc.dep[k])<1)continue;
          sourceChanged++;
+         changedCols[k%ac.width]++;
          const cx=ac.left+k%ac.width,cy=ac.top+Math.floor(k/ac.width);
          if(cx>=ac.viewport[0]&&cx<=ac.viewport[1]&&
             cy>=ac.viewport[2]&&cy<=ac.viewport[3])sourceVisibleChanged++;
@@ -128,9 +130,17 @@ fs.mkdirSync(dir,{recursive:true});
        // authored map, production camera formula or test screenshot with
        // separate standalone 3D rendering.
        let sourceVisibleAfterFocus=sourceVisibleChanged;
+       let sourceFocusCol=null;
        if(sourceChangedBounds){
+         // A symmetric castle has separated left/right clusters. Their
+         // bounding-box midpoint is the EMPTY gateway, so centering there
+         // can still keep every changed bay outside a narrow viewport.
+         let best=0,bestCol=0;
+         for(let i=0;i<changedCols.length;i++)
+           if(changedCols[i]>best){best=changedCols[i];bestCol=i;}
          const focusRow=(sourceChangedBounds[1]+sourceChangedBounds[3])*.5;
-         const focusCol=(sourceChangedBounds[0]+sourceChangedBounds[2])*.5;
+         const focusCol=ac.left+bestCol;
+         sourceFocusCol=focusCol;
          player.y=focusRow+VR*.4;player.ty=player.y;
          player.x=focusCol;player.tx=player.x;
          updateCamera(0,true);
@@ -170,7 +180,7 @@ fs.mkdirSync(dir,{recursive:true});
          throw Error('QA-only castle rebuild touched authored map');
        return {changedPixels:changed,restoreErrors,
          sourceChanged,sourceVisibleChanged,sourceVisibleAfterFocus,
-         sourceChangedBounds,
+         sourceChangedBounds,sourceFocusCol,
          warmupToOn,offToRestored,
          onFeatures,offFeatures,restoredFeatures,
          canvas:[canvas.width,canvas.height],
