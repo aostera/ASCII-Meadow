@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0c0c0e">
+<title>THE ASHEN VOW | ASCII Rig Laboratory</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;color:#eee9e4;background:#0c0b0e;font:13px/1.5 system-ui,-apple-system,sans-serif}
+canvas{display:block}#stage{position:fixed;inset:0;touch-action:none}
+#heading{position:fixed;left:28px;top:25px;pointer-events:none}
+#heading .over{font-size:10px;letter-spacing:.24em;color:#b38a8f}
+h1{font:normal 34px/1.1 Georgia,serif;letter-spacing:.12em;margin:9px 0}small{color:#a59f9a}
+#panel{position:fixed;top:16px;right:16px;width:288px;max-height:calc(100dvh - 32px);overflow:auto;padding:18px;background:#161518ed;border:1px solid #524349;border-radius:14px;backdrop-filter:blur(16px)}
+h2{font-size:11px;letter-spacing:.13em;color:#c7a9a7;margin:0 0 12px;text-transform:uppercase}
+button{color:#e6deda;background:#252329;border:1px solid #51474b;border-radius:7px;font:inherit;min-height:38px;padding:7px 10px;cursor:pointer}
+button:hover{background:#332c32}button.active{background:#66343d;border-color:#b77778}
+button:focus-visible,input:focus-visible{outline:2px solid #d79b92;outline-offset:2px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:13px}
+#panel label{display:flex;justify-content:space-between;gap:7px;margin:15px 0 5px;font-size:12px;color:#c3baba}
+#panel output{font-variant-numeric:tabular-nums;color:#edddcf}
+input[type=range]{width:100%;accent-color:#a85b61}
+#panel .hint{font-size:11px;line-height:1.55;color:#b9aaad;border-top:1px solid #504247;padding-top:13px;margin-top:15px}
+#panel .hint b{color:#ece1dd}
+#footer{position:fixed;bottom:20px;left:28px;color:#aca3a3;font-size:11px;max-width:450px;line-height:1.6;pointer-events:none}
+#views{position:fixed;bottom:16px;right:323px;display:flex;gap:6px}
+#views button{background:#201e22e8;font-size:11px}
+#fail{position:fixed;inset:0;background:#151418;z-index:9;display:none;place-items:center;padding:24px;text-align:center;font-size:16px}
+@media(max-width:690px){
+#stage{bottom:40dvh}
+#heading{left:13px;top:12px}h1{font-size:24px;margin:3px 0}
+#heading .over{font-size:8px}#heading small{font-size:10px}
+#panel{top:auto;left:0;right:0;bottom:0;width:100%;max-height:40dvh;border-radius:16px 16px 0 0;padding:10px 14px env(safe-area-inset-bottom)}
+#panel .grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-bottom:8px}
+#panel button{font-size:11px;min-height:33px;padding:3px}
+#panel label{margin:9px 0 3px}
+#footer{bottom:calc(40dvh + 10px);left:12px;max-width:54%;font-size:9px}
+#views{bottom:calc(40dvh + 9px);right:8px;gap:4px}
+#views button{padding:4px 7px;font-size:10px;min-height:29px}
+}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="stage"></div>
+<header id="heading"><div class="over">ASCII MEADOW · NEW THREE.JS ENGINE · ANIMATION STUDY</div><h1>THE ASHEN VOW</h1><small>ОТКЛОНЕНО: внешность не соответствует утверждённому эскизу</small></header>
+<aside id="panel">
+<h2>Анимация · 60 кадров</h2>
+<div class="grid" id="clips">
+<button data-clip="idle" class="active">Покой</button><button data-clip="walk">Ходьба</button>
+<button data-clip="run">Бег</button><button data-clip="jump">Прыжок</button>
+<button data-clip="attack">Удар</button><button data-clip="crouch">Приседание</button>
+<button data-clip="salute">Клятва</button><button data-clip="turn">Разворот</button>
+</div>
+<label for="frame">Кадр <output id="frameOut">1 / 60</output></label><input type="range" id="frame" min="0" max="59" value="0" step="1">
+<label for="speed">Скорость <output id="speedOut">1.0×</output></label><input type="range" id="speed" min="25" max="200" value="100" step="5">
+<div class="grid" style="margin-top:12px">
+<button id="pause">Пауза</button><button id="skeleton">Показать кости</button><button id="onlyBones">Только скелет</button>
+<button id="spin">Автовращение</button><button id="reset">Сброс камеры</button>
+</div>
+<div class="hint"><b>ВИЗУАЛЬНО ОТКЛОНЕНО: пузыреобразная форма, неправильные пропорции, нет читаемых маски, брони и плаща. НЕ ИСПОЛЬЗОВАТЬ В ИГРЕ.</b> Движение управляется 3D-костями, ноги используют двухзвенную IK-кинематику; объёмные символы привязаны к костям. Нет плоской картинки персонажа. В исходную игровую сцену не добавлено.</div>
+</aside>
+<div id="views"><button id="front">Спереди</button><button id="side">Сбоку</button><button id="back">Сзади</button></div>
+<div id="footer">Вращение — мышью или пальцем; масштаб — колесом или двумя пальцами. Проверяй ступни, локти, маску и плащ на каждом кадре.</div>
+<div id="fail">Не удалось создать WebGL-сцену. Попробуйте другой браузер или обновите страницу.</div>
+<script type="module" src="./ashen-glyph-rig.js"></script>
+</body>
+</html>
