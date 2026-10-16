@@ -61,7 +61,7 @@ fs.mkdirSync(out,{recursive:true});
         }
       }
       if(diff<10||s.changedCells<10||darkened<2||brightened<2||
-         maxDelta>.25||flatSaved<100||deepSaved<100)
+         maxDelta>.17||flatSaved<100||deepSaved<100)
         throw Error('Shadow blur changed actual ground topology '+JSON.stringify({
           diff,changed:s.changedCells,darkened,brightened,maxDelta,
           flatSaved,deepSaved}));
