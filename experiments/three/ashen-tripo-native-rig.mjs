@@ -141,15 +141,17 @@ function animateRig(model,source,root,weapon){
     //   shoulder: X lowers arm / Y swings it in the sagittal plane;
     //   elbow:    Y bends forearm forward after the shoulder is lowered.
     // The right (weapon) arm swings less, to avoid blade/torso clipping.
-    const shoulderDown=1.28;
+    // 1.28 folded both gloves onto the belt and moved the sword into the
+    // groin. 0.98 keeps natural clearance between forearms and tassets.
+    const shoulderDown=.98;
     twist(sets.leftArm[0],[['ix',-shoulderDown],['iy',-swing*armAmplitude]]);
     twist(sets.rightArm[0],[['ix',shoulderDown],['iy',-swing*armAmplitude*.38]]);
-    const leftElbow=-.44-.10*stride*Math.max(0,-swing);
-    const rightElbow=.56+.07*stride*Math.max(0,swing);
+    const leftElbow=-.20-.11*stride*Math.max(0,-swing);
+    const rightElbow=.24+.10*stride*Math.max(0,swing);
     twist(sets.leftArm[1],[['iy',leftElbow]]);
     twist(sets.rightArm[1],[['iy',rightElbow]]);
-    twist(sets.leftArm[2],[['iy',-.05+Math.sin(bodyClock*1.4)*.015]]);
-    twist(sets.rightArm[2],[['iy',.065]]);
+    twist(sets.leftArm[2],[['iy',-.018+Math.sin(bodyClock*1.4)*.015]]);
+    twist(sets.rightArm[2],[['iy',.025]]);
     twist(sets.leftArm[3],[]);
     twist(sets.rightArm[3],[]);
     const left=legPose(sets.leftLeg,0,stride,jumpWeight,runMix);
