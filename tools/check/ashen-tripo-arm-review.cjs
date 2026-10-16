@@ -624,6 +624,32 @@ fs.mkdirSync(out,{recursive:true});
   console.log('60 sequential TRUE TRIPO 60 Hz Run poses saved: '+
     JSON.stringify({swingRange,elbowRange,maxKneeTick,maxAnkleTick,
       maxContactTick,frames:poseSamples.length}));
+  // Eight supplementary 45-degree headings show the real model through
+  // 360 degrees rather than judging only a single flattering side view.
+  // The workshop supports every heading 0..359 degrees independently.
+  const headingEvidence=[];
+  for(const deg of [0,45,90,135,180,225,270,315]){
+    const actualHeading=await page.evaluate(target=>{
+      const root=window.__ASHEN_ANIMATION_LAB__.model;
+      for(let i=0;i<24;i++)
+        root.userData.animate(1/60,{speed:15,run:true,
+          heading:target*Math.PI/180},i/60);
+      return root.userData.pose().heading;
+    },deg);
+    const delta=Math.abs(Math.atan2(
+      Math.sin(actualHeading-deg*Math.PI/180),
+      Math.cos(actualHeading-deg*Math.PI/180)));
+    if(delta>.025)throw Error('Compass turn failed to reach '+deg+' degrees: '+delta);
+    await page.evaluate(()=>new Promise(resolve=>
+      requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    await page.screenshot({
+      path:path.join(out,'run-heading-'+String(deg).padStart(3,'0')+'.png'),
+      clip:{x:300,y:92,width:415,height:635},timeout:30000
+    });
+    headingEvidence.push({deg,errorRadians:delta});
+  }
+  console.log('8 real Tripo 360-degree Run reference views saved '+
+    JSON.stringify(headingEvidence));
   await browser.close();
  }catch(e){await browser.close();throw e}
 })().catch(e=>{console.error(e);process.exitCode=1});
