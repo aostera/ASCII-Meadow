@@ -64,7 +64,7 @@ fs.mkdirSync(output,{recursive:true});
      throw Error('Sword is NOT a separate real mesh attached to Tripo right wrist: '+JSON.stringify({weapon:idle.weapon,bone:idle.weaponSocketBone}));
    if(idle.cloakCells<5)
      throw Error('No cloak shading regions read from model surface: '+idle.cloakCells);
-   if(idle.pose?.animationVersion!=='Tripo-IK-v9-longer-reachable-step')
+   if(idle.pose?.animationVersion!=='Tripo-IK-v10-distance-synced-foot-pins')
      throw Error('New planted-feet IK gait controller did not load');
 
    const shot=async(name)=>{
@@ -105,6 +105,11 @@ fs.mkdirSync(output,{recursive:true});
      const sprint=await shot('run');
      if(sprint.pose?.phase<=walk.pose?.phase)
        throw Error('Walking->running phase restarted instead of being continuous');
+     if(!(sprint.pose.travelSource>walk.pose.travelSource)||
+        !sprint.pose.footPinned?.some(Boolean))
+       throw Error('Original MAP travel not transmitted to planted Tripo feet: '+
+         JSON.stringify({walk:walk.pose.travelSource,sprint:sprint.pose.travelSource,
+           pins:sprint.pose.footPinned}));
      await page.keyboard.up('Shift');await page.keyboard.up('d');
      await page.keyboard.press('Space');
      await page.waitForFunction(()=>window.__ASCII_NATIVE__.ashenVow?.clip==='Jump',
@@ -122,7 +127,7 @@ fs.mkdirSync(output,{recursive:true});
    const fin=await read();
    if(fin.map!==idle.map)throw Error('Original authored map changed');
    if(!fin.pose||!(fin.pose.phase>=0))throw Error('No live bone-animation controller state');
-   if(fin.pose?.animationVersion!=='Tripo-IK-v9-longer-reachable-step'||!fin.pose.weaponAttached)
+   if(fin.pose?.animationVersion!=='Tripo-IK-v10-distance-synced-foot-pins'||!fin.pose.weaponAttached)
      throw Error('New animated sword and IK state lost during play');
    if(!mobile&&fin.pose?.speed<0&&fin.pose?.heading===undefined)
      throw Error('Bad gameplay pose state');
