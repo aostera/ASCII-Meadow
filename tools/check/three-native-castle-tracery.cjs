@@ -203,6 +203,8 @@ fs.mkdirSync(dir,{recursive:true});
        // comparison frames, so pixel delta cannot come from those bays.
        // The tower screenshot follows exactly this final focused view.
        let towerGpuChanged=0,towerRestoreErrors=0,towerVisibleCells=0;
+       let towerSourceRestoreErrors=0,towerSecondRenderErrors=0;
+       let towerRestoreBounds=null;
        if(towerFocus){
          player.x=towerFocus.col;player.tx=player.x;
          player.y=towerFocus.row+VR*.4;player.ty=player.y;
@@ -225,17 +227,46 @@ fs.mkdirSync(dir,{recursive:true});
               cy>=a.viewport[2]&&cy<=a.viewport[3])
              towerVisibleCells++;
          }
+         // Compare ORIGINAL source geometry raster as well as rendered
+         // pixels: on/off/on GPU inconsistencies must not be dismissed as
+         // animation noise without proving the CPU solids were restored.
+         for(let k=0;k<towerOn.source.lum.length;k++){
+           const a=towerOn.source,b=towerRestored.source;
+           if(Math.abs(a.lum[k]-b.lum[k])>.01||
+              a.glyph[k]!==b.glyph[k]||
+              Math.abs(a.dep[k]-b.dep[k])>1)
+             towerSourceRestoreErrors++;
+         }
+         // Repaint the already-built scene once WITHOUT rebuilding. If
+         // native texture uploads are a single-frame lag, this isolates it
+         // from true geometric nondeterminism.
+         render();
+         const settledPixels=new Uint8Array(canvas.width*canvas.height*4);
+         gl.readPixels(0,0,canvas.width,canvas.height,
+           gl.RGBA,gl.UNSIGNED_BYTE,settledPixels);
          for(let i=0;i<towerOn.pixels.length;i+=4){
            const diff=(a,b)=>Math.max(Math.abs(a[i]-b[i]),
              Math.abs(a[i+1]-b[i+1]),Math.abs(a[i+2]-b[i+2]))>8;
            if(diff(towerOn.pixels,towerOff.pixels))towerGpuChanged++;
-           if(diff(towerOn.pixels,towerRestored.pixels))
+           if(diff(towerOn.pixels,towerRestored.pixels)){
              towerRestoreErrors++;
+             const k=i/4,cx=k%canvas.width,cy=Math.floor(k/canvas.width);
+             if(!towerRestoreBounds)towerRestoreBounds=[cx,cy,cx,cy];
+             else{
+               towerRestoreBounds[0]=Math.min(towerRestoreBounds[0],cx);
+               towerRestoreBounds[1]=Math.min(towerRestoreBounds[1],cy);
+               towerRestoreBounds[2]=Math.max(towerRestoreBounds[2],cx);
+               towerRestoreBounds[3]=Math.max(towerRestoreBounds[3],cy);
+             }
+           }
+           if(diff(towerOn.pixels,settledPixels))
+             towerSecondRenderErrors++;
          }
        }
        return {changedPixels:changed,restoreErrors,
          towerChanged,towerFocus,towerVisibleCells,
-         towerGpuChanged,towerRestoreErrors,
+         towerGpuChanged,towerRestoreErrors,towerSourceRestoreErrors,
+         towerSecondRenderErrors,towerRestoreBounds,
          onTowers,offTowers,restoredTowers,
          sourceChanged,sourceVisibleChanged,sourceVisibleAfterFocus,
          sourceChangedBounds,sourceFocusCol,
@@ -268,6 +299,9 @@ fs.mkdirSync(dir,{recursive:true});
      towerVisibleCells:comparison.towerVisibleCells,
      towerGpuChanged:comparison.towerGpuChanged,
      towerRestoreErrors:comparison.towerRestoreErrors,
+     towerSourceRestoreErrors:comparison.towerSourceRestoreErrors,
+     towerSecondRenderErrors:comparison.towerSecondRenderErrors,
+     towerRestoreBounds:comparison.towerRestoreBounds,
      onTowers:comparison.onTowers,
      offTowers:comparison.offTowers,
      focus:comparison.towerFocus
