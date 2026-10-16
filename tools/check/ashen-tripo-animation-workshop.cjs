@@ -86,7 +86,7 @@ fs.mkdirSync(out,{recursive:true});
      }
      // Unlike the source 8-way sprites, the real 3D rig supports every
      // heading. Exercise an angle that is deliberately NOT a preset.
-     await page.locator('#yaw').fill('137');
+     await page.locator('#yaw').evaluate(el=>{el.value='137';el.dispatchEvent(new Event('input',{bubbles:true}));});
      await page.waitForFunction(()=>{
        const lab=window.__ASHEN_ANIMATION_LAB__;
        const a=lab?.state?.heading,target=137*Math.PI/180;
