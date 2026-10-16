@@ -52,6 +52,9 @@ jobs:
           if-no-files-found: warn
       - name: Publish fast GLB result to draft PR 56
         if: always()
+        # The repo's GitHub App token may not have write-comment access.
+        # Publishing is advisory; never fail four successful GLB poses for 403.
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           SMOKE_STATUS: ${{ job.status }}
