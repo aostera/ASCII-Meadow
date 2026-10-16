@@ -288,7 +288,7 @@ function nativeBuildCompleteCastle(){
   }
   feature.outerTowerRelief=solids.length-before;
   nativeOuterTowerReliefClear=solids.slice(before).every(so=>
-    so.bb[1]<-480||so.bb[0]>480);
+    so.bb[1]<-460||so.bb[0]>460);
 
   for(let i=start;i<solids.length;i++){
     const s=solids[i],b=s.bb;
