@@ -665,6 +665,123 @@ fs.mkdirSync(dir,{recursive:true});
        JSON.stringify(mediumDelta));
    console.log('NATIVE CASTLE PORTAL MEDIUM ACTUAL GPU '+label+' '+
      JSON.stringify(mediumDelta));
+   // T02 visual acceptance: measure the PHYSICAL portal recess from a
+   // reachable, portal-in-frame PLAYER position with actual follow-camera.
+   // Previous gate-threshold shot was below the real entrance on desktop;
+   // its zero pixel difference cannot prove the door is visually unchanged.
+   // Do NOT move the camera independently, use a user-reachable point and
+   // require source-ray portal samples to land in its normal zoom=1 view.
+   if(walkablePortal.best.visibleSamples<15||
+      walkablePortal.best.upperArchSamples<2)
+     throw Error('No legitimate gameplay view contains most portal rays '+
+       JSON.stringify(walkablePortal.best));
+   const focusedPoint=walkablePortal.best;
+   await page.evaluate(point=>{
+     window.__ASCII_PORTAL_FOCUSED__={};
+     const model=window.__ASCII_NATIVE_COMPLETE_ARCH__;
+     if(!model.setMainPortalRecessEnabledForTest(true))
+       throw Error('Portal geometry test switch missing');
+     player.x=player.tx=point.x;player.y=player.ty=point.y;
+     player.h=player.hT=point.h;
+   },focusedPoint);
+   async function focusedPortalShot(enabled,tag){
+     const result=await page.evaluate(({enabled,point,tag})=>{
+       const model=window.__ASCII_NATIVE_COMPLETE_ARCH__,
+         native=window.__ASCII_NATIVE__;
+       if(!model.setMainPortalRecessEnabledForTest(enabled))
+         throw Error('Portal geometry toggle inaccessible');
+       // One runtime, one real camera; deterministic weather only in QA.
+       const wasRandom=Math.random;Math.random=()=>.513;
+       try{
+         build();
+         player.x=player.tx=point.x;player.y=player.ty=point.y;
+         player.h=player.hT=point.h;
+         VZ=1;updateCamera(0,true);
+         cloudTick=2;FG.tick=0;render();
+       }finally{Math.random=wasRandom}
+       const canvas=native.renderer.domElement,
+         gl=native.renderer.getContext(),
+         pix=new Uint8Array(canvas.width*canvas.height*4);
+       gl.readPixels(0,0,canvas.width,canvas.height,
+         gl.RGBA,gl.UNSIGNED_BYTE,pix);
+       const state={
+         pixels:pix,parts:model.features.castle.recessedMainPortal,
+         lum:new Float32Array(cathedral.lum),
+         dep:new Float32Array(cathedral.dep),
+         glyph:new Int16Array(cathedral.glyph),
+         camera:[camX,camY,VZ],window:[VX0,VY0,VX1,VY1],
+         gameplay:VZ===1&&!editing,walkable:!blocked(player.x,player.y,player),
+         oneThree:document.querySelectorAll('#three-parity-canvas').length===1&&
+           native.mode==='three',map:JSON.stringify(MEADOW_MAP),
+         clear:model.mainPortalRecessClear
+       };
+       window.__ASCII_PORTAL_FOCUSED__[tag]=state;
+       if(!state.gameplay||!state.walkable||!state.oneThree||
+          !state.clear)
+         throw Error('Non-native/nonwalkable portal view '+tag);
+       return {parts:state.parts,camera:state.camera,
+         window:state.window,walkable:state.walkable};
+     },{enabled,point:focusedPoint,tag});
+     await page.screenshot({
+       path:path.join(dir,label+'-portal-walkable-'+tag+'-gameplay.png'),
+       timeout:60000
+     });
+     return result;
+   }
+   const focusOn=await focusedPortalShot(true,'on');
+   const focusOff=await focusedPortalShot(false,'off');
+   const focusRestored=await focusedPortalShot(true,'restored');
+   const focusedDelta=await page.evaluate(()=>{
+     const states=window.__ASCII_PORTAL_FOCUSED__,
+       a=states.on,b=states.off,c=states.restored;
+     let changedGpu=0,gpuRestoreErrors=0,sourceChanged=0,
+       sourceRestoreErrors=0;
+     for(let k=0;k<a.pixels.length;k+=4){
+       const different=(x,y)=>Math.max(
+         Math.abs(x.pixels[k]-y.pixels[k]),
+         Math.abs(x.pixels[k+1]-y.pixels[k+1]),
+         Math.abs(x.pixels[k+2]-y.pixels[k+2]))>8;
+       if(different(a,b))changedGpu++;
+       if(different(a,c))gpuRestoreErrors++;
+     }
+     for(let i=0;i<a.lum.length;i++){
+       const different=(x,y)=>
+         Math.abs(x.lum[i]-y.lum[i])>.01||
+         Math.abs(x.dep[i]-y.dep[i])>1||
+         x.glyph[i]!==y.glyph[i];
+       if(different(a,b))sourceChanged++;
+       if(different(a,c))sourceRestoreErrors++;
+     }
+     const result={changedGpu,gpuRestoreErrors,sourceChanged,
+       sourceRestoreErrors,
+       fullPortalView:JSON.stringify(a.window)===JSON.stringify(b.window)&&
+         JSON.stringify(a.window)===JSON.stringify(c.window),
+       sameGameplayCamera:JSON.stringify(a.camera)===JSON.stringify(b.camera)&&
+         JSON.stringify(a.camera)===JSON.stringify(c.camera),
+       zoom:a.camera[2],mapUnchanged:a.map===b.map&&a.map===c.map,
+       onSolids:a.parts,offSolids:b.parts,restoredSolids:c.parts};
+     delete window.__ASCII_PORTAL_FOCUSED__;
+     return result;
+   });
+   if(focusedDelta.changedGpu<150||
+      focusedDelta.sourceChanged<100||
+      focusedDelta.sourceRestoreErrors!==0||
+      focusedDelta.gpuRestoreErrors>150||
+      !focusedDelta.fullPortalView||
+      !focusedDelta.sameGameplayCamera||
+      !focusedDelta.mapUnchanged||
+      focusedDelta.zoom!==1||
+      focusedDelta.onSolids<10||focusedDelta.offSolids!==0||
+      focusedDelta.restoredSolids!==focusedDelta.onSolids)
+     throw Error('Physical recess invisible at reachable real camera '+
+       JSON.stringify(focusedDelta));
+   console.log('NATIVE CASTLE REACHABLE PORTAL GAMEPLAY GPU '+label+' '+
+     JSON.stringify(focusedDelta));
+   fs.writeFileSync(path.join(dir,label+'-portal-walkable-gpu.json'),
+     JSON.stringify({point:focusedPoint,delta:focusedDelta,
+       note:'True 100% player-follow camera; independent walkable spot, not route continuity'},null,2)+
+       String.fromCharCode(10));
+
    fs.writeFileSync(path.join(dir,label+'-portal-medium-delta.json'),
      JSON.stringify({gameplay:portalDelta,inspection:mediumDelta,
        note:'0.35 is source renderer editor/inspection zoom, NOT gameplay camera'},null,2)+'\n');
