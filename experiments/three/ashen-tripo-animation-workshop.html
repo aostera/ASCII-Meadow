@@ -114,7 +114,7 @@ controls.minDistance=.85;controls.maxDistance=12;
 controls.maxPolarAngle=Math.PI*.94;
 controls.update();
 
-let mode='Idle',heading=0,tempo=1,paused=false,oneStep=false;
+let mode='Idle',heading=0,tempo=1,paused=false;
 let simulatedFrames=0,jumpClock=0,last=0,displayClock=0,stepTime=0;
 let boneHelper=null,wire=false,showSkeleton=false,rig=null,error=null;
 let smoothFps=0,alive=true,accumulator=0;
@@ -131,7 +131,10 @@ function setMotion(next){
   if(!paused)status('Режим '+mode+' · живые движения 40 костей, без готовых клипов Tripo.');
 }
 function setPaused(next){
-  paused=next;ui.pause.textContent=paused?'Продолжить':'Пауза';
+  paused=next;
+  // Never replay an accumulated sub-frame when single-stepping.
+  if(paused)accumulator=0;
+  ui.pause.textContent=paused?'Продолжить':'Пауза';
   ui.pause.setAttribute('aria-pressed',String(paused));
 }
 $('motions').addEventListener('click',ev=>{
@@ -149,7 +152,13 @@ ui.tempo.addEventListener('input',()=>{
   tempo=Number(ui.tempo.value);ui.tempoValue.textContent=tempo.toFixed(2)+'×';
 });
 ui.pause.addEventListener('click',()=>setPaused(!paused));
-ui.frame.addEventListener('click',()=>{setPaused(true);oneStep=true});
+ui.frame.addEventListener('click',()=>{
+  // Advance *synchronously* on click. On a slow GPU, relying on the next
+  // requestAnimationFrame made the button appear to do nothing until the
+  // page rendered, breaking frame accuracy and keyboard workflows.
+  setPaused(true);
+  advanceSimulation();
+});
 ui.skeleton.addEventListener('click',()=>{
   showSkeleton=!showSkeleton;if(boneHelper)boneHelper.visible=showSkeleton;
   ui.skeleton.setAttribute('aria-pressed',String(showSkeleton));
@@ -203,6 +212,27 @@ function fit(){
 window.addEventListener('resize',fit);
 new ResizeObserver(fit).observe(ui.viewport);fit();
 document.addEventListener('visibilitychange',()=>{last=0});
+// The fixed-step simulation is independent of the browser's render cadence.
+// It is also used by the +1 frame button, even if WebGL stalls or the tab
+// is throttled. This does not make every device physically render at 60fps.
+function advanceSimulation(){
+  if(!rig?.userData.gltf.loaded)return false;
+  stepTime+=SIM_STEP;simulatedFrames++;
+  if(mode==='Jump')jumpClock=(jumpClock+SIM_STEP)%2.04;
+  const jumpClipTime=mode==='Jump'&&jumpClock<1.49?jumpClock:undefined;
+  // Real 40-joint Tripo skin and the native game's actual pose function.
+  rig.userData.animate(SIM_STEP,{
+    speed:mode==='Walk'?8:mode==='Run'?15:0,
+    run:mode==='Run',heading,jumpClipTime
+  },stepTime);
+  // Studio-only ballistic display and projected blob shadow.
+  const liftPhase=mode==='Jump'&&jumpClock<1.49?
+    Math.max(0,Math.sin(Math.PI*jumpClock/1.49)):0;
+  rig.position.y=.36*liftPhase;
+  contactShadow.scale.setScalar(1+.30*liftPhase);
+  contactShadow.material.opacity=.29-.18*liftPhase;
+  return true;
+}
 function animateFrame(now){
   if(!alive)return;
   requestAnimationFrame(animateFrame);
@@ -210,28 +240,12 @@ function animateFrame(now){
   if(dt>0)smoothFps=smoothFps?(.94*smoothFps+.06/dt):1/dt;
   // Deterministic 60-pose-per-second playback on 60/90/120 Hz displays;
   // at slower refresh rates the small catch-up budget preserves cadence.
-  accumulator=oneStep?SIM_STEP:paused?0:Math.min(.075,accumulator+dt*tempo);
-  oneStep=false;
+  accumulator=paused?0:Math.min(.075,accumulator+dt*tempo);
   let stepBudget=4;
-  while(rig?.userData.gltf.loaded&&accumulator>=SIM_STEP-1e-8&&stepBudget-->0){
+  while(accumulator>=SIM_STEP-1e-8&&stepBudget-->0){
+    if(!advanceSimulation())break;
     accumulator-=SIM_STEP;
-    stepTime+=SIM_STEP;simulatedFrames++;
-    if(mode==='Jump')jumpClock=(jumpClock+SIM_STEP)%2.04;
-    const jumpClipTime=mode==='Jump'&&jumpClock<1.49?jumpClock:undefined;
-    // Same real-skin animation function that animates the native game.
-    rig.userData.animate(SIM_STEP,{
-      speed:mode==='Walk'?8:mode==='Run'?15:0,
-      run:mode==='Run',heading,jumpClipTime
-    },stepTime);
   }
-  // Visually lift the WHOLE skinned model during flight. Only the
-  // inspector sets its root position; the game continues using the
-  // original player jump and world-space ground contact.
-  const liftPhase=mode==='Jump'&&jumpClock<1.49?
-    Math.max(0,Math.sin(Math.PI*jumpClock/1.49)):0;
-  if(rig)rig.position.y=.36*liftPhase;
-  contactShadow.scale.setScalar(1+.30*liftPhase);
-  contactShadow.material.opacity=.29-.18*liftPhase;
   controls.update();
   renderer.render(scene,camera);
   if(now-displayClock>170){
