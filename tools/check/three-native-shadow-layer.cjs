@@ -38,11 +38,17 @@ fs.mkdirSync(out,{recursive:true});
       throw Error('No native stone-shadow refinement or duplicate GPU context');
     let diff=0,maxDelta=0,brightened=0,darkened=0,deepSaved=0,flatSaved=0;
     try{
-      // Compare source raycast baseline and the same world with edge filter.
+      // Isolate the filter on the SAME source raycast sample. A second
+      // complete buildWorld() can regenerate independent world/fog data,
+      // so comparing two rebuilds falsely attributes those differences
+      // to architectural penumbra adjustment.
       s.sourceBuildWorld();
       const source=bshade.slice();
-      buildWorld();
+      const bakeCount=s.bakes;
+      const manualChanged=s.refine();
       const refined=bshade.slice();
+      if(s.bakes!==bakeCount||manualChanged<10)
+        throw Error('Source shadow pass not isolated from world rebuild');
       for(let i=0;i<source.length;i++){
         const d=refined[i]-source[i];
         if(Math.abs(d)>.0001){
