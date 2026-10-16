@@ -56,7 +56,7 @@ fs.mkdirSync(out,{recursive:true});
      assert.equal(s.clip,'Idle');
      assert.deepEqual(s.pose.footContact,[true,true],
        'Both idle feet should be treated as planted');
-     assert.equal(s.pose.animationVersion,'Tripo-IK-v5-palm-bound-wrist');
+     assert.equal(s.pose.animationVersion,'Tripo-IK-v6-arm-followthrough');
      // Measure actual world-space skinned joints, not merely pose labels.
      // A T-pose has wrist far from shoulder; the resting armored hands must
      // be lower and substantially closer to the body. The separate sword
@@ -115,6 +115,9 @@ fs.mkdirSync(out,{recursive:true});
        undefined,{timeout:15000});
      let running=await lab();
      assert.ok(running.pose.phase>walking.pose.phase,'Gait phase must not restart on Run');
+     assert.ok(running.pose.armPose.rightElbow>.25 &&
+       running.pose.armPose.leftElbow<-.22,
+       'Arms should flex during running rather than hang in a rigid T-pose');
      assert.equal(running.pose.capeDeflection?.length,3,'Original three cape joints');
      assert.ok(running.pose.capeDeflection.every(pair=>
        pair.length===2&&pair.every(v=>Number.isFinite(v)&&Math.abs(v)<.12)),
