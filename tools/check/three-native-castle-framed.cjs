@@ -392,6 +392,7 @@ fs.mkdirSync(dir,{recursive:true});
      player.hT=player.h=surfAt(point[0],point[1]);
      Math.random=()=>.513;
      window.__ASCII_PORTAL_GATE_SHOTS__={};
+     window.__ASCII_PORTAL_QA_MAP__=originalMap;
      function snapshot(enabled){
        if(!arch.setMainPortalRecessEnabledForTest(enabled))
          throw Error('Scoped carved-portal switch unavailable');
@@ -431,7 +432,9 @@ fs.mkdirSync(dir,{recursive:true});
    await page.evaluate(()=>{
      const arch=window.__ASCII_NATIVE_COMPLETE_ARCH__;
      arch.setMainPortalRecessEnabledForTest(false);
-     build();VZ=1;updateCamera(0,true);cloudTick=2;render();
+     const randomWas=Math.random;Math.random=()=>.513;
+     try{build();VZ=1;updateCamera(0,true);cloudTick=2;render()}
+     finally{Math.random=randomWas}
      const native=window.__ASCII_NATIVE__,gl=native.renderer.getContext(),
        canvas=native.renderer.domElement;
      const pixels=new Uint8Array(canvas.width*canvas.height*4);
@@ -450,7 +453,9 @@ fs.mkdirSync(dir,{recursive:true});
    const portalDelta=await page.evaluate(()=>{
      const arch=window.__ASCII_NATIVE_COMPLETE_ARCH__;
      arch.setMainPortalRecessEnabledForTest(true);
-     build();VZ=1;updateCamera(0,true);cloudTick=2;render();
+     const randomWas=Math.random;Math.random=()=>.513;
+     try{build();VZ=1;updateCamera(0,true);cloudTick=2;render()}
+     finally{Math.random=randomWas}
      const native=window.__ASCII_NATIVE__,gl=native.renderer.getContext(),
        canvas=native.renderer.domElement;
      const pixels=new Uint8Array(canvas.width*canvas.height*4);
@@ -484,14 +489,16 @@ fs.mkdirSync(dir,{recursive:true});
        gateCollisionUnchanged:A.walkable===B.walkable,
        threeNative:native.mode==='three',
        originalMapUnchanged:JSON.stringify(MEADOW_MAP)===
-         JSON.stringify(MEADOW_MAP)
+         window.__ASCII_PORTAL_QA_MAP__
      };
      delete window.__ASCII_PORTAL_GATE_SHOTS__;
+     delete window.__ASCII_PORTAL_QA_MAP__;
      if(!result.roomAheadOfDoor||result.onSolids<10||
         result.offSolids!==0||result.restoredSolids!==result.onSolids||
         !result.gateCollisionUnchanged||sourceChanged<100||
         changedGPU<30||gpuRestoreErrors>150||
-        sourceRestoredErrors>0||!result.threeNative)
+        sourceRestoredErrors>0||!result.threeNative||
+        !result.originalMapUnchanged)
        throw Error('Recessed portal not reproducible in genuine gameplay '+
          JSON.stringify(result));
      return result;

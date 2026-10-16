@@ -524,7 +524,9 @@ function nativeBuildCompleteCastle(){
   feature.highFlyingArches=solids.length-before;
   nativeHighFlyingArchesClear=solids.slice(before).every(s=>
     s.bb[2]>=Y+870&&(s.bb[1]<-310||s.bb[0]>310));
-  for(let i=start;i<solids.length;i++){
+  // The recessed arch removed two ORIGINAL solids, shifting IDs in the
+  // existing masonry. Reindex all parts to keep source window IDs unique.
+  for(let i=0;i<solids.length;i++){
     const s=solids[i],b=s.bb;
     s.id=i;s.cx=(b[0]+b[1])*.5;
     s.cy=(b[2]+b[3])*.5;s.cz=(b[4]+b[5])*.5;
