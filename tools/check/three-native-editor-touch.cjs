@@ -94,7 +94,15 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
    const s5=await state();
    if(s5.undo!==s4.undo+1)throw Error(label+' quick tap did not paint '+JSON.stringify({s4:{...s4,map:0},s5:{...s5,map:0},same:s4.map===s5.map}));
    // 6. A second finger landing mid-stroke ends that stroke as one entry
-   // and the rest of the gesture paints nothing.
+   // and the rest of the gesture paints nothing. The end goes through the
+   // ACTIVE handler (the grey-ruin rotation delegate in native.html), so a
+   // rotation in progress is cancelled the same way.
+   await page.evaluate(()=>{
+     const real=window.__ASCII_NATIVE_EDITOR_POINTER__;
+     window.__touchDelivered=[];
+     window.__touchRealDelegate=real;
+     window.__ASCII_NATIVE_EDITOR_POINTER__=e=>{window.__touchDelivered.push(e.type);(real||edPointer)(e)};
+   });
    await touch('touchStart',[[9,cx-60,cy+100]]);
    for(let k=1;k<=4;k++){await touch('touchMove',[[9,cx-60+k*10,cy+100]]);await wait(16)}
    await touch('touchStart',[[9,cx-20,cy+100],[10,cx+60,cy+100]]);
@@ -106,6 +114,19 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
    await wait(80);
    const s6=await state();
    if(s6.undo!==s5.undo+1||s6.stroke)throw Error(label+' late second finger did not end the stroke cleanly');
+   const delivered=await page.evaluate(()=>{
+     window.__ASCII_NATIVE_EDITOR_POINTER__=window.__touchRealDelegate;
+     return window.__touchDelivered;
+   });
+   if(delivered.join()!=='pointerdown,pointermove,pointercancel')
+     throw Error(label+' stroke was not ended through the active handler '+delivered.join());
+   // 7. Closing the editor under a finger leaves no stale touch behind.
+   await touch('touchStart',[[11,cx,cy]]);
+   await page.evaluate(()=>closeEditor());
+   await touch('touchEnd',[]);
+   await page.evaluate(()=>{openEditor();ED.tool='w';edSyncUI()});
+   const stale=await page.evaluate(()=>window.__ASCII_NATIVE_EDITOR_TOUCH__.tracked);
+   if(stale)throw Error(label+' stale touches after closing the editor: '+stale);
    const mapAfterGesture=s6.map;
    // Screenshot at 100%: at 0.35 a tablet frame is too slow for software GL.
    await page.evaluate(()=>edZoomTo(1));

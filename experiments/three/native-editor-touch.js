@@ -9,14 +9,16 @@
 //   last move) are replayed to the editor's pointer handler, so a brush stroke or a tap acts
 //   exactly as before. No timer: a busy frame on a slow phone must not turn
 //   a two-finger gesture into a paint stroke;
-// - a second finger that lands later ends the open stroke/drag through the
-//   editor's own pointerup path (one undo entry, as with a lifted finger);
+// - a second finger that lands later ends whatever the first finger started
+//   (stroke, object drag, grey-ruin rotation) through the editor's own
+//   pointercancel path: a stroke stays one undo entry, a rotation preview is
+//   dropped uncommitted;
 // - while two fingers are down, camX/camY follow the centroid and edZoomTo()
 //   follows the finger spread, about the centroid, inside ED_ZOOMS limits;
 // - after the gesture, the remaining finger is ignored until it lifts.
 // Mouse, pen, the game's own touch controls and the editor UI are unchanged.
 const NATIVE_TOUCH_HOLD_PX=8;
-const nativeEditorTouch={pts:new Map(),held:null,gesture:null,swallow:new Set(),
+const nativeEditorTouch={pts:new Map(),held:null,gesture:null,swallow:new Set(),live:null,
   stats:{gestures:0,pans:0,zooms:0,replayed:0,cancelledStrokes:0}};
 
 function nativeTouchEvent(type,src){
@@ -33,15 +35,18 @@ function nativeTouchReplay(){
   if(!h)return;
   nativeEditorTouch.held=null;
   nativeEditorTouch.stats.replayed++;
+  nativeEditorTouch.live=h.down.pointerId;
   nativeTouchDeliver(nativeTouchEvent('pointerdown',h.down));
   if(h.last)nativeTouchDeliver(nativeTouchEvent('pointermove',h.last));
 }
 function nativeTouchGestureStart(){
   const T=nativeEditorTouch,[a,b]=[...T.pts.values()];
   if(T.held)T.held=null;
-  else if(ED.stroke||ED.drag){
-    // Finish the single-finger stroke exactly like a lifted finger would.
-    nativeTouchDeliver(nativeTouchEvent('pointerup',a));
+  else if(T.live!==null){
+    // The first finger already reached the editor (a stroke, an object drag
+    // or the grey-ruin rotation delegate): end it through the active handler.
+    nativeTouchDeliver(nativeTouchEvent('pointercancel',T.pts.get(T.live)||a));
+    T.live=null;
     T.stats.cancelledStrokes++;
   }
   ED.pan=null;ED.hover=null;
@@ -64,9 +69,24 @@ function nativeTouchGestureMove(){
   if(Math.abs(VZ-before)>1e-6)T.stats.zooms++;
   T.stats.pans++;
 }
+function nativeEditorTouchReset(){
+  const T=nativeEditorTouch;
+  T.pts.clear();T.swallow.clear();T.held=null;T.gesture=null;T.live=null;
+}
 function nativeEditorTouchPointer(e){
-  if(e.pointerType!=='touch'||typeof editing==='undefined'||!editing)return;
+  if(e.pointerType!=='touch')return;
   const T=nativeEditorTouch,id=e.pointerId;
+  if(typeof editing==='undefined'||!editing){
+    // The editor closed under a finger: forget it, so a later session never
+    // sees a stale second pointer or a swallowed finger.
+    if(T.pts.size&&(e.type==='pointerup'||e.type==='pointercancel')){
+      T.pts.delete(id);T.swallow.delete(id);
+      if(T.held?.down.pointerId===id)T.held=null;
+      if(T.live===id)T.live=null;
+      if(!T.pts.size)nativeEditorTouchReset();
+    }
+    return;
+  }
   if(e.type==='pointerdown'){
     if(e.target!==cv)return;
     T.pts.set(id,{pointerId:id,clientX:e.clientX,clientY:e.clientY});
@@ -98,6 +118,7 @@ function nativeEditorTouchPointer(e){
   }
   // pointerup / pointercancel
   T.pts.delete(id);
+  if(T.live===id)T.live=null;
   if(T.held&&T.held.down.pointerId===id){
     if(e.type==='pointerup')nativeTouchReplay();   // a tap still paints/places
     else{T.held=null;e.stopImmediatePropagation();return}
@@ -117,6 +138,7 @@ function nativeEditorTouchPointer(e){
 for(const t of ['pointerdown','pointermove','pointerup','pointercancel'])
   addEventListener(t,nativeEditorTouchPointer,true);
 window.__ASCII_NATIVE_EDITOR_TOUCH__={
+  get tracked(){return nativeEditorTouch.pts.size+nativeEditorTouch.swallow.size+(nativeEditorTouch.held?1:0)},
   get stats(){return {...nativeEditorTouch.stats,active:nativeEditorTouch.pts.size,
     gesture:!!nativeEditorTouch.gesture}},
   holdPx:NATIVE_TOUCH_HOLD_PX
