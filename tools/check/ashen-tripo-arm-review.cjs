@@ -326,6 +326,24 @@ fs.mkdirSync(out,{recursive:true});
      gaitLoadProbe.maxKnee>1.25)
     throw Error('v13 foot rocker, contralateral hand or planted support failed: '+
       JSON.stringify(gaitLoadProbe));
+  // A jump should unload both planted soles and the lateral support hip.
+  // It must not play the heel strike/push-off ground-contact curve in air.
+  const airborneUnloaded=await page.evaluate(()=>{
+    const root=window.__ASHEN_ANIMATION_LAB__.model;
+    for(let i=0;i<8;i++)root.userData.animate(1/60,{
+      speed:15,run:true,heading:0,jumpClipTime:.72
+    },i/60);
+    const pose=root.userData.pose();
+    return {clip:root.userData.gltf.clip,hip:pose.pelvisLateral,
+      rocker:pose.footRocker,weights:pose.supportWeights,
+      toePitch:pose.toePitch};
+  });
+  const biggestRocker=Math.max(...airborneUnloaded.rocker.flat());
+  if(Math.abs(airborneUnloaded.hip)>.00001||biggestRocker>.00001||
+     airborneUnloaded.toePitch.some(v=>Math.abs(v)>.00001))
+    throw Error('Jump still drives grounded rocker or planted hip: '+
+      JSON.stringify(airborneUnloaded));
+  console.log('TRUE TRIPO AIRBORNE HEEL/TOE RELEASE OK '+JSON.stringify(airborneUnloaded));
   // Save a REAL 60 Hz Run gait as 12 sequence frames, not a still chosen
   // at a flattering moment. The screenshots use the actual Tripo GPU skin.
   await page.locator('[data-motion="Run"]').click();
