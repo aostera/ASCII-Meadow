@@ -148,6 +148,7 @@ export class NativeKnightGlyphs {
     });
     this.scene.add(this.knight);
     this.clock = null; this.prev = null; this.disposed = false;
+    this.wasJumping = false;
     // Persistent travelled path length in the source GLB's bone units.
     // Independent from the knight's camera-centred ASCII sprite position.
     this.travelSource = 0;
@@ -184,7 +185,10 @@ export class NativeKnightGlyphs {
     const dy=this.prev?fy-this.prev[1]:0;
     const travelPixels=Math.hypot(dx,dy);
     this.prev = [fx, fy];
-    const walking = !(e.jump > 0) && (e.walk || 0) > .5;
+    const jumping=(e.jump||0)>0;
+    const firstLandingFrame=this.wasJumping&&!jumping;
+    this.wasJumping=jumping;
+    const walking = !jumping && (e.walk || 0) > .5;
     const pxPerMetre=src.KG.art*fch/1.9;
     this.knight.userData.pxPerMeter=pxPerMetre;
     // Source displacement drives BOTH animation speed and planted feet.
@@ -192,7 +196,8 @@ export class NativeKnightGlyphs {
     // never feed a bogus sprint to the real skinned legs for those events.
     const sourceUnitsPerMetre=this.knight.userData.sourceUnitsPerMetre;
     const movedMetres=travelPixels/Math.max(1,pxPerMetre);
-    const validStep=walking&&Number.isFinite(sourceUnitsPerMetre)&&
+    const validStep=walking&&!firstLandingFrame&&
+      Number.isFinite(sourceUnitsPerMetre)&&
       dt>0&&movedMetres/dt<12&&movedMetres<.20;
     const speed=validStep&&travelPixels>.001?
       Math.min(36,travelPixels/dt/10):0;
