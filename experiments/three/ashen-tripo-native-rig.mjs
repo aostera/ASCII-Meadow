@@ -635,8 +635,17 @@ export function createGltfKnight(_THREE=THREE,{url=TRIPO_V2_GLB,onLoad,onError}=
       wrist.getWorldQuaternion(restWorld);
       const grip=locateRightPalm(source.meshes,wrist);
       wrist.add(weapon);
-      weapon.position.copy(grip.point);
+      // A wrist-weighted palm centroid is HIGHER than the actual open glove
+      // finger cradle on this 40-joint GLB. The old handle visibly floated
+      // above the glove while the crossguard intersected the fingertips.
+      // Shift the sword downward in WORLD vertical after converting the
+      // palm's wrist-local anchor, not along the arbitrary wrist Y axis.
+      const palmWorld=wrist.localToWorld(grip.point.clone());
+      const hiltDropWorld=.05;
+      palmWorld.y-=hiltDropWorld;
+      weapon.position.copy(wrist.worldToLocal(palmWorld));
       weapon.quaternion.copy(restWorld.invert());
+      weapon.userData.hiltDropWorld=hiltDropWorld;
       weapon.userData.socketBoneIndex=source.skin.bones.indexOf(wrist);
       weapon.userData.palmAnchorValid=grip.valid;
       weapon.userData.palmVertexCount=grip.vertices;
