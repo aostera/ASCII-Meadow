@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const {pathToFileURL}=require('node:url'),path=require('node:path');
 (async()=>{
- const {locateBootSoleVertices}=await import(
+ const {locateBootSoleVertices,groundedSoleTarget}=await import(
    pathToFileURL(path.resolve(__dirname,'../../experiments/three/ashen-sole-contact.mjs')).href);
  const bones=Array.from({length:40},(_,i)=>({id:i}));
  const points=[];
@@ -50,5 +50,29 @@ const {pathToFileURL}=require('node:url'),path=require('node:path');
    rightLeg:[bones[10],bones[11],bones[12],bones[13]]
  });
  assert.deepEqual(bad,[null,null],'Never invent skin weights for unknown joints');
- console.log('PASS real weighted boot selection: both feet, heel/toe, bound size, no GLB fallback');
+ // Verify the same correction applied to the actual pelvis path.
+ const neutral=[{sampleCount:12,minY:0},{sampleCount:12,minY:.01}];
+ const rest=[0,.01];
+ let v=groundedSoleTarget(neutral,rest,[true,true],.5);
+ assert.equal(v.target,0,'Neutral original boots must not shift pelvis');
+ assert.equal(v.count,2);
+ const hovered=[{sampleCount:12,minY:.020},{sampleCount:12,minY:.030}];
+ v=groundedSoleTarget(hovered,rest,[true,true],.5);
+ assert.ok(Math.abs(v.target+.010)<1e-12,
+   'Positive heel/sole gap lowers pelvis to meet original contact plane');
+ v=groundedSoleTarget(hovered,rest,[false,true],.5);
+ assert.equal(v.count,1,'Swing foot must not influence the support hip');
+ assert.ok(Math.abs(v.target+.010)<1e-12);
+ v=groundedSoleTarget([
+   {sampleCount:12,minY:-.40},{sampleCount:12,minY:-.40}
+ ],rest,[true,true],.5);
+ assert.ok(Math.abs(v.target-.045)<1e-12,
+   'Deep mesh penetration can never displace pelvis beyond safety clamp');
+ v=groundedSoleTarget([null,null],rest,[true,true],.5);
+ assert.equal(v.count,0,'Missing real skin samples leave pivot fallback in control');
+ assert.equal(v.target,0);
+ v=groundedSoleTarget(hovered,rest,[false,false],.5);
+ assert.equal(v.target,0,'Airborne and idle foot release should not correct pelvis');
+ assert.throws(()=>groundedSoleTarget(hovered,rest,[true,true],0));
+ console.log('PASS real weighted boot selection and bounded stance-only sole-height correction');
 })().catch(e=>{console.error(e);process.exitCode=1});
