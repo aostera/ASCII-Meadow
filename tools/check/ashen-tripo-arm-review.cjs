@@ -272,7 +272,7 @@ fs.mkdirSync(out,{recursive:true});
      planarSweep.maxDiagnosticError>.00001)
     throw Error('2D planted boot solver slips or hyperflexes: '+
       JSON.stringify(planarSweep));
-  // v13 art-directed 60 Hz contact rocker and loaded-hip movement.
+  // v14 art-directed 60 Hz contact rocker and loaded-hip movement.
   // These are actual skin joint poses (not imported motion clips).
   // Keep the measurements separate from the native XZ foot-slip check.
   const gaitLoadProbe=await page.evaluate(()=>{
@@ -285,7 +285,7 @@ fs.mkdirSync(out,{recursive:true});
       if(i<65)continue;
       const p=root.userData.pose();
       if(p.animationVersion!=='Tripo-IK-v14-grounded-transitions')
-        throw Error('v13 authentic skin pose not loaded');
+        throw Error('v14 authentic skin pose not loaded');
       toeAngleRange=Math.max(toeAngleRange,toeQuat.angleTo(bones[34].quaternion));
       const foot=p.footRocker?.[0]||[];
       if(foot.length!==3)throw Error('Missing heel/midfoot/toe rocker stages');
@@ -315,7 +315,7 @@ fs.mkdirSync(out,{recursive:true});
       armSamples:records.filter(r=>Math.abs(r.freeArm)>.04).length,
       maxKnee:max('knee')};
   });
-  console.log('TRUE TRIPO v13 HEEL-TOE / LOADED HIP QA '+JSON.stringify(gaitLoadProbe));
+  console.log('TRUE TRIPO v14 HEEL-TOE / LOADED HIP QA '+JSON.stringify(gaitLoadProbe));
   if(gaitLoadProbe.samples<160||gaitLoadProbe.heelMax<.70||
      gaitLoadProbe.midMax<.70||gaitLoadProbe.toeMax<.70||
      gaitLoadProbe.toeMin>-.025||gaitLoadProbe.toeBoneAngleRange<.025||
@@ -324,7 +324,7 @@ fs.mkdirSync(out,{recursive:true});
      gaitLoadProbe.maxCounterLean>.014||
      gaitLoadProbe.contralateralSamples<gaitLoadProbe.armSamples*.93||
      gaitLoadProbe.maxKnee>1.25)
-    throw Error('v13 foot rocker, contralateral hand or planted support failed: '+
+    throw Error('v14 foot rocker, contralateral hand or planted support failed: '+
       JSON.stringify(gaitLoadProbe));
   // A jump should unload both planted soles and the lateral support hip.
   // It must not play the heel strike/push-off ground-contact curve in air.
@@ -335,11 +335,15 @@ fs.mkdirSync(out,{recursive:true});
     },i/60);
     const pose=root.userData.pose();
     return {clip:root.userData.gltf.clip,hip:pose.pelvisLateral,
+      spineCounter:pose.spineCounter,
       rocker:pose.footRocker,weights:pose.supportWeights,
       toePitch:pose.toePitch};
   });
   const biggestRocker=Math.max(...airborneUnloaded.rocker.flat());
-  if(Math.abs(airborneUnloaded.hip)>.00001||biggestRocker>.00001||
+  if(Math.abs(airborneUnloaded.hip)>.00001||
+     Math.abs(airborneUnloaded.spineCounter)>.00001||
+     Math.max(...airborneUnloaded.weights)>.00001||
+     biggestRocker>.00001||
      airborneUnloaded.toePitch.some(v=>Math.abs(v)>.00001))
     throw Error('Jump still drives grounded rocker or planted hip: '+
       JSON.stringify(airborneUnloaded));
