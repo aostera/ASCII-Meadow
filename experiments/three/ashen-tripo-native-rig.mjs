@@ -46,16 +46,23 @@ function setupBones(model){
           find('tripo::0_Right_Limb_2',38)]
   };
   model.updateMatrixWorld(true);
-  // Record rest transforms once. World -> each bone's LOCAL space, so
-  // Tripo's unusual initial quaternions never get overwritten by Euler zero.
+  // Record rest transforms once. Animate around ANATOMICAL model axes,
+  // not fixed scene axes. The model is permanently reoriented +X -> +Z
+  // by its parent; using uncorrected world Z to flex the knees twists
+  // them sideways when the parent rotation is -90 degrees.
+  // Convert source model axes -> world -> bone-local rest coordinates.
+  const modelWorldQ=new THREE.Quaternion();
+  model.getWorldQuaternion(modelWorldQ);
+  const modelAxes=[X,Y,Z].map(axis=>axis.clone().applyQuaternion(modelWorldQ));
   const rest=new Map();
   for(const b of skin.bones){
     const q=new THREE.Quaternion();
     b.getWorldQuaternion(q);
+    const inverseWorld=q.clone().invert();
     rest.set(b,{q:b.quaternion.clone(),p:b.position.clone(),
-      ix:X.clone().applyQuaternion(q.clone().invert()).normalize(),
-      iy:Y.clone().applyQuaternion(q.clone().invert()).normalize(),
-      iz:Z.clone().applyQuaternion(q.clone().invert()).normalize()});
+      ix:modelAxes[0].clone().applyQuaternion(inverseWorld).normalize(),
+      iy:modelAxes[1].clone().applyQuaternion(inverseWorld).normalize(),
+      iz:modelAxes[2].clone().applyQuaternion(inverseWorld).normalize()});
   }
   return {meshes,skin,sets,rest};
 }
@@ -101,7 +108,10 @@ function animateRig(model,source,root,weapon){
     twist(bones[1],[['iz',knee]]);
     twist(bones[2],[['iz',-hip-knee*.76]]);
     twist(bones[3],[]);
-    return {lift:weight*lift,x,knee,contact:inStance&&jumpWeight<.15};
+    // At rest both feet are planted. Without this guard the continuously
+    // running phase incorrectly marked an idle foot as airborne.
+    return {lift:weight*lift,x,knee,
+      contact:jumpWeight<.15&&(weight<.08||inStance)};
   }
   function update(dt,motion,now){
     const d=clamp(Number(dt)||1/60,0,1/15);
@@ -156,7 +166,7 @@ function animateRig(model,source,root,weapon){
       leftFootX:left.x,rightFootX:right.x,
       kneeBend:[left.knee,right.knee],
       weaponAttached:!!weapon?.parent,
-      animationVersion:'Tripo-IK-v2'
+      animationVersion:'Tripo-IK-v3-model-space-axes'
     };
     return clip.toLowerCase();
   }
