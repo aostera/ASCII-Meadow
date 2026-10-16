@@ -256,8 +256,13 @@ function animateRig(model,source,root,weapon){
     // Controlled weight loading and spring-like rise at alternating
     // strides. The real Tripo pelvis bone is the common parent of both
     // legs and torso; compensating ankle Y preserves the stance ground.
-    const bounce=stride*(.003+.010*runMix)*(1-Math.cos(2*phase))*.5;
-    const pelvisBob=bounce-.002*stride*runMix;
+    // Leg-reach geometry: at ±.10m source forward travel, the pelvis
+    // must settle ~.01m lower during support. Otherwise hip-to-ankle
+    // exceeds L1+L2 and the old solver hard-clamps to a straight knee.
+    // Two soft upward peaks follow the left/right push-off.
+    const supportDrop=stride*(.004+.008*runMix);
+    const bounce=stride*(.003+.011*runMix)*(1-Math.cos(2*phase))*.5;
+    const pelvisBob=bounce-supportDrop;
     sets.pelvis.position.copy(pelvisRest);
     sets.pelvis.position.y+=pelvisBob;
     const left=legPose(sets.leftLeg,legCalibration.left,0,
