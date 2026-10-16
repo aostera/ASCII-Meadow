@@ -13,6 +13,7 @@ const nativeBeforeFullCastle=buildModel;
 const nativeBeforeFullRuin=ruinDetail;
 const nativeFullArchitecturalCounts={castle:{},ruins:{}};
 let nativeWestPortalReliefClear=true,nativeWestCurtainProjects=false;
+let nativeWestTraceryEnabled=true;
 
 function nativeGothicBox(x0,x1,y0,y1,z0,z1,meta) {
   if(!(x1>x0&&y1>y0&&z1>z0))return;
@@ -168,7 +169,7 @@ function nativeBuildCompleteCastle(){
   // (|x|<75), its grounded collision and every passage remain unchanged.
   // Deliberately non-uniform rise and missing coping pieces prevent the
   // uniform horizontal rows seen in the baseline ASCII facade captures.
-  for(const side of [-1,1])for(let bay=0;bay<2;bay++){
+  if(nativeWestTraceryEnabled)for(const side of [-1,1])for(let bay=0;bay<2;bay++){
     // Inter-buttress bays of the outer curtain. Nearer z (towards the
     // camera) than the original front wall at z=140; never embedded in
     // existing gatehouse prisms centered x=+/-172, z=108, radius 52.
@@ -334,6 +335,13 @@ window.__ASCII_NATIVE_COMPLETE_ARCH__={
   get features(){return JSON.parse(JSON.stringify(nativeFullArchitecturalCounts))},
   get westPortalReliefClear(){return nativeWestPortalReliefClear},
   get westCurtainProjects(){return nativeWestCurtainProjects},
+  get facadeEnabled(){return nativeWestTraceryEnabled},
+  setFacadeEnabledForTest(on){
+    if(!new URLSearchParams(location.search).has('nativeCastleFacadeTest'))
+      return false;
+    nativeWestTraceryEnabled=Boolean(on);
+    return true;
+  }
   get castleTotal(){return Object.values(nativeFullArchitecturalCounts.castle)
     .reduce((a,b)=>a+b,0)},
   get ruinTotals(){return Object.fromEntries(Object.entries(nativeFullArchitecturalCounts.ruins)
