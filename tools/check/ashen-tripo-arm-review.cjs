@@ -61,7 +61,7 @@ fs.mkdirSync(out,{recursive:true});
       throw Error('Leg calibration must use real Tripo joints');
    if(data.pose.kneeBend.some(k=>k<0||k>1.25))
       throw Error('Leg must never hyperflex: '+JSON.stringify(data.pose.kneeBend));
-   if(data.pose.animationVersion!=='Tripo-IK-v9-longer-reachable-step')
+   if(data.pose.animationVersion!=='Tripo-IK-v10-distance-synced-foot-pins')
       throw Error('Wrong shoulder/elbow controller: '+data.pose.animationVersion);
    if(mode==='Idle'){
     if(data.pose.kneeBend.some(k=>k<0||k>1.23))
@@ -158,6 +158,43 @@ fs.mkdirSync(out,{recursive:true});
       m.pelvis[1]-m.pelvis[0]>.09||m.knee[1]>1.25)
       throw Error('Boot-ground / pelvis out of bounds: '+JSON.stringify(m));
   }
+  // Real actor-ground travel: a planted foot must remain at one
+  // world-relative horizontal coordinate even though the sprite itself
+  // is always rendered at the screen centre. This uses the genuine
+  // 40-bone rig, never fake positions or static state labels.
+  const footLock=await page.evaluate(()=>{
+    const root=window.__ASHEN_ANIMATION_LAB__.model;
+    const holds=[[],[]],slip=[0,0],last=[null,null];
+    let distance=0,pinnedFrames=0;
+    for(let i=0;i<300;i++){
+      distance+=.009;
+      root.userData.animate(1/60,{
+        speed:15,run:true,heading:0,travelSource:distance
+      },i/60);
+      const p=root.userData.pose();
+      for(let j=0;j<2;j++){
+        if(p.footPinned[j]){
+          pinnedFrames++;
+          if(last[j]!==null)slip[j]=Math.max(slip[j],
+            Math.abs(p.footAnchorWorldX[j]-last[j]));
+          last[j]=p.footAnchorWorldX[j];holds[j].push(last[j]);
+        }else last[j]=null;
+      }
+    }
+    const stoppedPhase=root.userData.pose().phase;
+    for(let i=0;i<30;i++)
+      root.userData.animate(1/60,{
+        speed:15,run:true,heading:0,travelSource:distance
+      },i/60);
+    return {pinnedFrames,slip,stationaryPhaseError:
+      Math.abs(root.userData.pose().phase-stoppedPhase),
+      travelSource:root.userData.pose().travelSource};
+  });
+  console.log('REAL MAP-DISTANCE FOOT-PINNING QA '+JSON.stringify(footLock));
+  if(footLock.pinnedFrames<80||footLock.slip.some(n=>n>.0004)||
+     footLock.stationaryPhaseError>.000001)
+    throw Error('Planted feet slipped or character moonwalked into a wall: '+
+      JSON.stringify(footLock));
   // Save a REAL 60 Hz Run gait as 12 sequence frames, not a still chosen
   // at a flattering moment. The screenshots use the actual Tripo GPU skin.
   await page.locator('[data-motion="Run"]').click();
