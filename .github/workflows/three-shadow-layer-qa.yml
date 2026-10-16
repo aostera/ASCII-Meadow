@@ -20,7 +20,7 @@ jobs:
   architecture-shadow-layer:
     name: Architectural shadows, foliage and editor consistency
     runs-on: ubuntu-latest
-    timeout-minutes: 22
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,7 +32,9 @@ jobs:
       - name: Native shadow implementation and browser test syntax
         run: |
           node --check experiments/three/native-shadow-soften.js
+          node --check experiments/three/native-shadow-coverage.js
           node --check tools/check/three-native-shadow-layer.cjs
+          node --check tools/check/three-native-shadow-coverage.cjs
       - name: Compare authored raycasts to softened shadows, verify foliage/editor snapshots
         run: |
           python3 -m http.server 8181 >/tmp/three-native-shadows-http.log 2>&1 &
@@ -43,9 +45,12 @@ jobs:
             sleep 1
           done
           node tools/check/three-native-shadow-layer.cjs http://127.0.0.1:8181
+          node tools/check/three-native-shadow-coverage.cjs http://127.0.0.1:8181
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: three-native-architectural-shadow-layer
-          path: shots/three-native-shadow-layer
+          path: |
+            shots/three-native-shadow-layer
+            shots/three-native-shadow-coverage
           if-no-files-found: warn

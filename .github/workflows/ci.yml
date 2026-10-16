@@ -358,6 +358,8 @@ jobs:
           node --check experiments/three/native-editor-models.mjs
           node --check tools/check/three-native-grey-editor.cjs
           node --check experiments/three/native-shadow-soften.js
+          node --check experiments/three/native-shadow-coverage.js
+          node --check tools/check/three-native-shadow-coverage.cjs
           node --check tools/check/three-native-art.cjs
           node --check experiments/three/native-architecture-depth.mjs
           node --check experiments/three/native-tree-depth.mjs
