@@ -272,6 +272,60 @@ fs.mkdirSync(out,{recursive:true});
      planarSweep.maxDiagnosticError>.00001)
     throw Error('2D planted boot solver slips or hyperflexes: '+
       JSON.stringify(planarSweep));
+  // v13 art-directed 60 Hz contact rocker and loaded-hip movement.
+  // These are actual skin joint poses (not imported motion clips).
+  // Keep the measurements separate from the native XZ foot-slip check.
+  const gaitLoadProbe=await page.evaluate(()=>{
+    const root=window.__ASHEN_ANIMATION_LAB__.model;
+    let bones;root.traverse(o=>{if(!bones&&o.isSkinnedMesh)bones=o.skeleton.bones;});
+    const records=[],toeQuat=bones[34].quaternion.clone();
+    let toeAngleRange=0;
+    for(let i=0;i<240;i++){
+      root.userData.animate(1/60,{speed:15,run:true,heading:0},i/60);
+      if(i<65)continue;
+      const p=root.userData.pose();
+      if(p.animationVersion!=='Tripo-IK-v13-contact-rocker-weight-transfer')
+        throw Error('v13 authentic skin pose not loaded');
+      toeAngleRange=Math.max(toeAngleRange,toeQuat.angleTo(bones[34].quaternion));
+      const foot=p.footRocker?.[0]||[];
+      if(foot.length!==3)throw Error('Missing heel/midfoot/toe rocker stages');
+      records.push({
+        heel:foot[0],mid:foot[1],toe:foot[2],
+        toeAngle:p.toePitch[0],
+        leftSupport:p.supportWeights[0],
+        rightSupport:p.supportWeights[1],
+        hip:p.pelvisLateral,
+        counter:p.spineCounter,
+        freeArm:p.armPose.shoulderSwing,
+        swordArm:p.armPose.rightShoulderSwing,
+        knee:p.kneeBend[0]
+      });
+    }
+    const min=(key)=>Math.min(...records.map(r=>r[key]));
+    const max=(key)=>Math.max(...records.map(r=>r[key]));
+    return {samples:records.length,
+      heelMax:max('heel'),midMax:max('mid'),toeMax:max('toe'),
+      toeMin:min('toeAngle'),toeBoneAngleRange:toeAngleRange,
+      hipMin:min('hip'),hipMax:max('hip'),
+      maxCounterLean:Math.max(...records.map(r=>Math.abs(r.counter))),
+      maxSupport:Math.max(max('leftSupport'),max('rightSupport')),
+      minSupport:Math.min(min('leftSupport'),min('rightSupport')),
+      contralateralSamples:records.filter(r=>Math.abs(r.freeArm)>.04&&
+        Math.abs(r.swordArm)>.012&&r.freeArm*r.swordArm<0).length,
+      armSamples:records.filter(r=>Math.abs(r.freeArm)>.04).length,
+      maxKnee:max('knee')};
+  });
+  console.log('TRUE TRIPO v13 HEEL-TOE / LOADED HIP QA '+JSON.stringify(gaitLoadProbe));
+  if(gaitLoadProbe.samples<160||gaitLoadProbe.heelMax<.70||
+     gaitLoadProbe.midMax<.70||gaitLoadProbe.toeMax<.70||
+     gaitLoadProbe.toeMin>-.025||gaitLoadProbe.toeBoneAngleRange<.025||
+     gaitLoadProbe.hipMin>-.0018||gaitLoadProbe.hipMax<.0018||
+     gaitLoadProbe.maxSupport>1.0001||gaitLoadProbe.minSupport<-.0001||
+     gaitLoadProbe.maxCounterLean>.014||
+     gaitLoadProbe.contralateralSamples<gaitLoadProbe.armSamples*.93||
+     gaitLoadProbe.maxKnee>1.25)
+    throw Error('v13 foot rocker, contralateral hand or planted support failed: '+
+      JSON.stringify(gaitLoadProbe));
   // Save a REAL 60 Hz Run gait as 12 sequence frames, not a still chosen
   // at a flattering moment. The screenshots use the actual Tripo GPU skin.
   await page.locator('[data-motion="Run"]').click();
