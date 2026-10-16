@@ -24,17 +24,21 @@ fs.mkdirSync(dir,{recursive:true});
    if(!reply?.ok())throw Error('Native castle route failed');
    await page.waitForFunction(()=>window.__ASCII_NATIVE__?.ready&&
      window.__ASCII_NATIVE_COMPLETE_ARCH__?.features?.castle?.portalSideTracery>40&&
+     window.__ASCII_NATIVE_COMPLETE_ARCH__?.features?.castle?.outerTowerRelief>65&&
      window.__ASCII_NATIVE__.frameCount>3,undefined,{timeout:120000});
    const stats=await page.evaluate(()=>{
      const game=window.__ASCII_NATIVE__,gothic=window.__ASCII_NATIVE_COMPLETE_ARCH__;
      const source=JSON.stringify(MEADOW_MAP);
      if(game.mode!=='three')throw Error('Three native not running');
+     if(!gothic.outerTowerReliefClear)
+       throw Error('Outer tower relief reaches the protected gate or inner nave');
      if(!gothic.westPortalReliefClear)
        throw Error('New Gothic solids cross protected central facade |x|<300');
      if(!gothic.westCurtainProjects)
        throw Error('Gothic canopies hidden behind source gatehouse rather than projecting ahead of curtain');
      const c=gothic.features.castle;
-     if(c.portalSideTracery<52||!c.rose||!c.portal||!c.buttresses)
+     if(c.portalSideTracery<52||c.outerTowerRelief<65||
+        !c.rose||!c.portal||!c.buttresses)
        throw Error('Gothic relief missing real stone solids '+JSON.stringify(c));
      // Move only the temporary player for the screenshot. Author map, ruins
      // and native camera / renderer remain real and otherwise unchanged.
@@ -66,8 +70,9 @@ fs.mkdirSync(dir,{recursive:true});
      const gl=native.renderer.getContext(),canvas=native.renderer.domElement;
      const oldRandom=Math.random;
      function snapshot(enabled){
-       if(!gothic.setFacadeEnabledForTest(enabled))
-         throw Error('Test-only castle geometry toggle is inaccessible');
+       if(!gothic.setFacadeEnabledForTest(enabled)||
+          !gothic.setOuterTowerReliefEnabledForTest(enabled))
+         throw Error('Test-only castle geometry toggles are inaccessible');
        // Rebuild the complete original renderer world, including source
        // sprites, all architecture rays, shadow, flora and depth worldGen.
        // Partial buildWorld()/placeFlora() leaks old GPU cache state and
@@ -97,12 +102,16 @@ fs.mkdirSync(dir,{recursive:true});
        const warmup=snapshot(true);
        let on=snapshot(true);
        const onFeatures=gothic.features.castle.portalSideTracery;
+       const onTowers=gothic.features.castle.outerTowerRelief;
        let off=snapshot(false);
        const offFeatures=gothic.features.castle.portalSideTracery;
+       const offTowers=gothic.features.castle.outerTowerRelief;
        let restored=snapshot(true);
        const restoredFeatures=gothic.features.castle.portalSideTracery;
+       const restoredTowers=gothic.features.castle.outerTowerRelief;
        let changed=0,restoreErrors=0,offToRestored=0,warmupToOn=0;
        let sourceChanged=0,sourceVisibleChanged=0,sourceChangedBounds=null;
+       let towerChanged=0,towerFocus=null;
        const ac=on.source,bc=off.source;
        const changedCols=new Uint32Array(ac.width);
        if(ac.width!==bc.width||ac.height!==bc.height||
@@ -115,6 +124,13 @@ fs.mkdirSync(dir,{recursive:true});
          sourceChanged++;
          changedCols[k%ac.width]++;
          const cx=ac.left+k%ac.width,cy=ac.top+Math.floor(k/ac.width);
+         // Real authored model coordinates, not a guessed screen rectangle.
+         const localX=((cx+.5)*CW-cathedral.kx)/MS;
+         if(Math.abs(localX)>475&&Math.abs(localX)<725){
+           towerChanged++;
+           if(!towerFocus || cy<towerFocus.row)
+             towerFocus={col:cx,row:cy};
+         }
          if(cx>=ac.viewport[0]&&cx<=ac.viewport[1]&&
             cy>=ac.viewport[2]&&cy<=ac.viewport[3])sourceVisibleChanged++;
          if(!sourceChangedBounds)sourceChangedBounds=[cx,cy,cx,cy];
@@ -169,16 +185,52 @@ fs.mkdirSync(dir,{recursive:true});
          if(different(off.pixels,restored.pixels))offToRestored++;
          if(different(warmup.pixels,on.pixels))warmupToOn++;
        }
-       if(!(onFeatures>=52&&offFeatures===0&&restoredFeatures>=52))
+       if(!(onFeatures>=52&&offFeatures===0&&restoredFeatures>=52&&
+          onTowers>=65&&offTowers===0&&restoredTowers>=65))
          throw Error('QA toggle did not actually rebuild source solids '+JSON.stringify({
-           onFeatures,offFeatures,restoredFeatures
+           onFeatures,offFeatures,restoredFeatures,
+           onTowers,offTowers,restoredTowers
          }));
        if(!gothic.westCurtainProjects||!gothic.westPortalReliefClear||
+          !gothic.outerTowerReliefClear||!gothic.outerTowerReliefEnabled||
           !gothic.facadeEnabled)
          throw Error('Castle features not physically restored');
        if(JSON.stringify(MEADOW_MAP)!==mapOriginal)
          throw Error('QA-only castle rebuild touched authored map');
+       // Independently prove the tower fragments reach an actual game
+       // frame, not merely the full source grid's off-screen cache.
+       // The tower screenshot follows exactly this final focused view.
+       let towerGpuChanged=0,towerRestoreErrors=0,towerVisibleCells=0;
+       if(towerFocus){
+         player.x=towerFocus.col;player.tx=player.x;
+         player.y=towerFocus.row+VR*.4;player.ty=player.y;
+         updateCamera(0,true);
+         snapshot(true); // force native WebGL upload on new camera
+         const towerOn=snapshot(true),towerOff=snapshot(false),
+           towerRestored=snapshot(true);
+         for(let k=0;k<towerOn.source.lum.length;k++){
+           const a=towerOn.source,b=towerOff.source;
+           if(Math.abs(a.lum[k]-b.lum[k])<.01&&a.glyph[k]===b.glyph[k]&&
+              Math.abs(a.dep[k]-b.dep[k])<1)continue;
+           const cx=a.left+k%a.width,cy=a.top+Math.floor(k/a.width),
+             localX=((cx+.5)*CW-cathedral.kx)/MS;
+           if(Math.abs(localX)<=475||Math.abs(localX)>=725)continue;
+           if(cx>=a.viewport[0]&&cx<=a.viewport[1]&&
+              cy>=a.viewport[2]&&cy<=a.viewport[3])
+             towerVisibleCells++;
+         }
+         for(let i=0;i<towerOn.pixels.length;i+=4){
+           const diff=(a,b)=>Math.max(Math.abs(a[i]-b[i]),
+             Math.abs(a[i+1]-b[i+1]),Math.abs(a[i+2]-b[i+2]))>8;
+           if(diff(towerOn.pixels,towerOff.pixels))towerGpuChanged++;
+           if(diff(towerOn.pixels,towerRestored.pixels))
+             towerRestoreErrors++;
+         }
+       }
        return {changedPixels:changed,restoreErrors,
+         towerChanged,towerFocus,towerVisibleCells,
+         towerGpuChanged,towerRestoreErrors,
+         onTowers,offTowers,restoredTowers,
          sourceChanged,sourceVisibleChanged,sourceVisibleAfterFocus,
          sourceChangedBounds,sourceFocusCol,
          warmupToOn,offToRestored,
@@ -189,18 +241,31 @@ fs.mkdirSync(dir,{recursive:true});
          mapUnchanged:true};
      }finally{
        Math.random=oldRandom;
-       if(!gothic.facadeEnabled){
+       if(!gothic.facadeEnabled||!gothic.outerTowerReliefEnabled){
          gothic.setFacadeEnabledForTest(true);
+         gothic.setOuterTowerReliefEnabledForTest(true);
          build();
        }
      }
    });
    await page.screenshot({path:path.join(dir,mode+'-castle-tracery.png'),
      timeout:60000});
-   if(comparison.sourceChanged<100||comparison.sourceVisibleAfterFocus<100||
+   if(comparison.towerChanged<100||comparison.towerVisibleCells<40||
+      comparison.towerGpuChanged<(mobile?30:100)||
+      comparison.towerRestoreErrors>120||
+      comparison.sourceChanged<100||comparison.sourceVisibleAfterFocus<100||
       comparison.changedPixels<(mobile?30:100)||
       comparison.restoreErrors>120)
      throw Error(mode+' castle geometry does not make stable visible GPU pixels '+JSON.stringify(comparison));
+   console.log('NATIVE CASTLE TOWERS VISIBLE '+mode+' '+JSON.stringify({
+     towerChanged:comparison.towerChanged,
+     towerVisibleCells:comparison.towerVisibleCells,
+     towerGpuChanged:comparison.towerGpuChanged,
+     towerRestoreErrors:comparison.towerRestoreErrors,
+     onTowers:comparison.onTowers,
+     offTowers:comparison.offTowers,
+     focus:comparison.towerFocus
+   }));
    console.log('NATIVE CASTLE TRACERY VISIBLE '+mode+' '+JSON.stringify(comparison));
    if(errors.length)throw Error(mode+' browser errors '+errors.join(' | '));
    console.log('NATIVE CASTLE TRACERY PASS '+mode+' '+JSON.stringify(stats));
