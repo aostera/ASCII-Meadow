@@ -17,6 +17,7 @@ let testDepthDisabled=false;
  * automatically preserves the source game.
  */
 const ashenVowOn=new URLSearchParams(location.search).get('ashenVow')!=='0';
+const tripoV2=new URLSearchParams(location.search).get('tripoV2')!=='0'; // this branch defaults to genuine Tripo skin; ?tripoV2=0 restores old V12
 
 const ashenInspect=new URLSearchParams(location.search).get('ashenInspect')==='1';
 if(ashenVowOn&&ashenInspect){
@@ -229,7 +230,7 @@ try{
 }catch(err){enableFallback(err)}
 
 if(ashenVowOn&&backend){
-  import('./native-ashen-vow.mjs').then(({NativeKnightGlyphs})=>{
+  import(tripoV2?'./native-tripo-v2.mjs':'./native-ashen-vow.mjs').then(({NativeKnightGlyphs})=>{
     if(!disposed&&backend)
       ashenVow=new NativeKnightGlyphs(backend.renderer);
   }).catch(error=>{
@@ -255,6 +256,7 @@ window.__ASCII_NATIVE__={
   get nativeDepth(){return depthPass?.stats||{frames:0,builds:0,visible:false,activeActors:0}},
   get greyEditor(){return editorModels?.stats||{enabled:false,frames:0,sites:[]}},
   get ashenInspect(){return ashenInspect},
+  get tripoV2(){return tripoV2},
   get ashenVow(){return ashenVowOn?
     {active:!!ashenVow,ready:!!ashenVow?.ready,
       error:ashenVowError||ashenVow?.stats.error||null,

@@ -1,0 +1,45 @@
+name: Tripo 40-Bone Player / Actual Native ASCII Game
+on:
+  push:
+    branches: [feat/ashen-tripo-v2-animated-native]
+    paths:
+      - experiments/three/ashen-tripo-native-rig.mjs
+      - experiments/three/native-tripo-v2.mjs
+      - experiments/three/native.js
+      - tools/check/ashen-tripo-native-game.cjs
+      - .github/workflows/ashen-tripo-native-game.yml
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  real-in-game-animation:
+    name: Real skinned player · desktop and mobile · Idle Walk Run Jump
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22',cache: npm}
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Static syntax checks
+        run: |
+          node --check experiments/three/ashen-tripo-native-rig.mjs
+          node --check experiments/three/native-tripo-v2.mjs
+          node --check experiments/three/native.js
+          node --check tools/check/ashen-tripo-native-game.cjs
+      - name: Run source map and input with native 40-bone skinned Tripo in game
+        run: |
+          python3 -m http.server 8181 >/tmp/tripo-v2-native-http.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8181/experiments/three/native.html >/dev/null && break
+            sleep 1
+          done
+          node tools/check/ashen-tripo-native-game.cjs http://127.0.0.1:8181
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tripo-v2-native-ASCII-real-gameplay
+          path: shots/ashen-tripo-v2-native/
+          if-no-files-found: warn
