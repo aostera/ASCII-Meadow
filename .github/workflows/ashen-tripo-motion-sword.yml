@@ -1,12 +1,14 @@
 name: Ashen Vow Tripo — Anatomical Gait and Gothic Sword In Game
 on:
   push:
-    branches: [feat/ashen-tripo-v2-motion-sword]
+    branches: [feat/ashen-tripo-v2-motion-sword, feat/ashen-tripo-animation-workshop-20261016]
     paths:
       - experiments/three/ashen-tripo-native-rig.mjs
+      - experiments/three/ashen-tripo-animation-workshop.html
       - experiments/three/ashen-gothic-longsword.mjs
       - experiments/three/native-tripo-v2.mjs
       - tools/check/ashen-tripo-motion-sword.cjs
+      - tools/check/ashen-tripo-animation-workshop.cjs
       - .github/workflows/ashen-tripo-motion-sword.yml
   workflow_dispatch:
 permissions: {contents: read}
@@ -27,6 +29,9 @@ jobs:
           node --check experiments/three/ashen-gothic-longsword.mjs
           node --check experiments/three/native-tripo-v2.mjs
           node --check tools/check/ashen-tripo-motion-sword.cjs
+          node --check tools/check/ashen-tripo-animation-workshop.cjs
+          node -e "const fs=require('fs');const html=fs.readFileSync('experiments/three/ashen-tripo-animation-workshop.html','utf8');const m=html.match(/<script type=\"module\">([\s\S]*?)<\/script>/);if(!m)throw Error('Workshop module missing');fs.writeFileSync('/tmp/ashen-workshop.mjs',m[1])"
+          node --check /tmp/ashen-workshop.mjs
       - name: Real skinned player, attached separate Gothic longsword, planted walk and jump
         run: |
           python3 -m http.server 8181 >/tmp/ashen-motion-http.log 2>&1 &
@@ -37,9 +42,12 @@ jobs:
             sleep 1
           done
           node tools/check/ashen-tripo-motion-sword.cjs http://127.0.0.1:8181
+          node tools/check/ashen-tripo-animation-workshop.cjs http://127.0.0.1:8181
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ashen-tripo-gait-gothic-sword-real-game
-          path: shots/ashen-tripo-v2-motion-sword/
+          path: |
+            shots/ashen-tripo-v2-motion-sword/
+            shots/ashen-tripo-animation-workshop/
           if-no-files-found: warn
