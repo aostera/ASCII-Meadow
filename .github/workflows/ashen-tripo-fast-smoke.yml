@@ -1,7 +1,7 @@
 name: Ashen Vow - Fast Real GLB Smoke
 on:
-  push:
-    branches: [feat/ashen-tripo-animation-workshop-20261016]
+  pull_request:
+    branches: [feat/ashen-tripo-v2-motion-sword]
     paths:
       - experiments/three/ashen-tripo-native-rig.mjs
       - experiments/three/ashen-sole-contact.mjs
