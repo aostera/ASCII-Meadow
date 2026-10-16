@@ -56,7 +56,7 @@ fs.mkdirSync(out,{recursive:true});
      assert.equal(s.clip,'Idle');
      assert.deepEqual(s.pose.footContact,[true,true],
        'Both idle feet should be treated as planted');
-     assert.equal(s.pose.animationVersion,'Tripo-IK-v4-anatomical-arm-hinges');
+     assert.equal(s.pose.animationVersion,'Tripo-IK-v5-palm-bound-wrist');
      // Measure actual world-space skinned joints, not merely pose labels.
      // A T-pose has wrist far from shoulder; the resting armored hands must
      // be lower and substantially closer to the body. The separate sword
@@ -84,6 +84,8 @@ fs.mkdirSync(out,{recursive:true});
      });
      const idleAnatomy=await anatomy();
      assert.equal(idleAnatomy.weaponSocketBone,19,'True right wrist joint');
+     assert.ok(s.pose.palmAnchorValid&&s.pose.palmVertexCount>=12,
+       'Sword grip should sample REAL palm vertices, not arbitrary wrist origin: '+JSON.stringify(s.pose));
      for(const side of ['left','right']){
        assert.ok(idleAnatomy[side].drop>.24,
          side+' wrist should be BELOW shoulder, not in a T-pose: '+
