@@ -73,6 +73,10 @@ fs.mkdirSync(out,{recursive:true});
        undefined,{timeout:15000});
      let running=await lab();
      assert.ok(running.pose.phase>walking.pose.phase,'Gait phase must not restart on Run');
+     assert.equal(running.pose.capeDeflection?.length,3,'Original three cape joints');
+     assert.ok(running.pose.capeDeflection.every(pair=>
+       pair.length===2&&pair.every(v=>Number.isFinite(v)&&Math.abs(v)<.12)),
+       'Cloak secondary motion must remain bounded even while sprinting');
      await page.locator('[data-view="side"]').click();
      await page.screenshot({path:path.join(out,name+'-run-side.png')});
 
