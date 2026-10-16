@@ -12,6 +12,7 @@
 const nativeBeforeFullCastle=buildModel;
 const nativeBeforeFullRuin=ruinDetail;
 const nativeFullArchitecturalCounts={castle:{},ruins:{}};
+let nativeWestPortalReliefClear=true;
 
 function nativeGothicBox(x0,x1,y0,y1,z0,z1,meta) {
   if(!(x1>x0&&y1>y0&&z1>z0))return;
@@ -209,6 +210,9 @@ function nativeBuildCompleteCastle(){
       z-16,z+8,{courses:[base-20]});
   }
   feature.portalSideTracery=solids.length-before;
+  // Guard the actual new 3D halfspaces, not a flat-screen impression.
+  nativeWestPortalReliefClear=solids.slice(before).every(so=>
+    so.bb[1]<=-145||so.bb[0]>=145);
 
   for(let i=start;i<solids.length;i++){
     const s=solids[i],b=s.bb;
@@ -321,6 +325,7 @@ ruinDetail=function(site){
 };
 window.__ASCII_NATIVE_COMPLETE_ARCH__={
   get features(){return JSON.parse(JSON.stringify(nativeFullArchitecturalCounts))},
+  get westPortalReliefClear(){return nativeWestPortalReliefClear},
   get castleTotal(){return Object.values(nativeFullArchitecturalCounts.castle)
     .reduce((a,b)=>a+b,0)},
   get ruinTotals(){return Object.fromEntries(Object.entries(nativeFullArchitecturalCounts.ruins)
