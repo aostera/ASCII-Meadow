@@ -93,3 +93,9 @@ The `+1 кадр` control advances the fixed 1/60-second skin pose synchronously
 ### Character secondary motion refinement (2026-10-16)
 
 The existing three cape-chain bones now receive a damped, capped follow-through from actual player heading changes and locomotion speed; no additional geometry, unpaid physics solver, or art assets are generated. `capeDeflection` is exposed in the existing pose diagnostics for automatic finite/bounded regression tests. This is **subtle bone sway, not simulated cloth**, and cannot establish believable fabric behavior without inspecting in-game silhouettes and receiving visual approval.
+
+### Right-hand sword and shoulder/elbow correction (2026-10-16)
+
+The previous Tripo rig's source T-pose shoulders were only lowered about 0.69 rad and arm swing was incorrectly applied around Z even though arms rest along ±Z: hands stuck far from the ribcage and the sword cut across the tabard. The v4 controller bends shoulder downward about source X (~1.28 rad), swings in the anatomical forward plane around model Y, and bends the elbows on model Y. The weapon remains parented to *the original right wrist bone 19*, but its local orientation is counter-rotated each animation tick to keep the blade pointed down at the character's right side. Rest geometries/40 skin joints are unchanged.
+
+The Playwright studio regression measures **actual shoulder-to-wrist world-space vectors** (not state labels) and the blade tip relative to its pommel, and captures front/side animated screenshots. This is a correction pending screenshot-level review, NOT an assertion of approved shoulder armour deformation or authentic weapon gripping.
