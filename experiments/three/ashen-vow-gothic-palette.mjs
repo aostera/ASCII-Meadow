@@ -3,69 +3,67 @@
 // an approved character skin. Existing GLB textures, bones and skin weights stay intact.
 import * as THREE from 'three';
 
-const STEEL=new THREE.Color(0x88838d);
-const DARK_STEEL=new THREE.Color(0x716d7b);
-const BURGUNDY=new THREE.Color(0x9b6275);
-const HOOD=new THREE.Color(0x865663);
-const BONE=new THREE.Color(0xffeee0);
-const CLOTH=new THREE.Color(0xf4e5d7);
-const LEATHER=new THREE.Color(0x6b4a3f);
-const EYES=new THREE.Color(0x130f14);
+// V20 ARTOUT: tone the actual source vertices using subtle multipliers,
+// without repainting the entire torso off-white or replacing the Tripo GLB.
+// This remains an opt-in material study until its screenshots are approved.
+const ARMOR=new THREE.Color(0x919aa5);
+const LIT_STEEL=new THREE.Color(0xb1b7bd);
+const SHADE=new THREE.Color(0x727b85);
+const CAPE=new THREE.Color(0x884c56);
+const TABARD=new THREE.Color(0xb1a18c);
+const LEATHER=new THREE.Color(0x6a5952);
+const HOOD=new THREE.Color(0x65616a);
+const VISOR=new THREE.Color(0x716c6e);
+const blend=(c,next,t)=>c.lerp(next,Math.max(0,Math.min(1,t)));
 const smooth=(a,b,v)=>{
-  const t=Math.min(1,Math.max(0,(v-a)/(b-a)));
-  return t*t*(3-2*t);
+ const t=Math.max(0,Math.min(1,(v-a)/(b-a)));return t*t*(3-2*t);
 };
-const blend=(out,color,amount)=>out.lerp(color,Math.min(1,Math.max(0,amount)));
 
 function shadeVertices(mesh){
-  const geo=mesh.geometry;
-  const positions=geo.attributes.position;
-  if(!positions)return null;
-  const colors=new Float32Array(positions.count*3);
-  const skinIndices=geo.attributes.skinIndex;
-  const skinWeights=geo.attributes.skinWeight;
-  const col=new THREE.Color();
-  for(let i=0;i<positions.count;i++){
-    const x=positions.getX(i),y=positions.getY(i),z=positions.getZ(i);
-    const width=Math.abs(z);
-    col.copy(y<.45?DARK_STEEL:STEEL);
-    // Crown hood: retain a dark silhouette and keep the bone face separate.
-    const hood=smooth(.68,.76,y)*(1-smooth(.065,.14,x));
-    blend(col,HOOD,hood*.92);
-    // Cloth back: use original Tripo clothing joints and spatial silhouette,
-    // rather than tinting a solid red block across the whole torso.
-    let clothJoint=0;
-    if(skinIndices&&skinWeights){
-      for(let j=0;j<4;j++){
-        const index=skinIndices.getComponent(i,j);
-        if(index>=36&&index<=39)clothJoint+=skinWeights.getComponent(i,j);
-      }
-    }
-    const rear=1-smooth(-.19,-.02,x);
-    const cape=Math.max(clothJoint*.9,rear*smooth(.08,.19,width))*
-      (1-smooth(.69,.80,y));
-    blend(col,BURGUNDY,cape*.83);
-    // Old white tabard is a vertical cloth plane in front of armour.
-    const tabard=smooth(.015,.075,x)*(1-smooth(.17,.23,width))*
-      smooth(.14,.20,y)*(1-smooth(.72,.78,y));
-    blend(col,CLOTH,tabard);
-    // Parchment mask and black eye sockets preserve the locked silhouette.
-    const face=smooth(.006,.045,x)*(1-smooth(.12,.18,width))*
-      smooth(.78,.82,y)*(1-smooth(.955,.99,y));
-    blend(col,BONE,face);
-    const eyes=face*smooth(.845,.86,y)*(1-smooth(.905,.925,y))*
-      smooth(.025,.038,width)*(1-smooth(.089,.104,width));
-    blend(col,EYES,eyes);
-    // Leather belt and straps are subdued; original texture detail stays.
-    const belt=smooth(.43,.49,y)*(1-smooth(.54,.59,y))*
-      smooth(.055,.12,x);
-    blend(col,LEATHER,belt*.26);
-    const k=i*3;colors[k]=col.r;colors[k+1]=col.g;colors[k+2]=col.b;
+ const geo=mesh.geometry,position=geo.attributes.position;
+ if(!position)return null;
+ const skinIndex=geo.attributes.skinIndex,skinWeight=geo.attributes.skinWeight;
+ const values=new Float32Array(position.count*3);
+ const base=new THREE.Color();
+ for(let i=0;i<position.count;i++){
+  const x=position.getX(i),y=position.getY(i),z=position.getZ(i);
+  const absZ=Math.abs(z);
+  const subtle=Math.sin(x*117+y*53+z*79)*.065;
+  base.copy(ARMOR);
+  // Vary the metal response by height without introducing a flat
+  // untextured white "face", breastplate or uniform white skirt.
+  blend(base,LIT_STEEL,(.22+.11*subtle)*smooth(.58,.93,y));
+  blend(base,SHADE,.24*(1-smooth(.35,.76,y)));
+  // The source cape carries the last four skin joints. Use its actual
+  // weights instead of painting a burgundy rectangle across the chest.
+  let capeWeight=0;
+  if(skinIndex&&skinWeight)for(let j=0;j<4;j++){
+    const index=skinIndex.getComponent(i,j);
+    if(index>=36&&index<=39)capeWeight+=skinWeight.getComponent(i,j);
   }
-  return new THREE.Float32BufferAttribute(colors,3);
+  const back=1-smooth(-.17,.025,x);
+  const mantle=back*smooth(.11,.23,absZ)*(1-smooth(.86,.99,y));
+  blend(base,CAPE,Math.max(capeWeight*.95,mantle*.65));
+  // The torn front tabard remains a warm sooty linen, never pure white.
+  const front=smooth(.10,.17,x)*(1-smooth(.085,.145,absZ));
+  const tabard=front*smooth(.10,.20,y)*(1-smooth(.47,.59,y));
+  blend(base,TABARD,tabard*.70);
+  const belt=smooth(.40,.46,y)*(1-smooth(.52,.57,y));
+  blend(base,LEATHER,belt*.45);
+  const hood=smooth(.72,.81,y)*(1-smooth(.045,.11,x));
+  blend(base,HOOD,hood*.55);
+  const visor=smooth(.80,.85,y)*(1-smooth(.94,.97,y))*
+    smooth(.025,.055,x)*(1-smooth(.065,.105,absZ));
+  blend(base,VISOR,visor*.35);
+  const k=3*i,variation=1+subtle;
+  values[k]=base.r*variation;
+  values[k+1]=base.g*variation;
+  values[k+2]=base.b*variation;
+ }
+ return new THREE.Float32BufferAttribute(values,3);
 }
 
-export function createGothicPalettePreview(root,{enabled=true}={}){
+export function createGothicPalettePreview(root,{enabled=false}={}){
   const records=[];
   root.traverse(obj=>{
     if(!obj.isSkinnedMesh)return; // never recolor the separate wrist sword
