@@ -47,27 +47,55 @@ function blur(src, tmp, out) {
 
 // Luminance in R, cloak in G (vertices driven by the Cloak_* bones), coverage in A.
 function cloakAttribute(mesh) {
-  const g = mesh.geometry, n = g.attributes.position.count, w = new Float32Array(n);
-  if (mesh.isSkinnedMesh && g.attributes.skinIndex) {
-    const cloakBone = mesh.skeleton.bones.map(b => /^Cloak/.test(b.name) || /tripo::0_Right_Limb_[0-3]$/.test(b.name)); // sparse 3-joint lower cloth chain; not full cloth physics
-    const si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
-    for (let v = 0; v < n; v++) {
-      let c = 0;
-      for (let k = 0; k < 4; k++) if (cloakBone[si.getComponent(v, k)]) c += sw.getComponent(v, k);
-      w[v] = c;
+  const g=mesh.geometry,n=g.attributes.position.count;
+  const cover=new Float32Array(n),accent=new Float32Array(n);
+  const pos=g.attributes.position;
+  const isSword=Boolean(mesh.name.match(/blade|edge|quillon|guard|pommel|grip|ferrule|fuller|sword|collar|spire/i));
+  const si=g.attributes.skinIndex,sw=g.attributes.skinWeight;
+  const clothBones=mesh.isSkinnedMesh ?
+    mesh.skeleton.bones.map((b,i)=>i>=36&&i<=39) : [];
+  for(let v=0;v<n;v++){
+    if(isSword){accent[v]=.24;cover[v]=0;continue;}
+    // The Tripo mesh is longitudinal along +X, with the mask in the
+    // face-facing +X half. Positions are in source 1-metre skin units.
+    const x=pos.getX(v),y=pos.getY(v),z=pos.getZ(v),w=Math.abs(z);
+    const face=y>.785&&y<.973&&x>.077&&w<.115;
+    const eyes=face&&y>.858&&y<.905&&w>.027&&w<.091;
+    const apron=y>.29&&y<.66&&x>.085&&w<.15;
+    const cape=(x<-.070&&y>.13&&y<.81&&w<.30);
+    let weight=0;
+    if(si&&sw){
+      for(let k=0;k<4;k++)if(clothBones[si.getComponent(v,k)])
+        weight+=sw.getComponent(v,k);
     }
+    cover[v]=cape?Math.max(.65,weight):weight*.25;
+    // This material separation changes REAL rasterized 3D luminance,
+    // not a pasted 2D sticker. Pale bone mask, dark eye slits, ashen
+    // apron, black engraved armour and dark trailing cloth.
+    accent[v]=eyes?-.34:face?.33:apron?.20:cape?-.22:
+      y>.60&&y<.83?-.035:0;
   }
-  g.setAttribute('cloak', new THREE.BufferAttribute(w, 1));
+  g.setAttribute('cloak',new THREE.BufferAttribute(cover,1));
+  g.setAttribute('ashenAccent',new THREE.BufferAttribute(accent,1));
 }
 function glyphMaterial(material) {
-  const m = material.clone();
-  m.onBeforeCompile = sh => {
-    sh.vertexShader = 'attribute float cloak;\nvarying float vCloak;\n' +
-      sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvCloak = cloak;');
-    sh.fragmentShader = 'varying float vCloak;\n' + sh.fragmentShader.replace('#include <dithering_fragment>',
-      '#include <dithering_fragment>\ngl_FragColor = vec4(dot(gl_FragColor.rgb, vec3(.299, .587, .114)), vCloak, 0., 1.);');
+  const m=material.clone();
+  m.onBeforeCompile=shader=>{
+    shader.vertexShader=
+      'attribute float cloak; attribute float ashenAccent;\n'+
+      'varying float vCloak; varying float vAshenAccent;\n'+
+      shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\nvCloak = cloak; vAshenAccent = ashenAccent;'
+      );
+    shader.fragmentShader=
+      'varying float vCloak; varying float vAshenAccent;\n'+
+      shader.fragmentShader.replace('#include <dithering_fragment>',
+        '#include <dithering_fragment>\n' +
+        'float ashenLuma=dot(gl_FragColor.rgb,vec3(.299,.587,.114));\n' +
+        'gl_FragColor=vec4(clamp(ashenLuma+vAshenAccent*.42,0.,1.),vCloak,0.,1.);');
   };
-  m.customProgramCacheKey = () => 'knight-glyph-pass';
+  m.customProgramCacheKey=()=> 'ashen-v2-glyph-luma-mask-cloak-v2';
   return m;
 }
 
@@ -104,6 +132,8 @@ export class NativeKnightGlyphs {
         this.stats.bones=rig.userData.gltf.bones;
         this.stats.skinnedMeshes=rig.userData.gltf.skinnedMeshes;
         this.stats.proceduralStates = ['Idle','Walk','Run','Jump'];
+        this.stats.weapon=rig.userData.gltf.weapon;
+        this.stats.weaponSocketBone=rig.userData.gltf.weaponSocketBone;
         this.stats.clips = []; // no authored glTF clips; direct bone animation uses the real skin
       },
       onError: err => { this.stats.error = String(err?.message || err); }
