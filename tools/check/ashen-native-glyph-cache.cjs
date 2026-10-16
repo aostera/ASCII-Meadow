@@ -1,0 +1,37 @@
+// Cheap regression: static 3D raster glyphs are rebuilt once, but the
+// original world draw and dynamic fire light still refresh every game tick.
+const assert=require('node:assert/strict');
+const {pathToFileURL}=require('node:url'),path=require('node:path');
+(async()=>{
+ const {NativeKnightGlyphs}=await import(
+   pathToFileURL(path.resolve(__dirname,'../../experiments/three/native-tripo-v2.mjs')).href);
+ const n=104*54,rgba={};
+ const cached={S:new Float32Array(n),A:new Float32Array(n),
+   cloakFrac:new Float32Array(n),
+   K:{n:0,code:new Int16Array(n),cx:new Int16Array(n),
+     cy:new Int16Array(n),cl:new Uint8Array(n)},
+   tone:null,glyphDirty:true,stats:{glyphBuilds:0,glyphCacheHits:0}};
+ for(let i=0;i<n;i++){
+   cached.A[i]=i%3===0?.9:0;
+   cached.S[i]=i/n;
+   cached.cloakFrac[i]=i%10===0?.9:0;
+ }
+ let lights=0,paints=0;
+ const src={KN0:3,KNS:12,rampCode:v=>v,
+   grect:()=>{},gput:()=>{paints++;},
+   fireLightAt:()=>{lights++;return [lights,1]},
+   knightFireBlock:()=>0};
+ for(let i=0;i<5;i++)
+   NativeKnightGlyphs.prototype.emit.call(cached,{},{left:0,top:0},1,1,src);
+ assert.equal(cached.stats.glyphBuilds,1,
+   'Unchanged raster must not redo tone histogram and glyph mapping');
+ assert.equal(cached.stats.glyphCacheHits,4);
+ assert.equal(lights,5,'Source fire light still updates on every game tick');
+ assert.equal(paints,cached.stats.glyphs*5,'Actual glyph geometry is still drawn');
+ cached.glyphDirty=true;
+ cached.S.fill(.1);
+ NativeKnightGlyphs.prototype.emit.call(cached,{},{left:0,top:0},1,1,src);
+ assert.equal(cached.stats.glyphBuilds,2,'New 3D raster must invalidate cached glyph geometry');
+ assert.equal(lights,6);
+ console.log('PASS actual native glyph: 1 rebuild + 4 cached frames; dynamic lighting still 5/5');
+})().catch(e=>{console.error(e);process.exitCode=1});
