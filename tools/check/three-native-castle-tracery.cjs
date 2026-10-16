@@ -19,7 +19,7 @@ fs.mkdirSync(dir,{recursive:true});
    const page=await context.newPage(),errors=[];
    page.on('pageerror',e=>errors.push(e.message));
    const reply=await page.goto(base.replace(/\/$/,'')+
-     '/experiments/three/native.html?edit=0',
+     '/experiments/three/native.html?edit=0&nativeCastleFacadeTest=1',
      {waitUntil:'domcontentloaded'});
    if(!reply?.ok())throw Error('Native castle route failed');
    await page.waitForFunction(()=>window.__ASCII_NATIVE__?.ready&&
@@ -58,6 +58,64 @@ fs.mkdirSync(dir,{recursive:true});
      throw Error(mode+' castle art regression '+JSON.stringify(stats));
    await page.screenshot({path:path.join(dir,mode+'-castle-tracery.png'),
      timeout:60000});
+   const comparison=await page.evaluate(()=>{
+     const gothic=window.__ASCII_NATIVE_COMPLETE_ARCH__;
+     const native=window.__ASCII_NATIVE__;
+     const mapOriginal=JSON.stringify(MEADOW_MAP);
+     const gl=native.renderer.getContext(),canvas=native.renderer.domElement;
+     const oldRandom=Math.random;
+     function snapshot(enabled){
+       if(!gothic.setFacadeEnabledForTest(enabled))
+         throw Error('Test-only castle geometry toggle is inaccessible');
+       // Rebuild the actual authored raycast solids and source flora for
+       // EACH state; a static rectangle or fake UV overlay cannot pass.
+       buildWorld();
+       placeFlora();
+       updateCamera(0,true);
+       render();
+       const out=new Uint8Array(canvas.width*canvas.height*4);
+       gl.readPixels(0,0,canvas.width,canvas.height,
+         gl.RGBA,gl.UNSIGNED_BYTE,out);
+       return out;
+     }
+     try{
+       // Fog banks otherwise have new random seeds on each rebuild.
+       // Freeze this source of timing noise, not the user's world map.
+       Math.random=()=>.513;
+       const on=snapshot(true);
+       const off=snapshot(false);
+       const restored=snapshot(true);
+       let changed=0,restoreErrors=0;
+       for(let i=0;i<on.length;i+=4){
+         if(Math.max(Math.abs(on[i]-off[i]),
+           Math.abs(on[i+1]-off[i+1]),
+           Math.abs(on[i+2]-off[i+2]))>8)changed++;
+         if(Math.max(Math.abs(on[i]-restored[i]),
+           Math.abs(on[i+1]-restored[i+1]),
+           Math.abs(on[i+2]-restored[i+2]))>8)restoreErrors++;
+       }
+       if(!gothic.westCurtainProjects||!gothic.westPortalReliefClear||
+          !gothic.facadeEnabled)
+         throw Error('Castle features not physically restored');
+       if(JSON.stringify(MEADOW_MAP)!==mapOriginal)
+         throw Error('QA-only castle rebuild touched authored map');
+       return {changedPixels:changed,restoreErrors,
+         canvas:[canvas.width,canvas.height],
+         portalClear:gothic.westPortalReliefClear,
+         projects:gothic.westCurtainProjects,
+         mapUnchanged:true};
+     }finally{
+       Math.random=oldRandom;
+       if(!gothic.facadeEnabled){
+         gothic.setFacadeEnabledForTest(true);
+         buildWorld();placeFlora();
+       }
+     }
+   });
+   if(comparison.changedPixels<(mobile?30:100)||
+      comparison.restoreErrors>120)
+     throw Error(mode+' castle geometry does not make stable visible GPU pixels '+JSON.stringify(comparison));
+   console.log('NATIVE CASTLE TRACERY VISIBLE '+mode+' '+JSON.stringify(comparison));
    if(errors.length)throw Error(mode+' browser errors '+errors.join(' | '));
    console.log('NATIVE CASTLE TRACERY PASS '+mode+' '+JSON.stringify(stats));
    await context.close();
