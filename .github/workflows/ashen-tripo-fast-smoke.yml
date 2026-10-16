@@ -15,7 +15,7 @@ on:
 concurrency:
   group: ashen-fast-smoke-${{ github.ref }}
   cancel-in-progress: true
-permissions: {contents: read}
+permissions: {contents: read, issues: write}
 jobs:
   quick:
     runs-on: ubuntu-latest
@@ -45,3 +45,19 @@ jobs:
           name: ashen-v18-fast-real-glb-4-poses
           path: shots/ashen-tripo-smoke/
           if-no-files-found: warn
+      - name: Publish fast GLB result to draft PR 56
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SMOKE_STATUS: ${{ job.status }}
+          SMOKE_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SMOKE_SHA: ${{ github.sha }}
+        run: |
+          marker='<!-- ashen-tripo-fast-smoke-status -->'
+          printf -v body '%s\n**Real 40-bone Tripo fast smoke:** `%s`\nCommit: `%s` · [GitHub Actions run](%s)\nFour original-GLB pose screenshots are attached to the workflow artifact when generated. This is not the full mobile/performance sign-off.\n' "$marker" "$SMOKE_STATUS" "$SMOKE_SHA" "$SMOKE_RUN"
+          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/56/comments?per_page=100" --jq '.[] | select(.body | startswith("<!-- ashen-tripo-fast-smoke-status -->")) | .id' | tail -n 1)
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/$existing" -f body="$body" >/dev/null
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/56/comments" -f body="$body" >/dev/null
+          fi
