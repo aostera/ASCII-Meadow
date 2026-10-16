@@ -127,6 +127,15 @@ fs.mkdirSync(out,{recursive:true});
      await page.locator('#wire').click();
      assert.equal(await page.locator('#wire').getAttribute('aria-pressed'),'true');
      assert.ok((await lab()).weapon,'Weapon must remain wrist-attached across animation and controls');
+     // Compare shaded surfaces, NOT wireframes or skeleton overlays.
+     await page.locator('#wire').click();
+     await page.locator('#skeleton').click();
+     await page.locator('[data-motion="Idle"]').click();
+     await page.locator('[data-view="front"]').click();
+     await page.locator('#yaw').evaluate(el=>{
+       el.value='0';el.dispatchEvent(new Event('input',{bubbles:true}));
+     });
+     await page.locator('#frame').click();
      // The recolor is NON-DESTRUCTIVE. Verify that the same loaded Tripo
      // mesh can return to original material and be recolored again.
      await page.locator('#palette').click();
