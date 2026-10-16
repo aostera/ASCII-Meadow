@@ -125,32 +125,44 @@ function animateRig(model,source,root,weapon){
     leftFootLift:0,rightFootLift:0,leftFootX:0,rightFootX:0,
     weaponAttached:true,footContact:[true,true],kneeBend:[0,0]};
   const pos=sets.spine.position.clone();
-  const L1=.209, L2=.169; // actual Tripo knee/ankle REST lengths in mesh units
+  const L1=.209, L2=.169; // approximate Tripo rest-pose segment lengths in source units
   function legPose(bones,offset,weight,jumpWeight,run){
     const p=((phase/(2*Math.PI)+offset)%1+1)%1;
     const stance=run>.5?.50:.61;
     const inStance=p<stance;
     const u=inStance?p/stance:(p-stance)/(1-stance);
-    const step=.115+run*.048,back=step*(inStance?1-2*u:2*smooth(u)-1);
-    const lift=inStance?0:(.062+run*.055)*Math.sin(Math.PI*u);
-    // Foot pose (X is natural model forward): foot planted during stance,
-    // lifted and carried forward during swing. Jump tucks both legs.
-    const x=weight*back*(1-.76*jumpWeight)+(offset?.028:-.028)*jumpWeight;
-    const y=-.370+weight*lift*(1-.6*jumpWeight)+.098*jumpWeight;
-    const rawLen=Math.hypot(x,y),len=clamp(rawLen,.10,L1+L2-.002);
+    // The previous run step (.163) and high foot lift (.117) made a
+    // two-bone IK target fold the shin into the thigh at >90 degrees.
+    // Keep a restrained cadence until real foot planting/root motion exists.
+    const step=.075+run*.030;
+    const back=step*(inStance?1-2*u:2*smooth(u)-1);
+    const lift=inStance?0:(.045+run*.027)*Math.sin(Math.PI*u);
+    // Tripo anatomical forward is +X; feet remain on the sagittal plane.
+    const x=weight*back*(1-.76*jumpWeight)+(offset?.022:-.022)*jumpWeight;
+    const y=-.375+weight*lift*(1-.6*jumpWeight)+.078*jumpWeight;
+    const rawLen=Math.hypot(x,y);
+    // Hard-stop excessive knee flexion in the sprint swing phase.
+    // Keeping the target *within* the allowed IK annulus avoids
+    // folding the knee sharply or clamping acos into an inverted limb.
+    const kneeLimit=.80+run*.22+Math.min(1,jumpWeight)*.20;
+    const minReach=Math.sqrt(Math.max(0,
+      L1*L1+L2*L2+2*L1*L2*Math.cos(kneeLimit)));
+    const len=clamp(rawLen,minReach,L1+L2-.001);
     const theta=Math.atan2(x,-y);
     const alpha=Math.acos(clamp((L1*L1+len*len-L2*L2)/(2*L1*len),-1,1));
-    const knee=Math.PI-Math.acos(clamp((L1*L1+L2*L2-len*len)/(2*L1*L2),-1,1));
-    const hip=theta-alpha;
-    // Both legs are vertical in source GLB. Rotating about model Z
-    // produces sagittal (forward/backward) motion; rotating X would splay!
+    const knee=Math.PI-Math.acos(clamp(
+      (L1*L1+L2*L2-len*len)/(2*L1*L2),-1,1));
+    // IMPORTANT: two-bone IK admits TWO mirrored solutions. Old
+    // hip=theta-alpha / knee=+knee put the bend behind the knight
+    // when +X is forward. The anatomical branch makes the knee point
+    // FORWARD: thigh=theta+alpha, shin bends back by -knee.
+    const hip=theta+alpha;
+    const shin=-knee;
     twist(bones[0],[['iz',hip]]);
-    twist(bones[1],[['iz',knee]]);
-    twist(bones[2],[['iz',-hip-knee*.76]]);
+    twist(bones[1],[['iz',shin]]);
+    twist(bones[2],[['iz',-hip-shin*.76]]);
     twist(bones[3],[]);
-    // At rest both feet are planted. Without this guard the continuously
-    // running phase incorrectly marked an idle foot as airborne.
-    return {lift:weight*lift,x,knee,
+    return {lift:weight*lift,x,knee,hip,
       contact:jumpWeight<.15&&(weight<.08||inStance)};
   }
   function update(dt,motion,now){
@@ -250,7 +262,7 @@ function animateRig(model,source,root,weapon){
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v6-arm-followthrough'
+      animationVersion:'Tripo-IK-v7-forward-knee-limits'
     };
     return clip.toLowerCase();
   }
