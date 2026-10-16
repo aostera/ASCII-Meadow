@@ -32,6 +32,7 @@ small{display:block;color:#c8bec2;margin-top:6px;font-size:11px}
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createGltfKnight,TRIPO_V2_GLB} from './ashen-tripo-native-rig.mjs';
+import {createGothicPalettePreview} from './ashen-vow-gothic-palette.mjs';
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x15151b);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.6));
@@ -48,13 +49,15 @@ camera.position.set(0,1.3,9);camera.lookAt(0,1.02,0);
 const sourceRoot=new THREE.Group();sourceRoot.position.x=-1.57;scene.add(sourceRoot);
 const animRoot=createGltfKnight(THREE,{
  url:TRIPO_V2_GLB,
- onLoad:()=>{
+ onLoad:root=>{
+  reviewPalette=createGothicPalettePreview(root,{enabled:false});
   rightReady=true;finish();
  },
  onError:e=>fail('Animated Tripo GLB: '+e.message)
 });
 animRoot.position.x=1.57;scene.add(animRoot);
 let rightReady=false,leftReady=false,source=null,mode='Bind',heading=0,
+    reviewPalette=null,
     deltaMax=null,materialsMatch=null,simulated=0,clock=0,last=0,error=null;
 const status=document.getElementById('status');
 function fail(message){error=String(message);status.textContent=error;}
@@ -160,6 +163,22 @@ function animate(now){
 }
 requestAnimationFrame(animate);
 window.__ASHEN_AB_COMPARE__={
+ setStyle(enabled){
+  if(!reviewPalette||!leftReady)throw Error('Tripo not loaded');
+  return reviewPalette.setEnabled(Boolean(enabled));
+ },
+ focus(which){
+  const key=String(which||'full');
+  const spec=key==='grip'?[1.57,1.08,3.6]:
+    key==='legs'?[1.57,.54,2.5]:[0,1.3,1];
+  camera.position.set(spec[0],spec[1],9);
+  camera.lookAt(spec[0],spec[1],0);
+  camera.zoom=spec[2];camera.updateProjectionMatrix();
+ },
+ get styleEnabled(){return reviewPalette?.enabled??false},
+ get swordBraces(){return animRoot.userData.weapon?.userData.retentionBraces||0},
+ get visualPose(){return animRoot.userData.pose?.()||null},
+ get effectivePalette(){return reviewPalette!==null},
  get ready(){return leftReady&&rightReady&&!error},
  get error(){return error},get mode(){return mode},
  get materialMatch(){return materialsMatch},get bindMaxDelta(){return deltaMax},
