@@ -11,6 +11,8 @@ on:
       - experiments/three/ashen-glyph-emitter.mjs
       - tools/check/ashen-native-glyph-cache.cjs
       - experiments/three/ashen-tripo-animation-workshop.html
+      - experiments/three/ashen-tripo-ab-review.html
+      - tools/check/ashen-tripo-ab-review.cjs
       - tools/check/ashen-tripo-smoke.cjs
       - .github/workflows/ashen-tripo-fast-smoke.yml
   workflow_dispatch:
@@ -31,6 +33,7 @@ jobs:
       - run: |
           node --check experiments/three/ashen-tripo-native-rig.mjs
           node --check tools/check/ashen-tripo-smoke.cjs
+          node --check tools/check/ashen-tripo-ab-review.cjs
           node --check experiments/three/ashen-glyph-emitter.mjs
           node --check tools/check/ashen-native-glyph-cache.cjs
           node tools/check/ashen-native-glyph-cache.cjs
@@ -44,11 +47,14 @@ jobs:
             sleep 1
           done
           node tools/check/ashen-tripo-smoke.cjs http://127.0.0.1:8181
+          node tools/check/ashen-tripo-ab-review.cjs http://127.0.0.1:8181
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ashen-v18-fast-real-glb-4-poses
-          path: shots/ashen-tripo-smoke/
+          name: ashen-v19-original-vs-animated-art-audit
+          path: |
+            shots/ashen-tripo-smoke/
+            shots/ashen-tripo-ab-reference/
           if-no-files-found: warn
       - name: Publish fast GLB result to draft PR 56
         if: always()
