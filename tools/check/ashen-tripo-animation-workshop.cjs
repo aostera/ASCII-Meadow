@@ -56,7 +56,7 @@ fs.mkdirSync(out,{recursive:true});
      assert.equal(s.clip,'Idle');
      assert.deepEqual(s.pose.footContact,[true,true],
        'Both idle feet should be treated as planted');
-     assert.equal(s.pose.animationVersion,'Tripo-IK-v6-arm-followthrough');
+     assert.equal(s.pose.animationVersion,'Tripo-IK-v7-forward-knee-limits');
      // Measure actual world-space skinned joints, not merely pose labels.
      // A T-pose has wrist far from shoulder; the resting armored hands must
      // be lower and substantially closer to the body. The separate sword
@@ -107,6 +107,8 @@ fs.mkdirSync(out,{recursive:true});
      let walking=await lab();
      assert.equal(walking.mode,'Walk');
      assert.equal(walking.pose.kneeBend.length,2);
+     assert.ok(walking.pose.kneeBend.every(k=>k>=0&&k<1.25),
+       'Walk knees must not fold through the thighs');
      assert.equal(walking.weapon,true);
      await page.screenshot({path:path.join(out,name+'-walk-front.png')});
 
@@ -114,6 +116,8 @@ fs.mkdirSync(out,{recursive:true});
      await page.waitForFunction(()=>window.__ASHEN_ANIMATION_LAB__?.model?.userData?.gltf?.clip==='Run',
        undefined,{timeout:15000});
      let running=await lab();
+     assert.ok(running.pose.kneeBend.every(k=>k>=0&&k<=1.03),
+       'Run knees must stay within the anatomical IK arc');
      assert.ok(running.pose.phase>walking.pose.phase,'Gait phase must not restart on Run');
      assert.ok(running.pose.armPose.rightElbow>.25 &&
        running.pose.armPose.leftElbow<-.22,
