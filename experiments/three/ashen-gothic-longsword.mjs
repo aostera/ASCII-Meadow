@@ -4,6 +4,7 @@
 // blade points down and stays outside the torso during motion.
 // Can later be swapped for an artist/Tripo-exported separate sword GLB.
 import * as THREE from 'three';
+import {ASHEN_BLADE_STATIONS} from './ashen-blade-envelope.mjs';
 const mat=(color,metalness=.6,roughness=.6)=>new THREE.MeshStandardMaterial({
   color,metalness,roughness,side:THREE.DoubleSide
 });
@@ -58,11 +59,8 @@ export function createAshenGothicLongsword(){
   // Sword grip center at origin: the hilt/socket is in the hand. Tip hangs
   // toward boot height in neutral pose. Total approx 0.48 source-metres.
   // Double-edged distal taper with long narrow point and central ridge.
-  bladeLoft([
-    [-.045,.022,.0053],[-.085,.021,.005],[-.135,.0195,.0047],
-    [-.215,.017,.004],[-.30,.0135,.003],[-.37,.0095,.0024],
-    [-.422,.0054,.0013],[-.475,.0003,.0002]
-  ],steel,'Blade / six tapered bevels / true diamond cross-section',sword);
+  bladeLoft(ASHEN_BLADE_STATIONS,steel,
+    'Blade / six tapered bevels / true diamond cross-section',sword);
   // Separate polished longitudinal edges. A groove (fuller) ends well
   // before the tip, and never forms a second imaginary sword.
   for(const s of [-1,1]){
