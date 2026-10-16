@@ -66,6 +66,43 @@ function setupBones(model){
   }
   return {meshes,skin,sets,rest};
 }
+// The sword needs to pass through the ACTUAL weighted glove/palm surface,
+// not through the centre of a skeleton joint which can sit outside the mesh.
+// Sample only vertices whose strongest influence is the existing right-wrist
+// bone. Every sampled point is transformed into wrist-local coordinates.
+// No new character geometry, fake fingers, textures or expensive API calls.
+function locateRightPalm(meshes,wrist){
+  const sum=new THREE.Vector3(),p=new THREE.Vector3(),ws=new THREE.Vector3();
+  let total=0,vertices=0;
+  wrist.updateWorldMatrix(true,false);
+  for(const mesh of meshes){
+    const boneIndex=mesh.skeleton?.bones.indexOf(wrist)??-1;
+    const geo=mesh.geometry;
+    const joints=geo.attributes?.skinIndex,weights=geo.attributes?.skinWeight;
+    if(boneIndex<0||!joints||!weights)continue;
+    mesh.updateWorldMatrix(true,false);
+    const count=geo.attributes.position?.count||0;
+    for(let i=0;i<count;i++){
+      let weight=0;
+      for(let j=0;j<4;j++){
+        const influence=weights.getComponent(i,j);
+        if(joints.getComponent(i,j)===boneIndex)weight+=influence;
+      }
+      if(weight<.52)continue;
+      mesh.getVertexPosition(i,p);
+      ws.copy(p).applyMatrix4(mesh.matrixWorld);
+      wrist.worldToLocal(ws);
+      if(!Number.isFinite(ws.x+ws.y+ws.z))continue;
+      sum.addScaledVector(ws,weight);total+=weight;vertices++;
+    }
+  }
+  if(vertices<12||total<8)return {point:new THREE.Vector3(),vertices,valid:false};
+  const point=sum.divideScalar(total);
+  // Guard against a mislabeled skin: never fling the sword far from wrist.
+  if(point.length()>.21)return {point:new THREE.Vector3(),vertices,valid:false};
+  return {point,vertices,valid:true};
+}
+
 // Anatomical, phase-continuous walk/run with stance/swing foot targets.
 // Every joint below deforms the authentic Tripo SKIN rather than a fake puppet.
 function animateRig(model,source,root,weapon){
@@ -153,7 +190,10 @@ function animateRig(model,source,root,weapon){
     twist(sets.leftArm[2],[['iy',-.018+Math.sin(bodyClock*1.4)*.015]]);
     twist(sets.rightArm[2],[['iy',.025]]);
     twist(sets.leftArm[3],[]);
-    twist(sets.rightArm[3],[]);
+    // Small anatomical wrist turn makes the OPEN Tripo glove follow the
+    // hilt. Fingers are not independently rigged: never imply a true grasp.
+    const wristTurn=-.10-.04*runMix+Math.sin(phase)*stride*.025;
+    twist(sets.rightArm[3],[['iy',wristTurn]]);
     const left=legPose(sets.leftLeg,0,stride,jumpWeight,runMix);
     const right=legPose(sets.rightLeg,.5,stride,jumpWeight,runMix);
     twist(sets.spine,[['iz',.028*runMix+.022*arc],['ix',.012*Math.sin(phase)*stride]]);
@@ -199,8 +239,10 @@ function animateRig(model,source,root,weapon){
       capeDeflection:capeRoll.map((roll,i)=>[roll,capeYaw[i]]),
       weaponAttached:!!weapon?.parent,
       armPose:{shoulderDown,shoulderSwing:-swing*armAmplitude,
-        leftElbow,rightElbow,swordCant:-.12-.025*stride},
-      animationVersion:'Tripo-IK-v4-anatomical-arm-hinges'
+        leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
+      palmAnchorValid:weapon?.userData.palmAnchorValid===true,
+      palmVertexCount:weapon?.userData.palmVertexCount||0,
+      animationVersion:'Tripo-IK-v5-palm-bound-wrist'
     };
     return clip.toLowerCase();
   }
@@ -238,10 +280,14 @@ export function createGltfKnight(_THREE=THREE,{url=TRIPO_V2_GLB,onLoad,onError}=
       model.updateMatrixWorld(true);
       const restWorld=new THREE.Quaternion();
       wrist.getWorldQuaternion(restWorld);
+      const grip=locateRightPalm(source.meshes,wrist);
       wrist.add(weapon);
-      weapon.position.set(0,0,0);
+      weapon.position.copy(grip.point);
       weapon.quaternion.copy(restWorld.invert());
       weapon.userData.socketBoneIndex=source.skin.bones.indexOf(wrist);
+      weapon.userData.palmAnchorValid=grip.valid;
+      weapon.userData.palmVertexCount=grip.vertices;
+      weapon.userData.palmLocal=grip.point.toArray();
       const anim=animateRig(model,source,root,weapon);
       root.userData.gltf={
         loaded:true,
@@ -250,6 +296,8 @@ export function createGltfKnight(_THREE=THREE,{url=TRIPO_V2_GLB,onLoad,onError}=
         skinnedMeshes:source.meshes.length,
         weapon:'detached Gothic longsword',
         weaponSocketBone:weapon.userData.socketBoneIndex,
+        palmAnchorValid:weapon.userData.palmAnchorValid,
+        palmVertexCount:weapon.userData.palmVertexCount,
         type:'Tripo_V2_40_Bone_Native_Runtime',
         get clip(){return anim.clip}
       };
