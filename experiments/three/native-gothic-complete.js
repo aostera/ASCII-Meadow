@@ -18,6 +18,8 @@ let nativeOuterTowerReliefEnabled=true;
 let nativeCentralGableEnabled=true;
 let nativeHighFlyingArchesEnabled=true;
 let nativeHighFlyingArchesClear=true;
+let nativeMainPortalRecessEnabled=true;
+let nativeMainPortalRecessClear=true;
 let nativeCentralGablePortalClear=true;
 let nativeCentralGableProjects=false;
 let nativeOuterTowerReliefClear=true;
@@ -90,10 +92,94 @@ function nativeGothicGargoyles(positions,y){
     nativeGothicBox(x-3,x+3,y-32,y-21,z-34,z-24);
   }
 }
+// Turn the original *painted* great door into a real deep Gothic portal.
+// In the inherited castle the near gatehouse box (-160..160, z100..240)
+// and its curtain wall cover the whole entrance in physical source depth.
+// Carve ONLY their forward masonry; a full slab with the exact original
+// authored door meta stays at the BACK of the reveal (z178..240). This is
+// a true 78-unit recessed arch with open side reveals, not a black decal.
+// The original closed oak door still blocks movement: NO new passage, map
+// change, contact shadow override, color/alpha edit or added ground wall.
+function nativeRecessOriginalMainPortal(){
+  if(!nativeMainPortalRecessEnabled){
+    nativeMainPortalRecessClear=true;
+    return 0;
+  }
+  const Y=120;
+  const isBox=(so,x0,x1,y0,y1,z0,z1)=>so?.kind==='wall'&&
+    so.bb[0]===x0&&so.bb[1]===x1&&
+    so.bb[2]===y0&&so.bb[3]===y1&&
+    so.bb[4]===z0&&so.bb[5]===z1;
+  const gateIndex=solids.findIndex(s=>
+    isBox(s,-160,160,Y,Y+560,100,240)&&s.meta?.door);
+  const wallIndex=solids.findIndex(s=>
+    isBox(s,-540,540,Y,Y+300,140,205));
+  if(gateIndex<0||wallIndex<0)
+    throw Error('Missing original gatehouse and curtain solids for recess');
+  const gate=solids[gateIndex],curtain=solids[wallIndex];
+  // Remove only the two identified full boxes. All other original source
+  // castle and already modeled masonry, and the original oak door meta,
+  // remain physically present. IDs are rebuilt by nativeBuildCompleteCastle.
+  for(const i of [gateIndex,wallIndex].sort((a,b)=>b-a))
+    solids.splice(i,1);
+  const start=solids.length,half=76;
+  const base=Y+137,tip=Y+287;
+  function segment(original,x0,x1,y0,y1,z0,z1,withDoor=false){
+    const meta={...original.meta};
+    if(!withDoor)delete meta.door;
+    addBox(x0,x1,y0,y1,z0,z1,'wall',meta);
+  }
+  // The two VISIBLE masonry faces are 78 units apart in depth.
+  // The back retains ALL original door planks, iron and ring-pull glyphs.
+  segment(gate,-160,160,Y,Y+560,178,240,true);
+  function archShoulder(original,sign,z0,z1,roofY){
+    const x0=sign<0?-half:0,x1=sign<0?0:half;
+    const m=(tip-base)/half;
+    // Upper half-space y >= tip - m*abs(x) forms a real concave
+    // pointed opening after combining two *convex* stone shoulders.
+    const p=sign<0?[m,-1,0,-tip]:[-m,-1,0,-tip];
+    const meta={...original.meta};delete meta.door;
+    solid('wall',[
+      [1,0,0,x1],[-1,0,0,-x0],[0,1,0,roofY],
+      [0,0,1,z1],[0,0,-1,-z0],p
+    ],[x0,x1,base,roofY,z0,z1],meta);
+  }
+  // Gatehouse frontage: flank masonry + pointed open vault ahead of
+  // the recessed door, including real faces for cast() and GPU Z depth.
+  segment(gate,-160,-half,Y,Y+560,100,178);
+  segment(gate,half,160,Y,Y+560,100,178);
+  segment(gate,-half,half,tip,Y+560,100,178);
+  archShoulder(gate,-1,100,178,tip);
+  archShoulder(gate,1,100,178,tip);
+  // The other culprit is the full-width curtain immediately behind the
+  // porch. Physically pierce its exact same doorway, with the continuous
+  // wall, window pattern and blind arcades preserved to left and right.
+  segment(curtain,-540,-half,Y,Y+300,140,205);
+  segment(curtain,half,540,Y,Y+300,140,205);
+  segment(curtain,-half,half,tip,Y+300,140,205);
+  archShoulder(curtain,-1,140,205,tip);
+  archShoulder(curtain,1,140,205,tip);
+  function stoneAt(x,y,z){
+    return solids.some(so=>so.pl.every(p=>
+      p[0]*x+p[1]*y+p[2]*z<=p[3]+1e-6));
+  }
+  const air=[
+    [0,Y+75,112],[0,Y+75,158],
+    [-33,Y+75,112],[33,Y+75,158],
+    [0,Y+160,112]
+  ];
+  nativeMainPortalRecessClear=air.every(([x,y,z])=>!stoneAt(x,y,z))&&
+    stoneAt(0,Y+75,207)&&stoneAt(95,Y+75,112)&&
+    stoneAt(0,Y+320,112);
+  if(!nativeMainPortalRecessClear)
+    throw Error('Carved portal has blocked void, lost oak door or lost roof');
+  return solids.length-start;
+}
 function nativeBuildCompleteCastle(){
   nativeBeforeFullCastle();
+  const recessedMainPortal=nativeRecessOriginalMainPortal();
   const start=solids.length,Y=120,front=330;
-  const feature={};
+  const feature={recessedMainPortal};
   let before=solids.length;
   // The west facade: a raised 24-piece rose-window stone ring, outer
   // tracery, 12 flying spokes and central boss; existing glass still exists.
@@ -552,6 +638,15 @@ window.__ASCII_NATIVE_COMPLETE_ARCH__={
   get westPortalReliefClear(){return nativeWestPortalReliefClear},
   get westCurtainProjects(){return nativeWestCurtainProjects},
   get facadeEnabled(){return nativeWestTraceryEnabled},
+  get mainPortalRecessEnabled(){return nativeMainPortalRecessEnabled},
+  get mainPortalRecessClear(){return nativeMainPortalRecessClear},
+  setMainPortalRecessEnabledForTest(on){
+    const q=new URLSearchParams(location.search);
+    if(!q.has('nativeCastleFacadeTest')&&!q.has('nativeCastleFramedTest'))
+      return false;
+    nativeMainPortalRecessEnabled=Boolean(on);
+    return true;
+  },
   get highFlyingArchesEnabled(){return nativeHighFlyingArchesEnabled},
   get highFlyingArchesClear(){return nativeHighFlyingArchesClear},
   setHighFlyingArchesEnabledForTest(on){

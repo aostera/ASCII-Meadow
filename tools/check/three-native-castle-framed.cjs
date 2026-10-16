@@ -24,7 +24,8 @@ fs.mkdirSync(dir,{recursive:true});
    await page.waitForFunction(()=>window.__ASCII_NATIVE__?.ready&&
      window.__ASCII_NATIVE__.frameCount>4&&
      window.__ASCII_NATIVE_COMPLETE_ARCH__?.features?.castle?.centralBrokenGables>=30&&
-     window.__ASCII_NATIVE_COMPLETE_ARCH__?.features?.castle?.highFlyingArches>=20,
+     window.__ASCII_NATIVE_COMPLETE_ARCH__?.features?.castle?.highFlyingArches>=20&&
+     window.__ASCII_NATIVE_COMPLETE_ARCH__?.features?.castle?.recessedMainPortal>=10,
      undefined,{timeout:120000});
    // Freeze the test page after its current RAF; production camera is untouched.
    await page.evaluate(()=>{window.requestAnimationFrame=()=>0});
@@ -34,6 +35,7 @@ fs.mkdirSync(dir,{recursive:true});
      const mapOriginal=JSON.stringify(MEADOW_MAP);
      const outline=window.__ASCII_NATIVE_COMPLETE_ARCH__;
      if(!outline.highFlyingArchesClear)throw Error('Flying arches cross the protected inner portal/nave');
+     if(!outline.mainPortalRecessClear)throw Error('Gate recess is physically blocked or lost original door');
      if(native.mode!=='three'||editing||!c.cv)
        throw Error('Not in original playable Three mode');
      let n=0,x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
@@ -325,7 +327,7 @@ fs.mkdirSync(dir,{recursive:true});
      });
      gameplayMetrics.push(metrics);
    }
-   // Audit ORIGINAL convex source raycast at the great-portal carving.
+   // Audit REAL convex source raycast at the carved great-portal.
    // The map's gatehouse uses meta.door on a full 320-wide masonry box;
    // a dark carved doorway does NOT by itself remove its physics or depth.
    // Cast along EXACT original baked cathedral camera rays (same PITCH)
@@ -375,6 +377,132 @@ fs.mkdirSync(dir,{recursive:true});
        throw Error('Invalid physical portal ray audit '+JSON.stringify(result));
      return result;
    });
+   // The difference must be made by a real physical carve, not a
+   // screen-space dark decal or an always-hidden solid. Compare the same
+   // 100% playable gate-follow-camera before/after in one native WebGL2
+   // context; replay source on/off/on and demand bitwise restoration.
+   const gatePoint=gameplayMetrics.find(x=>x.id==='gate-threshold').knight;
+   const portalRun=await page.evaluate(point=>{
+     const arch=window.__ASCII_NATIVE_COMPLETE_ARCH__,
+       native=window.__ASCII_NATIVE__,oldRandom=Math.random;
+     const gl=native.renderer.getContext(),canvas=native.renderer.domElement;
+     const originalMap=JSON.stringify(MEADOW_MAP);
+     player.x=point[0];player.y=point[1];
+     player.tx=point[0];player.ty=point[1];
+     player.hT=player.h=surfAt(point[0],point[1]);
+     Math.random=()=>.513;
+     window.__ASCII_PORTAL_GATE_SHOTS__={};
+     function snapshot(enabled){
+       if(!arch.setMainPortalRecessEnabledForTest(enabled))
+         throw Error('Scoped carved-portal switch unavailable');
+       build();VZ=1;updateCamera(0,true);cloudTick=2;render();
+       const pix=new Uint8Array(canvas.width*canvas.height*4);
+       gl.readPixels(0,0,canvas.width,canvas.height,gl.RGBA,
+         gl.UNSIGNED_BYTE,pix);
+       return {pixels:pix,source:{
+         lum:new Float32Array(cathedral.lum),
+         glyph:new Int16Array(cathedral.glyph),
+         dep:new Float32Array(cathedral.dep)},
+         pieces:arch.features.castle.recessedMainPortal,
+         clear:arch.mainPortalRecessClear,
+         walkable:!blocked(player.x,player.y,player),
+         single:document.querySelectorAll('#three-parity-canvas').length===1,
+         three:native.mode==='three'};
+     }
+     try{
+       const on=snapshot(true);
+       // Native page screenshot is taken from Playwright after this
+       // evaluation; maintain same frozen gameplay viewport and player.
+       window.__ASCII_PORTAL_GATE_SHOTS__.on=on;
+       return {enabled:on.pieces,clear:on.clear,walkable:on.walkable,
+         nativeThree:on.three,oneCanvas:on.single,
+         pixels:on.pixels.length,
+         mapUnchanged:originalMap===JSON.stringify(MEADOW_MAP)};
+     }finally{Math.random=oldRandom}
+   },gatePoint);
+   if(portalRun.enabled<10||!portalRun.clear||
+     !portalRun.walkable||!portalRun.nativeThree||
+     !portalRun.oneCanvas||!portalRun.mapUnchanged)
+     throw Error('Recessed portal first gameplay state invalid '+
+       JSON.stringify(portalRun));
+   await page.screenshot({
+     path:path.join(dir,label+'-portal-recess-on-gameplay.png'),
+     timeout:60000});
+   await page.evaluate(()=>{
+     const arch=window.__ASCII_NATIVE_COMPLETE_ARCH__;
+     arch.setMainPortalRecessEnabledForTest(false);
+     build();VZ=1;updateCamera(0,true);cloudTick=2;render();
+     const native=window.__ASCII_NATIVE__,gl=native.renderer.getContext(),
+       canvas=native.renderer.domElement;
+     const pixels=new Uint8Array(canvas.width*canvas.height*4);
+     gl.readPixels(0,0,canvas.width,canvas.height,gl.RGBA,
+       gl.UNSIGNED_BYTE,pixels);
+     window.__ASCII_PORTAL_GATE_SHOTS__.off={
+       pixels,source:{lum:new Float32Array(cathedral.lum),
+       glyph:new Int16Array(cathedral.glyph),
+       dep:new Float32Array(cathedral.dep)},
+       pieces:arch.features.castle.recessedMainPortal,
+       walkable:!blocked(player.x,player.y,player)};
+   });
+   await page.screenshot({
+     path:path.join(dir,label+'-portal-recess-off-gameplay.png'),
+     timeout:60000});
+   const portalDelta=await page.evaluate(()=>{
+     const arch=window.__ASCII_NATIVE_COMPLETE_ARCH__;
+     arch.setMainPortalRecessEnabledForTest(true);
+     build();VZ=1;updateCamera(0,true);cloudTick=2;render();
+     const native=window.__ASCII_NATIVE__,gl=native.renderer.getContext(),
+       canvas=native.renderer.domElement;
+     const pixels=new Uint8Array(canvas.width*canvas.height*4);
+     gl.readPixels(0,0,canvas.width,canvas.height,gl.RGBA,
+       gl.UNSIGNED_BYTE,pixels);
+     const A=window.__ASCII_PORTAL_GATE_SHOTS__.on,
+       B=window.__ASCII_PORTAL_GATE_SHOTS__.off;
+     let changedGPU=0,gpuRestoreErrors=0,sourceChanged=0,sourceRestoredErrors=0;
+     for(let k=0;k<pixels.length;k+=4){
+       const different=(a,b)=>
+         Math.max(Math.abs(a[k]-b[k]),Math.abs(a[k+1]-b[k+1]),
+           Math.abs(a[k+2]-b[k+2]))>8;
+       if(different(A.pixels,B.pixels))changedGPU++;
+       if(different(A.pixels,pixels))gpuRestoreErrors++;
+     }
+     const now={lum:new Float32Array(cathedral.lum),
+       glyph:new Int16Array(cathedral.glyph),
+       dep:new Float32Array(cathedral.dep)};
+     for(let i=0;i<now.lum.length;i++){
+       const different=(x,y)=>Math.abs(x.lum[i]-y.lum[i])>.01||
+         x.glyph[i]!==y.glyph[i]||Math.abs(x.dep[i]-y.dep[i])>1;
+       if(different(A.source,B.source))sourceChanged++;
+       if(different(A.source,now))sourceRestoredErrors++;
+     }
+     const result={
+       sourceChanged,gpuChanged:changedGPU,gpuRestoreErrors,
+       sourceRestoredErrors,
+       onSolids:A.pieces,offSolids:B.pieces,
+       restoredSolids:arch.features.castle.recessedMainPortal,
+       roomAheadOfDoor:arch.mainPortalRecessClear,
+       gateCollisionUnchanged:A.walkable===B.walkable,
+       threeNative:native.mode==='three',
+       originalMapUnchanged:JSON.stringify(MEADOW_MAP)===
+         JSON.stringify(MEADOW_MAP)
+     };
+     delete window.__ASCII_PORTAL_GATE_SHOTS__;
+     if(!result.roomAheadOfDoor||result.onSolids<10||
+        result.offSolids!==0||result.restoredSolids!==result.onSolids||
+        !result.gateCollisionUnchanged||sourceChanged<100||
+        changedGPU<30||gpuRestoreErrors>150||
+        sourceRestoredErrors>0||!result.threeNative)
+       throw Error('Recessed portal not reproducible in genuine gameplay '+
+         JSON.stringify(result));
+     return result;
+   });
+   await page.screenshot({
+     path:path.join(dir,label+'-portal-recess-restored-gameplay.png'),
+     timeout:60000});
+   fs.writeFileSync(path.join(dir,label+'-portal-recess-delta.json'),
+     JSON.stringify(portalDelta,null,2)+'\n');
+   console.log('NATIVE CASTLE PHYSICAL PORTAL RECESS '+label+' '+
+     JSON.stringify(portalDelta));
    fs.writeFileSync(path.join(dir,label+'-portal-ray-audit.json'),
      JSON.stringify(portalAudit,null,2)+'\n');
    console.log('NATIVE CASTLE PORTAL RAY AUDIT '+label+' '+
