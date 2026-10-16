@@ -29,6 +29,9 @@ fs.mkdirSync(out,{recursive:true});
    const hilt=pos(sword);
    const tip=sword.localToWorld(new V(0,sword.userData.tipLocalY,0));
    return {left:arm(6,9),right:arm(16,19),hilt,tip:[tip.x,tip.y,tip.z],
+      anchor:{valid:sword.userData.palmAnchorValid,
+        count:sword.userData.palmVertexCount,
+        local:sword.userData.palmLocal},
       pose:root.userData.pose()};
   });
   for(const [mode,view] of [['Idle','front'],['Walk','front'],['Run','side'],['Jump','front']]){
@@ -39,6 +42,8 @@ fs.mkdirSync(out,{recursive:true});
    // Always retain a genuine render even when an anatomy assertion fails.
    await page.screenshot({path:path.join(out,mode.toLowerCase()+'-'+view+'.png')});
    if(mode==='Idle'){
+    if(!data.anchor.valid||data.anchor.count<12)
+      throw Error('Weapon did not find weighted wrist vertices: '+JSON.stringify(data));
     for(const arm of [data.left,data.right]){
      if(arm.spread<.24||arm.spread>.59||arm.drop<.25)
       throw Error('Gauntlet still misplaced: '+JSON.stringify(data));
