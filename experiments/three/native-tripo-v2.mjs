@@ -185,22 +185,18 @@ export class NativeKnightGlyphs {
     const travelPixels=Math.hypot(dx,dy);
     this.prev = [fx, fy];
     const walking = !(e.jump > 0) && (e.walk || 0) > .5;
-    // Input intent is NOT ground speed. If the player holds Run against
-    // a wall, dx=dy=0 and the skinned actor must return toward Idle,
-    // rather than freezing a full running stance mid-stride.
-    // Calibrate cadence exclusively from actual source-map displacement.
-    const speed=walking&&travelPixels>.001&&dt>0?
-      Math.min(36,travelPixels/dt/10):0;
     const pxPerMetre=src.KG.art*fch/1.9;
     this.knight.userData.pxPerMeter=pxPerMetre;
-    // Original actor x/y is the actual MAP position, unlike the fixed
-    // origin used for the little Tripo sprite's offscreen render.
-    // Convert actor map displacement to authentic GLB bone units.
-    // Discard large teleports/camera discontinuities and airborne jumps.
+    // Source displacement drives BOTH animation speed and planted feet.
+    // Ignore teleports, airborne movement and held input at a solid wall;
+    // never feed a bogus sprint to the real skinned legs for those events.
     const sourceUnitsPerMetre=this.knight.userData.sourceUnitsPerMetre;
     const movedMetres=travelPixels/Math.max(1,pxPerMetre);
-    if(walking&&Number.isFinite(sourceUnitsPerMetre)&&
-       movedMetres/dt<12&&movedMetres<.20){
+    const validStep=walking&&Number.isFinite(sourceUnitsPerMetre)&&
+      dt>0&&movedMetres/dt<12&&movedMetres<.20;
+    const speed=validStep&&travelPixels>.001?
+      Math.min(36,travelPixels/dt/10):0;
+    if(validStep){
       const factor=sourceUnitsPerMetre/Math.max(1,pxPerMetre);
       this.travelSource+=movedMetres*sourceUnitsPerMetre;
       // In the original screen projection, right/down is negative world X/Z.
