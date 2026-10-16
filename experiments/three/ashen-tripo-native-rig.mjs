@@ -163,9 +163,9 @@ function animateRig(model,source,root,weapon){
   const soles=locateBootSoleVertices(source.meshes,sets);
   const soleVertex=new THREE.Vector3(),soleWorld=new THREE.Vector3();
   let soleVertexReads=0;
-  function soleSurfacePose(){
-    return soles.map(foot=>{
-      if(!foot)return null;
+  function soleSurfacePose(contacts=null){
+    return soles.map((foot,side)=>{
+      if(!foot||contacts&&!contacts[side])return null;
       foot.mesh.updateWorldMatrix(true,false);
       let low=Infinity,high=-Infinity,heelSum=0,toeSum=0;
       const levels=new Map();
@@ -491,7 +491,9 @@ function animateRig(model,source,root,weapon){
     const planted=[left.contact,right.contact];
     let soleGround=null,groundCorrection='off';
     if(jumpWeight<.12&&stride>.12){
-      const skinBefore=soleSurfacePose();
+      // Sample only load-bearing boots for gameplay ground correction.
+      // The workshop can still request the full diagnostic scan below.
+      const skinBefore=soleSurfacePose(planted);
       soleGround=groundedSoleTarget(skinBefore,restSoleY,planted,sourcePerMetre);
       let target=soleGround.target;
       if(soleGround.count===0){
@@ -543,7 +545,11 @@ function animateRig(model,source,root,weapon){
       twist(sets.cape[i],[['iz',capeRoll[i]],['iy',capeYaw[i]]]);
     }
     clip=airborne?'Jump':runMix>.5&&stride>.4?'Run':stride>.2?'Walk':'Idle';
-    const currentSoleSurface=soleSurfacePose();
+    // Diagnostic mesh readback is useful in the studio, but duplicating it
+    // every game tick wastes CPU skinning on a 400k-triangle character.
+    // Gameplay still samples weighted plantar vertices for real grounding.
+    const currentSoleSurface=motion?.inspectSoles===false?
+      null:soleSurfacePose();
     lastFrameData={
       speed,run:running,airborne,heading,phase,
       footContact:[left.contact,right.contact],
@@ -584,7 +590,7 @@ function animateRig(model,source,root,weapon){
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v17-rate-limited-contact'
+      animationVersion:'Tripo-IK-v18-sampled-stance-fastpath'
     };
     return clip.toLowerCase();
   }
