@@ -82,12 +82,14 @@ const raf=page=>page.evaluate(()=>new Promise(resolve=>
      zIndex:'100000',padding:'12px 15px',background:'#101014ef',
      color:'#f4e8e8',font:'14px/1.5 monospace',border:'1px solid #75646f',
      pointerEvents:'none',whiteSpace:'pre'});
-   div.textContent='REAL ASCII MEADOW / Tripo V20\\n'+
-    'Skinned model bones: '+s.bones+'\\n'+
-    'Visible raster target: '+s.rasterTargetHz+' Hz (adaptive 20-30)\\n'+
-    'Real raster frames: '+s.rasterFrames+'\\n'+
-    'Cached glyph frames: '+s.glyphCacheHits+'\\n'+
-    'Glyphs on map: '+s.glyphs;
+   div.textContent=[
+     'REAL ASCII MEADOW — authentic 40-bone knight',
+     '3D skinned bones: '+s.bones,
+     'Actual new image target: '+s.rasterTargetHz+' Hz (GPU-adaptive)',
+     'Rendered raster frames: '+s.rasterFrames,
+     'Reused glyph frames: '+s.glyphCacheHits,
+     'Glyphs in source map: '+s.glyphs
+   ].join(String.fromCharCode(10));
    document.body.appendChild(div);
    return {bones:s.bones,targetHz:s.rasterTargetHz,
      raster:s.rasterFrames,hits:s.glyphCacheHits,glyphs:s.glyphs};
