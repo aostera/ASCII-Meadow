@@ -6,7 +6,7 @@
 
 - PR #59 merged (09369d662c): устранено обрезание source-cast окна замка, геометрическая 3×3 обработка shadow edges. [CI success](https://github.com/aostera/ASCII-Meadow/actions/runs/38931456659).
 - PR #60 merged (c1f12b6496): сглажена только контактная тень рыцаря/NPC/коров в траве, directional sun/fire/lightning сохранены. [CI success](https://github.com/aostera/ASCII-Meadow/actions/runs/38944223018), [editor/character success](https://github.com/aostera/ASCII-Meadow/actions/runs/38944215332).
-- PR #62 (T07 editor touch pan/pinch) открыт; PR #61 (T08 authored-world performance baseline) draft. PR #54/#58 (T02/T03 art) отложены. Никакой аппаратной приёмки FPS/Android/iOS не заявлено.
+- PR #62 (T07 editor touch pan/pinch) merged (`73cf6c8`); PR #61 (T08 authored-world performance baseline) draft. PR #54/#58 (T02/T03 art) отложены. Никакой аппаратной приёмки FPS/Android/iOS не заявлено.
 
 ---
 
