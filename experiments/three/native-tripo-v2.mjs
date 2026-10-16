@@ -215,6 +215,9 @@ export class NativeKnightGlyphs {
       speed, run: (e.run || 0) > .5, heading: headingForSourceD8(e.d8 || 0),
       travelSource:this.travelSource,
       groundX:this.groundX,groundZ:this.groundZ,
+      // Gameplay keeps authentic sole-ground support but skips the SECOND
+      // CPU-skinned mesh diagnostic scan; studio previews keep full QA.
+      inspectSoles:false,
       jumpClipTime: NativeKnightGlyphs.jumpClipTime(e, src.JUMP_T, src.AIR0, src.AIR1)
     }, now);
     this.stats.clip = this.knight.userData.gltf.clip;
