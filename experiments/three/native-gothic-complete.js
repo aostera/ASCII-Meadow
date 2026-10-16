@@ -288,8 +288,10 @@ function nativeBuildCompleteCastle(){
     }
   }
   feature.outerTowerRelief=solids.length-before;
+  // Lower crockets follow the 108-unit spire radius, extending to
+  // |x|>=~443; guard |x|>420 while protecting the |x|<300 gateway.
   nativeOuterTowerIntrusions=solids.slice(before)
-    .filter(so=>!(so.bb[1]<-460||so.bb[0]>460))
+    .filter(so=>!(so.bb[1]<-420||so.bb[0]>420))
     .map(so=>so.bb.slice());
   nativeOuterTowerReliefClear=nativeOuterTowerIntrusions.length===0;
 
