@@ -444,7 +444,7 @@ fs.mkdirSync(dir,{recursive:true});
      content:'.hud,.stats{visibility:visible!important}'
    });
    fs.writeFileSync(path.join(dir,label+'-portal-walkable-audit.json'),
-     JSON.stringify(walkablePortal,null,2)+'\\n');
+     JSON.stringify(walkablePortal,null,2)+String.fromCharCode(10));
    console.log('NATIVE CASTLE WALKABLE PORTAL CAMERA '+label+' '+
      JSON.stringify(walkablePortal));
    if(!walkablePortal.topOfPortalInView)
