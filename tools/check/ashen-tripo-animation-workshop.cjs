@@ -35,6 +35,7 @@ fs.mkdirSync(out,{recursive:true});
        return {ready:q.ready,error:q.error,bones:q.bones,
          frame:q.frame,mode:q.mode,pose:q.state,
          weapon:q.weaponAttached,jumpHeight:q.jumpHeight,
+         paletteActive:q.paletteActive,
          clip:q.model?.userData.gltf?.clip,
          skinnedMeshes:q.model?.userData.gltf?.skinnedMeshes,
          canvasCount:document.querySelectorAll('#viewport canvas').length
@@ -46,6 +47,7 @@ fs.mkdirSync(out,{recursive:true});
      assert.ok(s.skinnedMeshes>=1,'Actual skin meshes are required');
      assert.equal(s.weapon,true,'Sword should stay parented to the wrist');
      assert.equal(s.canvasCount,1,'One model WebGL canvas');
+     assert.equal(s.paletteActive,true,'Gothic studio palette defaults on');
 
      await page.waitForFunction(()=>window.__ASHEN_ANIMATION_LAB__.frame>=35,
        undefined,{timeout:20000});
@@ -125,6 +127,14 @@ fs.mkdirSync(out,{recursive:true});
      await page.locator('#wire').click();
      assert.equal(await page.locator('#wire').getAttribute('aria-pressed'),'true');
      assert.ok((await lab()).weapon,'Weapon must remain wrist-attached across animation and controls');
+     // The recolor is NON-DESTRUCTIVE. Verify that the same loaded Tripo
+     // mesh can return to original material and be recolored again.
+     await page.locator('#palette').click();
+     assert.equal((await lab()).paletteActive,false);
+     await page.screenshot({path:path.join(out,name+'-original-material.png')});
+     await page.locator('#palette').click();
+     assert.equal((await lab()).paletteActive,true);
+     await page.screenshot({path:path.join(out,name+'-gothic-palette.png')});
 
      if(errors.length)throw Error(name+' page errors: '+errors.join(' | '));
      console.log('TRIPO WORKSHOP '+name+' OK: '+JSON.stringify({
