@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createAshenGothicLongsword} from './ashen-gothic-longsword.mjs';
-import {locateBootSoleVertices,groundedSoleTarget} from './ashen-sole-contact.mjs';
+import {locateBootSoleVertices,groundedSoleTarget,advanceSoleCorrection} from './ashen-sole-contact.mjs';
 
 export const TRIPO_V2_GLB = new URL('./assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb',import.meta.url).href;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -501,8 +501,8 @@ function animateRig(model,source,root,weapon){
         target=num?clamp(-(sumY/num)*sourcePerMetre,-.045,.045):0;
         groundCorrection=num?'pivot-fallback':'off';
       }else groundCorrection='skinned-sole';
-      contactCorrection=damp(contactCorrection,target,28,d);
-    }else contactCorrection=damp(contactCorrection,0,28,d);
+      contactCorrection=advanceSoleCorrection(contactCorrection,target,d);
+    }else contactCorrection=advanceSoleCorrection(contactCorrection,0,d);
     sets.pelvis.position.y+=contactCorrection;
     // Delayed upper-body counterweight prevents a rigid same-side lean.
     // Subtle only: heavy plate armor + long sword should retain inertia.
@@ -561,6 +561,7 @@ function animateRig(model,source,root,weapon){
       hipAbduction:[left.hipRoll,right.hipRoll],
       actorGroundXZ:ground?ground.slice():null,
       contactCorrection,groundCorrection,
+      maxContactCorrectionSpeed:.18,
       soleCorrectionTarget:soleGround?.target??null,
       soleSurfaceFloorError:soleGround?.meanHeightError??null,
       soleRestY:restSoleY.slice(),
@@ -576,7 +577,7 @@ function animateRig(model,source,root,weapon){
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v16-skinned-sole-floor-contact'
+      animationVersion:'Tripo-IK-v17-rate-limited-contact'
     };
     return clip.toLowerCase();
   }
