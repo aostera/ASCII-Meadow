@@ -45,16 +45,15 @@ ornament=function nativeGateMasonryOrnament(x,y,z,n,so,base){
   // are authored geometry decoration, not part of this quieter ashlar.
   if(so.meta.door&&pointedArch(x,y,0,so.meta.door.w,
     so.meta.door.y,so.meta.door.h))return v;
-  // Broad, staggered world-space courses (56 high, 74 wide): retain a
-  // chipped mortar rim, leave the interior with sparse worn glyphs. Using
-  // physical hit coordinates rather than canvas rows prevents 2D stickers
-  // or view-specific noise. Stone remains occupied in raycast and depth.
-  const row=Math.floor((y-120)/56);
-  const h=((y-120)%56+56)%56;
-  const u=((x+160+(row&1)*37)%74+74)%74;
-  const mortar=h<5.5||h>50.5||u<5||u>69;
-  const weathered=vnoise(x*.067+z*.002,y*.071)>.77;
-  return mortar||weathered?v:Math.min(v,.036);
+  // World-coordinate weather erosion: continuous low-frequency pockets
+  // with irregularly chipped edges. Avoid the previous regular rectangular
+  // glyph holes, which looked like a broken sprite on actual phone PNGs.
+  // Cast ray, stone silhouette, rear oak door and physical Z remain intact.
+  const longWear=vnoise(x*.021+z*.003,y*.028);
+  const chipping=vnoise(x*.105+z*.001,y*.097);
+  const pits=vnoise(x*.19-11,y*.17+9);
+  const eroded=longWear>.62&&chipping>.46&&pits>.34;
+  return eroded?Math.min(v,.036):v;
 };
 
 function nativeGothicBox(x0,x1,y0,y1,z0,z1,meta) {
