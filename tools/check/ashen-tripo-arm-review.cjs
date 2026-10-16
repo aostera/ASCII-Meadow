@@ -215,6 +215,63 @@ fs.mkdirSync(out,{recursive:true});
      footLock.stationaryPhaseError>.000001)
     throw Error('Planted feet slipped or character moonwalked into a wall: '+
       JSON.stringify(footLock));
+  // Planar game-map contact: 4 segments at 60 Hz with straight,
+  // diagonal, sideways, and gradually turning source actor movement.
+  // Check the true original boot bones independently of reported pose data.
+  const planarSweep=await page.evaluate(()=>{
+    const root=window.__ASHEN_ANIMATION_LAB__.model;
+    let bones;root.traverse(o=>{if(!bones&&o.isSkinnedMesh)bones=o.skeleton.bones;});
+    const actual=new (root.position.constructor)();
+    let groundX=0,groundZ=0,distance=0;
+    const planted=[0,0],largest=[0,0],sum=[0,0];
+    let maxAbduction=0,maxKnee=0,maxDiagnosticError=0;
+    for(let i=0;i<280;i++){
+      const a=i<70?0:i<140?Math.PI/4:i<210?Math.PI/2:
+        Math.PI/2+(i-210)/70*Math.PI/4;
+      // Fixed step distance in real Tripo source-bone coordinates.
+      groundX+=.006*Math.sin(a);
+      groundZ+=.006*Math.cos(a);
+      distance+=.006;
+      root.userData.animate(1/60,{
+        speed:15,run:true,heading:a,travelSource:distance,
+        groundX,groundZ
+      },i/60);
+      const p=root.userData.pose();
+      if(p.animationVersion!=='Tripo-IK-v12-planar-boot-pins')
+        throw Error('Wrong planar IK version');
+      maxKnee=Math.max(maxKnee,...p.kneeBend);
+      maxAbduction=Math.max(maxAbduction,...p.hipAbduction.map(Math.abs));
+      const c=Math.cos(p.heading),ss=Math.sin(p.heading);
+      for(let j=0;j<2;j++){
+        if(!p.planarFootPinned[j])continue;
+        if(!p.footPinWorldXZ[j]||!p.trueBootWorldXZ[j])
+          throw Error('Planar foot pin has no real boot evidence');
+        planted[j]++;
+        bones[j===0?34:29].getWorldPosition(actual);
+        root.worldToLocal(actual);
+        const scale=root.userData.sourceUnitsPerMetre;
+        const bx=actual.x*scale,bz=actual.z*scale;
+        const physical=[groundX+c*bx+ss*bz,groundZ-ss*bx+c*bz];
+        const diagnostic=p.trueBootWorldXZ[j];
+        maxDiagnosticError=Math.max(maxDiagnosticError,
+          Math.hypot(physical[0]-diagnostic[0],physical[1]-diagnostic[1]));
+        const anchor=p.footPinWorldXZ[j];
+        const error=Math.hypot(physical[0]-anchor[0],physical[1]-anchor[1]);
+        if(!Number.isFinite(error))throw Error('Non-finite Tripo foot bone');
+        sum[j]+=error;largest[j]=Math.max(largest[j],error);
+      }
+    }
+    return {planted,largest,mean:sum.map((v,j)=>v/Math.max(1,planted[j])),
+      maxKnee,maxAbduction,maxDiagnosticError,steps:280};
+  });
+  console.log('TRUE TRIPO XZ PLANTED-BOOT TEST '+JSON.stringify(planarSweep));
+  if(planarSweep.planted.some(n=>n<45)||
+     planarSweep.largest.some(n=>n>.085)||
+     planarSweep.maxAbduction>.231||
+     planarSweep.maxKnee>1.25||
+     planarSweep.maxDiagnosticError>.00001)
+    throw Error('2D planted boot solver slips or hyperflexes: '+
+      JSON.stringify(planarSweep));
   // Save a REAL 60 Hz Run gait as 12 sequence frames, not a still chosen
   // at a flattering moment. The screenshots use the actual Tripo GPU skin.
   await page.locator('[data-motion="Run"]').click();
