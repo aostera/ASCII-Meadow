@@ -53,3 +53,16 @@ python3 tools/check/diff.py /tmp/shots/b /tmp/shots/a --out /tmp/shots/diff   # 
 | `npc-readability.cjs` | Два постоянных NPC: занятость мелкой 12×14 ASCII-сетки и тональный диапазон во всех 576 кадрах |
 
 | `standalone-npc.cjs` | Встроенные villager/hermit PNG в автономной HTML и body-сборке, побайтовая сверка, отсутствие внешних путей |
+
+
+## Native Three.js: профильные QA (ветка experiment)
+
+| Тест/набор | Охват |
+|---|---|
+| `three-native-game.cjs`, `three-parity.cjs` | Настоящий native runtime, одно WebGL2-окно, source-сцена, fallback, frozen parity |
+| `three-native-shadow-layer.cjs`, `three-native-body-shadows.cjs` | Слой архитектурных теней; контактная тень рыцаря/NPC/коров без изменения directional casts |
+| `three-native-tree-depth.cjs`, `three-native-bush-depth.cjs`, `three-native-stone-depth.cjs` | Объекты и GPU depth/occlusion на desktop и phone viewport |
+| `three-native-grey-editor.cjs`, `three-native-recovery.cjs`, `three-native-mobile.mjs` | Серые модели, редактор, восстановление контекста, mobile lifecycle |
+| `three-performance.cjs`, `three-device-profiler.cjs` | Лабораторная нагрузка; **не** аппаратные FPS |
+
+Соответствующие workflow находятся в `.github/workflows/three-*`. Проверки нового редактора/оптимизации в PR #62/#61 нельзя считать базовыми, пока PR не влит. Источник статуса — [Three STATUS](https://github.com/aostera/ASCII-Meadow/blob/experiment/threejs-ascii-prototype/experiments/three/STATUS.md).
