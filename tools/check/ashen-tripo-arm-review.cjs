@@ -176,6 +176,14 @@ fs.mkdirSync(out,{recursive:true});
           throw Error('Wrong v15 genuine-sole probe controller');
         if(!Array.isArray(pose.soleSurface)||pose.soleSurface.length!==2)
           throw Error('No real mesh soleSurface state');
+        if(!Array.isArray(pose.soleRestY)||pose.soleRestY.length!==2||
+           pose.soleRestY.some(v=>!Number.isFinite(v)))
+          throw Error('Skinned boot ground references are absent');
+        if(Math.abs(pose.contactCorrection)>.04501)
+          throw Error('Unbounded real-sole pelvis correction');
+        if(mode!=='Idle'&&(pose.groundCorrection!=='skinned-sole'||
+           !Number.isFinite(pose.soleSurfaceFloorError)))
+          throw Error('Movement did not use actual weighted boot-sole contact');
         for(let j=0;j<2;j++){
           const sole=pose.soleSurface[j];
           if(!sole||!Number.isFinite(sole.minY)||!Number.isFinite(sole.maxY)||
