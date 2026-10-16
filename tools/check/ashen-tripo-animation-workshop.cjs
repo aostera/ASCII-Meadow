@@ -122,9 +122,8 @@ fs.mkdirSync(out,{recursive:true});
      assert.ok(Math.abs(calib.left.thigh-.209)<.01 &&
        Math.abs(calib.right.shin-.169)<.01,
        'Gait must use measured Tripo bone lengths, not guessed segments');
-     assert.ok(Math.abs(calib.left.restHip)>0.015 &&
-       Math.abs(calib.left.restShin)>0.015,
-       'IK should compensate the GLB non-straight knee rest pose');
+     assert.ok(Math.abs(calib.left.restShin-calib.left.restHip)>.03,
+       'IK should compensate actual rest-knee curvature, even if upper thigh is upright');
      assert.ok(running.pose.stepFrequencyHz<2.1 &&
        running.pose.stepFrequencyHz>1.1,
        'Human run must not produce 7+ fast footfalls per second');
