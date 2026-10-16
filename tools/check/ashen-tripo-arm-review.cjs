@@ -125,6 +125,39 @@ fs.mkdirSync(out,{recursive:true});
     minHipDistance:Math.min(...clearances.map(x=>x.minClearance)),
     minBladeDrop:Math.min(...clearances.map(x=>x.minVertical))
   }));
+  // True foot-to-floor QA: sample actual GLB toe/boot pivot world
+  // coordinates over moving frames, not the synthetic foot-contact labels.
+  const groundProbe=await page.evaluate(()=>{
+    const root=window.__ASHEN_ANIMATION_LAB__.model;
+    let bones;root.traverse(o=>{if(!bones&&o.isSkinnedMesh)bones=o.skeleton.bones;});
+    const V=new (bones[0].position.constructor)();
+    const summary=[];
+    for(const [name,speed,run] of [['Walk',8,false],['Run',15,true]]){
+      const ground=[],swing=[],pelvis=[],knees=[],footX=[];
+      for(let i=0;i<200;i++){
+        root.userData.animate(1/60,{speed,run,heading:0},i/60);
+        const pose=root.userData.pose();
+        if(i<60)continue; // allow transitions/stride speed to settle
+        bones[0].getWorldPosition(V);pelvis.push(V.y);
+        knees.push(...pose.kneeBend);
+        for(const [idx,side] of [[34,0],[29,1]]){
+          bones[idx].getWorldPosition(V);
+          (pose.footContact[side]?ground:swing).push(V.y);
+          footX.push(V.z);
+        }
+      }
+      const range=a=>[Math.min(...a),Math.max(...a)];
+      summary.push({name,ground:range(ground),swing:range(swing),
+        pelvis:range(pelvis),knee:range(knees),footForward:range(footX)});
+    }
+    return summary;
+  });
+  console.log('REAL GLB TOE PLANTING AND PELVIS QA '+JSON.stringify(groundProbe));
+  for(const m of groundProbe){
+    if(m.ground[0]<-.07||m.ground[1]>.13||
+      m.pelvis[1]-m.pelvis[0]>.09||m.knee[1]>1.25)
+      throw Error('Boot-ground / pelvis out of bounds: '+JSON.stringify(m));
+  }
   // Save a REAL 60 Hz Run gait as 12 sequence frames, not a still chosen
   // at a flattering moment. The screenshots use the actual Tripo GPU skin.
   await page.locator('[data-motion="Run"]').click();
