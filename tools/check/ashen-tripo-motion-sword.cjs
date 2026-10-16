@@ -61,7 +61,7 @@ fs.mkdirSync(output,{recursive:true});
          render(){},convert(){},emit(){}};
        for(const [i,x] of [100,102,102].entries())
          NativeKnightGlyphs.prototype.draw.call(stub,
-           {x,y:40,walk:1,run:1,d8:0,jump:0},null,1,1,
+           {x,y:[40,41,41][i],walk:1,run:1,d8:0,jump:0},null,1,1,
            {t:(i+1)/30,CW:1,CH:1,KG:{art:44.4},JUMP_T:1,AIR0:.2,AIR1:.8});
        return samples;
      });
@@ -70,6 +70,7 @@ fs.mkdirSync(output,{recursive:true});
         runIntoWall[2][1]!==runIntoWall[1][1]||
         !Number.isFinite(runIntoWall[1][2])||
         !(runIntoWall[1][2]<runIntoWall[0][2])||
+        !(runIntoWall[1][3]<runIntoWall[0][3])||
         runIntoWall[2][2]!==runIntoWall[1][2]||
         runIntoWall[2][3]!==runIntoWall[1][3])
        throw Error('Player moonwalks while blocked: '+JSON.stringify(runIntoWall));
