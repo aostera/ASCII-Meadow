@@ -150,12 +150,24 @@ function animateRig(model,source,root,weapon){
     weaponAttached:true,footContact:[true,true],kneeBend:[0,0]};
   const pos=sets.spine.position.clone();
   const pelvisRest=sets.pelvis.position.clone();
-  const lastContacts=[false,false];
-  // Footstrike is just after the swing foot reaches forward. Walking has
-  // bilateral double support; running has two brief airborne intervals.
-  // A stationary studio uses treadmill targets; an independently moving
-  // game root can later use world-space anchors with the same 2-bone IK.
-  function legPose(bones,cal,offset,weight,jumpWeight,run,pelvisBob){
+  const shoePivot=[sets.leftLeg[3],sets.rightLeg[3]];
+  const pin=[{contact:false,travel:0,x:0},{contact:false,travel:0,x:0}];
+  const bootWorld=new THREE.Vector3();
+  let lastTravel=null, contactCorrection=0;
+  const sourcePerMetre=1/model.getWorldScale(new THREE.Vector3()).y;
+  // Each sole's own original pivot level in normalized character metres.
+  model.updateMatrixWorld(true);
+  const restBootY=shoePivot.map(b=>{
+    b.getWorldPosition(bootWorld);
+    return root.worldToLocal(bootWorld.clone()).y;
+  });
+  // The ASCII game's sprite is centred on the hero, but the true ground
+  // travel is passed separately. During stance an anchor holds the
+  // *virtual world-space sagittal foot position*: player travel + foot X
+  // remains fixed until toe-off, even when the sprite camera follows.
+  // In the standing studio without motion.travelSource, use the old
+  // phase-based treadmill as a preview, never misreport it as foot lock.
+  function legPose(bones,cal,offset,weight,jumpWeight,run,pelvisBob,footId,travelSource,hasTravel){
     const p=((phase/(2*Math.PI)+offset)%1+1)%1;
     const stance=.63-run*.21;
     const inStance=p<stance;
@@ -164,7 +176,20 @@ function animateRig(model,source,root,weapon){
     // Heel strike in front, mid-stance over pelvis, toe-off behind.
     // The weight shift is predictable and continuous at touchdown.
     const travel=inStance?1-2*u:2*smooth(u)-1;
-    const x=cal.restX+weight*step*travel*(1-.78*jumpWeight);
+    let x=cal.restX+weight*step*travel*(1-.78*jumpWeight);
+    const anchored=hasTravel&&weight>.2&&jumpWeight<.15;
+    if(anchored&&inStance){
+      if(!pin[footId].contact){
+        pin[footId].contact=true;
+        pin[footId].travel=travelSource;
+        pin[footId].x=x;
+      }
+      // This subtracts the REAL player-map displacement, rather than
+      // inventing foot motion from animation time. Release at toe-off.
+      x=pin[footId].x-(travelSource-pin[footId].travel);
+    }else{
+      pin[footId].contact=false;
+    }
     const lift=inStance?0:(.041+run*.020)*Math.sin(Math.PI*u);
     const y=cal.restY-pelvisBob+weight*lift*(1-.57*jumpWeight)+
       .067*jumpWeight;
@@ -200,7 +225,9 @@ function animateRig(model,source,root,weapon){
       twist(bones[3],[['iz',Math.max(0,toeOff)*.19*weight]]);
     }
     return {lift:weight*lift,x:x-cal.restX,y,knee,hip:hipDelta,
-      anklePitch:footPitch,contact,stance:inStance,phase:p};
+      anklePitch:footPitch,contact,stance:inStance,phase:p,
+      pinned:anchored&&inStance,anchorWorldX:anchored&&inStance?
+        x+travelSource:null};
   }
   function update(dt,motion,now){
     const d=clamp(Number(dt)||1/60,0,1/15);
@@ -215,11 +242,25 @@ function animateRig(model,source,root,weapon){
     const jumpTime=airborne?motion.jumpClipTime:0;
     const arc=airborne?Math.max(0,Math.sin(Math.PI*clamp(jumpTime/1.49,0,1))):0;
     const jumpWeight=Math.max(arc*.94,airMix*.32);
-    // phase must NEVER reset when moving between Idle/Walk/Run.
-    // Gait cycles per second (2 steps per cycle): ~1.7 walking steps/s
-    // and ~3.5 running steps/s, rather than the previous ~7.7/s.
+    // The native map provides monotonic distance in ORIGINAL Tripo bone
+    // units (not render pixels). Match gait phase to actual ground travel;
+    // when the studio supplies no such field, retain 60 Hz preview timing.
+    const travelSource=Number(motion?.travelSource);
+    const hasTravel=Number.isFinite(travelSource)&&travelSource>=0;
+    let travelDelta=0;
+    if(hasTravel){
+      if(lastTravel!==null&&travelSource>=lastTravel)
+        travelDelta=clamp(travelSource-lastTravel,0,.13);
+      else pin.forEach(p=>p.contact=false); // teleport/reset
+      lastTravel=travelSource;
+    }else{lastTravel=null;pin.forEach(p=>p.contact=false);}
     const hz=(.86+.56*runMix)*clamp(Math.sqrt(Math.max(.35,speed)),.8,1.25);
-    phase+=d*2*Math.PI*hz*(stride>.03?1:.02);
+    const stanceRatio=.63-runMix*.21;
+    const stepLength=.076+runMix*.052;
+    const cycleDistance=2*stepLength/stanceRatio;
+    phase+=hasTravel&&travelDelta>.00001?
+      2*Math.PI*travelDelta/cycleDistance:
+      d*2*Math.PI*hz*(stride>.03?1:.02);
     const swing=Math.sin(phase);
     const armAmplitude=(.19+runMix*.20)*stride*(1-.78*airMix);
     // The source Tripo shoulder bones rest in a near T-pose along +/-Z.
@@ -266,9 +307,26 @@ function animateRig(model,source,root,weapon){
     sets.pelvis.position.copy(pelvisRest);
     sets.pelvis.position.y+=pelvisBob;
     const left=legPose(sets.leftLeg,legCalibration.left,0,
-      stride,jumpWeight,runMix,pelvisBob);
+      stride,jumpWeight,runMix,pelvisBob,0,travelSource,hasTravel);
     const right=legPose(sets.rightLeg,legCalibration.right,.5,
-      stride,jumpWeight,runMix,pelvisBob);
+      stride,jumpWeight,runMix,pelvisBob,1,travelSource,hasTravel);
+    // Aim to place the actual original boot pivots on the ground,
+    // compensating for skin rest curvature and knee solver reach.
+    // This is pelvis-level vertical contact correction; it is not a
+    // per-triangle shoe collision model.
+    if(jumpWeight<.12&&stride>.12){
+      let sumY=0,num=0;
+      for(let i=0;i<2;i++){
+        if(!(i===0?left.contact:right.contact))continue;
+        shoePivot[i].getWorldPosition(bootWorld);
+        root.worldToLocal(bootWorld);
+        sumY+=bootWorld.y-restBootY[i];num++;
+      }
+      const target=num?
+        clamp(-(sumY/num)*sourcePerMetre,-.055,.055):0;
+      contactCorrection=damp(contactCorrection,target,28,d);
+    }else contactCorrection=damp(contactCorrection,0,28,d);
+    sets.pelvis.position.y+=contactCorrection;
     twist(sets.spine,[['iz',-.016*stride-.078*runMix-.012*arc],
       ['ix',.019*Math.sin(phase)*stride]]);
     twist(sets.chest,[['iz',-.012*runMix],['ix',.012*Math.sin(bodyClock*1.75)]]);
@@ -312,6 +370,10 @@ function animateRig(model,source,root,weapon){
       leftFootX:left.x,rightFootX:right.x,
       kneeBend:[left.knee,right.knee],
       legCalibration,stepFrequencyHz:hz,pelvisBob,
+      travelSource:hasTravel?travelSource:null,travelDelta,
+      footPinned:[left.pinned,right.pinned],
+      footAnchorWorldX:[left.anchorWorldX,right.anchorWorldX],
+      contactCorrection,
       anklePitch:[left.anklePitch,right.anklePitch],
       stancePhase:[left.stance,right.stance],
       footY:[left.y,right.y],
@@ -321,7 +383,7 @@ function animateRig(model,source,root,weapon){
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v9-longer-reachable-step'
+      animationVersion:'Tripo-IK-v10-distance-synced-foot-pins'
     };
     return clip.toLowerCase();
   }
@@ -367,6 +429,7 @@ export function createGltfKnight(_THREE=THREE,{url=TRIPO_V2_GLB,onLoad,onError}=
       weapon.userData.palmAnchorValid=grip.valid;
       weapon.userData.palmVertexCount=grip.vertices;
       weapon.userData.palmLocal=grip.point.toArray();
+      root.userData.sourceUnitsPerMetre=1/sc;
       const anim=animateRig(model,source,root,weapon);
       root.userData.gltf={
         loaded:true,
