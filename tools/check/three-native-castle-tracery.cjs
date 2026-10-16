@@ -67,10 +67,11 @@ fs.mkdirSync(dir,{recursive:true});
      function snapshot(enabled){
        if(!gothic.setFacadeEnabledForTest(enabled))
          throw Error('Test-only castle geometry toggle is inaccessible');
-       // Rebuild the actual authored raycast solids and source flora for
-       // EACH state; a static rectangle or fake UV overlay cannot pass.
-       buildWorld();
-       placeFlora();
+       // Rebuild the complete original renderer world, including source
+       // sprites, all architecture rays, shadow, flora and depth worldGen.
+       // Partial buildWorld()/placeFlora() leaks old GPU cache state and
+       // can make the third pass spuriously differ from the first.
+       build();
        updateCamera(0,true);
        render();
        const out=new Uint8Array(canvas.width*canvas.height*4);
@@ -108,7 +109,7 @@ fs.mkdirSync(dir,{recursive:true});
        Math.random=oldRandom;
        if(!gothic.facadeEnabled){
          gothic.setFacadeEnabledForTest(true);
-         buildWorld();placeFlora();
+         build();
        }
      }
    });
