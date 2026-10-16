@@ -47,7 +47,8 @@ fs.mkdirSync(out,{recursive:true});
      assert.ok(s.skinnedMeshes>=1,'Actual skin meshes are required');
      assert.equal(s.weapon,true,'Sword should stay parented to the wrist');
      assert.equal(s.canvasCount,1,'One model WebGL canvas');
-     assert.equal(s.paletteActive,true,'Gothic studio palette defaults on');
+     assert.equal(s.paletteActive,false,
+       'Original Tripo materials MUST be the default, not unapproved white/burgundy tint');
 
      await page.waitForFunction(()=>window.__ASHEN_ANIMATION_LAB__.frame>=35,
        undefined,{timeout:20000});
@@ -210,14 +211,17 @@ fs.mkdirSync(out,{recursive:true});
        el.value='0';el.dispatchEvent(new Event('input',{bubbles:true}));
      });
      await page.locator('#frame').click();
-     // The recolor is NON-DESTRUCTIVE. Verify that the same loaded Tripo
-     // mesh can return to original material and be recolored again.
-     await page.locator('#palette').click();
+     // Only the genuine original model is approved as the studio default.
+     // Verify that unapproved tint is opt-in and 100% reversible.
      assert.equal((await lab()).paletteActive,false);
      await page.screenshot({path:path.join(out,name+'-original-material.png')});
      await page.locator('#palette').click();
      assert.equal((await lab()).paletteActive,true);
-     await page.screenshot({path:path.join(out,name+'-gothic-palette.png')});
+     await page.screenshot({path:path.join(out,name+'-UNAPPROVED-tint.png')});
+     await page.locator('#palette').click();
+     assert.equal((await lab()).paletteActive,false,
+       'After comparison, source Tripo material must be restored');
+     await page.screenshot({path:path.join(out,name+'-restored-original.png')});
 
      if(errors.length)throw Error(name+' page errors: '+errors.join(' | '));
      console.log('TRIPO WORKSHOP '+name+' OK: '+JSON.stringify({
