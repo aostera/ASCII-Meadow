@@ -77,7 +77,15 @@ fs.mkdirSync(dir,{recursive:true});
        const out=new Uint8Array(canvas.width*canvas.height*4);
        gl.readPixels(0,0,canvas.width,canvas.height,
          gl.RGBA,gl.UNSIGNED_BYTE,out);
-       return out;
+       // Keep a source-space sample too: a solid can exist in the 3D
+       // registry yet remain hidden by the original masonry rasterizer.
+       const c=cathedral;
+       return {pixels:out,source:{
+         lum:new Float32Array(c.lum),glyph:new Int16Array(c.glyph),
+         dep:new Float32Array(c.dep),left:c.cx0,top:c.cy0,
+         width:c.BW,height:c.BH,
+         viewport:[VX0,VX1,VY0,VY1]
+       }};
      }
      try{
        // Fog banks otherwise have new random seeds on each rebuild.
@@ -93,16 +101,37 @@ fs.mkdirSync(dir,{recursive:true});
        const restored=snapshot(true);
        const restoredFeatures=gothic.features.castle.portalSideTracery;
        let changed=0,restoreErrors=0,offToRestored=0,warmupToOn=0;
-       for(let i=0;i<on.length;i+=4){
+       let sourceChanged=0,sourceVisibleChanged=0,sourceChangedBounds=null;
+       const ac=on.source,bc=off.source;
+       if(ac.width!==bc.width||ac.height!==bc.height||
+          ac.left!==bc.left||ac.top!==bc.top)
+         throw Error('Castle source-grid moved during reversible QA');
+       for(let k=0;k<ac.lum.length;k++){
+         if(Math.abs(ac.lum[k]-bc.lum[k])<.01&&
+            ac.glyph[k]===bc.glyph[k]&&
+            Math.abs(ac.dep[k]-bc.dep[k])<1)continue;
+         sourceChanged++;
+         const cx=ac.left+k%ac.width,cy=ac.top+Math.floor(k/ac.width);
+         if(cx>=ac.viewport[0]&&cx<=ac.viewport[1]&&
+            cy>=ac.viewport[2]&&cy<=ac.viewport[3])sourceVisibleChanged++;
+         if(!sourceChangedBounds)sourceChangedBounds=[cx,cy,cx,cy];
+         else{
+           sourceChangedBounds[0]=Math.min(cx,sourceChangedBounds[0]);
+           sourceChangedBounds[1]=Math.min(cy,sourceChangedBounds[1]);
+           sourceChangedBounds[2]=Math.max(cx,sourceChangedBounds[2]);
+           sourceChangedBounds[3]=Math.max(cy,sourceChangedBounds[3]);
+         }
+       }
+       for(let i=0;i<on.pixels.length;i+=4){
          function different(a,b){
            return Math.max(Math.abs(a[i]-b[i]),
              Math.abs(a[i+1]-b[i+1]),
              Math.abs(a[i+2]-b[i+2]))>8;
          }
-         if(different(on,off))changed++;
-         if(different(on,restored))restoreErrors++;
-         if(different(off,restored))offToRestored++;
-         if(different(warmup,on))warmupToOn++;
+         if(different(on.pixels,off.pixels))changed++;
+         if(different(on.pixels,restored.pixels))restoreErrors++;
+         if(different(off.pixels,restored.pixels))offToRestored++;
+         if(different(warmup.pixels,on.pixels))warmupToOn++;
        }
        if(!(onFeatures>=52&&offFeatures===0&&restoredFeatures>=52))
          throw Error('QA toggle did not actually rebuild source solids '+JSON.stringify({
@@ -114,6 +143,7 @@ fs.mkdirSync(dir,{recursive:true});
        if(JSON.stringify(MEADOW_MAP)!==mapOriginal)
          throw Error('QA-only castle rebuild touched authored map');
        return {changedPixels:changed,restoreErrors,
+         sourceChanged,sourceVisibleChanged,sourceChangedBounds,
          warmupToOn,offToRestored,
          onFeatures,offFeatures,restoredFeatures,
          canvas:[canvas.width,canvas.height],
