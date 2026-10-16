@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const {pathToFileURL}=require('node:url'),path=require('node:path');
 (async()=>{
- const {locateBootSoleVertices,groundedSoleTarget}=await import(
+ const {locateBootSoleVertices,groundedSoleTarget,advanceSoleCorrection}=await import(
    pathToFileURL(path.resolve(__dirname,'../../experiments/three/ashen-sole-contact.mjs')).href);
  const bones=Array.from({length:40},(_,i)=>({id:i}));
  const points=[];
@@ -74,5 +74,24 @@ const {pathToFileURL}=require('node:url'),path=require('node:path');
  v=groundedSoleTarget(hovered,rest,[false,false],.5);
  assert.equal(v.target,0,'Airborne and idle foot release should not correct pelvis');
  assert.throws(()=>groundedSoleTarget(hovered,rest,[true,true],0));
+ // Contact support may change immediately, but the weighted pelvis
+ // must not jump on the very next simulation frame (any dt).
+ let current=0;
+ for(let i=0;i<8;i++){
+   const next=advanceSoleCorrection(current,.045,1/60);
+   assert.ok(next>=current&&next-current<=.18/60+1e-12,
+     'Ground correction exceeded maximum upward rate');
+   current=next;
+ }
+ assert.ok(current>0&&current<.045,'Support must approach target smoothly');
+ const retreat=advanceSoleCorrection(current,-.045,1/60);
+ assert.ok(current-retreat<=.18/60+1e-12,
+   'Landing/replant must be rate-limited in BOTH directions');
+ assert.equal(advanceSoleCorrection(current,0,0),current);
+ const half=advanceSoleCorrection(0,.045,1/120);
+ assert.ok(half<=.18/120+1e-12,
+   'Slower/faster frame rate may not multiply maximum pelvis velocity');
+ assert.throws(()=>advanceSoleCorrection(0,.1,-.01));
+ assert.throws(()=>advanceSoleCorrection(0,.1,.02,0));
  console.log('PASS real weighted boot selection and bounded stance-only sole-height correction');
 })().catch(e=>{console.error(e);process.exitCode=1});
