@@ -537,7 +537,11 @@ fs.mkdirSync(dir,{recursive:true});
        const originalRandom=Math.random;Math.random=()=>.513;
        try{
          build();VZ=.35;camX=cam[0];camY=cam[1];
-         setView();cloudTick=2;render();
+         // The real fog field memoizes every second frame and would
+         // otherwise reuse the PREVIOUS gameplay camera's fog texture
+         // for the first medium snapshot. Refresh the original fog from
+         // the exact same inspection camera on each QA pass only.
+         setView();cloudTick=2;FG.tick=0;render();
        }finally{Math.random=originalRandom}
        const nat=window.__ASCII_NATIVE__,gl=nat.renderer.getContext(),
          can=nat.renderer.domElement,p=new Uint8Array(can.width*can.height*4);
