@@ -210,12 +210,13 @@ fs.mkdirSync(out,{recursive:true});
   if(soleSurfaceProbe.length!==3||
      soleSurfaceProbe.some(s=>s.sampledCounts.some(n=>n<6)))
     throw Error('Sole mesh QA did not scan both real boots');
-  // Intersect the Gothic blade centreline with sampled REAL right boot
+  // Intersect the actual diamond-section Gothic blade with the right boot
   // vertices (CPU-skinned every pose). This is stronger than hip envelope
   // clearance, but deliberately weaker than exhaustive triangle collision:
   // thin edges, cape and plate tassets still need visual/art acceptance.
   const bladeBootProbe=await page.evaluate(async()=>{
     const {locateBootSoleVertices}=await import('./ashen-sole-contact.mjs');
+    const {pointBladeGap}=await import('./ashen-blade-envelope.mjs');
     const root=window.__ASHEN_ANIMATION_LAB__.model;
     const meshes=[];root.traverse(o=>{if(o.isSkinnedMesh)meshes.push(o);});
     const bones=meshes[0].skeleton.bones;
@@ -226,8 +227,9 @@ fs.mkdirSync(out,{recursive:true});
     const boot=locateBootSoleVertices(meshes,legs)[1];
     if(!boot||boot.indices.length<6)throw Error('No weighted sword-side boot mesh');
     const weapon=root.userData.weapon,V=root.position.constructor;
-    const start=new V(),end=new V(),p=new V(),v=new V(),ab=new V();
-    let minDistance=Infinity,closeSamples=0,samples=0,closest=null;
+    const p=new V();
+    let minDistance=Infinity,closeSamples=0,samples=0,closest=null,
+      bladeIntersections=0;
     for(const [mode,speed,run] of [['Idle',0,false],['Walk',8,false],['Run',15,true],['Jump',0,false]]){
       for(const deg of [0,45,90,135,180,225,270,315]){
         for(let i=0;i<50;i++){
@@ -237,18 +239,15 @@ fs.mkdirSync(out,{recursive:true});
             jumpClipTime:mode==='Jump'?t:undefined
           },t);
           boot.mesh.updateWorldMatrix(true,false);
-          weapon.localToWorld(start.set(0,-.045,0));
-          weapon.localToWorld(end.set(0,-.475,0));
-          ab.subVectors(end,start);
-          const d2=Math.max(1e-8,ab.lengthSq());
           for(const idx of boot.indices){
             boot.mesh.getVertexPosition(idx,p);
             p.applyMatrix4(boot.mesh.matrixWorld);
-            v.subVectors(p,start);
-            const k=Math.max(0,Math.min(1,v.dot(ab)/d2));
-            v.copy(ab).multiplyScalar(k).add(start);
-            const gap=p.distanceTo(v);
+            weapon.worldToLocal(p);
+            // This uses the actual diamond widths/depths of the sword
+            // mesh, not a fictitious zero-width centerline.
+            const gap=pointBladeGap(p.x,p.y,p.z);
             samples++;
+            if(gap<0)bladeIntersections++;
             if(gap<.020)closeSamples++;
             if(gap<minDistance){
               minDistance=gap;closest={mode,deg,frame:i};
@@ -257,13 +256,13 @@ fs.mkdirSync(out,{recursive:true});
         }
       }
     }
-    return {minDistance,closeSamples,samples,closest,
+    return {minDistance,bladeIntersections,closeSamples,samples,closest,
       sampledBootVertices:boot.indices.length};
   });
-  console.log('REAL SKINNED SWORD/BLADE-TO-RIGHT-BOOT PROXIMITY '+JSON.stringify(bladeBootProbe));
+  console.log('REAL DIAMOND SWORD/BLADE-TO-RIGHT-BOOT SURFACE QA '+JSON.stringify(bladeBootProbe));
   if(!Number.isFinite(bladeBootProbe.minDistance)||
      bladeBootProbe.sampledBootVertices<6||bladeBootProbe.samples<4000||
-     bladeBootProbe.minDistance<.004)
+     bladeBootProbe.bladeIntersections!==0)
     throw Error('Blade may penetrate real sampled Tripo boot geometry: '+
       JSON.stringify(bladeBootProbe));
   // Real actor-ground travel: a planted foot must remain at one
