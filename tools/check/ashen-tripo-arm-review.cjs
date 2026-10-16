@@ -279,10 +279,19 @@ fs.mkdirSync(out,{recursive:true});
     const root=window.__ASHEN_ANIMATION_LAB__.model;
     let bones;root.traverse(o=>{if(!bones&&o.isSkinnedMesh)bones=o.skeleton.bones;});
     const records=[],toeQuat=bones[34].quaternion.clone();
-    let toeAngleRange=0;
+    const oldToe=toeQuat.clone(),oldAnkle=bones[33].quaternion.clone();
+    let toeAngleRange=0,maxToeTick=0,maxAnkleTick=0;
     for(let i=0;i<240;i++){
       root.userData.animate(1/60,{speed:15,run:true,heading:0},i/60);
-      if(i<65)continue;
+      if(i<65){
+        oldToe.copy(bones[34].quaternion);
+        oldAnkle.copy(bones[33].quaternion);
+        continue;
+      }
+      maxToeTick=Math.max(maxToeTick,oldToe.angleTo(bones[34].quaternion));
+      maxAnkleTick=Math.max(maxAnkleTick,oldAnkle.angleTo(bones[33].quaternion));
+      oldToe.copy(bones[34].quaternion);
+      oldAnkle.copy(bones[33].quaternion);
       const p=root.userData.pose();
       if(p.animationVersion!=='Tripo-IK-v14-grounded-transitions')
         throw Error('v14 authentic skin pose not loaded');
@@ -306,6 +315,7 @@ fs.mkdirSync(out,{recursive:true});
     return {samples:records.length,
       heelMax:max('heel'),midMax:max('mid'),toeMax:max('toe'),
       toeMin:min('toeAngle'),toeBoneAngleRange:toeAngleRange,
+      maxToeTick,maxAnkleTick,
       hipMin:min('hip'),hipMax:max('hip'),
       maxCounterLean:Math.max(...records.map(r=>Math.abs(r.counter))),
       maxSupport:Math.max(max('leftSupport'),max('rightSupport')),
@@ -319,6 +329,7 @@ fs.mkdirSync(out,{recursive:true});
   if(gaitLoadProbe.samples<160||gaitLoadProbe.heelMax<.70||
      gaitLoadProbe.midMax<.70||gaitLoadProbe.toeMax<.70||
      gaitLoadProbe.toeMin>-.025||gaitLoadProbe.toeBoneAngleRange<.025||
+     gaitLoadProbe.maxToeTick>.045||gaitLoadProbe.maxAnkleTick>.18||
      gaitLoadProbe.hipMin>-.0018||gaitLoadProbe.hipMax<.0018||
      gaitLoadProbe.maxSupport>1.0001||gaitLoadProbe.minSupport<-.0001||
      gaitLoadProbe.maxCounterLean>.014||
