@@ -35,6 +35,7 @@
 
 - **T00 — DONE (2026-10-16).** Полный CI [run 38852776960](https://github.com/aostera/ASCII-Meadow/actions/runs/38852776960) **success** на `1a6eb80257e1`, native editor QA [run 38852772547](https://github.com/aostera/ASCII-Meadow/actions/runs/38852772547) **success**. `main` не изменён.
 - **T01 — DONE как аудит, НЕ финальная приёмка арта (2026-10-16).** Лично просмотрены 8 реальных PNG из CI `three-native-art/` (4 постройки × desktop/phone). [Аудит и дефекты](ARCHITECTURE_VISUAL_AUDIT_T01.md), [источник PNG](https://github.com/aostera/ASCII-Meadow/actions/runs/38852776960/artifacts/12026581565). Отдельно выявлены проблемы framing/HUD и слишком однообразные большие каменные массы, точно не заявляется соответствие недоступным референсам.
+- **T02 — IN_PROGRESS, контрольная точка PR #54 (2026-10-16).** Настоящие 64 solids на четырёх боковых стрельчатых навесах фасада, центральный портал защищён. Прицельное on/off/on сравнение в **игровом native Three**: desktop 50 858 и phone viewport 70 173 изменённых GPU-пикселей, ровно 0 ошибок восстановления после возврата on, оригинальная карта сохранена. [Профильная CI 38858012638](https://github.com/aostera/ASCII-Meadow/actions/runs/38858012638) success на `42b6224a`. Это **не завершение T02**: PR draft, другие обязательные QA/визуальная проверка и оставшаяся детализация башен ещё открыты; на T03 пока не переходить.
 
 ## Исполнение в строгом порядке
 
