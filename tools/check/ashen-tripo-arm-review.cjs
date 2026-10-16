@@ -158,6 +158,50 @@ fs.mkdirSync(out,{recursive:true});
       m.pelvis[1]-m.pelvis[0]>.09||m.knee[1]>1.25)
       throw Error('Boot-ground / pelvis out of bounds: '+JSON.stringify(m));
   }
+  // New v15: check the ACTUAL animated boot mesh, not just the 34/29
+  // toe joint pivots. Sample a small subset of lower-boot weighted source
+  // vertices at 60 Hz across both movement types. These are diagnostics:
+  // a sampled vertex clearance is not triangle-level floor collision.
+  const soleSurfaceProbe=await page.evaluate(()=>{
+    const rig=window.__ASHEN_ANIMATION_LAB__.model;
+    const result=[];
+    for(const [mode,speed,run] of [['Idle',0,false],['Walk',8,false],['Run',15,true]]){
+      const heelRanges=[[],[]],toeRanges=[[],[]],minRanges=[[],[]],
+        sourceCandidateCounts=[0,0],sampledCounts=[0,0];
+      for(let i=0;i<150;i++){
+        rig.userData.animate(1/60,{speed,run,heading:0},i/60);
+        if(i<40)continue;
+        const pose=rig.userData.pose();
+        if(pose.animationVersion!=='Tripo-IK-v15-skinned-sole-contact-probe')
+          throw Error('Wrong v15 genuine-sole probe controller');
+        if(!Array.isArray(pose.soleSurface)||pose.soleSurface.length!==2)
+          throw Error('No real mesh soleSurface state');
+        for(let j=0;j<2;j++){
+          const sole=pose.soleSurface[j];
+          if(!sole||!Number.isFinite(sole.minY)||!Number.isFinite(sole.maxY)||
+             !Number.isFinite(sole.heelY)||!Number.isFinite(sole.toeY)||
+             sole.sampleCount<6||sole.candidateCount<12||
+             sole.minY>sole.maxY)
+            throw Error('Weighted boot geometry sample missing/invalid: '+
+              JSON.stringify({mode,j,sole}));
+          sampledCounts[j]=sole.sampleCount;
+          sourceCandidateCounts[j]=sole.candidateCount;
+          heelRanges[j].push(sole.heelY);
+          toeRanges[j].push(sole.toeY);
+          minRanges[j].push(sole.minY);
+        }
+      }
+      const range=a=>[Math.min(...a),Math.max(...a)];
+      result.push({mode,sampledCounts,sourceCandidateCounts,
+        heel:heelRanges.map(range),toe:toeRanges.map(range),
+        lowest: minRanges.map(range)});
+    }
+    return result;
+  });
+  console.log('GENUINE CPU-SKINNED TRIPO BOOT-SOLE SURFACE '+JSON.stringify(soleSurfaceProbe));
+  if(soleSurfaceProbe.length!==3||
+     soleSurfaceProbe.some(s=>s.sampledCounts.some(n=>n<6)))
+    throw Error('Sole mesh QA did not scan both real boots');
   // Real actor-ground travel: a planted foot must remain at one
   // world-relative horizontal coordinate even though the sprite itself
   // is always rendered at the screen centre. This uses the genuine
