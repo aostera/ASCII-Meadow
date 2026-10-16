@@ -59,13 +59,15 @@ fs.mkdirSync(output,{recursive:true});
            animate:(_dt,m)=>{samples.push([m.speed,m.travelSource,m.groundX,m.groundZ]);return 'idle';},
            pose:()=>({})}},
          render(){},convert(){},emit(){}};
-       for(const [i,x] of [100,102,102,500].entries())
+       const positions=[[100,40,0],[102,41,0],[102,41,0],[500,500,0],
+         [501,500,1],[502,500,0],[503,500,0]];
+       for(const [i,[x,y,jump]] of positions.entries())
          NativeKnightGlyphs.prototype.draw.call(stub,
-           {x,y:[40,41,41,500][i],walk:1,run:1,d8:0,jump:0},null,1,1,
+           {x,y,walk:1,run:1,d8:0,jump},null,1,1,
            {t:(i+1)/30,CW:1,CH:1,KG:{art:44.4},JUMP_T:1,AIR0:.2,AIR1:.8});
        return samples;
      });
-     if(runIntoWall.length!==4||runIntoWall[0][0]!==0||runIntoWall[1][0]<=0||
+     if(runIntoWall.length!==7||runIntoWall[0][0]!==0||runIntoWall[1][0]<=0||
         runIntoWall[2][0]!==0||runIntoWall[1][1]<=0||
         runIntoWall[2][1]!==runIntoWall[1][1]||
         !Number.isFinite(runIntoWall[1][2])||
@@ -76,7 +78,12 @@ fs.mkdirSync(output,{recursive:true});
         runIntoWall[3][0]!==0||
         runIntoWall[3][1]!==runIntoWall[2][1]||
         runIntoWall[3][2]!==runIntoWall[2][2]||
-        runIntoWall[3][3]!==runIntoWall[2][3])
+        runIntoWall[3][3]!==runIntoWall[2][3]||
+        runIntoWall[4][0]!==0||runIntoWall[5][0]!==0||
+        runIntoWall[4][1]!==runIntoWall[3][1]||
+        runIntoWall[5][1]!==runIntoWall[3][1]||
+        runIntoWall[6][0]<=0||
+        runIntoWall[6][1]<=runIntoWall[5][1])
        throw Error('Player moonwalks while blocked: '+JSON.stringify(runIntoWall));
      console.log('Run displacement / wall stop pass',runIntoWall);
    }
