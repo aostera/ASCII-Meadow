@@ -23,16 +23,24 @@ fs.mkdirSync(out,{recursive:true});
   },undefined,{timeout:90000});
   const data=await page.evaluate(()=>{
     const l=window.__ASHEN_ANIMATION_LAB__;
-    return {error:l.error,bones:l.bones,loaded:l.ready,weapon:l.weaponAttached};
+    return {error:l.error,bones:l.bones,loaded:l.ready,
+      weapon:l.weaponAttached,paletteActive:l.paletteActive};
   });
-  if(!data.loaded||data.error||data.bones!==40||!data.weapon)
+  if(!data.loaded||data.error||data.bones!==40||!data.weapon||
+     data.paletteActive!==false)
     throw Error('Real 40-bone Tripo GLB/real wrist sword failed to load: '+JSON.stringify(data));
   for(const mode of ['Idle','Walk','Run','Jump']){
+    const before=await page.evaluate(()=>window.__ASHEN_ANIMATION_LAB__.frame);
     await page.locator('[data-motion="'+mode+'"]').click();
-    await page.waitForFunction(m=>{
+    // A selected button is NOT evidence of a completed motion pose:
+    // wait for >= 14 genuine fixed-timestep bone updates and both
+    // native GLB clip and palette integrity BEFORE taking a photo.
+    await page.waitForFunction(({mode,before})=>{
       const a=window.__ASHEN_ANIMATION_LAB__;
-      return a?.model?.userData?.gltf?.clip===m;
-    },mode,{timeout:13000});
+      return a?.frame>=before+14 &&
+        a?.model?.userData?.gltf?.clip===mode&&
+        a?.paletteActive===false;
+    },{mode,before},{timeout:45000});
     const state=await page.evaluate(()=>{
       const a=window.__ASHEN_ANIMATION_LAB__,p=a.state;
       return {mode:a.model.userData.gltf.clip,bones:a.bones,
@@ -43,6 +51,8 @@ fs.mkdirSync(out,{recursive:true});
        !state.weapon||state.bones!==40||
        !Number.isInteger(state.soleReads)||state.soleReads>64)
       throw Error(mode+' wrong authentic Tripo rig/per-frame skinning: '+JSON.stringify(state));
+    await page.evaluate(()=>new Promise(resolve=>
+      requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     await page.screenshot({path:path.join(out,mode.toLowerCase()+'.png'),timeout:30000});
     console.log('PASS '+mode+': '+JSON.stringify(state));
   }
@@ -62,6 +72,25 @@ fs.mkdirSync(out,{recursive:true});
      !Number.isFinite(nativeFastPath.correction))
     throw Error('Native CPU skin fastpath failed: '+JSON.stringify(nativeFastPath));
   console.log('PASS production sole fastpath: '+JSON.stringify(nativeFastPath));
+  // Baseline image from the NEVER-RECOLORED 40-bone source viewer.
+  // Compare visually against the workshop to reject unexpected materials,
+  // distorted shading or clothing before declaring the character complete.
+  await page.goto(rootUrl+'/experiments/three/ashen-tripo-v2-viewer.html',
+    {waitUntil:'domcontentloaded',timeout:60000});
+  await page.waitForFunction(()=>{
+    const v=window.__TRIPO_V2_VIEW__;
+    return v?.ready||v?.error;
+  },undefined,{timeout:90000});
+  const original=await page.evaluate(()=>window.__TRIPO_V2_VIEW__);
+  if(!original.ready||original.bones!==40)
+    throw Error('Original untouched Tripo reference was unavailable: '+
+      JSON.stringify(original));
+  await page.locator('#side').click(); // Raw GLB +X is authored forward.
+  await page.evaluate(()=>new Promise(resolve=>
+    requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await page.screenshot({path:path.join(out,'original-tripo-baseline.png'),
+    timeout:30000});
+  console.log('PASS original GLB material baseline captured');
   if(failures.length)throw Error('Page errors: '+JSON.stringify(failures));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
