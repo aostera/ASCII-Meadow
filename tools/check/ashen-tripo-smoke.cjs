@@ -46,6 +46,22 @@ fs.mkdirSync(out,{recursive:true});
     await page.screenshot({path:path.join(out,mode.toLowerCase()+'.png'),timeout:30000});
     console.log('PASS '+mode+': '+JSON.stringify(state));
   }
+  // The game opts out of optional SECOND diagnostic skin sampling.
+  // Check the real v18 controller without loading replacement geometry.
+  const nativeFastPath=await page.evaluate(()=>{
+    const rig=window.__ASHEN_ANIMATION_LAB__.model;
+    rig.userData.animate(1/60,{
+      speed:15,run:true,heading:0,inspectSoles:false
+    },0);
+    const p=rig.userData.pose();
+    return {surface:p.soleSurface,reads:p.soleVertexReads,
+      correction:p.contactCorrection};
+  });
+  if(nativeFastPath.surface!==null||
+     nativeFastPath.reads<0||nativeFastPath.reads>24||
+     !Number.isFinite(nativeFastPath.correction))
+    throw Error('Native CPU skin fastpath failed: '+JSON.stringify(nativeFastPath));
+  console.log('PASS production sole fastpath: '+JSON.stringify(nativeFastPath));
   if(failures.length)throw Error('Page errors: '+JSON.stringify(failures));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
