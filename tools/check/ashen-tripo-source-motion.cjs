@@ -20,6 +20,11 @@ const path=require('node:path');
  assert.equal(read(e(600,600),snapshot(run)).movement.speed,0,'Teleport must not sprint');
  const leap=e(101,41,{jump:.7});
  assert.equal(read(leap,snapshot(initial)).movement.speed,0,'Airborne movement has no ground gait');
+ const touchdown=e(103,43);
+ assert.equal(read(touchdown,snapshot(leap)).movement.speed,0,
+   'First landed frame must not turn jump displacement into a sprint');
+ assert.ok(read(e(104,43),snapshot(touchdown)).movement.speed>0,
+   'Grounded movement after touchdown must resume');
  const standing=e(101,41,{walk:0,moving:0,run:1});
  assert.equal(read(standing,snapshot(initial)).movement.speed,0,'Run without Walk/moving cannot stride');
  assert.deepEqual(sourceActorFoot(e(1,2),CW,CH),[1,2.7]);
