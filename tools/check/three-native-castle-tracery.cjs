@@ -31,7 +31,8 @@ fs.mkdirSync(dir,{recursive:true});
      const source=JSON.stringify(MEADOW_MAP);
      if(game.mode!=='three')throw Error('Three native not running');
      if(!gothic.outerTowerReliefClear)
-       throw Error('Outer tower relief reaches the protected gate or inner nave');
+       throw Error('Outer tower relief reaches protected gate: '+
+         JSON.stringify(gothic.outerTowerIntrusions));
      if(!gothic.westPortalReliefClear)
        throw Error('New Gothic solids cross protected central facade |x|<300');
      if(!gothic.westCurtainProjects)
