@@ -56,7 +56,7 @@ fs.mkdirSync(out,{recursive:true});
      assert.equal(s.clip,'Idle');
      assert.deepEqual(s.pose.footContact,[true,true],
        'Both idle feet should be treated as planted');
-     assert.equal(s.pose.animationVersion,'Tripo-IK-v15-skinned-sole-contact-probe');
+     assert.equal(s.pose.animationVersion,'Tripo-IK-v16-skinned-sole-floor-contact');
      // Measure actual world-space skinned joints, not merely pose labels.
      // A T-pose has wrist far from shoulder; the resting armored hands must
      // be lower and substantially closer to the body. The separate sword
