@@ -160,7 +160,7 @@ function animateRig(model,source,root,weapon){
     const stance=.63-run*.21;
     const inStance=p<stance;
     const u=inStance?p/stance:(p-stance)/(1-stance);
-    const step=.071+run*.026;
+    const step=.076+run*.052; // broader, reachable heel-toe travel at running speed
     // Heel strike in front, mid-stance over pelvis, toe-off behind.
     // The weight shift is predictable and continuous at touchdown.
     const travel=inStance?1-2*u:2*smooth(u)-1;
@@ -260,8 +260,8 @@ function animateRig(model,source,root,weapon){
     // must settle ~.01m lower during support. Otherwise hip-to-ankle
     // exceeds L1+L2 and the old solver hard-clamps to a straight knee.
     // Two soft upward peaks follow the left/right push-off.
-    const supportDrop=stride*(.004+.008*runMix);
-    const bounce=stride*(.003+.011*runMix)*(1-Math.cos(2*phase))*.5;
+    const supportDrop=stride*(.006+.015*runMix);
+    const bounce=stride*(.004+.013*runMix)*(1-Math.cos(2*phase))*.5;
     const pelvisBob=bounce-supportDrop;
     sets.pelvis.position.copy(pelvisRest);
     sets.pelvis.position.y+=pelvisBob;
@@ -269,8 +269,8 @@ function animateRig(model,source,root,weapon){
       stride,jumpWeight,runMix,pelvisBob);
     const right=legPose(sets.rightLeg,legCalibration.right,.5,
       stride,jumpWeight,runMix,pelvisBob);
-    twist(sets.spine,[['iz',-.016*stride-.044*runMix-.012*arc],
-      ['ix',.015*Math.sin(phase)*stride]]);
+    twist(sets.spine,[['iz',-.016*stride-.078*runMix-.012*arc],
+      ['ix',.019*Math.sin(phase)*stride]]);
     twist(sets.chest,[['iz',-.012*runMix],['ix',.012*Math.sin(bodyClock*1.75)]]);
     twist(sets.head,[['ix',.012*Math.sin(bodyClock*1.1)],
       ['iy',.015*Math.cos(bodyClock*.7)],['iz',.022*runMix]]);
@@ -321,7 +321,7 @@ function animateRig(model,source,root,weapon){
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v8-rest-calibrated-gait'
+      animationVersion:'Tripo-IK-v9-longer-reachable-step'
     };
     return clip.toLowerCase();
   }
