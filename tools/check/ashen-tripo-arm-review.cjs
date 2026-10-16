@@ -165,6 +165,12 @@ fs.mkdirSync(out,{recursive:true});
   const footLock=await page.evaluate(()=>{
     const root=window.__ASHEN_ANIMATION_LAB__.model;
     const holds=[[],[]],slip=[0,0],last=[null,null];
+    // Compare actual boot bone positions to virtual actor map distance.
+    // Unlike virtual footAnchorWorldX, this detects IK reach clamping.
+    let bones;root.traverse(o=>{if(!bones&&o.isSkinnedMesh)bones=o.skeleton.bones;});
+    const realSlip=[0,0],lastReal=[null,null];
+    const bootPos=new (root.position.constructor)();
+    const normToSource=root.userData.sourceUnitsPerMetre;
     let distance=0,pinnedFrames=0;
     for(let i=0;i<300;i++){
       distance+=.009;
@@ -178,7 +184,14 @@ fs.mkdirSync(out,{recursive:true});
           if(last[j]!==null)slip[j]=Math.max(slip[j],
             Math.abs(p.footAnchorWorldX[j]-last[j]));
           last[j]=p.footAnchorWorldX[j];holds[j].push(last[j]);
-        }else last[j]=null;
+          bones[j===0?34:29].getWorldPosition(bootPos);
+          root.worldToLocal(bootPos);
+          // Source-model local +X maps to game-facing +Z under oriented parent.
+          const trueBootX=distance+bootPos.z*normToSource;
+          if(lastReal[j]!==null)realSlip[j]=Math.max(realSlip[j],
+            Math.abs(trueBootX-lastReal[j]));
+          lastReal[j]=trueBootX;
+        }else{last[j]=null;lastReal[j]=null;}
       }
     }
     const stoppedPhase=root.userData.pose().phase;
@@ -186,7 +199,8 @@ fs.mkdirSync(out,{recursive:true});
       root.userData.animate(1/60,{
         speed:15,run:true,heading:0,travelSource:distance
       },i/60);
-    return {pinnedFrames,slip,stationaryPhaseError:
+    return {pinnedFrames,slip,realBootSlipPerTick:realSlip,
+      stationaryPhaseError:
       Math.abs(root.userData.pose().phase-stoppedPhase),
       travelSource:root.userData.pose().travelSource};
   });
