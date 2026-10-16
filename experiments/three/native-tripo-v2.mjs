@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import {createGltfKnight} from './ashen-tripo-native-rig.mjs';
 import {headingForSourceD8} from './source-motion.mjs';
-import {emitCachedTripoGlyphs} from './ashen-glyph-emitter.mjs';
+import {emitCachedTripoGlyphs,chooseNativeRasterHz} from './ashen-glyph-emitter.mjs';
 
 const COLS = 104, ROWS = 54, FX = 52, FY = 51.6, ART = 44.4;   // the source knight grid (KG)
 const SPRITE_ELEV = .35;                            // camera elevation of the sprite view, rad
@@ -164,8 +164,11 @@ export class NativeKnightGlyphs {
     // Mobile gets lower GPU readback frequency; 60+ distinct animation
     // poses are still evaluated from the simulation's live time.
     const slowDevice=window.matchMedia?.('(pointer:coarse)')?.matches;
+    this.touchDevice=Boolean(slowDevice);
     this.rasterInterval=1/(slowDevice?12:20);
     this.stats.rasterHz=slowDevice?12:20;
+    this.stats.rasterTargetHz=this.stats.rasterHz;
+    this.rasterCostAvg=null;
     this.stats.rasterFrames=0;
   }
   get ready() { return !this.disposed && this.stats.loaded; }
@@ -234,6 +237,19 @@ export class NativeKnightGlyphs {
       this.render(G, fcw, fch);
       this.convert();
       this.glyphDirty=true;
+      // Let fast GPUs display up to 30 (desktop) / 20 (touch) DISTINCT
+      // mesh-based glyph images; under load fall back to safe 20/12 Hz.
+      // No assertion that a 399k-triangle model can visibly run 60fps.
+      const cost=this.stats.readMs+this.stats.convertMs;
+      if(Number.isFinite(cost)&&cost>=0)
+        this.rasterCostAvg=this.rasterCostAvg===null?
+          cost:this.rasterCostAvg*.85+cost*.15;
+      const targetHz=chooseNativeRasterHz({
+        gpuReadMs:this.rasterCostAvg??25,
+        glyphConvertMs:0,touch:this.touchDevice
+      });
+      this.rasterInterval=1/targetHz;
+      this.stats.rasterTargetHz=targetHz;
       this.rasterClock=now;
       this.stats.rasterFrames++;
     }
