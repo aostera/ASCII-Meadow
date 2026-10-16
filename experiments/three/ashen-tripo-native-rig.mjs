@@ -70,6 +70,8 @@ function setupBones(model){
 // Every joint below deforms the authentic Tripo SKIN rather than a fake puppet.
 function animateRig(model,source,root,weapon){
   const {sets,rest}=source,axisQ=new THREE.Quaternion();
+  const wristWorldQ=new THREE.Quaternion(),rootWorldQ=new THREE.Quaternion();
+  const swordCantQ=new THREE.Quaternion();
   function twist(b,axes){
     const r=rest.get(b);
     b.quaternion.copy(r.q);
@@ -130,16 +132,24 @@ function animateRig(model,source,root,weapon){
     // phase must NEVER reset when moving between Idle/Walk/Run.
     const hz=(1.45+1.20*runMix)*Math.min(1.45,Math.max(.7,speed));
     phase+=d*2*Math.PI*hz*(stride>.03?1:.02);
-    const swing=Math.sin(phase),other=-swing;
-    const armAmplitude=(.22+runMix*.29)*stride*(1-.74*airMix);
-    // Shoulder rests extend horizontally along +/-Z. Tilt them DOWN
-    // about X, then swing in the anatomical X/Y walking plane about Z.
-    twist(sets.leftArm[0],[['ix',-.69],['iz',-swing*armAmplitude]]);
-    twist(sets.rightArm[0],[['ix',+.69],['iz',-other*armAmplitude*.68]]);
-    twist(sets.leftArm[1],[['iz',-.06-Math.max(0,swing)*(.20+.16*runMix)*stride]]);
-    twist(sets.rightArm[1],[['iz',-.12-Math.max(0,other)*(.22+.13*runMix)*stride]]);
-    twist(sets.leftArm[2],[['iz',.035*Math.sin(bodyClock*1.4)]]);
-    twist(sets.rightArm[2],[['iz',.02*Math.sin(bodyClock*1.8)]]);
+    const swing=Math.sin(phase);
+    const armAmplitude=(.19+runMix*.20)*stride*(1-.78*airMix);
+    // The source Tripo shoulder bones rest in a near T-pose along +/-Z.
+    // Old 0.69 rad X rotations left them spread ~45 degrees from the
+    // torso; additionally, rolling around Z while the arm extends on Z
+    // cannot produce a proper forward walking swing. Correct 3D hinges:
+    //   shoulder: X lowers arm / Y swings it in the sagittal plane;
+    //   elbow:    Y bends forearm forward after the shoulder is lowered.
+    // The right (weapon) arm swings less, to avoid blade/torso clipping.
+    const shoulderDown=1.28;
+    twist(sets.leftArm[0],[['ix',-shoulderDown],['iy',-swing*armAmplitude]]);
+    twist(sets.rightArm[0],[['ix',shoulderDown],['iy',-swing*armAmplitude*.38]]);
+    const leftElbow=-.44-.10*stride*Math.max(0,-swing);
+    const rightElbow=.56+.07*stride*Math.max(0,swing);
+    twist(sets.leftArm[1],[['iy',leftElbow]]);
+    twist(sets.rightArm[1],[['iy',rightElbow]]);
+    twist(sets.leftArm[2],[['iy',-.05+Math.sin(bodyClock*1.4)*.015]]);
+    twist(sets.rightArm[2],[['iy',.065]]);
     twist(sets.leftArm[3],[]);
     twist(sets.rightArm[3],[]);
     const left=legPose(sets.leftLeg,0,stride,jumpWeight,runMix);
@@ -158,6 +168,14 @@ function animateRig(model,source,root,weapon){
     const headingStep=turnDelta*(1-Math.exp(-12*d));
     heading+=headingStep;
     root.rotation.y=heading;
+    // The Gothic sword is parented to the Tripo RIGHT wrist for position.
+    // Counter-rotate only the independent sword mesh so the blade still
+    // points DOWN next to the boot as the wrist bends; previously the
+    // inherited T-pose orientation sent it across the belt/left leg.
+    root.getWorldQuaternion(rootWorldQ);
+    sets.rightArm[3].getWorldQuaternion(wristWorldQ);
+    swordCantQ.setFromAxisAngle(Z,-.12-.025*stride);
+    weapon.quaternion.copy(wristWorldQ.invert()).multiply(rootWorldQ).multiply(swordCantQ);
     const turning=clamp(headingStep/d,-3.5,3.5);
     const drag=stride*(.016+.038*runMix);
     for(let i=0;i<sets.cape.length;i++){
@@ -178,7 +196,9 @@ function animateRig(model,source,root,weapon){
       kneeBend:[left.knee,right.knee],
       capeDeflection:capeRoll.map((roll,i)=>[roll,capeYaw[i]]),
       weaponAttached:!!weapon?.parent,
-      animationVersion:'Tripo-IK-v3-model-space-axes'
+      armPose:{shoulderDown,shoulderSwing:-swing*armAmplitude,
+        leftElbow,rightElbow,swordCant:-.12-.025*stride},
+      animationVersion:'Tripo-IK-v4-anatomical-arm-hinges'
     };
     return clip.toLowerCase();
   }
