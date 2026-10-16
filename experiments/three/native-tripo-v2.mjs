@@ -151,6 +151,9 @@ export class NativeKnightGlyphs {
     // Persistent travelled path length in the source GLB's bone units.
     // Independent from the knight's camera-centred ASCII sprite position.
     this.travelSource = 0;
+    // Accumulated original-map X/Z travel in Tripo source-bone units.
+    // This is not the stationary offscreen sprite root's position.
+    this.groundX = 0; this.groundZ = 0;
     this.rasterClock = null;
     // Mobile gets lower GPU readback frequency; 60+ distinct animation
     // poses are still evaluated from the simulation's live time.
@@ -197,12 +200,20 @@ export class NativeKnightGlyphs {
     const sourceUnitsPerMetre=this.knight.userData.sourceUnitsPerMetre;
     const movedMetres=travelPixels/Math.max(1,pxPerMetre);
     if(walking&&Number.isFinite(sourceUnitsPerMetre)&&
-       movedMetres/dt<12&&movedMetres<.20)
+       movedMetres/dt<12&&movedMetres<.20){
+      const factor=sourceUnitsPerMetre/Math.max(1,pxPerMetre);
       this.travelSource+=movedMetres*sourceUnitsPerMetre;
+      // In the original screen projection, right/down is negative world X/Z.
+      // Integrate from actual actor coordinates, never camera pan or input intent.
+      this.groundX-=dx*factor;
+      this.groundZ-=dy*factor;
+    }
     this.stats.sourceTravel=this.travelSource;
+    this.stats.groundXZ=[this.groundX,this.groundZ];
     this.stats.motion = this.knight.userData.animate(dt, {
       speed, run: (e.run || 0) > .5, heading: headingForSourceD8(e.d8 || 0),
       travelSource:this.travelSource,
+      groundX:this.groundX,groundZ:this.groundZ,
       jumpClipTime: NativeKnightGlyphs.jumpClipTime(e, src.JUMP_T, src.AIR0, src.AIR1)
     }, now);
     this.stats.clip = this.knight.userData.gltf.clip;
