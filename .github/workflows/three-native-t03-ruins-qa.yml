@@ -35,6 +35,7 @@ jobs:
           node --check experiments/three/native-gothic-complete.js
           node --check tools/check/three-native-art.cjs
           node --check tools/check/ruins-browser.cjs
+          node --check tools/check/three-native-t03-geometry.cjs
       - name: Verify native Three world PC and phone with all 3 ruins
         run: |
           python3 -m http.server 8181 >/tmp/three-t03-http.log 2>&1 &
@@ -45,6 +46,7 @@ jobs:
             sleep 1
           done
           node tools/check/three-native-art.cjs http://127.0.0.1:8181
+          node tools/check/three-native-t03-geometry.cjs http://127.0.0.1:8181
           node tools/check/ruins-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -53,4 +55,5 @@ jobs:
           path: |
             shots/three-native-art
             shots/ruins
+            shots/three-native-t03-angles
           if-no-files-found: warn

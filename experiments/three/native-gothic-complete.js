@@ -732,10 +732,12 @@ function nativeRuinGothicComplete(site){
       const edge=side*w*.39;
       nativeGothicBox(edge-15,edge+15,rise,rise+h*.22,
         frontZ-20,frontZ+16,{courses:[rise+h*.13]});
-      nativeGothicBeam(edge,rise+h*.24,side*w*.13,rise+h*.42,
+      // Source raster ceiling is site.height*1.08 in the original game.
+      // h*.42 used to reach 1.11h and silently clip the new apex!
+      nativeGothicBeam(edge,rise+h*.24,side*w*.13,rise+h*.36,
         frontZ-12,21);
       nativeGothicBox(side*w*.21-13,side*w*.21+13,
-        rise+h*.35,rise+h*.39,frontZ-26,frontZ+10);
+        rise+h*.32,rise+h*.36,frontZ-26,frontZ+10);
     }
   }else{
     // Roofless cloister: TWO separated broken transverse vaults, at
@@ -748,7 +750,7 @@ function nativeRuinGothicComplete(site){
         nativeGothicBox(edge-14,edge+14,rise,rise+h*.15,
           zz-15,zz+17);
         nativeGothicBeam(edge,rise+h*.16,
-          side*w*.16,rise+h*(k===0?.29:.36),
+          side*w*.16,rise+h*(k===0?.29:.33),
           zz-11,16);
       }
     }

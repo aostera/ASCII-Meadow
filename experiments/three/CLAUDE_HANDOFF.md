@@ -1,5 +1,7 @@
 # Claude handoff — Three.js exploration (2026-10-13)
 
+> **CURRENT COLLABORATION STATUS (2026-10-16):** Before changing the Three world, read [`COLLAB_WORKLOG.md`](COLLAB_WORKLOG.md). It records current PR #54 castle, dependent PR #58 T03 ruins, owner boundaries, tests, visual review and pending checks. Older items below are historical and may be superseded.
+
 Repo: aostera/ASCII-Meadow
 Branch: experiment/threejs-ascii-prototype
 Start: experiments/three/index.html
