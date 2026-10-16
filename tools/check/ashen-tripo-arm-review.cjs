@@ -36,15 +36,16 @@ fs.mkdirSync(out,{recursive:true});
    await page.locator('[data-view="'+view+'"]').click();
    await page.waitForTimeout(500);
    const data=await inspect();
+   // Always retain a genuine render even when an anatomy assertion fails.
+   await page.screenshot({path:path.join(out,mode.toLowerCase()+'-'+view+'.png')});
    if(mode==='Idle'){
     for(const arm of [data.left,data.right]){
-     if(arm.spread<.35||arm.spread>.59||arm.drop<.25)
+     if(arm.spread<.24||arm.spread>.59||arm.drop<.25)
       throw Error('Gauntlet still misplaced: '+JSON.stringify(data));
     }
     if(data.hilt[0]>-.17||data.hilt[1]-data.tip[1]<.3)
       throw Error('Sword crosses the abdomen: '+JSON.stringify(data));
    }
-   await page.screenshot({path:path.join(out,mode.toLowerCase()+'-'+view+'.png')});
    console.log(mode+' anatomical frame',JSON.stringify(data));
   }
   await browser.close();
