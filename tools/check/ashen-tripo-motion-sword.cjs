@@ -169,6 +169,15 @@ fs.mkdirSync(output,{recursive:true});
    const fin=await read();
    if(fin.map!==idle.map)throw Error('Original authored map changed');
    if(!fin.pose||!(fin.pose.phase>=0))throw Error('No live bone-animation controller state');
+   // Production never does the studio's second CPU-skinned boot scan:
+   // grounded surface correction remains active, but 60Hz diagnostics
+   // should be explicitly disabled in the native game fast path.
+   if(fin.pose.soleSurface!==null||
+      !Number.isInteger(fin.pose.soleVertexReads)||
+      fin.pose.soleVertexReads>24)
+     throw Error('Live native knight still wasting skin reads per tick: '+
+       JSON.stringify({surface:fin.pose.soleSurface,
+         reads:fin.pose.soleVertexReads}));
    if(fin.pose?.animationVersion!=='Tripo-IK-v18-sampled-stance-fastpath'||!fin.pose.weaponAttached)
      throw Error('New animated sword and IK state lost during play');
    if(!mobile&&fin.pose?.speed<0&&fin.pose?.heading===undefined)
