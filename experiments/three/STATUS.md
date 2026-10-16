@@ -25,7 +25,7 @@
 | T04 | IN_REVIEW | #59/#60 merged и CI зелёный; проверить весь спектр теней, проёмы, повороты, undo/redo, ghost-shadow на живой карте |
 | T05 | IN_PROGRESS | Системы физики и Z растительности частично работают; проверить видимость NPC в густых кустах, GPU clipping и восстановление ветвей на реальном телефоне |
 | T06 | IN_PROGRESS | Довести шатры, заборы, костры, дороги/декор, истинные основания/коллизии без заглушек |
-| T07 | IN_PROGRESS | Сенсорный pan/pinch редактора — [PR #62](https://github.com/aostera/ASCII-Meadow/pull/62) **open**; mobile lifecycle, HUD, WebGL recovery и реальный Safari остаются gate |
+| T07 | IN_PROGRESS | Сенсорный pan/pinch редактора — [PR #62](https://github.com/aostera/ASCII-Meadow/pull/62) **merged** (`73cf6c8`, CI зелёный, только эмуляция Chromium); mobile lifecycle, HUD, WebGL recovery и реальный Safari остаются gate |
 | T08 | IN_PROGRESS — baseline | [PR #61](https://github.com/aostera/ASCII-Meadow/pull/61) **draft**; нельзя объявлять доказанными аппаратные FPS |
 | T02 / T03 | PARKED | Детализация замка [#54](https://github.com/aostera/ASCII-Meadow/pull/54) и трёх руин [#58](https://github.com/aostera/ASCII-Meadow/pull/58) — draft, не мержить до снятия приоритета системного переноса; у #54 был визуально невидимый relief |
 | T09 | TODO | Сквозная parity, реальные Android/iOS, art sign-off и только потом **явное** разрешение владельца на `main` |
