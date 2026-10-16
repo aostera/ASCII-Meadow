@@ -14,6 +14,7 @@ on:
       - experiments/three/ashen-vow-gothic-palette.mjs
       - experiments/three/ashen-gothic-longsword.mjs
       - experiments/three/native-tripo-v2.mjs
+      - experiments/three/ashen-glyph-emitter.mjs
       - tools/check/ashen-native-glyph-cache.cjs
       - tools/check/ashen-tripo-motion-sword.cjs
       - tools/check/ashen-tripo-animation-workshop.cjs
@@ -51,6 +52,7 @@ jobs:
           node --check experiments/three/ashen-gothic-longsword.mjs
           node --check experiments/three/native-tripo-v2.mjs
           node --check tools/check/ashen-tripo-motion-sword.cjs
+          node --check experiments/three/ashen-glyph-emitter.mjs
           node --check tools/check/ashen-native-glyph-cache.cjs
           node tools/check/ashen-native-glyph-cache.cjs
           node --check tools/check/ashen-tripo-animation-workshop.cjs
