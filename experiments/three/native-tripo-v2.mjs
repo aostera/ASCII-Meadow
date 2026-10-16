@@ -151,6 +151,7 @@ export class NativeKnightGlyphs {
       jumpClipTime: NativeKnightGlyphs.jumpClipTime(e, src.JUMP_T, src.AIR0, src.AIR1)
     }, now);
     this.stats.clip = this.knight.userData.gltf.clip;
+    this.stats.pose = this.knight.userData.pose?.()||null;
     // Do not force an expensive GPU->CPU readback every simulation step.
     // On intermediate frames the previous live 3D pose's glyphs remain
     // world-anchored and depth-sorted, while the rig continues animating.
