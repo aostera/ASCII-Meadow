@@ -150,6 +150,14 @@ function animateRig(model,source,root,weapon){
     weaponAttached:true,footContact:[true,true],kneeBend:[0,0]};
   const pos=sets.spine.position.clone();
   const pelvisRest=sets.pelvis.position.clone();
+  // Tripo's side axis is authored in source model Z. Infer which way
+  // "left" points from actual hip joints, rather than assuming a sign.
+  const leftHipInPelvis=new THREE.Vector3(),rightHipInPelvis=new THREE.Vector3();
+  sets.leftLeg[0].getWorldPosition(leftHipInPelvis);
+  sets.rightLeg[0].getWorldPosition(rightHipInPelvis);
+  sets.pelvis.worldToLocal(leftHipInPelvis);
+  sets.pelvis.worldToLocal(rightHipInPelvis);
+  const leftSideSign=Math.sign(leftHipInPelvis.z-rightHipInPelvis.z)||1;
   const shoePivot=[sets.leftLeg[3],sets.rightLeg[3]];
   const pin=[{contact:false,travel:0,x:0},{contact:false,travel:0,x:0}];
   const bootWorld=new THREE.Vector3();
@@ -193,11 +201,22 @@ function animateRig(model,source,root,weapon){
     const kneeLimit=.82+run*.22+Math.min(1,jumpWeight)*.20;
     const minReach=Math.sqrt(Math.max(0,
       L1*L1+L2*L2+2*L1*L2*Math.cos(kneeLimit)));
-    const heelStrike=inStance?-.030*(1-smooth(u*5)):0;
-    const toeOff=inStance?.12*smooth((u-.78)/.22):0;
-    const flightPitch=inStance?0:-.038*Math.sin(Math.PI*u);
-    const footPitch=(heelStrike+toeOff+flightPitch)*weight*
+    // Three physically interpretable stance intervals: initial heel
+    // rocker, nearly level midfoot support, then toe rocker at push-off.
+    // Curves overlap slightly but never kick both hinges at once.
+    // The original Tripo boot/toe joints deform; no mesh replacements.
+    const heelLoad=inStance?1-smooth(u/.23):0;
+    const toeLoad=inStance?smooth((u-.72)/.28):0;
+    const midLoad=inStance?
+      smooth(u/.26)*(1-smooth((u-.68)/.30)):0;
+    const flightPitch=inStance?0:-.028*Math.sin(Math.PI*u);
+    const heelPitch=-.047*heelLoad;
+    const toeRocker=.115*toeLoad;
+    const footPitch=(heelPitch+toeRocker+flightPitch)*weight*
       (1-.7*jumpWeight);
+    const toePitch=-.052*toeLoad*weight*(1-.7*jumpWeight);
+    const supportLoad=inStance?weight*clamp(
+      smooth(u/.16)*(1-smooth((u-.80)/.20)),0,1):0;
     const contact=jumpWeight<.15&&(weight<.08||inStance);
     // IK targets are on the REAL original bent Tripo leg, never a
     // geometrically straight mannequin. Clamp knee bend for injury-safe
@@ -220,7 +239,7 @@ function animateRig(model,source,root,weapon){
         twist(bones[0],[['ix',hipRoll],['iz',hipDelta]]);
         twist(bones[1],[['iz',kneeDelta]]);
         twist(bones[2],[['iz',-hipDelta-kneeDelta+footPitch]]);
-        twist(bones[3],[['iz',Math.max(0,toeOff)*.19*weight]]);
+        twist(bones[3],[['iz',toePitch]]);
       }
       return {hipDelta,knee};
     }
@@ -294,7 +313,9 @@ function animateRig(model,source,root,weapon){
       bootError=trueBootWorldX-pin[footId].bootWorldX;
     }
     return {lift:weight*lift,x:x-cal.restX,y,knee:solved.knee,hip:solved.hipDelta,
-      hipRoll,anklePitch:footPitch,contact,stance:inStance,phase:p,
+      hipRoll,anklePitch:footPitch,toePitch,
+      supportLoad,footRocker:[heelLoad,midLoad,toeLoad],
+      contact,stance:inStance,phase:p,
       pinned:anchored,planar,anchorXZ,trueBootXZ,planarError,
       anchorWorldX:anchored&&!planar?pin[footId].bootWorldX:null,
       trueBootWorldX,bootError};
@@ -362,13 +383,16 @@ function animateRig(model,source,root,weapon){
     // shoulder. The sword arm deliberately has a shorter travel than the
     // free arm, while the elbows bend noticeably during the running phase.
     // In flight both hands move slightly forward to balance the landing.
+    // Contralateral arm swing: sword hand counters the free hand rather
+    // than both marching in synchrony. Limit the armed side to keep the
+    // blade outside the hip while the left elbow supplies momentum.
     const leftSwing=-swing*armAmplitude+arc*.15;
-    const rightSwing=-swing*armAmplitude*.41-arc*.075;
+    const rightSwing=+swing*armAmplitude*.35-arc*.075;
     twist(sets.leftArm[0],[['ix',-shoulderDown],['iy',leftSwing]]);
     twist(sets.rightArm[0],[['ix',shoulderDown],['iy',rightSwing]]);
     const leftElbow=-.20-.10*stride*Math.max(0,-swing)-
       .13*runMix-.20*arc;
-    const rightElbow=.24+.08*stride*Math.max(0,swing)+
+    const rightElbow=.24+.08*stride*Math.max(0,-swing)+
       .12*runMix+.10*arc;
     twist(sets.leftArm[1],[['iy',leftElbow]]);
     twist(sets.rightArm[1],[['iy',rightElbow]]);
@@ -389,8 +413,23 @@ function animateRig(model,source,root,weapon){
     const supportDrop=stride*(.006+.015*runMix);
     const bounce=stride*(.004+.013*runMix)*(1-Math.cos(2*phase))*.5;
     const pelvisBob=bounce-supportDrop;
+    // Load the real planted hip rather than bobbing the skeleton exactly
+    // over the center line. The half-cycle support envelope corresponds
+    // to the left/right leg phases, not the arm animation phases.
+    const loadAt=(offset)=>{
+      const p=((phase/(2*Math.PI)+offset)%1+1)%1;
+      const stance=.63-runMix*.21;
+      if(p>=stance)return 0;
+      const u=p/stance;
+      return smooth(u/.17)*(1-smooth((u-.80)/.20));
+    };
+    const leftSupport=loadAt(0),rightSupport=loadAt(.5);
+    const balance=(leftSupport-rightSupport)/
+      Math.max(.5,leftSupport+rightSupport);
+    const pelvisLateral=leftSideSign*.006*stride*(1-.7*jumpWeight)*balance;
     sets.pelvis.position.copy(pelvisRest);
     sets.pelvis.position.y+=pelvisBob;
+    sets.pelvis.position.z+=pelvisLateral;
     const left=legPose(sets.leftLeg,legCalibration.left,0,
       stride,jumpWeight,runMix,pelvisBob,0,travelSource,hasTravel,ground);
     const right=legPose(sets.rightLeg,legCalibration.right,.5,
@@ -412,8 +451,11 @@ function animateRig(model,source,root,weapon){
       contactCorrection=damp(contactCorrection,target,28,d);
     }else contactCorrection=damp(contactCorrection,0,28,d);
     sets.pelvis.position.y+=contactCorrection;
+    // Delayed upper-body counterweight prevents a rigid same-side lean.
+    // Subtle only: heavy plate armor + long sword should retain inertia.
+    const spineCounter=-leftSideSign*.013*balance*stride;
     twist(sets.spine,[['iz',-.016*stride-.078*runMix-.012*arc],
-      ['ix',.019*Math.sin(phase)*stride]]);
+      ['ix',.019*Math.sin(phase)*stride+spineCounter]]);
     twist(sets.chest,[['iz',-.012*runMix],['ix',.012*Math.sin(bodyClock*1.75)]]);
     twist(sets.head,[['ix',.012*Math.sin(bodyClock*1.1)],
       ['iy',.015*Math.cos(bodyClock*.7)],['iz',.022*runMix]]);
@@ -450,6 +492,10 @@ function animateRig(model,source,root,weapon){
       leftFootX:left.x,rightFootX:right.x,
       kneeBend:[left.knee,right.knee],
       legCalibration,stepFrequencyHz:hz,pelvisBob,
+      pelvisLateral,balance,spineCounter,
+      supportWeights:[leftSupport,rightSupport],
+      footRocker:[left.footRocker,right.footRocker],
+      toePitch:[left.toePitch,right.toePitch],
       travelSource:hasTravel?travelSource:null,travelDelta,
       footPinned:[left.pinned,right.pinned],
       footAnchorWorldX:[left.anchorWorldX,right.anchorWorldX],
@@ -471,7 +517,7 @@ function animateRig(model,source,root,weapon){
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v12-planar-boot-pins'
+      animationVersion:'Tripo-IK-v13-contact-rocker-weight-transfer'
     };
     return clip.toLowerCase();
   }
