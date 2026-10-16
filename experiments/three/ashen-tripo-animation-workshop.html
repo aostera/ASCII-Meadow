@@ -54,7 +54,10 @@ a{color:#e8b8ae}a:focus-visible{outline:2px solid #e8b8ae}
  <input id="yaw" type="range" min="0" max="359" step="1" value="0" aria-label="Угол поворота персонажа от 0 до 359 градусов"></div>
  <div class="group"><label for="tempo">Темп анимации</label><div class="inline"><input id="tempo" type="range" min="0.5" max="1.5" step="0.05" value="1"><span id="tempo-value">1.00×</span></div></div>
  <div class="group"><div class="pills"><button id="pause" aria-pressed="false">Пауза</button><button id="frame" type="button">+1 кадр</button><button id="skeleton" aria-pressed="false">Кости</button><button id="wire" aria-pressed="false">Сетка</button></div></div>
- <div class="group"><button id="palette" aria-pressed="true" type="button" style="width:100%">Готическая палитра · эксперимент</button></div>
+ <div class="group"><div class="pills">
+  <button id="turn" aria-pressed="false" type="button">Авто 360°</button>
+  <button id="palette" aria-pressed="true" type="button">Готическая палитра · эксперимент</button>
+ </div></div>
  <div class="group"><label>Осмотр модели</label><div class="tiles views"><button data-view="front">Спереди</button><button data-view="side">Сбоку</button><button data-view="back">Сзади</button></div></div>
  <div class="meta" id="metrics" aria-live="off">Загрузка GLB…</div>
  <p class="status" id="status" role="status">Ожидание модели со скелетом. Дополнительные кредиты Tripo не расходуются.</p>
@@ -73,7 +76,7 @@ const ui={viewport:$('viewport'),status:$('status'),metrics:$('metrics'),
   tempo:$('tempo'),tempoValue:$('tempo-value'),direction:$('direction'),
   yaw:$('yaw'),yawValue:$('yaw-value'),
   pause:$('pause'),frame:$('frame'),skeleton:$('skeleton'),wire:$('wire'),
-  palette:$('palette')};
+  palette:$('palette'),turn:$('turn')};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const mobile=matchMedia('(max-width:760px)').matches;
 const renderer=new THREE.WebGLRenderer({antialias:!mobile,alpha:false,powerPreference:'high-performance'});
@@ -117,7 +120,7 @@ controls.minDistance=.85;controls.maxDistance=12;
 controls.maxPolarAngle=Math.PI*.94;
 controls.update();
 
-let mode='Idle',heading=0,tempo=1,paused=false;
+let mode='Idle',heading=0,tempo=1,paused=false,autoTurn=false;
 let simulatedFrames=0,jumpClock=0,last=0,displayClock=0,stepTime=0;
 let boneHelper=null,wire=false,showSkeleton=false,rig=null,error=null,palette=null;
 let smoothFps=0,alive=true,accumulator=0;
@@ -149,8 +152,20 @@ function setHeading(degrees){
   ui.yaw.value=String(value);
   ui.yawValue.textContent=value+'°';
 }
-ui.direction.addEventListener('change',()=>setHeading(ui.direction.value));
-ui.yaw.addEventListener('input',()=>setHeading(ui.yaw.value));
+function setAutoTurn(value){
+  autoTurn=Boolean(value);
+  ui.turn.setAttribute('aria-pressed',String(autoTurn));
+}
+ui.direction.addEventListener('change',()=>{
+  setAutoTurn(false);setHeading(ui.direction.value);
+});
+ui.yaw.addEventListener('input',()=>{
+  setAutoTurn(false);setHeading(ui.yaw.value);
+});
+ui.turn.addEventListener('click',()=>{
+  setAutoTurn(!autoTurn);
+  if(autoTurn&&paused)setPaused(false);
+});
 ui.tempo.addEventListener('input',()=>{
   tempo=Number(ui.tempo.value);ui.tempoValue.textContent=tempo.toFixed(2)+'×';
 });
@@ -193,6 +208,7 @@ const diagnostics={
   get model(){return rig},
   get mode(){return mode},
   get headingTarget(){return heading},
+  get autoTurn(){return autoTurn},
   get frame(){return simulatedFrames},
   get state(){return rig?.userData.pose?.()||null},
   get bones(){return rig?.userData.gltf.bones||0},
@@ -236,6 +252,14 @@ document.addEventListener('visibilitychange',()=>{last=0});
 function advanceSimulation(){
   if(!rig?.userData.gltf.loaded)return false;
   stepTime+=SIM_STEP;simulatedFrames++;
+  if(autoTurn){
+    // 45 degrees per simulated second: full orbit every 8 seconds.
+    // This rotates the model, not the camera, for full skin QA.
+    heading=(heading+SIM_STEP*Math.PI/4)%(2*Math.PI);
+    const degrees=Math.round(heading*180/Math.PI)%360;
+    ui.yaw.value=String(degrees);
+    ui.yawValue.textContent=degrees+'°';
+  }
   if(mode==='Jump')jumpClock=(jumpClock+SIM_STEP)%2.04;
   const jumpClipTime=mode==='Jump'&&jumpClock<1.49?jumpClock:undefined;
   // Real 40-joint Tripo skin and the native game's actual pose function.
