@@ -168,10 +168,19 @@ fs.mkdirSync(out,{recursive:true});
     for(const [mode,speed,run] of [['Idle',0,false],['Walk',8,false],['Run',15,true]]){
       const heelRanges=[[],[]],toeRanges=[[],[]],minRanges=[[],[]],
         sourceCandidateCounts=[0,0],sampledCounts=[0,0];
+      let previousCorrection=null,maxCorrectionTick=0;
       for(let i=0;i<150;i++){
         rig.userData.animate(1/60,{speed,run,heading:0},i/60);
-        if(i<40)continue;
         const pose=rig.userData.pose();
+        if(previousCorrection!==null){
+          const tick=Math.abs(pose.contactCorrection-previousCorrection);
+          maxCorrectionTick=Math.max(maxCorrectionTick,tick);
+          if(tick>pose.maxContactCorrectionSpeed/60+.000001)
+            throw Error('Real Tripo hip teleported during contact transition: '+
+              JSON.stringify({mode,i,tick,pose:pose.contactCorrection}));
+        }
+        previousCorrection=pose.contactCorrection;
+        if(i<40)continue;
         if(pose.animationVersion!=='Tripo-IK-v17-rate-limited-contact')
           throw Error('Wrong v15 genuine-sole probe controller');
         if(!Array.isArray(pose.soleSurface)||pose.soleSurface.length!==2)
@@ -202,7 +211,7 @@ fs.mkdirSync(out,{recursive:true});
       const range=a=>[Math.min(...a),Math.max(...a)];
       result.push({mode,sampledCounts,sourceCandidateCounts,
         heel:heelRanges.map(range),toe:toeRanges.map(range),
-        lowest: minRanges.map(range)});
+        lowest: minRanges.map(range),maxCorrectionTick});
     }
     return result;
   });
