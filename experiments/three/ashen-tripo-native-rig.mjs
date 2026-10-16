@@ -178,6 +178,7 @@ function animateRig(model,source,root,weapon){
     const p=((phase/(2*Math.PI)+offset)%1+1)%1;
     const stance=.63-run*.21,inStance=p<stance;
     const u=inStance?p/stance:(p-stance)/(1-stance);
+    const groundBlend=clamp(1-4*jumpWeight,0,1);
     const step=.076+run*.052;
     const travel=inStance?1-2*u:2*smooth(u)-1;
     let x=cal.restX+weight*step*travel*(1-.78*jumpWeight);
@@ -205,17 +206,17 @@ function animateRig(model,source,root,weapon){
     // rocker, nearly level midfoot support, then toe rocker at push-off.
     // Curves overlap slightly but never kick both hinges at once.
     // The original Tripo boot/toe joints deform; no mesh replacements.
-    const heelLoad=inStance?1-smooth(u/.23):0;
-    const toeLoad=inStance?smooth((u-.72)/.28):0;
+    const heelLoad=inStance?(1-smooth(u/.23))*groundBlend:0;
+    const toeLoad=inStance?smooth((u-.72)/.28)*groundBlend:0;
     const midLoad=inStance?
-      smooth(u/.26)*(1-smooth((u-.68)/.30)):0;
+      smooth(u/.26)*(1-smooth((u-.68)/.30))*groundBlend:0;
     const flightPitch=inStance?0:-.028*Math.sin(Math.PI*u);
     const heelPitch=-.047*heelLoad;
     const toeRocker=.115*toeLoad;
     const footPitch=(heelPitch+toeRocker+flightPitch)*weight*
       (1-.7*jumpWeight);
     const toePitch=-.052*toeLoad*weight*(1-.7*jumpWeight);
-    const supportLoad=inStance?weight*clamp(
+    const supportLoad=inStance?weight*groundBlend*clamp(
       smooth(u/.16)*(1-smooth((u-.80)/.20)),0,1):0;
     const contact=jumpWeight<.15&&(weight<.08||inStance);
     // IK targets are on the REAL original bent Tripo leg, never a
@@ -426,7 +427,8 @@ function animateRig(model,source,root,weapon){
     const leftSupport=loadAt(0),rightSupport=loadAt(.5);
     const balance=(leftSupport-rightSupport)/
       Math.max(.5,leftSupport+rightSupport);
-    const pelvisLateral=leftSideSign*.006*stride*(1-.7*jumpWeight)*balance;
+    const pelvisLateral=leftSideSign*.006*stride*
+      clamp(1-4*jumpWeight,0,1)*balance;
     sets.pelvis.position.copy(pelvisRest);
     sets.pelvis.position.y+=pelvisBob;
     sets.pelvis.position.z+=pelvisLateral;
