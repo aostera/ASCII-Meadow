@@ -524,11 +524,15 @@ function nativeBuildCompleteCastle(){
   feature.highFlyingArches=solids.length-before;
   nativeHighFlyingArchesClear=solids.slice(before).every(s=>
     s.bb[2]>=Y+870&&(s.bb[1]<-310||s.bb[0]>310));
-  // The recessed arch removed two ORIGINAL solids, shifting IDs in the
-  // existing masonry. Reindex all parts to keep source window IDs unique.
+  // Keep original authored IDs on untouched stone: changing these IDs
+  // modifies window-light identifiers far away from the carved gate.
+  // Allocate only NEW convex solids beyond the old max instead.
+  let nextId=solids.reduce((m,s)=>
+    Math.max(m,Number.isInteger(s.id)?s.id:-1),-1)+1;
   for(let i=0;i<solids.length;i++){
     const s=solids[i],b=s.bb;
-    s.id=i;s.cx=(b[0]+b[1])*.5;
+    if(!Number.isInteger(s.id))s.id=nextId++;
+    s.cx=(b[0]+b[1])*.5;
     s.cy=(b[2]+b[3])*.5;s.cz=(b[4]+b[5])*.5;
   }
   nativeFullArchitecturalCounts.castle=feature;
