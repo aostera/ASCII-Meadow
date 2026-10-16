@@ -341,7 +341,7 @@ window.__ASCII_NATIVE_COMPLETE_ARCH__={
       return false;
     nativeWestTraceryEnabled=Boolean(on);
     return true;
-  }
+  },
   get castleTotal(){return Object.values(nativeFullArchitecturalCounts.castle)
     .reduce((a,b)=>a+b,0)},
   get ruinTotals(){return Object.fromEntries(Object.entries(nativeFullArchitecturalCounts.ruins)
