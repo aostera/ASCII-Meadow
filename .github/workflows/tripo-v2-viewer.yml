@@ -1,0 +1,42 @@
+name: Tripo V2 - Interactive 40 Bone Model Viewer
+on:
+  push:
+    branches: [feat/ashen-tripo-v2-game]
+    paths:
+      - experiments/three/ashen-tripo-v2-viewer.html
+      - experiments/three/ashen-tripo-v2-viewer.js
+      - experiments/three/assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb
+      - tools/check/tripo-v2-viewer.cjs
+      - .github/workflows/tripo-v2-viewer.yml
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22',cache: npm}
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Check native model viewer JS syntax
+        run: |
+          node --check experiments/three/ashen-tripo-v2-viewer.js
+          node --check tools/check/tripo-v2-viewer.cjs
+      - name: Test Tripo V2 40 bones on desktop and phone and capture screenshots
+        run: |
+          python3 -m http.server 8181 >/tmp/ashen-v2-http.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8181/experiments/three/ashen-tripo-v2-viewer.html >/dev/null && break
+            sleep 1
+          done
+          node tools/check/tripo-v2-viewer.cjs http://127.0.0.1:8181
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ashen-tripo-v2-360-and-real-skeleton
+          path: shots/tripo-v2-viewer/
+          if-no-files-found: warn
