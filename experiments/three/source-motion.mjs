@@ -29,7 +29,9 @@ export function sourceKnightMotion(e,previous,dt,CW,CH){
  const pxPerMetre=Number.isFinite(e.pxPerMetre)&&e.pxPerMetre>0?
    e.pxPerMetre:24;
  const movedMetres=moved/pxPerMetre;
- const validStep=Boolean(previous)&&!jumping&&
+ // The first grounded frame may still carry jump-arc map displacement.
+ // Do not convert it into a phantom walk/run stride on touchdown.
+ const validStep=Boolean(previous)&&!jumping&&!previous?.jumping&&
    Boolean(e.moving||(e.walk||0)>.5)&&
    movedMetres<.20&&movedMetres/dt<12;
  const speed=validStep&&moved>.001?
