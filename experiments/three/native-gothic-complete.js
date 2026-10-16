@@ -12,7 +12,7 @@
 const nativeBeforeFullCastle=buildModel;
 const nativeBeforeFullRuin=ruinDetail;
 const nativeFullArchitecturalCounts={castle:{},ruins:{}};
-let nativeWestPortalReliefClear=true;
+let nativeWestPortalReliefClear=true,nativeWestCurtainProjects=false;
 
 function nativeGothicBox(x0,x1,y0,y1,z0,z1,meta) {
   if(!(x1>x0&&y1>y0&&z1>z0))return;
@@ -169,7 +169,10 @@ function nativeBuildCompleteCastle(){
   // Deliberately non-uniform rise and missing coping pieces prevent the
   // uniform horizontal rows seen in the baseline ASCII facade captures.
   for(const side of [-1,1])for(let bay=0;bay<2;bay++){
-    const cx=side*(174+bay*72),z=95-bay*5;
+    // Inter-buttress bays of the outer curtain. Nearer z (towards the
+    // camera) than the original front wall at z=140; never embedded in
+    // existing gatehouse prisms centered x=+/-172, z=108, radius 52.
+    const cx=side*(342+bay*81),z=103-bay*4;
     const base=Y+155+bay*15,shoulder=base+118+bay*9;
     const peak=shoulder+51+bay*8;
     const jamb=bay===0?19:23;
@@ -211,8 +214,12 @@ function nativeBuildCompleteCastle(){
   }
   feature.portalSideTracery=solids.length-before;
   // Guard the actual new 3D halfspaces, not a flat-screen impression.
-  nativeWestPortalReliefClear=solids.slice(before).every(so=>
-    so.bb[1]<=-145||so.bb[0]>=145);
+  const curtainDetails=solids.slice(before);
+  nativeWestPortalReliefClear=curtainDetails.every(so=>
+    so.bb[1]<=-300||so.bb[0]>=300);
+  nativeWestCurtainProjects=[-423,-342,342,423].every(x=>
+    curtainDetails.some(so=>so.bb[0]<x+8&&so.bb[1]>x-8&&
+      so.bb[4]<115));
 
   for(let i=start;i<solids.length;i++){
     const s=solids[i],b=s.bb;
@@ -326,6 +333,7 @@ ruinDetail=function(site){
 window.__ASCII_NATIVE_COMPLETE_ARCH__={
   get features(){return JSON.parse(JSON.stringify(nativeFullArchitecturalCounts))},
   get westPortalReliefClear(){return nativeWestPortalReliefClear},
+  get westCurtainProjects(){return nativeWestCurtainProjects},
   get castleTotal(){return Object.values(nativeFullArchitecturalCounts.castle)
     .reduce((a,b)=>a+b,0)},
   get ruinTotals(){return Object.fromEntries(Object.entries(nativeFullArchitecturalCounts.ruins)
