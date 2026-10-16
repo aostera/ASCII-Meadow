@@ -55,7 +55,7 @@ function setupBones(model){
   }
   return {meshes,skin,sets,rest};
 }
-function animateRig(model,source){
+function animateRig(model,source,root){
   const {sets,rest}=source;
   const axisQ=new THREE.Quaternion();
   function twist(b,axes){
@@ -92,9 +92,9 @@ function animateRig(model,source){
     const swing=(.26+runMix*.33)*stride*(1-.65*airMix);
     const elbowBase=.09+runMix*.16;
     // Tripo rig has arms extending along +/-Z, legs along -Y and forward +X.
-    // Shoulder setDown about model-space X makes real T-pose into loose A-pose.
-    twist(sets.leftArm[0], [['ix',-.79],['iy',wave*swing]]);
-    twist(sets.rightArm[0],[['ix',+.79],['iy',opp*swing]]);
+    // Shoulder setDown about world Z makes real T-pose into loose A-pose.
+    twist(sets.leftArm[0], [['iz',-.79],['iy',wave*swing]]);
+    twist(sets.rightArm[0],[['iz',+.79],['iy',opp*swing]]);
     twist(sets.leftArm[1], [['iy',+.12+Math.max(0,-wave)*elbowBase]]);
     twist(sets.rightArm[1],[['iy',-.12-Math.max(0,-opp)*elbowBase]]);
     twist(sets.leftArm[2], [['iy',+.025*Math.sin(bodyClock*1.7)]]);
@@ -107,14 +107,14 @@ function animateRig(model,source){
       const hipAngle=w*swing*(1+runMix*.45)+jumpArc*(s*.11-.31);
       const kneeAngle=Math.max(0,-w)*(.40+runMix*.33)*stride+
         jumpArc*(.38+runMix*.12);
-      twist(chain[0],[['iz',hipAngle]]);
-      twist(chain[1],[['iz',-kneeAngle]]);
-      twist(chain[2],[['iz',kneeAngle*.34-hipAngle*.35]]);
+      twist(chain[0],[['ix',hipAngle]]);
+      twist(chain[1],[['ix',-kneeAngle]]);
+      twist(chain[2],[['ix',kneeAngle*.34-hipAngle*.35]]);
       twist(chain[3],[]);
     }
-    twist(sets.spine,[['iz',.025*wave2*stride],['ix',.045*runMix+.06*jumpArc]]);
-    twist(sets.chest,[['iz',.014*Math.sin(bodyClock*1.8)],['ix',-.02*runMix]]);
-    twist(sets.head,[['iz',.013*Math.sin(bodyClock*1.4)],['iy',.012*Math.cos(bodyClock*.9)]]);
+    twist(sets.spine,[['ix',.025*wave2*stride],['iz',.045*runMix+.06*jumpArc]]);
+    twist(sets.chest,[['ix',.014*Math.sin(bodyClock*1.8)],['iz',-.02*runMix]]);
+    twist(sets.head,[['ix',.013*Math.sin(bodyClock*1.4)],['iy',.012*Math.cos(bodyClock*.9)]]);
     sets.spine.position.copy(pos);
     sets.spine.position.y+=.004*Math.sin(bodyClock*2.1)*(1-stride)+
       Math.abs(Math.cos(phase))*stride*.010;
@@ -128,7 +128,7 @@ function animateRig(model,source){
     heading+=Math.atan2(Math.sin(h-heading),Math.cos(h-heading))*(1-Math.exp(-12*d));
     // Parent heading is applied by the character object, while mesh has its
     // own static orientation correction, preserving all glTF bind matrices.
-    model.parent.rotation.y=heading;
+    root.rotation.y=heading;
     clip=airborne?'Jump':runMix>.5&&stride>.45?'Run':stride>.2?'Walk':'Idle';
     lastFrameData={speed,run:desiredRun,airborne,heading,phase};
     return clip.toLowerCase();
@@ -160,7 +160,7 @@ export function createGltfKnight(_THREE=THREE,{url=TRIPO_V2_GLB,onLoad,onError}=
                          -box.getCenter(new THREE.Vector3()).z*sc);
       oriented.add(model);
       const source=setupBones(model);
-      const anim=animateRig(model,source);
+      const anim=animateRig(model,source,root);
       root.userData.gltf={
         loaded:true,
         actions:{Idle:true,Walk:true,Run:true,Jump:true},
