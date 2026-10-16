@@ -344,6 +344,83 @@ fs.mkdirSync(out,{recursive:true});
     throw Error('Jump still drives grounded rocker or planted hip: '+
       JSON.stringify(airborneUnloaded));
   console.log('TRUE TRIPO AIRBORNE HEEL/TOE RELEASE OK '+JSON.stringify(airborneUnloaded));
+  // v14 long mixed-state probe: uninterrupted real skinned character,
+  // no state reload, no phase restart and no single-frame limb teleport.
+  // 70 Idle, 120 Walk, 150 Run, 110 turning Run, 60 blocked Run,
+  // 80 Jump and 80 post-landing Idle = 670 consecutive 60 Hz ticks.
+  const transitionProbe=await page.evaluate(()=>{
+    const root=window.__ASHEN_ANIMATION_LAB__.model;
+    let bones;root.traverse(o=>{if(!bones&&o.isSkinnedMesh)bones=o.skeleton.bones;});
+    const L=bones[34],R=bones[29];
+    const vL=L.position.clone(),vR=R.position.clone();
+    const oldL=vL.clone(),oldR=vR.clone();
+    const checks={states:new Set(),maxLeftTick:0,maxRightTick:0,
+      maxHipTick:0,maxKnee:0,maxAbduction:0,
+      blockedPhaseDelta:0,jumpMidSupport:0,finalSupport:0,
+      lastClip:'',frames:0};
+    let dist=0,gx=0,gz=0,phase=null,prevHip=null,stopPhase=null;
+    for(let i=0;i<670;i++){
+      const idle=i<70||i>=590;
+      const walk=i>=70&&i<190;
+      const run=i>=190&&i<450;
+      const stop=i>=450&&i<510;
+      const jumping=i>=510&&i<590;
+      const turn=i>=340&&i<450?
+        (i-340)/110*Math.PI/2:i>=450?Math.PI/2:0;
+      const speed=walk?8:run?15:0;
+      const step=walk?.004:run?.009:0;
+      gx+=step*Math.sin(turn);gz+=step*Math.cos(turn);dist+=step;
+      const jumpClipTime=jumping?(i-510)/80*1.49:undefined;
+      root.userData.animate(1/60,{
+        speed,run:run||stop,heading:turn,
+        travelSource:dist,groundX:gx,groundZ:gz,
+        jumpClipTime
+      },i/60);
+      const p=root.userData.pose();
+      if(p.animationVersion!=='Tripo-IK-v14-grounded-transitions')
+        throw Error('Wrong v14 transition controller');
+      if(!Number.isFinite(p.phase)||p.kneeBend.some(v=>!Number.isFinite(v)))
+        throw Error('Nonfinite mixed-clip skinned pose');
+      if(phase!==null&&p.phase+1e-9<phase)
+        throw Error('Walk/Run/Jump transition restarted gait phase');
+      phase=p.phase;
+      checks.states.add(root.userData.gltf.clip);
+      checks.maxKnee=Math.max(checks.maxKnee,...p.kneeBend);
+      checks.maxAbduction=Math.max(checks.maxAbduction,...p.hipAbduction.map(Math.abs));
+      L.getWorldPosition(vL);R.getWorldPosition(vR);
+      if(i){
+        checks.maxLeftTick=Math.max(checks.maxLeftTick,vL.distanceTo(oldL));
+        checks.maxRightTick=Math.max(checks.maxRightTick,vR.distanceTo(oldR));
+      }
+      oldL.copy(vL);oldR.copy(vR);
+      if(prevHip!==null)
+        checks.maxHipTick=Math.max(checks.maxHipTick,
+          Math.abs(p.pelvisLateral-prevHip));
+      prevHip=p.pelvisLateral;
+      if(i===459)stopPhase=p.phase;
+      if(i===509)checks.blockedPhaseDelta=Math.abs(p.phase-stopPhase);
+      if(i===551)checks.jumpMidSupport=Math.max(...p.supportWeights,
+        ...p.footRocker.flat());
+      if(i===669){
+        checks.finalSupport=Math.max(...p.supportWeights);
+        checks.lastClip=root.userData.gltf.clip;
+      }
+      checks.frames++;
+    }
+    return {...checks,states:[...checks.states]};
+  });
+  console.log('670-TICK REAL TRIPO CLIP TRANSITIONS '+JSON.stringify(transitionProbe));
+  if(transitionProbe.frames!==670||
+     !['Idle','Walk','Run','Jump'].every(s=>transitionProbe.states.includes(s))||
+     transitionProbe.maxLeftTick>.18||transitionProbe.maxRightTick>.18||
+     transitionProbe.maxHipTick>.012||
+     transitionProbe.maxKnee>1.25||transitionProbe.maxAbduction>.231||
+     transitionProbe.blockedPhaseDelta>.0000001||
+     transitionProbe.jumpMidSupport>.00001||
+     transitionProbe.finalSupport>.0005||
+     transitionProbe.lastClip!=='Idle')
+    throw Error('Real skinned knight clip transition / wall stop broke: '+
+      JSON.stringify(transitionProbe));
   // Save a REAL 60 Hz Run gait as 12 sequence frames, not a still chosen
   // at a flattering moment. The screenshots use the actual Tripo GPU skin.
   await page.locator('[data-motion="Run"]').click();
