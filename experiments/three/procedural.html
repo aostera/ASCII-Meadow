@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0b">
+<title>ASCII Meadow — Three.js renderer experiment</title>
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="viewport" aria-label="Three.js proof of concept: ASCII Meadow gothic world"></div>
+<section id="controls" aria-label="Prototype controls">
+  <div class="heading"><div><span class="eyebrow">EXPERIMENT / NOT PRODUCTION</span><h1>ASCII MEADOW <small>THREE.JS</small></h1></div><div class="hud-actions"><button id="hud-toggle" type="button" aria-controls="controls" aria-expanded="true">Свернуть</button><a href="../../index.html" title="Open current game">Игра ↗</a></div></div>
+  <div class="control-row">
+    <label>Локация <select id="location"><option value="cloister">Готическая галерея</option><option value="abbey">Аббатство</option><option value="gate">Разрушенные ворота</option><option value="camp">Лагерь</option><option value="castle">Главный замок</option></select></label>
+    <label>Детализация <select id="quality"><option value="low">Низкая</option><option value="medium" selected>Средняя</option><option value="high">Высокая</option></select></label>
+    <label>Рыцарь <select id="character"><option value="rig">3D-риг</option><option value="original">192 кадра оригинала</option></select></label>
+  </div>
+  <div class="control-row toggles">
+    <label><input type="checkbox" id="ascii" checked> ASCII</label>
+    <label><input type="checkbox" id="wind" checked> Ветер</label>
+    <label><input type="checkbox" id="shadows" checked> Тени</label>
+    <label><input type="checkbox" id="stress"> + плотность (тест)</label>
+  </div>
+  <output id="stats">Инициализация…</output>
+  <p class="note">Карта и координаты читаются из <code>src/data/map.js</code> без изменений. Поверни камеру мышью или пальцем, приблизь колесом/щипком. WASD — шаг, Shift — бег, Space — прыжок. Переключатель «Рыцарь» показывает также исходные 192 ASCII-кадра. «+ плотность» добавляет только временные объекты для стресс-теста.</p>
+</section>
+<nav id="mobile-pad" aria-label="Управление движением" class="mobile-pad">
+  <div class="pad-directions">
+    <button type="button" data-move="KeyW" class="pad-up" aria-label="Идти вперёд">↑</button>
+    <button type="button" data-move="KeyA" class="pad-left" aria-label="Идти влево">←</button>
+    <button type="button" data-move="KeyS" class="pad-down" aria-label="Идти назад">↓</button>
+    <button type="button" data-move="KeyD" class="pad-right" aria-label="Идти вправо">→</button>
+  </div>
+  <div class="pad-actions">
+    <button type="button" data-move="ShiftLeft" aria-label="Бег">БЕГ</button>
+    <button type="button" data-move="Space" aria-label="Прыжок">ПРЫЖОК</button>
+  </div>
+</nav>
+<div id="error" role="alert" hidden></div>
+<script src="../../src/data/map.js"></script>
+<script src="../../src/data/knight-frames.js"></script>
+<script>window.ASCII_MEADOW_MAP = MEADOW_MAP; window.ASCII_KNIGHT_FRAMES = KNIGHT_ART;</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

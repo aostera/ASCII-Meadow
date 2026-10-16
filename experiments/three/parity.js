@@ -1,0 +1,495 @@
+// Original ASCII Meadow gameplay + switchable Three.js rasterizer.
+// This page is the migration baseline: all gameplay and authored-world scripts
+// are loaded directly from ../../src/*. This bridge only swaps final GL.flush.
+// The separate primitive-model experiment remains app.js on index.html.
+import { ThreeGlyphBackend } from './three-glyphs.js';
+
+const originalCanvas=document.getElementById('g');
+const modeOriginal=document.getElementById('parity-legacy');
+const modeThree=document.getElementById('parity-three');
+const architectureButton=document.getElementById('parity-architecture');
+const depthButton=document.getElementById('parity-depth');
+const knightButton=document.getElementById('parity-knight');
+const cowButton=document.getElementById('parity-cow');
+let depthStartedArchitecture=false;
+let knightStartedArchitecture=false;
+let cowStartedArchitecture=false;
+let liveArchitecture=null,architectureLoading=null,architectureWanted=false;
+const status=document.getElementById('parity-status');
+let legacyFlush=GL.flush;
+let backend=null,mode='legacy',lastError=null;
+let lastStats=0;
+const referenceRender=render; // original complete draw of the exact source glyph batch
+const referenceSimulate=simulate; // actual original game logic for controlled animation QA
+let referenceBatch=null;
+const safeStatus=text=>{status.textContent=text;};
+
+function renderThree(camx,camy,castle){
+  try {
+    backend.flush(GB,SPF,gput,CAST,camx,camy,castle,W,H,DPR,VZ,cathedral.cv);
+    // Native Gothic source meshes share this very same GPU context. The
+    // full-screen original ASCII image is committed first; optional geometry
+    // is restricted to a small diagnostic viewport, never replacing art.
+    if(liveArchitecture?.active){
+      liveArchitecture.render({W,H,VZ,CW,CH,camX:camx/CW,camY:camy/CH,DPR});
+    }
+    const now=performance.now();
+    if(now-lastStats>1100){
+      const s=backend.stats;
+      safeStatus(s.glyphs.toLocaleString()+' исходных символов · '+s.drawCalls+
+        ' вызовов Three.js · все игровые системы оригинальные');
+      lastStats=now;
+    }
+  } catch(error) {
+    lastError=error.message||String(error);
+    console.error('Experimental Three.js backend failed, switching to original:',error);
+    selectMode('legacy');
+    legacyFlush(camx,camy,castle);
+    safeStatus('Three.js ошибка, восстановлен оригинал: '+lastError);
+  }
+}
+
+function selectMode(next){
+  if(next==='three'){
+    if(!GL.ok||GL.lost){
+      safeStatus('На этом устройстве WebGL2 недоступен. Оставлен оригинал.');
+      return false;
+    }
+    try{
+      if(!backend)backend=new ThreeGlyphBackend(originalCanvas);
+      // Only rendering backend changes. Original simulation, renderer/render.js,
+      // world, paint, grass, cow/knight frames and map editor remain operational.
+      GL.flush=renderThree;
+      originalCanvas.style.visibility='hidden';
+      backend.show(true);
+      mode='three';lastStats=0;
+      safeStatus('Исходный мир → Three.js glyph renderer. Графика ещё проходит проверку 1:1.');
+    }catch(error){
+      lastError=String(error);
+      console.error('Unable to initialize Three.js rasterizer',error);
+      mode='legacy';GL.flush=legacyFlush;
+      originalCanvas.style.visibility='visible';
+      backend?.show(false);
+      safeStatus('Three.js инициализация не удалась: '+lastError);
+      return false;
+    }
+  }else{
+    GL.flush=legacyFlush;
+    originalCanvas.style.visibility='visible';
+    backend?.show(false);
+    // Free experimental 3D GPU resources on returning to original mode.
+    if(liveArchitecture){liveArchitecture.dispose();liveArchitecture=null}
+    architectureWanted=false;
+    depthStartedArchitecture=false;
+    architectureButton.setAttribute('aria-pressed','false');
+    architectureButton.textContent='3D архитектура: выкл.';
+    depthButton.setAttribute('aria-pressed','false');
+    depthButton.textContent='Глубина 3D: выкл.';
+    knightButton.setAttribute('aria-pressed','false');
+    knightButton.textContent='3D риг: выкл.';
+    cowButton.setAttribute('aria-pressed','false');
+    cowButton.textContent='3D корова: выкл.';
+    cowStartedArchitecture=false;
+    knightStartedArchitecture=false;
+    mode='legacy';
+    safeStatus('Оригинальный движок: эталон 1:1 без каких-либо визуальных замен');
+  }
+  modeOriginal.setAttribute('aria-pressed',String(mode==='legacy'));
+  modeThree.setAttribute('aria-pressed',String(mode==='three'));
+  return true;
+}
+async function setLiveArchitecture(enabled){
+  architectureWanted=Boolean(enabled);
+  if(!architectureWanted){
+    if(liveArchitecture){liveArchitecture.dispose();liveArchitecture=null}
+    depthStartedArchitecture=false;
+    depthButton.setAttribute('aria-pressed','false');
+    depthButton.textContent='Глубина 3D: выкл.';
+    knightButton.setAttribute('aria-pressed','false');
+    knightButton.textContent='3D риг: выкл.';
+    cowButton.setAttribute('aria-pressed','false');
+    cowButton.textContent='3D корова: выкл.';
+    cowStartedArchitecture=false;
+    knightStartedArchitecture=false;
+    architectureButton.setAttribute('aria-pressed','false');
+    architectureButton.textContent='3D архитектура: выкл.';
+    return true;
+  }
+  if(!selectMode('three')){
+    architectureWanted=false;return false;
+  }
+  architectureButton.disabled=true;
+  try{
+    // Lazy dependency: main game and old WebGL never spend CPU/GPU resources
+    // generating native meshes unless the player explicitly chooses 3D QA.
+    const {LiveSourceArchitecture}=await import('./live-architecture.js');
+    if(!architectureWanted)return false;
+    liveArchitecture=new LiveSourceArchitecture(backend.renderer,()=>({
+      solids,ruinSites,ruinDetail,ruinRotateMesh,cathedral,
+      WS,MS,pitch:PITCH,worldGen,
+      player:{x:player.x,y:player.y,d8:player.d8,
+        moving:player.moving,walk:player.walk,run:player.run,jump:player.jump},
+      gameTime:t,knightSourceHeight:KG.art*charDims(player).fch,
+      cows:cows.map(c=>({x:c.x,y:c.y,d8:c.d8,state:c.state,
+        at:c.at,gp:c.gp,wd:c.wd})),
+      cowSourceHeight:cows.length?CG.rows*charDims(cows[0]).fch*.75:0
+    }));
+    architectureButton.setAttribute('aria-pressed','true');
+    architectureButton.textContent='3D архитектура: вкл.';
+    return true;
+  }catch(error){
+    console.error('Native 3D architecture integration failed',error);
+    architectureWanted=false;
+    architectureButton.setAttribute('aria-pressed','false');
+    architectureButton.textContent='3D архитектура: ошибка';
+    return false;
+  }finally{architectureButton.disabled=false}
+}
+async function setDepthMode(enabled){
+  depthButton.disabled=true;
+  try{
+    if(!enabled){
+      if(liveArchitecture)await liveArchitecture.setDepthPreview(false);
+      // If depth created the source layer on its own, disabling depth must
+      // also remove that layer. Do not leave a distracting gray inset behind.
+      if(depthStartedArchitecture)await setLiveArchitecture(false);
+      depthStartedArchitecture=false;
+      depthButton.setAttribute('aria-pressed','false');
+      depthButton.textContent='Глубина 3D: выкл.';
+      return true;
+    }
+    if(!liveArchitecture){
+      if(!(await setLiveArchitecture(true)))return false;
+      depthStartedArchitecture=true;
+    }else depthStartedArchitecture=false;
+    if(!liveArchitecture||!(await liveArchitecture.setDepthPreview(true)))return false;
+    depthButton.setAttribute('aria-pressed','true');
+    depthButton.textContent='Глубина 3D: вкл.';
+    return true;
+  }catch(error){
+    console.error('Native Gothic depth prepass failed',error);
+    depthButton.setAttribute('aria-pressed','false');
+    depthButton.textContent='Глубина 3D: ошибка';
+    return false;
+  }finally{depthButton.disabled=false}
+}
+async function setKnightMode(enabled){
+  knightButton.disabled=true;
+  try{
+    if(!enabled){
+      if(liveArchitecture)liveArchitecture.setKnightRig(false);
+      if(knightStartedArchitecture&&depthButton.getAttribute('aria-pressed')!=='true'&&cowButton.getAttribute('aria-pressed')!=='true')
+        await setLiveArchitecture(false);
+      knightStartedArchitecture=false;
+      knightButton.setAttribute('aria-pressed','false');
+      knightButton.textContent='3D риг: выкл.';
+      // Do not reset an independent active cow when switching knight off.
+      return true;
+    }
+    if(!liveArchitecture){
+      if(!(await setLiveArchitecture(true)))return false;
+      knightStartedArchitecture=true;
+    }else knightStartedArchitecture=false;
+    if(liveArchitecture?.cowEnabled){
+      liveArchitecture.setCowRig(false);
+      if(cowStartedArchitecture)knightStartedArchitecture=true;
+      cowStartedArchitecture=false;
+      cowButton.setAttribute('aria-pressed','false');
+      cowButton.textContent='3D корова: выкл.';
+    }
+    if(!liveArchitecture?.setKnightRig(true))return false;
+    knightButton.setAttribute('aria-pressed','true');
+    knightButton.textContent='3D риг: вкл.';
+    return true;
+  }catch(error){
+    console.error('Experimental source-driven Three knight rig failed',error);
+    knightButton.setAttribute('aria-pressed','false');
+    knightButton.textContent='3D риг: ошибка';
+    return false;
+  }finally{knightButton.disabled=false}
+}
+
+async function setCowMode(enabled){
+  cowButton.disabled=true;
+  try{
+    if(!enabled){
+      if(liveArchitecture)liveArchitecture.setCowRig(false);
+      cowButton.setAttribute('aria-pressed','false');
+      cowButton.textContent='3D корова: выкл.';
+      if(cowStartedArchitecture&&depthButton.getAttribute('aria-pressed')!=='true'&&
+         knightButton.getAttribute('aria-pressed')!=='true')
+        await setLiveArchitecture(false);
+      cowStartedArchitecture=false;
+      return true;
+    }
+    if(!liveArchitecture){
+      if(!(await setLiveArchitecture(true)))return false;
+      cowStartedArchitecture=true;
+    }else cowStartedArchitecture=false;
+    if(liveArchitecture?.knightEnabled){
+      liveArchitecture.setKnightRig(false);
+      if(knightStartedArchitecture)cowStartedArchitecture=true;
+      knightStartedArchitecture=false;
+      knightButton.setAttribute('aria-pressed','false');
+      knightButton.textContent='3D риг: выкл.';
+    }
+    if(!liveArchitecture?.setCowRig(true))return false;
+    cowButton.setAttribute('aria-pressed','true');
+    cowButton.textContent='3D корова: вкл.';
+    return true;
+  }catch(error){
+    console.error('Original-source Three cow diagnostic failed',error);
+    cowButton.setAttribute('aria-pressed','false');
+    cowButton.textContent='3D корова: ошибка';
+    return false;
+  }finally{cowButton.disabled=false}
+}
+
+architectureButton.addEventListener('click',()=>setLiveArchitecture(!architectureWanted));
+cowButton.addEventListener('click',()=>setCowMode(cowButton.getAttribute('aria-pressed')!=='true'));
+knightButton.addEventListener('click',()=>setKnightMode(knightButton.getAttribute('aria-pressed')!=='true'));
+depthButton.addEventListener('click',()=>setDepthMode(depthButton.getAttribute('aria-pressed')!=='true'));
+modeOriginal.addEventListener('click',()=>selectMode('legacy'));
+modeThree.addEventListener('click',()=>selectMode('three'));
+
+// Restored WebGL2 contexts reset GL.flush. Reinstall experimental backend
+// only after the old renderer's handler finished restoring its resources.
+originalCanvas.addEventListener('webglcontextrestored',()=>{
+  // src/renderer/webgl.js rebuilds its WebGL2 program and replaces GL.flush.
+  // The old function closes over deleted GPU handles, so NEVER restore it
+  // after tab suspension (especially on Safari/iPadOS).
+  queueMicrotask(()=>{
+    if(!GL.ok)return;
+    if(GL.flush!==renderThree)legacyFlush=GL.flush;
+    if(mode==='three')GL.flush=renderThree;
+  });
+});
+window.addEventListener('pagehide',()=>{});
+window.__ASCII_PARITY__={
+  select:selectMode,
+  get mode(){return mode;},
+  get stats(){return backend?.stats||null;},
+  get liveArchitecture(){return liveArchitecture?{
+    active:liveArchitecture.active,
+    ...liveArchitecture.stats,
+    camera:liveArchitecture.lastCamera,
+    depth:liveArchitecture.depthInfo
+  }:null;},
+  setDepthMode,
+  setLiveArchitecture,
+  setKnightMode,
+  setCowMode,
+  get error(){return lastError;},
+  get canvas(){return backend?.renderer.domElement||null;},
+  get ready(){return Boolean(GB.atlasCv&&GB.spr.length&&W&&H&&GB.n>1000);},
+  get baselineGlyphs(){return GB.n;},
+  advanceThreeForTest(dt,action=''){
+    if(!new URLSearchParams(location.search).has('parityTest')||mode!=='three')
+      return null;
+    if(!(dt>0&&dt<=.15))throw Error('Invalid live 3D animation dt');
+    if(action==='jump')jump();
+    if(action==='cow-graze'&&cows.length){
+      Object.assign(cows[0],{state:'graze',gp:'down',at:0,gl:5});
+    }
+    if(action==='cow-hop'&&cows.length){
+      Object.assign(cows[0],{state:'hop',at:.32,hv:[0,0]});
+    }
+    if(action==='cow-walk'&&cows.length){
+      const c=cows[0];
+      Object.assign(c,{state:'walk',at:0,tx:c.x+14,ty:c.y});
+    }
+    if(action==='cow-run'&&cows.length){
+      Object.assign(cows[0],{state:'run',at:0,rt:3});
+    }
+    // Keep the real original simulation, atlas, rig and GL frame authoritative.
+    referenceSimulate(dt);
+    referenceRender();
+    return {player:[player.x,player.y],jump:player.jump,
+      motion:liveArchitecture?.stats.knightMotion||'off',
+      feet:liveArchitecture?.stats.knightActorFoot||null,
+      cow:liveArchitecture?.stats.cowMotion||'off',
+      cowHead:liveArchitecture?.stats.cowHeadLowering||0,
+      cowFoot:liveArchitecture?.stats.cowActorFoot||null,
+      cowState:cows[0]?.state||null,
+      sourceMap:JSON.stringify(MEADOW_MAP)};
+  },
+  setGlyphCullingForTest(enabled){
+    if(!new URLSearchParams(location.search).has('parityTest')||!backend)return false;
+    backend.cullingEnabled=Boolean(enabled);
+    return true;
+  },
+  // Test actual authored castle lightning, including the source's additive
+  // second pass. No brightness/alpha change to normal gameplay.
+  setSourceFlashForTest(strength){
+    if(!new URLSearchParams(location.search).has('parityTest'))return false;
+    if(!(strength>=0&&strength<=1))throw Error('Invalid source lightning');
+    flash=strength;
+    return true;
+  },
+
+  // Produce ONE exact glyph buffer from the original scene, then render that
+  // identical buffer in the independent Three.js backend. No second foliage
+  // draw, no extra smoothing ticks, no perceptual brightness manipulation.
+  captureReferenceForTest(){
+    if(!new URLSearchParams(location.search).has('parityTest'))return null;
+    if(mode!=='legacy')selectMode('legacy');
+    referenceRender();
+    const castle=castleDraw;
+    const count=GB.n-(castle?(castle.flash>0.02?2:1):0);
+    referenceBatch={count,camX:camX*CW,camY:camY*CH,castle};
+    return {glyphs:count,camera:[referenceBatch.camX,referenceBatch.camY]};
+  },
+
+  stepAnimatedReferenceForTest(dt,action=''){
+    if(!new URLSearchParams(location.search).has('parityTest'))return null;
+    if(!(dt>0&&dt<=.15))throw Error('Invalid animation QA timestep');
+    if(mode!=='legacy')selectMode('legacy');
+    if(action==='jump')jump();
+    if(action==='cow-graze'&&cows.length){
+      const cow=cows[0];
+      cow.state='graze';cow.gp='down';cow.gl=3;cow.at=0;
+    }
+    // The real gameplay clock, NPCs, physics, sprite phases, grass, fog,
+    // knight and cow art all move; no fake 3D replacement rig is involved.
+    referenceSimulate(dt);
+    referenceRender();
+    const castle=castleDraw;
+    const count=GB.n-(castle?(castle.flash>0.02?2:1):0);
+    referenceBatch={count,camX:camX*CW,camY:camY*CH,castle};
+    const bits=new Uint32Array(GB.buf.buffer,GB.buf.byteOffset,count*6);
+    let fingerprint=2166136261>>>0;
+    const stride=Math.max(1,Math.floor(bits.length/9000));
+    for(let i=0;i<bits.length;i+=stride)
+      fingerprint=Math.imul(fingerprint^bits[i],16777619)>>>0;
+    return {
+      glyphs:count,fingerprint,time:t,
+      playerJump:player.jump||0,player:[player.x,player.y],
+      cows:cows.map(c=>({state:c.state,at:c.at,d8:c.d8})),
+      npcs:npcs.length,worldGen
+    };
+  },
+
+  captureThreeForTest(){
+    if(!new URLSearchParams(location.search).has('parityTest')||!referenceBatch)return null;
+    if(!selectMode('three'))return null;
+    GB.n=referenceBatch.count;
+    renderThree(referenceBatch.camX,referenceBatch.camY,referenceBatch.castle);
+    return backend?.stats||null;
+  },
+
+  // Only used in automated screenshot QA. Camera and player positions are
+  // temporary; the authored MEADOW_MAP and editor state are not mutated.
+  visitForTest(name) {
+    if(!new URLSearchParams(location.search).has('parityTest'))return null;
+    let coords=null;
+    if(name==='castle')coords=[0,-115];
+    else if(name!=='camp') {
+      const site=(MEADOW_MAP.ruins||[]).find(r=>r[0]===name);
+      if(!site)return null;
+      coords=[site[2],site[3]];
+    }
+    if(coords) {
+      [player.x,player.y]=mapToCell(coords[0],coords[1]);
+      player.tx=player.x;player.ty=player.y;player.moving=false;
+      updateCamera(0,true);
+    }
+    return {name,player:[player.x,player.y],camera:[camX,camY]};
+  },
+  get positionDiagnostics(){
+    if(!backend)return null;
+    const layer=backend.glyphs,n=layer.geo.instanceCount;
+    const rect=layer.rect,cam=layer.uniforms.uCam.value,view=layer.uniforms.uView.value;
+    let visible=0,minX=Infinity,maxX=-Infinity;
+    for(let i=0;i<n;i+=Math.max(1,Math.floor(n/2048))){
+      const j=i*4,x=(rect[j]-cam.x)/view.x*2-1,xx=(rect[j+2]-cam.x)/view.x*2-1;
+      if(x<1&&xx>-1)visible++;
+      minX=Math.min(minX,x);maxX=Math.max(maxX,xx);
+    }
+    return {sampledVisibleX:visible,clipXRange:[minX,maxX],
+      first:rect.slice(0,16).join(','),cam:[cam.x,cam.y],view:[view.x,view.y],
+      positions:layer.geo.instanceCount,draws:backend.stats.drawCalls,
+      triangles:backend.stats.triangles};
+  },
+  // Debug shader modes are available ONLY in ?parityTest=1, never to players.
+  debugForTest(mode){
+    if(!new URLSearchParams(location.search).has('parityTest')||!backend)return false;
+    backend.debug(mode);return true;
+  },
+  // Test-only deterministic frame comparison. Never available during normal play.
+  freezeForTest(){
+    if(!new URLSearchParams(location.search).has('parityTest'))return false;
+    window.simulate=()=>{};
+    window.render=()=>{}; // freeze canvas-producing render(), not just simulate()
+    return true;
+  },
+  get map(){return MEADOW_MAP;},
+  get originalWebGL(){return Boolean(GL.ok);},
+  get playerLocation(){return [player?.x||0,player?.y||0];}
+};
+selectMode('legacy');
+
+// Optional on-device measurements, never active in the ordinary game.
+// Includes vsync-capped RAF p50/p95 and actual JS submit timings. This is
+// the only way to collect genuine iPad/iPhone/desktop performance evidence.
+if(new URLSearchParams(location.search).get('profile')==='1'){
+  const readyForProfile=()=>{
+    if(!GB.atlasCv||!W||!H){
+      requestAnimationFrame(readyForProfile);return;
+    }
+    if(!selectMode('three'))return;
+    import('./device-profiler.mjs').then(m=>m.installDeviceProfiler({
+      getStats:()=>backend?.stats||null,
+      durationMs:new URLSearchParams(location.search).has('profileTest')?900:10000
+    })).catch(e=>{
+      console.error('Native Three device profiling failed',e);
+      safeStatus('Измерение кадров недоступно: '+e.message);
+    });
+  };
+  requestAnimationFrame(readyForProfile);
+}
+
+// On-device alternating A/B test. Only the GL backend changes. Ordinary
+// gameplay, authored sprites, light levels and source map are never edited.
+// URL: ?profile=compare (short deterministic smoke: &profileTest=1).
+if(new URLSearchParams(location.search).get('profile')==='compare'){
+  const readyForComparison=()=>{
+    if(!GB.atlasCv||!W||!H||!GL.ok){
+      if(!GL.ok){safeStatus('A/B невозможно: исходный WebGL2 недоступен');return}
+      requestAnimationFrame(readyForComparison);return;
+    }
+    import('./engine-comparison.mjs').then(m=>m.installEngineComparison({
+      selectMode,getMode:()=>mode,getStats:()=>backend?.stats||{},
+      getMapSnapshot:()=>JSON.stringify(MEADOW_MAP),
+      durationMs:new URLSearchParams(location.search).has('profileTest')?700:5000,
+      warmupMs:new URLSearchParams(location.search).has('profileTest')?50:400
+    })).catch(e=>{
+      console.error('Original / Three device A/B profiling failed',e);
+      safeStatus('A/B измерение недоступно: '+e.message);
+    });
+  };
+  requestAnimationFrame(readyForComparison);
+}
+
+// Dedicated opt-in geometry inspection mode. Never enters the pixel-perfect
+// original / Three glyph comparison unless explicitly requested in the URL.
+// It builds meshes from the REAL raycast source and is not the game's renderer.
+if(['1','world'].includes(new URLSearchParams(location.search).get('geometry'))){
+  const readyForSourceModel=()=>{
+    if(!GB.atlasCv||!solids.length){
+      requestAnimationFrame(readyForSourceModel);return;
+    }
+    import('./architecture-viewer.mjs')
+      .then(m=>m.openSourceArchitecture({
+        solids,ruinSites,ruinDetail,ruinRotateMesh,cathedral,
+        WS,MS,PITCH,
+        getCamera:()=>({W,H,VZ,CW,CH,camX,camY}),
+        initialWorld:new URLSearchParams(location.search).get('geometry')==='world'
+      }))
+      .catch(err=>{
+        console.error('Original-masonry Three.js view failed:',err);
+        safeStatus('Ошибка загрузки исходной 3D-геометрии: '+err.message);
+      });
+  };
+  requestAnimationFrame(readyForSourceModel);
+}
+

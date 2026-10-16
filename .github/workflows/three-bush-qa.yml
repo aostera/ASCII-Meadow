@@ -1,0 +1,53 @@
+name: Three Native Articulated Bush QA
+
+on:
+  push:
+    branches:
+      - 'feat/three-native-bush-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-bush-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  articulated-bush-depth:
+    name: Physical bush occlusion and spring movement (desktop/mobile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Syntax-check native scene and test
+        run: |
+          node --check experiments/three/native-bush-depth.mjs
+          node --check experiments/three/native-architecture-depth.mjs
+          node --check experiments/three/native.js
+          node --check tools/check/three-native-bush-depth.cjs
+      - name: Physically verify source bush Z and independent twig deflection
+        run: |
+          python3 -m http.server 8181 > /tmp/native-bush-http.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8181/experiments/three/native.html >/dev/null && break
+            sleep 1
+          done
+          node tools/check/three-native-bush-depth.cjs http://127.0.0.1:8181
+          node tools/check/three-native-tree-depth.cjs http://127.0.0.1:8181
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: three-physical-bush-depth
+          path: |
+            shots/three-native-bushes
+            shots/three-native-trees
+          if-no-files-found: warn

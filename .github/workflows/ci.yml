@@ -277,3 +277,186 @@ jobs:
             echo "::error::frames differ from the base branch (see the visual-diff artifacts). If the change to the picture is intended, add the visual-change label."
             exit 1
           fi
+
+  three-prototype:
+    name: Three.js experiment (real WebGL, authored-map scene, phone viewport)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Module syntax
+        run: |
+          node --check experiments/three/app.js
+          node --check experiments/three/knight-ascii.js
+          node --check experiments/three/castle.js
+          node --check experiments/three/gpu-timing.js
+          node --check tools/check/three-prototype.cjs
+          node --check tools/check/three-unit.cjs
+          node --check experiments/three/ashen-vow.js
+          node --check tools/check/three-ashen-vow.cjs
+      - name: Ground and GPU timing unit tests
+        run: node tools/check/three-unit.cjs
+      - name: Install screenshot inspector
+        run: python3 -m pip install 'Pillow==12.0.0'
+      - name: Render actual 3D scene and preserve the author map
+        run: |
+          python3 -m http.server 8181 > /tmp/three-http.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8181/experiments/three/ > /dev/null && break; sleep 1; done
+          node tools/check/three-prototype.cjs http://127.0.0.1:8181
+          node tools/check/three-ashen-vow.cjs http://127.0.0.1:8181
+      - name: Reject nearly blank ASCII screenshots
+        run: python3 tools/check/three-visibility.py shots/three/desktop.png shots/three/phone.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: three-prototype-screenshots
+          path: |
+            shots/three/
+            shots/three-ashen-vow/
+          if-no-files-found: warn
+
+  three-parity:
+    name: Exact-world Three.js renderer migration (original game + experimental backend)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Check new migration module syntax
+        run: |
+          node --check experiments/three/parity.js
+          node --check experiments/three/three-glyphs.js
+          node --check experiments/three/native-gl.js
+          node --check experiments/three/native.js
+          node --check tools/check/three-native-game.cjs
+          node --check tools/check/three-native-recovery.cjs
+          node --check experiments/three/native-mobile.js
+          node --check experiments/three/native-mobile-lifecycle.mjs
+          node --check tools/check/three-native-mobile.mjs
+          node tools/check/three-native-mobile.mjs
+          node --check tools/check/three-native-android.cjs
+          node --check experiments/three/native-bushes.js
+          node --check tools/check/three-native-bush.cjs
+          node --check experiments/three/native-npcs.js
+          node --check experiments/three/native-gothic-details.js
+          node --check experiments/three/native-gothic-complete.js
+          node --check experiments/three/native-editor-models.mjs
+          node --check tools/check/three-native-grey-editor.cjs
+          node --check experiments/three/native-shadow-soften.js
+          node --check experiments/three/native-shadow-coverage.js
+          node --check tools/check/three-native-shadow-coverage.cjs
+          node --check experiments/three/native-body-shadows.js
+          node --check tools/check/three-native-body-shadows.cjs
+          node --check tools/check/three-native-art.cjs
+          node --check experiments/three/native-architecture-depth.mjs
+          node --check experiments/three/native-tree-depth.mjs
+          node --check experiments/three/native-props-depth.mjs
+          node --check tools/check/three-native-props-depth.cjs
+          node --check tools/check/three-native-tree-depth.cjs
+          node --check tools/check/three-native-depth.cjs
+          node --check tools/check/three-native-npcs.cjs
+          node --check experiments/three/glyph-visibility.mjs
+          node --check experiments/three/source-motion.mjs
+          node tools/check/three-source-motion.mjs
+          node --check tools/check/three-live-knight.cjs
+          node --check experiments/three/cow-rig.js
+          node --check experiments/three/source-cow-motion.mjs
+          node --check experiments/three/device-profiler.mjs
+          node tools/check/three-device-profiler.mjs
+          node --check experiments/three/engine-comparison.mjs
+          node tools/check/three-engine-comparison.mjs
+          node --check tools/check/three-engine-comparison.cjs
+          node --check tools/check/three-device-profiler.cjs
+          node tools/check/three-source-cow-motion.mjs
+          node --check tools/check/three-live-cow.cjs
+          node tools/check/three-glyph-visibility.mjs
+          node --check tools/check/three-parity.cjs
+          node --check tools/check/three-performance.cjs
+          node --check tools/check/three-motion-parity.cjs
+          node tools/check/three-source-sync.cjs
+          node --check experiments/three/source-masonry.mjs
+          node --check experiments/three/architecture-viewer.mjs
+          node --check tools/check/three-architecture.cjs
+          node --check experiments/three/live-architecture.js
+          node --check tools/check/three-live-architecture.cjs
+          node --check experiments/three/architecture-depth.js
+          node --check tools/check/three-depth.cjs
+          node tools/check/three-source-masonry.mjs
+          node --check experiments/three/source-world.mjs
+          node tools/check/three-world-projection.mjs
+      - name: Screenshot-diff dependency
+        run: python3 -m pip install 'Pillow==12.0.0'
+      - name: Render original full game through both rasterizers
+        run: |
+          python3 -m http.server 8181 > /tmp/parity-http.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8181/experiments/three/parity.html > /dev/null && break; sleep 1; done
+          node tools/check/three-native-game.cjs http://127.0.0.1:8181
+          node tools/check/three-native-recovery.cjs http://127.0.0.1:8181
+          node tools/check/three-native-android.cjs http://127.0.0.1:8181
+          node tools/check/three-native-bush.cjs http://127.0.0.1:8181
+          node tools/check/three-native-npcs.cjs http://127.0.0.1:8181
+          node tools/check/three-native-depth.cjs http://127.0.0.1:8181
+          node tools/check/three-native-tree-depth.cjs http://127.0.0.1:8181
+          node tools/check/three-native-props-depth.cjs http://127.0.0.1:8181
+          node tools/check/three-native-art.cjs http://127.0.0.1:8181
+          node tools/check/three-native-grey-editor.cjs http://127.0.0.1:8181
+          node tools/check/three-native-body-shadows.cjs http://127.0.0.1:8181
+          node tools/check/three-parity.cjs http://127.0.0.1:8181
+          node tools/check/three-motion-parity.cjs http://127.0.0.1:8181
+          node tools/check/three-performance.cjs http://127.0.0.1:8181
+          node tools/check/three-live-knight.cjs http://127.0.0.1:8181
+          node tools/check/three-live-cow.cjs http://127.0.0.1:8181
+          node tools/check/three-device-profiler.cjs http://127.0.0.1:8181
+          node tools/check/three-engine-comparison.cjs http://127.0.0.1:8181
+          node tools/check/three-architecture.cjs http://127.0.0.1:8181
+          node tools/check/three-live-architecture.cjs http://127.0.0.1:8181
+          node tools/check/three-depth.cjs http://127.0.0.1:8181
+      - name: Report fixed-scene pixel differences / block empty Three output
+        run: |
+          python3 tools/check/three-pixel-parity.py shots/three-parity
+          python3 tools/check/three-motion-pixels.py shots/three-motion
+          python3 tools/check/three-live-knight-pixels.py shots/three-knight
+          python3 tools/check/three-live-cow-pixels.py shots/three-cow
+          python3 tools/check/three-depth-visibility.py shots/three-depth
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-world-three-parity
+          path: |
+            shots/three-parity/
+            shots/three-depth/
+            shots/three-motion/
+            shots/three-performance/
+            shots/three-knight/
+            shots/three-cow/
+            shots/three-device-profiler/
+            shots/three-engine-comparison/
+            shots/three-native-game/
+            shots/three-native-recovery/
+            shots/three-native-android/
+            shots/three-native-bush/
+            shots/three-native-npcs/
+            shots/three-native-depth/
+            shots/three-native-trees/
+            shots/three-native-props/
+            shots/three-native-art/
+            shots/three-native-grey-editor/
+            shots/three-native-body-shadows/
+          if-no-files-found: warn

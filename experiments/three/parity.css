@@ -1,0 +1,52 @@
+/* Exact-parity migration lab. The original game stylesheet is untouched. */
+#g { z-index: 0; }
+#three-parity-canvas { z-index: 1; pointer-events: none; }
+#c { z-index: 2; }
+.hud,.stats,.ed,.ed-open { z-index: 4; }
+#parity-toolbar {
+  position: fixed;
+  z-index: 6;
+  top: calc(86px + env(safe-area-inset-top, 0px));
+  left: 16px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: min(520px,calc(100vw - 32px));
+  padding: 8px;
+  border: 1px solid #4a4a46;
+  background: rgba(11,11,12,.88);
+  backdrop-filter: blur(8px);
+  color: #b3b3af;
+  font: 11px/1.3 "JetBrains Mono", ui-monospace, monospace;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: auto;
+}
+#parity-label { font-size: 10px; letter-spacing: .05em; margin-right: 4px; }
+#parity-toolbar button {
+  cursor: pointer; color: #bbb;
+  border: 1px solid #4a4a46; background: #191919;
+  padding: 7px 10px; font: 11px/1.1 inherit;
+  border-radius: 2px;
+}
+#parity-toolbar button[aria-pressed=true] { color: #fff; border-color:#b1b1b0; background:#393939; }
+#parity-toolbar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+#parity-status { flex-basis: 100%; color: #959590; }
+body.editing #parity-toolbar { opacity: .55; pointer-events: none; }
+@media(max-width:640px) {
+  .hud { max-width: calc(100vw - 20px); left: 8px; top: calc(8px + env(safe-area-inset-top,0px)); padding: 7px 9px; }
+  .hud p { font-size: 10px; }
+  #parity-toolbar { left: 8px; top: calc(81px + env(safe-area-inset-top,0px)); padding: 6px; gap: 3px; max-width: calc(100vw - 16px); }
+  #parity-label { flex-basis: 100%; }
+  #parity-toolbar button { padding: 6px 8px; }
+  #parity-status { font-size: 10px; }
+}
+
+/* Opt-in architecture is rendered through the SAME WebGL context; this
+   button merely exposes it, leaving the main glyph image untouched. */
+#parity-architecture[aria-pressed="true"]{border-color:#bcbcb9;color:#fff}
+#parity-architecture:disabled{opacity:.5;cursor:wait}
+
+#parity-depth[aria-pressed="true"]{border-color:#bbb;color:#fff}
+#parity-depth:disabled{opacity:.5;cursor:wait}

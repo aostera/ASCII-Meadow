@@ -1,0 +1,82 @@
+/* Experimental native runtime: one full-screen Three WebGL canvas plus
+   the existing 2D overlay; the old GPU canvas is never created. */
+#g { z-index:0; }
+#three-parity-canvas { z-index:1; pointer-events:none; }
+#c { z-index:2; }
+.hud,.stats,.ed,.ed-open { z-index:4; }
+
+/* Android browser chrome, cut-outs and WebView gesture surfaces. Only native
+   touch layouts change; world glyph RGB/alpha/pixel ratios remain authored. */
+html,body { overscroll-behavior: none; }
+#c { touch-action: none; -webkit-tap-highlight-color: transparent; }
+@media (pointer: coarse) {
+  .hud {
+    box-sizing: border-box;
+    left: max(10px,env(safe-area-inset-left,0px));
+    right: max(10px,env(safe-area-inset-right,0px));
+    top: calc(10px + env(safe-area-inset-top,0px));
+    max-width: none;
+    padding: 8px 10px;
+  }
+  .hud p { max-width: 36ch; }
+  .stats {
+    right: max(10px,env(safe-area-inset-right,0px));
+    bottom: calc(10px + env(safe-area-inset-bottom,0px));
+  }
+}
+
+
+/* Actual rotatable grey Three.js 3D buildings in the existing map editor.
+   This toolbar has no effect on the non-editor/normal game viewport. */
+.native-grey-editor {
+  position:fixed;
+  z-index:6;
+  top:calc(90px + env(safe-area-inset-top,0px));
+  left:calc(14px + env(safe-area-inset-left,0px));
+  box-sizing:border-box;
+  width:min(270px,calc(100vw - 28px));
+  display:grid;
+  gap:9px;
+  padding:12px;
+  border:1px solid #555;
+  background:rgba(14,14,14,.95);
+  color:#dedede;
+  font:500 12px/1.35 var(--ui);
+  box-shadow:0 3px 24px #0006;
+  touch-action:pan-y;
+}
+.native-grey-editor[hidden] { display:none !important; }
+.native-grey-switch, .native-grey-rotation-title {
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.native-grey-switch { justify-content:flex-start;cursor:pointer; }
+.native-grey-switch input, .native-grey-rotation input { accent-color:#b8b8b8; }
+.native-grey-note { color:#aaa;font:400 11px/1.45 var(--ui); }
+.native-grey-rotation { display:grid;gap:8px; }
+.native-grey-rotation[hidden] { display:none; }
+.native-grey-rotation input { width:100%;margin:0;touch-action:none; }
+.native-grey-rotation output { font:500 12px/1 var(--mono); }
+.native-grey-buttons { display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px; }
+.native-grey-buttons button {
+  background:#242424;color:#dedede;border:1px solid #626262;
+  padding:8px 5px;cursor:pointer;font:500 11px/1.2 var(--ui);
+  touch-action:manipulation;
+}
+.native-grey-buttons button:hover { background:#353535; }
+.native-grey-map-drag {
+  width:100%;padding:9px 8px;
+  border:1px solid #727272;background:#292929;color:#e4e4e4;
+  font:500 12px/1.3 var(--ui);cursor:pointer;
+  touch-action:manipulation;
+}
+.native-grey-map-drag[aria-pressed="true"] {
+  background:#494949;border-color:#e0e0e0;
+}
+.native-grey-map-drag:focus-visible { outline:2px solid #eee;outline-offset:2px; }
+@media(max-width:650px){
+  .native-grey-editor {
+    width:min(236px,calc(100vw - 18px));
+    top:calc(68px + env(safe-area-inset-top,0px));
+    left:calc(9px + env(safe-area-inset-left,0px));
+  }
+}
