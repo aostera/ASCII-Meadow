@@ -8,6 +8,7 @@ on:
       - experiments/three/ashen-blade-envelope.mjs
       - experiments/three/ashen-gothic-longsword.mjs
       - experiments/three/native-tripo-v2.mjs
+      - tools/check/ashen-native-glyph-cache.cjs
       - experiments/three/ashen-tripo-animation-workshop.html
       - tools/check/ashen-tripo-smoke.cjs
       - .github/workflows/ashen-tripo-fast-smoke.yml
@@ -29,6 +30,8 @@ jobs:
       - run: |
           node --check experiments/three/ashen-tripo-native-rig.mjs
           node --check tools/check/ashen-tripo-smoke.cjs
+          node --check tools/check/ashen-native-glyph-cache.cjs
+          node tools/check/ashen-native-glyph-cache.cjs
       - name: Original 40-joint knight and four 3D motion screenshots
         run: |
           python3 -m http.server 8181 >/tmp/ashen-fast-http.log 2>&1 &
