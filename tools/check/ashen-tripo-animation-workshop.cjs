@@ -56,7 +56,44 @@ fs.mkdirSync(out,{recursive:true});
      assert.equal(s.clip,'Idle');
      assert.deepEqual(s.pose.footContact,[true,true],
        'Both idle feet should be treated as planted');
-     assert.equal(s.pose.animationVersion,'Tripo-IK-v3-model-space-axes');
+     assert.equal(s.pose.animationVersion,'Tripo-IK-v4-anatomical-arm-hinges');
+     // Measure actual world-space skinned joints, not merely pose labels.
+     // A T-pose has wrist far from shoulder; the resting armored hands must
+     // be lower and substantially closer to the body. The separate sword
+     // should point DOWN rather than crossing the torso.
+     const anatomy=()=>page.evaluate(()=>{
+       const root=window.__ASHEN_ANIMATION_LAB__.model;
+       let bones=null;root.traverse(o=>{
+         if(!bones&&o.isSkinnedMesh)bones=o.skeleton.bones;
+       });
+       if(!bones)throw Error('Real Tripo skeleton not found');
+       const V=bones[6].position.constructor;
+       const pos=b=>{const v=new V();b.getWorldPosition(v);
+         return {x:v.x,y:v.y,z:v.z};};
+       const wrist=root.userData.weapon;
+       const hilt=pos(wrist);
+       const bladeTip=wrist.localToWorld(new V(0,wrist.userData.tipLocalY,0));
+       const toMetrics=(shoulder,hand)=>{
+         const a=pos(bones[shoulder]),b=pos(bones[hand]);
+         return {drop:a.y-b.y,spread:Math.hypot(a.x-b.x,a.z-b.z)};
+       };
+       return {left:toMetrics(6,9),right:toMetrics(16,19),
+         swordDrop:hilt.y-bladeTip.y,
+         weaponSocketBone:wrist.userData.socketBoneIndex,
+         swordHilt:hilt, swordTip:{x:bladeTip.x,y:bladeTip.y,z:bladeTip.z}};
+     });
+     const idleAnatomy=await anatomy();
+     assert.equal(idleAnatomy.weaponSocketBone,19,'True right wrist joint');
+     for(const side of ['left','right']){
+       assert.ok(idleAnatomy[side].drop>.24,
+         side+' wrist should be BELOW shoulder, not in a T-pose: '+
+         JSON.stringify(idleAnatomy));
+       assert.ok(idleAnatomy[side].spread<.46,
+         side+' wrist should be close to the hips, not extended sideways: '+
+         JSON.stringify(idleAnatomy));
+     }
+     assert.ok(idleAnatomy.swordDrop>.28,
+       'Sword blade must hang below the right fist: '+JSON.stringify(idleAnatomy));
      await page.screenshot({path:path.join(out,name+'-idle-front.png')});
 
      await page.locator('[data-motion="Walk"]').click();
@@ -163,7 +200,7 @@ fs.mkdirSync(out,{recursive:true});
 
      if(errors.length)throw Error(name+' page errors: '+errors.join(' | '));
      console.log('TRIPO WORKSHOP '+name+' OK: '+JSON.stringify({
-       bones:s.bones,skinnedMeshes:s.skinnedMeshes,
+       bones:s.bones,skinnedMeshes:s.skinnedMeshes,armAnatomy:idleAnatomy,
        sampledHeadings:'8 presets + 137° custom',motions:['Idle','Walk','Run','Jump'],
        jumpHeight:jumping.jumpHeight,steppedFrame:stepped.frame
      }));
