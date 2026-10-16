@@ -61,7 +61,7 @@ fs.mkdirSync(out,{recursive:true});
       throw Error('Leg calibration must use real Tripo joints');
    if(data.pose.kneeBend.some(k=>k<0||k>1.25))
       throw Error('Leg must never hyperflex: '+JSON.stringify(data.pose.kneeBend));
-   if(data.pose.animationVersion!=='Tripo-IK-v14-grounded-transitions')
+   if(data.pose.animationVersion!=='Tripo-IK-v15-skinned-sole-contact-probe')
       throw Error('Wrong shoulder/elbow controller: '+data.pose.animationVersion);
    if(mode==='Idle'){
     if(data.pose.kneeBend.some(k=>k<0||k>1.23))
@@ -237,7 +237,7 @@ fs.mkdirSync(out,{recursive:true});
         groundX,groundZ
       },i/60);
       const p=root.userData.pose();
-      if(p.animationVersion!=='Tripo-IK-v14-grounded-transitions')
+      if(p.animationVersion!=='Tripo-IK-v15-skinned-sole-contact-probe')
         throw Error('Wrong planar IK version');
       maxKnee=Math.max(maxKnee,...p.kneeBend);
       maxAbduction=Math.max(maxAbduction,...p.hipAbduction.map(Math.abs));
@@ -293,7 +293,7 @@ fs.mkdirSync(out,{recursive:true});
       oldToe.copy(bones[34].quaternion);
       oldAnkle.copy(bones[33].quaternion);
       const p=root.userData.pose();
-      if(p.animationVersion!=='Tripo-IK-v14-grounded-transitions')
+      if(p.animationVersion!=='Tripo-IK-v15-skinned-sole-contact-probe')
         throw Error('v14 authentic skin pose not loaded');
       toeAngleRange=Math.max(toeAngleRange,toeQuat.angleTo(bones[34].quaternion));
       const foot=p.footRocker?.[0]||[];
@@ -392,7 +392,7 @@ fs.mkdirSync(out,{recursive:true});
         jumpClipTime
       },i/60);
       const p=root.userData.pose();
-      if(p.animationVersion!=='Tripo-IK-v14-grounded-transitions')
+      if(p.animationVersion!=='Tripo-IK-v15-skinned-sole-contact-probe')
         throw Error('Wrong v14 transition controller');
       if(!Number.isFinite(p.phase)||p.kneeBend.some(v=>!Number.isFinite(v)))
         throw Error('Nonfinite mixed-clip skinned pose');
