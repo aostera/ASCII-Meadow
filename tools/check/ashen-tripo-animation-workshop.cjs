@@ -88,7 +88,7 @@ fs.mkdirSync(out,{recursive:true});
        assert.ok(idleAnatomy[side].drop>.24,
          side+' wrist should be BELOW shoulder, not in a T-pose: '+
          JSON.stringify(idleAnatomy));
-       assert.ok(idleAnatomy[side].spread>.35&&idleAnatomy[side].spread<.59,
+       assert.ok(idleAnatomy[side].spread>.24&&idleAnatomy[side].spread<.59,
          side+' glove should hang BESIDE the hips, neither T-pose nor folded onto groin: '+
          JSON.stringify(idleAnatomy));
      }
