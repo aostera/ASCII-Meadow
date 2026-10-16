@@ -1,6 +1,9 @@
 # ASCII Meadow — Three.js experiment
 
-Status: **isolated renderer experiment**. This is not a playable port or a replacement for the current game.
+Status: **isolated experiments + playable native Three.js test route**. The `/experiments/three/` page is a renderer/prototyping lab; `/experiments/three/native.html` is the authored-world playable Three WebGL2 port with native Canvas2D fallback. Neither has replaced production `main` nor reached final visual/hardware acceptance.
+
+**Living environment migration record (changes, CI evidence, known defects, next steps):**
+[ENVIRONMENT_MIGRATION_LOG.md](ENVIRONMENT_MIGRATION_LOG.md).
 
 ## Run
 From repository root: python3 -m http.server 8080
