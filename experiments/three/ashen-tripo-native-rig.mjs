@@ -162,6 +162,7 @@ function animateRig(model,source,root,weapon){
   const shoePivot=[sets.leftLeg[3],sets.rightLeg[3]];
   const soles=locateBootSoleVertices(source.meshes,sets);
   const soleVertex=new THREE.Vector3(),soleWorld=new THREE.Vector3();
+  let soleVertexReads=0;
   function soleSurfacePose(){
     return soles.map(foot=>{
       if(!foot)return null;
@@ -169,6 +170,7 @@ function animateRig(model,source,root,weapon){
       let low=Infinity,high=-Infinity,heelSum=0,toeSum=0;
       const levels=new Map();
       for(const index of foot.indices){
+        soleVertexReads++;
         // SkinnedMesh.getVertexPosition returns the current bone-weighted
         // point on the genuine Tripo surface, not its rest/bind position.
         foot.mesh.getVertexPosition(index,soleVertex);
@@ -362,6 +364,9 @@ function animateRig(model,source,root,weapon){
   function update(dt,motion,now){
     const d=clamp(Number(dt)||1/60,0,1/15);
     bodyClock+=d;
+    // Count genuine CPU skin reads; the character must not regress into
+    // sampling all 399k mesh triangles on every 60 Hz animation tick.
+    soleVertexReads=0;
     const speed=clamp((Number(motion?.speed)||0)/8,0,4.5);
     const moving=speed>.12;
     const running=moving&&Boolean(motion?.run);
@@ -538,6 +543,7 @@ function animateRig(model,source,root,weapon){
       twist(sets.cape[i],[['iz',capeRoll[i]],['iy',capeYaw[i]]]);
     }
     clip=airborne?'Jump':runMix>.5&&stride>.4?'Run':stride>.2?'Walk':'Idle';
+    const currentSoleSurface=soleSurfacePose();
     lastFrameData={
       speed,run:running,airborne,heading,phase,
       footContact:[left.contact,right.contact],
@@ -567,7 +573,8 @@ function animateRig(model,source,root,weapon){
       soleRestY:restSoleY.slice(),
       // Real CPU-skinned boot surface diagnostics in character-local Y.
       // Used for geometry-level stance QA, NOT to override source physics.
-      soleSurface:soleSurfacePose(),
+      soleSurface:currentSoleSurface,
+      soleVertexReads,
       anklePitch:[left.anklePitch,right.anklePitch],
       stancePhase:[left.stance,right.stance],
       footY:[left.y,right.y],
