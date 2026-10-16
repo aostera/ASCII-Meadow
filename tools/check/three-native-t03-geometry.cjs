@@ -93,23 +93,37 @@ fs.mkdirSync(dir,{recursive:true});
            const lb=ray(bare,variant,-site.width*.5-110,y,z,1,0);
            if(hitChanged(la,lb))sideDelta++;
          }
+         let newShadowRays=0;
          if(angle===0){
-           // Same sun-ray as src/world/ruins.js::paintRuinGroundShadows.
-           // If the new tall shapes cast NO distinct sunlight occlusion,
-           // the silhouette is visual-only and not physically integrated.
-           for(let iz=0;iz<30;iz++)for(let ix=0;ix<30;ix++){
-             const lx=-site.width*.7+
-               ix*(site.width*1.55+site.sourceTop*.9)/29;
-             const lz=-site.depth*.7+
-               iz*(site.depth*1.15+site.sourceTop*.95)/29;
-             const [wx,wz]=ruinWorldXZ(variant,lx,lz);
-             const px=wx-site.x,pz=wz-site.z;
-             const a=cast(px,.5,pz,LGT[0],LGT[1],LGT[2],.01,mesh);
-             const b=cast(px,.5,pz,LGT[0],LGT[1],LGT[2],.01,bare);
-             if(hitChanged(a,b))shadowDelta++;
+           // The authored yaw may be almost 180 degrees. A fixed local
+           // +x/+z grid MISSES all shadows when the sun projects negative
+           // into the rotated local frame. Sample the actual WORLD-space
+           // projection of each rotated convex bbox, using the same sun
+           // vector as paintRuinGroundShadows() instead.
+           const newPieces=mesh.slice(-n);
+           const dx=-LGT[0]/LGT[1],dz=-LGT[2]/LGT[1];
+           for(const so of newPieces){
+             const bb=so.bb;
+             for(const ty of [.2,.5,.8]){
+               const surfaceY=bb[2]+(bb[3]-bb[2])*ty;
+               for(let iz=0;iz<9;iz++)for(let ix=0;ix<9;ix++){
+                 const stoneX=bb[0]+(bb[1]-bb[0])*(ix+.5)/9;
+                 const stoneZ=bb[4]+(bb[5]-bb[4])*(iz+.5)/9;
+                 const groundX=stoneX+dx*(surfaceY-.5);
+                 const groundZ=stoneZ+dz*(surfaceY-.5);
+                 if(cast(groundX,.5,groundZ,
+                   LGT[0],LGT[1],LGT[2],.01,newPieces))
+                   newShadowRays++;
+                 const a=cast(groundX,.5,groundZ,
+                   LGT[0],LGT[1],LGT[2],.01,mesh);
+                 const b=cast(groundX,.5,groundZ,
+                   LGT[0],LGT[1],LGT[2],.01,bare);
+                 if(hitChanged(a,b))shadowDelta++;
+               }
+             }
            }
          }
-         angles.push({yaw:variant.yaw,frontDelta,sideDelta,shadowDelta,
+         angles.push({yaw:variant.yaw,frontDelta,sideDelta,shadowDelta,newShadowRays,
            portalFrontOpen:true,portalRearOpen:true,pierBlocks:true});
        }
        assert(angles.some(a=>a.frontDelta>3),
@@ -118,8 +132,11 @@ fs.mkdirSync(dir,{recursive:true});
        assert(angles.some(a=>a.sideDelta>1),
          'T03 upper silhouette is a flat facade '+site.id+' '+
          JSON.stringify(angles));
+       assert(angles[0].newShadowRays>8,
+         'T03 high Gothic stone has no independent castable sun rays '+
+         site.id+' '+JSON.stringify(angles));
        assert(angles[0].shadowDelta>1,
-         'T03 high Gothic stone casts no unique actual sun rays '+
+         'T03 high Gothic stones change no full-scene sunlight rays '+
          site.id+' '+JSON.stringify(angles));
        out.push({id:site.id,highestNewStone,
          legacyRasterCeiling:site.height*1.08,
