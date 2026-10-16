@@ -125,7 +125,8 @@ export class NativeKnightGlyphs {
       cy: new Int16Array(COLS * ROWS), cl: new Uint8Array(COLS * ROWS)};
     this.tone = null;
     this.stats = {frames: 0, loaded: false, error: null, clip: null, motion: 'idle',
-      cells: 0, glyphs: 0, cloakCells: 0, readMs: 0, convertMs: 0};
+      cells: 0, glyphs: 0, cloakCells: 0, readMs: 0, convertMs: 0,
+      glyphBuilds:0, glyphCacheHits:0};
     this.knight = createGltfKnight(THREE, {
       arc: false,
       onLoad: rig => {
@@ -156,6 +157,9 @@ export class NativeKnightGlyphs {
     // This is not the stationary offscreen sprite root's position.
     this.groundX = 0; this.groundZ = 0;
     this.rasterClock = null;
+    // Visible glyph geometry is stable until the next 3D raster sample.
+    // Fire lighting and ground-map occlusion are STILL painted each tick.
+    this.glyphDirty = true;
     // Mobile gets lower GPU readback frequency; 60+ distinct animation
     // poses are still evaluated from the simulation's live time.
     const slowDevice=window.matchMedia?.('(pointer:coarse)')?.matches;
@@ -228,6 +232,7 @@ export class NativeKnightGlyphs {
     if(this.rasterClock===null||now-this.rasterClock>=this.rasterInterval){
       this.render(G, fcw, fch);
       this.convert();
+      this.glyphDirty=true;
       this.rasterClock=now;
       this.stats.rasterFrames++;
     }
@@ -309,11 +314,17 @@ export class NativeKnightGlyphs {
 
   emit(e, G, fcw, fch, src) {
     const {S, A, K} = this;
+    if(this.glyphDirty!==false){
     const vals = [];
     for (let c = 0; c < COLS * ROWS; c++) if (A[c] >= .3) vals.push(S[c]);
     K.n = 0;
     this.stats.cells = vals.length;
-    if (vals.length < 10) { this.stats.glyphs = 0; return; }
+    if (vals.length < 10) {
+      this.stats.glyphs = 0;
+      this.glyphDirty=false;
+      this.stats.glyphBuilds=(this.stats.glyphBuilds||0)+1;
+      return;
+    }
     vals.sort((a, b) => a - b);
     const pct = q => vals[Math.min(vals.length - 1, Math.max(0, Math.round(q / 100 * (vals.length - 1))))];
     let lo = pct(3), hi = pct(98);
@@ -340,6 +351,13 @@ export class NativeKnightGlyphs {
     let y0 = ROWS, y1 = 0, x0 = COLS, x1 = 0;
     for (let j = 0; j < K.n; j++) { y0 = Math.min(y0, K.cy[j]); y1 = Math.max(y1, K.cy[j]); x0 = Math.min(x0, K.cx[j]); x1 = Math.max(x1, K.cx[j]); }
     this.stats.bounds = [x0, y0, x1, y1];
+    this.glyphDirty=false;
+    this.stats.glyphBuilds=(this.stats.glyphBuilds||0)+1;
+    }else{
+      // Reuse the last real 3D->ASCII raster; no repeated sort, tone
+      // stretch or shader glyph reconstruction on unchanged imagery.
+      this.stats.glyphCacheHits=(this.stats.glyphCacheHits||0)+1;
+    }
     const left = G.left, top = G.top;
     // dark plate first, in runs along each row (as drawKnight does), then the glyphs
     let ry = -1, rs = 0, re = 0;
