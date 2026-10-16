@@ -6,6 +6,8 @@ on:
       - experiments/three/ashen-tripo-native-rig.mjs
       - experiments/three/source-motion.mjs
       - experiments/three/ashen-sole-contact.mjs
+      - experiments/three/ashen-blade-envelope.mjs
+      - tools/check/ashen-blade-envelope.cjs
       - tools/check/ashen-tripo-sole-contact.cjs
       - tools/check/ashen-tripo-source-motion.cjs
       - experiments/three/ashen-gothic-longsword.mjs
@@ -34,6 +36,9 @@ jobs:
           node --check experiments/three/ashen-sole-contact.mjs
           node --check tools/check/ashen-tripo-sole-contact.cjs
           node tools/check/ashen-tripo-sole-contact.cjs
+          node --check experiments/three/ashen-blade-envelope.mjs
+          node --check tools/check/ashen-blade-envelope.cjs
+          node tools/check/ashen-blade-envelope.cjs
           node --check tools/check/ashen-tripo-arm-review.cjs
       - name: Verify real wrist/elbow and save 4 studio frames
         run: |
