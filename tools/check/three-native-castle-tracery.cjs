@@ -70,9 +70,9 @@ fs.mkdirSync(dir,{recursive:true});
      const mapOriginal=JSON.stringify(MEADOW_MAP);
      const gl=native.renderer.getContext(),canvas=native.renderer.domElement;
      const oldRandom=Math.random;
-     function snapshot(enabled){
+     function snapshot(enabled,towerEnabled=enabled){
        if(!gothic.setFacadeEnabledForTest(enabled)||
-          !gothic.setOuterTowerReliefEnabledForTest(enabled))
+          !gothic.setOuterTowerReliefEnabledForTest(towerEnabled))
          throw Error('Test-only castle geometry toggles are inaccessible');
        // Rebuild the complete original renderer world, including source
        // sprites, all architecture rays, shadow, flora and depth worldGen.
@@ -198,8 +198,9 @@ fs.mkdirSync(dir,{recursive:true});
          throw Error('Castle features not physically restored');
        if(JSON.stringify(MEADOW_MAP)!==mapOriginal)
          throw Error('QA-only castle rebuild touched authored map');
-       // Independently prove the tower fragments reach an actual game
-       // frame, not merely the full source grid's off-screen cache.
+       // Independently prove ONLY tower geometry changes the actual
+       // GPU frame: keep earlier west-front tracery enabled in BOTH
+       // comparison frames, so pixel delta cannot come from those bays.
        // The tower screenshot follows exactly this final focused view.
        let towerGpuChanged=0,towerRestoreErrors=0,towerVisibleCells=0;
        if(towerFocus){
@@ -207,8 +208,12 @@ fs.mkdirSync(dir,{recursive:true});
          player.y=towerFocus.row+VR*.4;player.ty=player.y;
          updateCamera(0,true);
          snapshot(true); // force native WebGL upload on new camera
-         const towerOn=snapshot(true),towerOff=snapshot(false),
-           towerRestored=snapshot(true);
+         const towerOn=snapshot(true),towerOff=snapshot(true,false);
+         const towerOffFeatures=gothic.features.castle.outerTowerRelief;
+         const towerRestored=snapshot(true);
+         if(towerOffFeatures!==0||
+            gothic.features.castle.outerTowerRelief!==onTowers)
+           throw Error('Tower-only switch did not leave facade intact');
          for(let k=0;k<towerOn.source.lum.length;k++){
            const a=towerOn.source,b=towerOff.source;
            if(Math.abs(a.lum[k]-b.lum[k])<.01&&a.glyph[k]===b.glyph[k]&&
