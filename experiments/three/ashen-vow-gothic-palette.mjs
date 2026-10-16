@@ -85,6 +85,11 @@ export function createGothicPalettePreview(root,{enabled=false}={}){
         if(!item.tintedMaterial){
           const tint=m=>{
             const copy=m.clone();
+            // glTF base material already contains a grey albedo multiplier.
+            // Multiplying its albedo AGAIN by dark vertex factors made the
+            // entire knight almost BLACK. Use authored vertex colors as the
+            // actual preview albedo, while retaining maps/PBR properties.
+            if(copy.color)copy.color.set(0xffffff);
             copy.vertexColors=true;
             // Retain source roughness/metalness/normal maps. This is a
             // color experiment, not a replacement of the approved texture.
