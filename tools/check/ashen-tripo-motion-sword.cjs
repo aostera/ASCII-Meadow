@@ -53,10 +53,10 @@ fs.mkdirSync(output,{recursive:true});
      const runIntoWall=await page.evaluate(async()=>{
        const {NativeKnightGlyphs}=await import('./native-tripo-v2.mjs');
        const samples=[];
-       const stub={clock:null,prev:null,travelSource:0,
+       const stub={clock:null,prev:null,travelSource:0,groundX:0,groundZ:0,
          stats:{frames:0},rasterClock:0,rasterInterval:Infinity,
          knight:{userData:{sourceUnitsPerMetre:.5,gltf:{clip:'Idle'},
-           animate:(_dt,m)=>{samples.push([m.speed,m.travelSource]);return 'idle';},
+           animate:(_dt,m)=>{samples.push([m.speed,m.travelSource,m.groundX,m.groundZ]);return 'idle';},
            pose:()=>({})}},
          render(){},convert(){},emit(){}};
        for(const [i,x] of [100,102,102].entries())
@@ -67,7 +67,11 @@ fs.mkdirSync(output,{recursive:true});
      });
      if(runIntoWall[0][0]!==0||runIntoWall[1][0]<=0||
         runIntoWall[2][0]!==0||runIntoWall[1][1]<=0||
-        runIntoWall[2][1]!==runIntoWall[1][1])
+        runIntoWall[2][1]!==runIntoWall[1][1]||
+        !Number.isFinite(runIntoWall[1][2])||
+        !(runIntoWall[1][2]<runIntoWall[0][2])||
+        runIntoWall[2][2]!==runIntoWall[1][2]||
+        runIntoWall[2][3]!==runIntoWall[1][3])
        throw Error('Player moonwalks while blocked: '+JSON.stringify(runIntoWall));
      console.log('Run displacement / wall stop pass',runIntoWall);
    }
@@ -87,7 +91,7 @@ fs.mkdirSync(output,{recursive:true});
      throw Error('Sword is NOT a separate real mesh attached to Tripo right wrist: '+JSON.stringify({weapon:idle.weapon,bone:idle.weaponSocketBone}));
    if(idle.cloakCells<5)
      throw Error('No cloak shading regions read from model surface: '+idle.cloakCells);
-   if(idle.pose?.animationVersion!=='Tripo-IK-v11-real-boot-pivot-lock')
+   if(idle.pose?.animationVersion!=='Tripo-IK-v12-planar-boot-pins')
      throw Error('New planted-feet IK gait controller did not load');
 
    const shot=async(name)=>{
@@ -153,7 +157,7 @@ fs.mkdirSync(output,{recursive:true});
    const fin=await read();
    if(fin.map!==idle.map)throw Error('Original authored map changed');
    if(!fin.pose||!(fin.pose.phase>=0))throw Error('No live bone-animation controller state');
-   if(fin.pose?.animationVersion!=='Tripo-IK-v11-real-boot-pivot-lock'||!fin.pose.weaponAttached)
+   if(fin.pose?.animationVersion!=='Tripo-IK-v12-planar-boot-pins'||!fin.pose.weaponAttached)
      throw Error('New animated sword and IK state lost during play');
    if(!mobile&&fin.pose?.speed<0&&fin.pose?.heading===undefined)
      throw Error('Bad gameplay pose state');
