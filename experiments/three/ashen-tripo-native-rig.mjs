@@ -3,6 +3,7 @@
 // Uses existing, skinned, 399k triangle / 10.7 MB GLB.
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createAshenGothicLongsword} from './ashen-gothic-longsword.mjs';
 
 export const TRIPO_V2_GLB = new URL('./assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb',import.meta.url).href;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -58,9 +59,10 @@ function setupBones(model){
   }
   return {meshes,skin,sets,rest};
 }
-function animateRig(model,source,root){
-  const {sets,rest}=source;
-  const axisQ=new THREE.Quaternion();
+// Anatomical, phase-continuous walk/run with stance/swing foot targets.
+// Every joint below deforms the authentic Tripo SKIN rather than a fake puppet.
+function animateRig(model,source,root,weapon){
+  const {sets,rest}=source,axisQ=new THREE.Quaternion();
   function twist(b,axes){
     const r=rest.get(b);
     b.quaternion.copy(r.q);
@@ -70,70 +72,92 @@ function animateRig(model,source,root){
       b.quaternion.multiply(axisQ);
     }
   }
+  const smooth=t=>{const a=clamp(t,0,1);return a*a*(3-2*a)};
   let phase=0,stride=0,runMix=0,airMix=0,bodyClock=0,heading=0,clip='Idle';
-  let lastFrameData={speed:0,heading:0,run:false};
-  // Normalization: the source knight is delivered in ~1m, 3D game is ~2.04m.
+  let lastFrameData={speed:0,heading:0,run:false,airborne:false,phase:0,
+    leftFootLift:0,rightFootLift:0,leftFootX:0,rightFootX:0,
+    weaponAttached:true,footContact:[true,true],kneeBend:[0,0]};
   const pos=sets.spine.position.clone();
+  const L1=.209, L2=.169; // actual Tripo knee/ankle REST lengths in mesh units
+  function legPose(bones,offset,weight,jumpWeight,run){
+    const p=((phase/(2*Math.PI)+offset)%1+1)%1;
+    const stance=run>.5?.50:.61;
+    const inStance=p<stance;
+    const u=inStance?p/stance:(p-stance)/(1-stance);
+    const step=.115+run*.048,back=step*(inStance?1-2*u:2*smooth(u)-1);
+    const lift=inStance?0:(.062+run*.055)*Math.sin(Math.PI*u);
+    // Foot pose (X is natural model forward): foot planted during stance,
+    // lifted and carried forward during swing. Jump tucks both legs.
+    const x=weight*back*(1-.76*jumpWeight)+(offset?.028:-.028)*jumpWeight;
+    const y=-.370+weight*lift*(1-.6*jumpWeight)+.098*jumpWeight;
+    const rawLen=Math.hypot(x,y),len=clamp(rawLen,.10,L1+L2-.002);
+    const theta=Math.atan2(x,-y);
+    const alpha=Math.acos(clamp((L1*L1+len*len-L2*L2)/(2*L1*len),-1,1));
+    const knee=Math.PI-Math.acos(clamp((L1*L1+L2*L2-len*len)/(2*L1*L2),-1,1));
+    const hip=theta-alpha;
+    // Both legs are vertical in source GLB. Rotating about model Z
+    // produces sagittal (forward/backward) motion; rotating X would splay!
+    twist(bones[0],[['iz',hip]]);
+    twist(bones[1],[['iz',knee]]);
+    twist(bones[2],[['iz',-hip-knee*.76]]);
+    twist(bones[3],[]);
+    return {lift:weight*lift,x,knee,contact:inStance&&jumpWeight<.15};
+  }
   function update(dt,motion,now){
     const d=clamp(Number(dt)||1/60,0,1/15);
     bodyClock+=d;
     const speed=clamp((Number(motion?.speed)||0)/8,0,4.5);
-    const wantsMove=speed>.12;
-    const desiredRun=wantsMove&&Boolean(motion?.run);
-    stride=damp(stride,wantsMove?1:0,9,d);
-    runMix=damp(runMix,desiredRun?1:0,6,d);
+    const moving=speed>.12;
+    const running=moving&&Boolean(motion?.run);
+    stride=damp(stride,moving?1:0,9,d);
+    runMix=damp(runMix,running?1:0,7,d);
     const airborne=Number.isFinite(motion?.jumpClipTime);
-    airMix=damp(airMix,airborne?1:0,14,d);
+    airMix=damp(airMix,airborne?1:0,15,d);
     const jumpTime=airborne?motion.jumpClipTime:0;
-    const jumpArc=airborne?Math.max(0,Math.sin(Math.PI*clamp(jumpTime/1.5,0,1))):0;
-    const cadence=1.1+(runMix*.48);
-    // Run faster: original source passes walk speed ~8, run ~15.
-    phase+=d*(5.8+4.0*runMix)*Math.max(.6,Math.min(1.6,speed/1.1))*Math.max(.05,stride);
-    const wave=Math.sin(phase);
-    const opp=-wave;
-    const wave2=Math.sin(phase+Math.PI*.5);
-    const swing=(.26+runMix*.33)*stride*(1-.65*airMix);
-    const elbowBase=.09+runMix*.16;
-    // Tripo rig has arms extending along +/-Z, legs along -Y and forward +X.
-    // Shoulder setDown about world Z makes real T-pose into loose A-pose.
-    twist(sets.leftArm[0], [['iz',-.79],['iy',wave*swing]]);
-    twist(sets.rightArm[0],[['iz',+.79],['iy',opp*swing]]);
-    twist(sets.leftArm[1], [['iy',+.12+Math.max(0,-wave)*elbowBase]]);
-    twist(sets.rightArm[1],[['iy',-.12-Math.max(0,-opp)*elbowBase]]);
-    twist(sets.leftArm[2], [['iy',+.025*Math.sin(bodyClock*1.7)]]);
-    twist(sets.rightArm[2],[['iy',-.025*Math.sin(bodyClock*1.7)]]);
+    const arc=airborne?Math.max(0,Math.sin(Math.PI*clamp(jumpTime/1.49,0,1))):0;
+    const jumpWeight=Math.max(arc*.94,airMix*.32);
+    // phase must NEVER reset when moving between Idle/Walk/Run.
+    const hz=(1.45+1.20*runMix)*Math.min(1.45,Math.max(.7,speed));
+    phase+=d*2*Math.PI*hz*(stride>.03?1:.02);
+    const swing=Math.sin(phase),other=-swing;
+    const armAmplitude=(.22+runMix*.29)*stride*(1-.74*airMix);
+    // Shoulder rests extend horizontally along +/-Z. Tilt them DOWN
+    // about X, then swing in the anatomical X/Y walking plane about Z.
+    twist(sets.leftArm[0],[['ix',-.69],['iz',-swing*armAmplitude]]);
+    twist(sets.rightArm[0],[['ix',+.69],['iz',-other*armAmplitude*.68]]);
+    twist(sets.leftArm[1],[['iz',-.06-Math.max(0,swing)*(.20+.16*runMix)*stride]]);
+    twist(sets.rightArm[1],[['iz',-.12-Math.max(0,other)*(.22+.13*runMix)*stride]]);
+    twist(sets.leftArm[2],[['iz',.035*Math.sin(bodyClock*1.4)]]);
+    twist(sets.rightArm[2],[['iz',.02*Math.sin(bodyClock*1.8)]]);
     twist(sets.leftArm[3],[]);
     twist(sets.rightArm[3],[]);
-    // Anatomical motion with knee flex and foot counterrotation.
-    for(const [chain,s] of [[sets.leftLeg,1],[sets.rightLeg,-1]]){
-      const w=wave*s;
-      const hipAngle=w*swing*(1+runMix*.45)+jumpArc*(s*.11-.31);
-      const kneeAngle=Math.max(0,-w)*(.40+runMix*.33)*stride+
-        jumpArc*(.38+runMix*.12);
-      twist(chain[0],[['ix',hipAngle]]);
-      twist(chain[1],[['ix',-kneeAngle]]);
-      twist(chain[2],[['ix',kneeAngle*.34-hipAngle*.35]]);
-      twist(chain[3],[]);
-    }
-    twist(sets.spine,[['ix',.025*wave2*stride],['iz',.045*runMix+.06*jumpArc]]);
-    twist(sets.chest,[['ix',.014*Math.sin(bodyClock*1.8)],['iz',-.02*runMix]]);
-    twist(sets.head,[['ix',.013*Math.sin(bodyClock*1.4)],['iy',.012*Math.cos(bodyClock*.9)]]);
+    const left=legPose(sets.leftLeg,0,stride,jumpWeight,runMix);
+    const right=legPose(sets.rightLeg,.5,stride,jumpWeight,runMix);
+    twist(sets.spine,[['iz',.028*runMix+.022*arc],['ix',.012*Math.sin(phase)*stride]]);
+    twist(sets.chest,[['iz',-.012*runMix],['ix',.012*Math.sin(bodyClock*1.75)]]);
+    twist(sets.head,[['ix',.012*Math.sin(bodyClock*1.1)],['iy',.015*Math.cos(bodyClock*.7)]]);
     sets.spine.position.copy(pos);
-    sets.spine.position.y+=.004*Math.sin(bodyClock*2.1)*(1-stride)+
-      Math.abs(Math.cos(phase))*stride*.010;
-    // Only 3 Tripo lower garment bones exist, not a full cloth rig.
-    // Keep sway extremely subtle: don't invent impossible 7-panel physics.
-    const capeDrag=stride*(.035+.05*runMix);
-    twist(sets.cape[0],[['iz',.019*Math.sin(bodyClock*1.2)-capeDrag]]);
-    twist(sets.cape[1],[['iz',.025*Math.sin(bodyClock*1.7+.5)-capeDrag*.7]]);
-    twist(sets.cape[2],[['iz',.028*Math.sin(bodyClock*1.55+.9)-capeDrag*.55]]);
-    const h=Number.isFinite(motion?.heading)?motion.heading:heading;
-    heading+=Math.atan2(Math.sin(h-heading),Math.cos(h-heading))*(1-Math.exp(-12*d));
-    // Parent heading is applied by the character object, while mesh has its
-    // own static orientation correction, preserving all glTF bind matrices.
+    sets.spine.position.y+=.004*Math.sin(bodyClock*1.8)*(1-stride)+
+      Math.abs(Math.cos(phase))*stride*.012;
+    // Three actual GLB lower-garment chain bones. These weights affect
+    // cloth, but this is a small authored sway, not a cloth simulation.
+    const drag=stride*(.018+.018*runMix);
+    twist(sets.cape[0],[['iz',.012*Math.sin(bodyClock*1.1)-drag]]);
+    twist(sets.cape[1],[['iz',.020*Math.sin(bodyClock*1.5+.6)-drag*.80]]);
+    twist(sets.cape[2],[['iz',.024*Math.sin(bodyClock*1.25+1.1)-drag*.65]]);
+    const targetHeading=Number.isFinite(motion?.heading)?motion.heading:heading;
+    heading+=Math.atan2(Math.sin(targetHeading-heading),Math.cos(targetHeading-heading))*(1-Math.exp(-12*d));
     root.rotation.y=heading;
-    clip=airborne?'Jump':runMix>.5&&stride>.45?'Run':stride>.2?'Walk':'Idle';
-    lastFrameData={speed,run:desiredRun,airborne,heading,phase};
+    clip=airborne?'Jump':runMix>.5&&stride>.4?'Run':stride>.2?'Walk':'Idle';
+    lastFrameData={
+      speed,run:running,airborne,heading,phase,
+      footContact:[left.contact,right.contact],
+      leftFootLift:left.lift,rightFootLift:right.lift,
+      leftFootX:left.x,rightFootX:right.x,
+      kneeBend:[left.knee,right.knee],
+      weaponAttached:!!weapon?.parent,
+      animationVersion:'Tripo-IK-v2'
+    };
     return clip.toLowerCase();
   }
   return {update,get clip(){return clip},get state(){return lastFrameData}};
@@ -163,17 +187,31 @@ export function createGltfKnight(_THREE=THREE,{url=TRIPO_V2_GLB,onLoad,onError}=
                          -box.getCenter(new THREE.Vector3()).z*sc);
       oriented.add(model);
       const source=setupBones(model);
-      const anim=animateRig(model,source,root);
+      // The sword is its OWN geometry and follows the true right wrist.
+      // Orient in hand rest space so the point is down beside the body.
+      const weapon=createAshenGothicLongsword();
+      const wrist=source.sets.rightArm[3];
+      model.updateMatrixWorld(true);
+      const restWorld=new THREE.Quaternion();
+      wrist.getWorldQuaternion(restWorld);
+      wrist.add(weapon);
+      weapon.position.set(0,0,0);
+      weapon.quaternion.copy(restWorld.invert());
+      weapon.userData.socketBoneIndex=source.skin.bones.indexOf(wrist);
+      const anim=animateRig(model,source,root,weapon);
       root.userData.gltf={
         loaded:true,
         actions:{Idle:true,Walk:true,Run:true,Jump:true},
         bones:source.skin.bones.length,
         skinnedMeshes:source.meshes.length,
+        weapon:'detached Gothic longsword',
+        weaponSocketBone:weapon.userData.socketBoneIndex,
         type:'Tripo_V2_40_Bone_Native_Runtime',
         get clip(){return anim.clip}
       };
       root.userData.animate=(dt,motion,now)=>anim.update(dt,motion,now);
       root.userData.pose=()=>anim.state;
+      root.userData.weapon=weapon;
       root.userData.prepareModel?.(model);
       onLoad?.(root);
     }catch(error){
