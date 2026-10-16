@@ -424,11 +424,16 @@ function animateRig(model,source,root,weapon){
       const u=p/stance;
       return smooth(u/.17)*(1-smooth((u-.80)/.20));
     };
-    const leftSupport=loadAt(0),rightSupport=loadAt(.5);
+    // The planted-load indicator and torso compensation must agree:
+    // neither a stationary Idle nor an airborne Jump may claim a
+    // weight-bearing boot. Fade through takeoff/landing instead of
+    // teleporting the pelvis back onto the centre line.
+    const groundLoad=stride*clamp(1-4*jumpWeight,0,1);
+    const leftSupport=loadAt(0)*groundLoad;
+    const rightSupport=loadAt(.5)*groundLoad;
     const balance=(leftSupport-rightSupport)/
       Math.max(.5,leftSupport+rightSupport);
-    const pelvisLateral=leftSideSign*.006*stride*
-      clamp(1-4*jumpWeight,0,1)*balance;
+    const pelvisLateral=leftSideSign*.006*stride*balance;
     sets.pelvis.position.copy(pelvisRest);
     sets.pelvis.position.y+=pelvisBob;
     sets.pelvis.position.z+=pelvisLateral;
@@ -519,7 +524,7 @@ function animateRig(model,source,root,weapon){
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v13-contact-rocker-weight-transfer'
+      animationVersion:'Tripo-IK-v14-grounded-transitions'
     };
     return clip.toLowerCase();
   }
