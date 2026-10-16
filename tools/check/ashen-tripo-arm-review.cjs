@@ -185,6 +185,10 @@ fs.mkdirSync(out,{recursive:true});
           throw Error('Wrong v15 genuine-sole probe controller');
         if(!Array.isArray(pose.soleSurface)||pose.soleSurface.length!==2)
           throw Error('No real mesh soleSurface state');
+        if(!Number.isInteger(pose.soleVertexReads)||
+           pose.soleVertexReads<12||pose.soleVertexReads>64)
+          throw Error('Unbounded per-frame 399k-vertex Tripo skin sampling: '+
+            pose.soleVertexReads);
         if(!Array.isArray(pose.soleRestY)||pose.soleRestY.length!==2||
            pose.soleRestY.some(v=>!Number.isFinite(v)))
           throw Error('Skinned boot ground references are absent');
