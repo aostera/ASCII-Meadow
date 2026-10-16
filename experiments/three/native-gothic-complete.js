@@ -16,6 +16,8 @@ let nativeWestPortalReliefClear=true,nativeWestCurtainProjects=false;
 let nativeWestTraceryEnabled=true;
 let nativeOuterTowerReliefEnabled=true;
 let nativeCentralGableEnabled=true;
+let nativeHighFlyingArchesEnabled=true;
+let nativeHighFlyingArchesClear=true;
 let nativeCentralGablePortalClear=true;
 let nativeCentralGableProjects=false;
 let nativeOuterTowerReliefClear=true;
@@ -372,6 +374,70 @@ function nativeBuildCompleteCastle(){
     so.bb[4]<70&&so.bb[3]>Y+600)&&
     centralDetails.some(so=>so.bb[4]<295&&so.bb[3]>Y+1050);
 
+  // HIGH WEST-FRONT FLYING BUTTRESS WINGS (real stone, not painted
+  // shading). Existing full-frame art tests revealed that tiny decorative
+  // ribs disappear at 13-14% zoom. These large detached load-bearing
+  // profiles make negative-space arches between the paired cathedral
+  // spires and outer front towers. Keep the middle sky and lower gate open.
+  // Z<280 projects AHEAD of the west-front masonry at z=300; Y>Y+875
+  // ensures no new collision in the great gate or its upper gallery.
+  before=solids.length;
+  if(nativeHighFlyingArchesEnabled)for(const side of [-1,1]){
+    const bz=229,outer=side*445,inner=side*356;
+    // Massive staggered masonry base: the outer pier is intentionally
+    // split into three vertical courses so its top reads as a battered,
+    // once-load-bearing support rather than another parallel wall strip.
+    nativeGothicBox(outer-23,outer+23,Y+878,Y+1024,
+      bz-20,bz+18,{courses:[Y+921,Y+985]});
+    nativeGothicBox(outer-18,outer+18,Y+1044,Y+1110,
+      bz-17,bz+20,{courses:[Y+1082]});
+    nativeGothicBox(outer-22,outer+22,Y+1130,Y+1200,
+      bz-17,bz+19,{courses:[Y+1166]});
+    nativeGothicBox(outer-34,outer+34,Y+1190,Y+1211,
+      bz-24,bz+24);
+    // True flying arch: two non-parallel diagonals form a large open
+    // pointed void. Their missing apex is the deliberate broken skyline.
+    nativeGothicBeam(inner,Y+1050,outer,Y+1191,bz-19,22);
+    nativeGothicBeam(side*331,Y+1181,side*389,Y+1306,
+      bz-24,19);
+    nativeGothicBeam(side*411,Y+1323,outer,Y+1230,
+      bz-23,18);
+    // Second *short* flying rib reveals a different depth level. It has
+    // a large real gap before the higher arch and never plugs the void.
+    nativeGothicBeam(side*358,Y+1106,side*415,Y+1188,
+      bz-38,11);
+    nativeGothicBeam(side*404,Y+1242,side*450,Y+1314,
+      bz-35,12);
+    nativeGothicBox(side*409-15,side*409+15,Y+1284,Y+1321,
+      bz-31,bz+12,{courses:[Y+1304]});
+    // Outer broken pinnacle offsets anchor both the 3D silhouette and
+    // the recognizable Gothic buttress rhythm at tiny source zoom.
+    nativeGothicBox(outer-17,outer+17,Y+1320,Y+1377,
+      bz-26,bz+17,{courses:[Y+1347]});
+    if(side<0){
+      addCone(outer,bz,21,6,Y+1377,Y+1492,'spire',{
+        axis:[outer,bz],n:6
+      });
+      nativeGothicBeam(side*425,Y+1380,side*481,Y+1442,
+        bz-25,14);
+    }else{
+      // The right finial broke off: two surviving oblique blocks instead.
+      nativeGothicBox(outer+side*17-9,outer+side*17+9,
+        Y+1400,Y+1438,bz-28,bz+11);
+      nativeGothicBeam(side*438,Y+1378,side*477,Y+1413,
+        bz-26,12);
+    }
+    // Three large surviving brackets, spaced and omitted asymmetrically.
+    for(let k=0;k<3;k++){
+      if(side>0&&k===1)continue;
+      const x=outer+side*(27+k*19),y=Y+953+k*95;
+      nativeGothicBox(x-15,x+15,y,y+25+(k%2)*11,
+        bz-31-k*2,bz+10,{courses:[y+12]});
+    }
+  }
+  feature.highFlyingArches=solids.length-before;
+  nativeHighFlyingArchesClear=solids.slice(before).every(s=>
+    s.bb[2]>=Y+870&&(s.bb[1]<-310||s.bb[0]>310));
   for(let i=start;i<solids.length;i++){
     const s=solids[i],b=s.bb;
     s.id=i;s.cx=(b[0]+b[1])*.5;
@@ -486,6 +552,15 @@ window.__ASCII_NATIVE_COMPLETE_ARCH__={
   get westPortalReliefClear(){return nativeWestPortalReliefClear},
   get westCurtainProjects(){return nativeWestCurtainProjects},
   get facadeEnabled(){return nativeWestTraceryEnabled},
+  get highFlyingArchesEnabled(){return nativeHighFlyingArchesEnabled},
+  get highFlyingArchesClear(){return nativeHighFlyingArchesClear},
+  setHighFlyingArchesEnabledForTest(on){
+    const q=new URLSearchParams(location.search);
+    if(!q.has('nativeCastleFacadeTest')&&!q.has('nativeCastleFramedTest'))
+      return false;
+    nativeHighFlyingArchesEnabled=Boolean(on);
+    return true;
+  },
   get centralGableEnabled(){return nativeCentralGableEnabled},
   get centralGablePortalClear(){return nativeCentralGablePortalClear},
   get centralGableProjects(){return nativeCentralGableProjects},
