@@ -14,6 +14,7 @@ on:
       - experiments/three/ashen-vow-gothic-palette.mjs
       - experiments/three/ashen-gothic-longsword.mjs
       - experiments/three/native-tripo-v2.mjs
+      - tools/check/ashen-native-glyph-cache.cjs
       - tools/check/ashen-tripo-motion-sword.cjs
       - tools/check/ashen-tripo-animation-workshop.cjs
       - .github/workflows/ashen-tripo-motion-sword.yml
@@ -50,6 +51,8 @@ jobs:
           node --check experiments/three/ashen-gothic-longsword.mjs
           node --check experiments/three/native-tripo-v2.mjs
           node --check tools/check/ashen-tripo-motion-sword.cjs
+          node --check tools/check/ashen-native-glyph-cache.cjs
+          node tools/check/ashen-native-glyph-cache.cjs
           node --check tools/check/ashen-tripo-animation-workshop.cjs
           node -e "const fs=require('fs');const html=fs.readFileSync('experiments/three/ashen-tripo-animation-workshop.html','utf8');const m=html.match(/<script type=\"module\">([\s\S]*?)<\/script>/);if(!m)throw Error('Workshop module missing');fs.writeFileSync('/tmp/ashen-workshop.mjs',m[1])"
           node --check /tmp/ashen-workshop.mjs
