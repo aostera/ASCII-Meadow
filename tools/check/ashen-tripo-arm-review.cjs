@@ -61,7 +61,7 @@ fs.mkdirSync(out,{recursive:true});
       throw Error('Leg calibration must use real Tripo joints');
    if(data.pose.kneeBend.some(k=>k<0||k>1.25))
       throw Error('Leg must never hyperflex: '+JSON.stringify(data.pose.kneeBend));
-   if(data.pose.animationVersion!=='Tripo-IK-v11-real-boot-pivot-lock')
+   if(data.pose.animationVersion!=='Tripo-IK-v12-planar-boot-pins')
       throw Error('Wrong shoulder/elbow controller: '+data.pose.animationVersion);
    if(mode==='Idle'){
     if(data.pose.kneeBend.some(k=>k<0||k>1.23))
