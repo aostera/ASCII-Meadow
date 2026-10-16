@@ -69,3 +69,13 @@ The link is for testing and may briefly show the previous build while Cloudflare
 ## Side-by-side performance QA on actual hardware (2026-10-14)
 
 Use [the opt-in original / Three A/B comparison](https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev/experiments/three/?profile=compare) on the same device. Four sequential 5-second samples run **Original → Three → Three → Original** (plus warm-up per segment), restore the initial renderer on completion or Close, and show both measured FPS and frame p95. Press **Скопировать JSON** to share the result. This runs the actual unchanged source game on both renderers; no brightness, alpha or world-data substitutions. Results are display-vsync capped and affected by scene movement and thermals; for a meaningful performance decision, compare several runs on the same physical device. CI SwiftShader is a functional smoke test, not a real-world speed benchmark.
+
+## Tripo V2 — interactive skeleton / motion workshop (2026-10-16)
+
+- Route: `experiments/three/ashen-tripo-animation-workshop.html` (works when this feature branch is deployed; does not affect main).
+- Loads the **existing** 10.7 MB skinned Tripo V2 GLB, not a procedural silhouette or a new generation.
+- Uses the **same** `createGltfKnight()` / `ashen-tripo-native-rig.mjs` runtime as `native-tripo-v2.mjs`. No separate rig logic, credit spend, or glTF animation-clips claim.
+- Inspect Idle / Walk / Run / Jump, all 8 compass directions, pause, one 1/60 s pose step, 0.5–1.5x playback, skeleton, wireframe and camera angles. Detached Gothic sword follows the right wrist joint.
+- Animation is evaluated at fixed 60 Hz for deterministic inspection; **display FPS depends on the device**. This is a pose preview and cannot establish physically correct foot contact, cloth simulation or final visual fidelity until watched and accepted in browser/on mobile.
+- The original V2 viewer remains a static skeleton/geometry inspection. The authored source map and original production knight remain unchanged.
+- QA: JavaScript module syntax was checked offline. A full GLB render, shader compilation and actual hardware validation still require the deployed page.
