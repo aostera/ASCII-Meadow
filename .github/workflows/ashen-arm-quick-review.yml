@@ -4,6 +4,8 @@ on:
     branches: [feat/ashen-tripo-animation-workshop-20261016]
     paths:
       - experiments/three/ashen-tripo-native-rig.mjs
+      - experiments/three/source-motion.mjs
+      - tools/check/ashen-tripo-source-motion.cjs
       - experiments/three/ashen-gothic-longsword.mjs
       - tools/check/ashen-tripo-arm-review.cjs
       - .github/workflows/ashen-arm-quick-review.yml
@@ -24,6 +26,9 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: |
           node --check experiments/three/ashen-tripo-native-rig.mjs
+          node --check experiments/three/source-motion.mjs
+          node --check tools/check/ashen-tripo-source-motion.cjs
+          node tools/check/ashen-tripo-source-motion.cjs
           node --check tools/check/ashen-tripo-arm-review.cjs
       - name: Verify real wrist/elbow and save 4 studio frames
         run: |
