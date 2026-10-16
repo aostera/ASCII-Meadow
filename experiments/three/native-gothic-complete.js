@@ -16,6 +16,8 @@ let nativeWestPortalReliefClear=true,nativeWestCurtainProjects=false;
 let nativeWestTraceryEnabled=true;
 let nativeOuterTowerReliefEnabled=true;
 let nativeCentralGableEnabled=true;
+let nativeMonumentalPortalFrameEnabled=true;
+let nativeMonumentalPortalFrameClear=true;
 let nativeHighFlyingArchesEnabled=true;
 let nativeHighFlyingArchesClear=true;
 let nativeMainPortalRecessEnabled=true;
@@ -241,6 +243,33 @@ function nativeBuildCompleteCastle(){
       82,100,{courses:[Y+392]});
   }
   feature.portal=solids.length-before;before=solids.length;
+  // Monumental, truly projecting pointed arch in front of the dark gate.
+  // Large source convex pieces, not glyph decoration or screen overlays.
+  // Broad jambs are outside the walkable corridor; diagonal ribs rise well
+  // above the original closed oak door and join to one pointed apex.
+  if(nativeMonumentalPortalFrameEnabled){
+    for(const sign of [-1,1]){
+      const x=sign*132;
+      nativeGothicBox(x-15,x+15,Y+25,Y+270,31,74,{
+        courses:[Y+118,Y+233]
+      });
+      nativeGothicBox(x-22,x+22,Y+262,Y+288,25,78);
+    }
+    // addBeam needs ascending x0,x1 (not mirrored reversed bounds).
+    addBeam(-132,0,29,70,Y+300,Y+431,24,'wall');
+    addBeam(0,132,29,70,Y+431,Y+300,24,'wall');
+  }
+  feature.monumentalPortalFrame=solids.length-before;
+  const monumental=solids.slice(before);
+  const clearPoints=[-75,0,75].flatMap(x=>
+    [Y+55,Y+160,Y+250].map(y=>[x,y,48]));
+  nativeMonumentalPortalFrameClear=monumental.length===0||
+    (monumental.length===6&&monumental.every(so=>so.bb[4]<85)&&
+      clearPoints.every(([x,y,z])=>!monumental.some(so=>
+        so.pl.every(p=>p[0]*x+p[1]*y+p[2]*z<=p[3]+1e-6))));
+  if(!nativeMonumentalPortalFrameClear)
+    throw Error('Monumental porch intrudes on original passage');
+  before=solids.length;
 
   // Side towers and cathedral west front: actual thin window jambs,
   // gothic hood mouldings and multiple upper tracery bays.
@@ -682,6 +711,15 @@ window.__ASCII_NATIVE_COMPLETE_ARCH__={
   get westPortalReliefClear(){return nativeWestPortalReliefClear},
   get westCurtainProjects(){return nativeWestCurtainProjects},
   get facadeEnabled(){return nativeWestTraceryEnabled},
+  get monumentalPortalFrameEnabled(){return nativeMonumentalPortalFrameEnabled},
+  get monumentalPortalFrameClear(){return nativeMonumentalPortalFrameClear},
+  setMonumentalPortalFrameEnabledForTest(on){
+    const q=new URLSearchParams(location.search);
+    if(!q.has('nativeCastleFacadeTest')&&!q.has('nativeCastleFramedTest'))
+      return false;
+    nativeMonumentalPortalFrameEnabled=Boolean(on);
+    return true;
+  },
   get mainPortalRecessEnabled(){return nativeMainPortalRecessEnabled},
   get widePortalSilhouetteEnabled(){return nativeWidePortalSilhouetteEnabled},
   get sparseGateAshlarEnabled(){return nativeSparseGateAshlarEnabled},

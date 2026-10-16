@@ -529,6 +529,86 @@ fs.mkdirSync(dir,{recursive:true});
      JSON.stringify(widthArt,null,2)+String.fromCharCode(10));
    console.log('NATIVE CASTLE WIDE PHYSICAL ARCH ART '+label+' '+
      JSON.stringify(widthArt));
+   // T02: large foreground arch, A/B in unmodified playable follow-camera.
+   async function monumentalFrame(enabled,tag){
+     const result=await page.evaluate(({enabled,tag,p})=>{
+       const a=window.__ASCII_NATIVE_COMPLETE_ARCH__,nat=window.__ASCII_NATIVE__;
+       if(!a.setMonumentalPortalFrameEnabledForTest(enabled))
+         throw Error('Monumental geometry QA switch unavailable');
+       player.x=player.tx=p.x;player.y=player.ty=p.y;
+       player.h=player.hT=surfAt(p.x,p.y);
+       const map=JSON.stringify(MEADOW_MAP),was=Math.random;
+       try{
+         Math.random=()=>.513;build();VZ=1;updateCamera(0,true);
+         FG.tick=0;cloudTick=2;render();
+       }finally{Math.random=was}
+       const canvas=nat.renderer.domElement,gl=nat.renderer.getContext();
+       const pixels=new Uint8Array(canvas.width*canvas.height*4);
+       gl.readPixels(0,0,canvas.width,canvas.height,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+       const snap={pixels,lum:new Float32Array(cathedral.lum),
+         glyph:new Int16Array(cathedral.glyph),dep:new Float32Array(cathedral.dep),
+         enabled:a.monumentalPortalFrameEnabled,
+         clear:a.monumentalPortalFrameClear,
+         parts:a.features.castle.monumentalPortalFrame,
+         camera:[camX,camY,VZ],
+         walkable:!blocked(player.x,player.y,player),
+         mapOK:map===JSON.stringify(MEADOW_MAP),
+         single:document.querySelectorAll('#three-parity-canvas').length===1,
+         native:nat.mode==='three'};
+       (window.__ASCII_MONUMENTAL__ ||= {})[tag]=snap;
+       return {enabled:snap.enabled,parts:snap.parts,
+         clear:snap.clear,walkable:snap.walkable,mapOK:snap.mapOK,
+         single:snap.single,native:snap.native};
+     },{enabled,tag,p:walkablePortal.best});
+     if(result.enabled!==enabled||result.parts!==(enabled?6:0)||
+       !result.clear||!result.walkable||!result.mapOK||
+       !result.single||!result.native)
+       throw Error('Large Gothic arch source invariant '+JSON.stringify(result));
+     await page.addStyleTag({content:'.hud,.stats{visibility:hidden!important}'});
+     await page.screenshot({path:path.join(dir,
+       label+'-monumental-portal-'+tag+'-gameplay.png'),timeout:60000});
+     await page.addStyleTag({content:'.hud,.stats{visibility:visible!important}'});
+   }
+   await monumentalFrame(true,'on');
+   await monumentalFrame(false,'off');
+   await monumentalFrame(true,'restored');
+   const monumentalDelta=await page.evaluate(()=>{
+     const S=window.__ASCII_MONUMENTAL__,a=S.on,b=S.off,c=S.restored;
+     let gpu=0,gpuRestore=0,source=0,sourceRestore=0;
+     for(let i=0;i<a.pixels.length;i+=4){
+       const diff=(x,y)=>Math.max(Math.abs(x[i]-y[i]),
+         Math.abs(x[i+1]-y[i+1]),Math.abs(x[i+2]-y[i+2]))>8;
+       if(diff(a.pixels,b.pixels))gpu++;
+       if(diff(a.pixels,c.pixels))gpuRestore++;
+     }
+     for(let i=0;i<a.lum.length;i++){
+       const diff=(x,y)=>Math.abs(x.lum[i]-y.lum[i])>.01||
+         x.glyph[i]!==y.glyph[i]||Math.abs(x.dep[i]-y.dep[i])>1;
+       if(diff(a,b))source++;
+       if(diff(a,c))sourceRestore++;
+     }
+     const out={gpu,gpuRestore,source,sourceRestore,
+       identicalCamera:JSON.stringify(a.camera)===JSON.stringify(b.camera)&&
+         JSON.stringify(a.camera)===JSON.stringify(c.camera),
+       parts:a.parts===6&&b.parts===0&&c.parts===6,
+       clear:a.clear&&b.clear&&c.clear,
+       walkable:a.walkable&&b.walkable&&c.walkable,
+       map:a.mapOK&&b.mapOK&&c.mapOK,
+       native:[a,b,c].every(x=>x.native&&x.single&&x.camera[2]===1)};
+     delete window.__ASCII_MONUMENTAL__;
+     return out;
+   });
+   if(monumentalDelta.gpu<100||monumentalDelta.source<30||
+     monumentalDelta.gpuRestore>150||monumentalDelta.sourceRestore!==0||
+     !monumentalDelta.identicalCamera||!monumentalDelta.parts||
+     !monumentalDelta.clear||!monumentalDelta.walkable||
+     !monumentalDelta.map||!monumentalDelta.native)
+     throw Error('Monumental Gothic source arch not visible/reversible '+
+       JSON.stringify(monumentalDelta));
+   fs.writeFileSync(path.join(dir,label+'-monumental-portal.json'),
+     JSON.stringify(monumentalDelta,null,2)+String.fromCharCode(10));
+   console.log('NATIVE CASTLE MONUMENTAL PLAYABLE PORTAL '+label+' '+
+     JSON.stringify(monumentalDelta));
    // Native gate-only stone-glyph rhythm: original source geometry,
    // depth, backing masonry, oak door, view and palette remain unchanged.
    async function gateAshlarFrame(enabled,tag){
