@@ -19,6 +19,9 @@ let nativeCentralGableEnabled=true;
 let nativeHighFlyingArchesEnabled=true;
 let nativeHighFlyingArchesClear=true;
 let nativeMainPortalRecessEnabled=true;
+// T02: large physical opening to counter repetitive masonry at 100% play zoom.
+// Toggle is accessible ONLY to the QA page for identical-camera A/B.
+let nativeWidePortalSilhouetteEnabled=true;
 let nativeMainPortalRecessClear=true;
 let nativeCentralGablePortalClear=true;
 let nativeCentralGableProjects=false;
@@ -122,8 +125,12 @@ function nativeRecessOriginalMainPortal(){
   // remain physically present. IDs are rebuilt by nativeBuildCompleteCastle.
   for(const i of [gateIndex,wallIndex].sort((a,b)=>b-a))
     solids.splice(i,1);
-  const start=solids.length,half=76;
-  const base=Y+137,tip=Y+287;
+  const start=solids.length;
+  const half=nativeWidePortalSilhouetteEnabled?100:76;
+  const base=Y+137,tip=Y+(nativeWidePortalSilhouetteEnabled?329:287);
+  // The original curtain is only 300 tall; its physical pointed void must
+  // remain below that wall's top even when the taller porch projects in front.
+  const curtainTip=Math.min(tip,Y+296);
   function segment(original,x0,x1,y0,y1,z0,z1,withDoor=false){
     const meta={...original.meta};
     if(!withDoor)delete meta.door;
@@ -132,12 +139,12 @@ function nativeRecessOriginalMainPortal(){
   // The two VISIBLE masonry faces are 78 units apart in depth.
   // The back retains ALL original door planks, iron and ring-pull glyphs.
   segment(gate,-160,160,Y,Y+560,178,240,true);
-  function archShoulder(original,sign,z0,z1,roofY){
+  function archShoulder(original,sign,z0,z1,roofY,apex=tip){
     const x0=sign<0?-half:0,x1=sign<0?0:half;
-    const m=(tip-base)/half;
+    const m=(apex-base)/half;
     // Upper half-space y >= tip - m*abs(x) forms a real concave
     // pointed opening after combining two *convex* stone shoulders.
-    const p=sign<0?[m,-1,0,-tip]:[-m,-1,0,-tip];
+    const p=sign<0?[m,-1,0,-apex]:[-m,-1,0,-apex];
     const meta={...original.meta};delete meta.door;
     solid('wall',[
       [1,0,0,x1],[-1,0,0,-x0],[0,1,0,roofY],
@@ -156,9 +163,9 @@ function nativeRecessOriginalMainPortal(){
   // wall, window pattern and blind arcades preserved to left and right.
   segment(curtain,-540,-half,Y,Y+300,140,205);
   segment(curtain,half,540,Y,Y+300,140,205);
-  segment(curtain,-half,half,tip,Y+300,140,205);
-  archShoulder(curtain,-1,140,205,tip);
-  archShoulder(curtain,1,140,205,tip);
+  segment(curtain,-half,half,curtainTip,Y+300,140,205);
+  archShoulder(curtain,-1,140,205,Y+300,curtainTip);
+  archShoulder(curtain,1,140,205,Y+300,curtainTip);
   function stoneAt(x,y,z){
     return solids.some(so=>so.pl.every(p=>
       p[0]*x+p[1]*y+p[2]*z<=p[3]+1e-6));
@@ -169,8 +176,8 @@ function nativeRecessOriginalMainPortal(){
     [0,Y+160,112]
   ];
   nativeMainPortalRecessClear=air.every(([x,y,z])=>!stoneAt(x,y,z))&&
-    stoneAt(0,Y+75,207)&&stoneAt(95,Y+75,112)&&
-    stoneAt(0,Y+320,112);
+    stoneAt(0,Y+75,207)&&stoneAt(half+18,Y+75,112)&&
+    stoneAt(0,Y+365,112);
   if(!nativeMainPortalRecessClear)
     throw Error('Carved portal has blocked void, lost oak door or lost roof');
   return solids.length-start;
@@ -186,16 +193,17 @@ function nativeBuildCompleteCastle(){
   nativeGothicRose(0,Y+580,110,front-23);
   feature.rose=solids.length-before;before=solids.length;
 
-  // Deep front portal: four offset lintels, pointed rib pairs and carved
-  // voussoir joints. All lower blocks live OUTSIDE |x|<75 walk corridor.
+  // Deep front portal: chunky physical ribs FOLLOW the new opening, rather
+  // than crossing its negative space. This is source stone, not a decal.
   for(const side of [-1,1])for(let step=0;step<4;step++){
-    const off=87+step*14,z=95-step*5;
+    const off=(nativeWidePortalSilhouetteEnabled?106:87)+step*14,z=95-step*5;
     nativeGothicBox(side*off-6,side*off+6,Y+40,
-      Y+270+step*13,z-4,z+7,{
+      Y+(nativeWidePortalSilhouetteEnabled?305:270)+step*13,z-4,z+7,{
         courses:[Y+106,Y+184,Y+247],corbels:Y+259
       });
-    nativeGothicBeam(side*off,Y+278+step*11,0,
-      Y+359+step*11,z-2,6);
+    nativeGothicBeam(side*off,
+      Y+(nativeWidePortalSilhouetteEnabled?316:278)+step*11,0,
+      Y+(nativeWidePortalSilhouetteEnabled?401:359)+step*11,z-2,6);
   }
   for(let x=-152;x<=152;x+=21){
     if(Math.abs(x)<72)continue;
@@ -645,6 +653,14 @@ window.__ASCII_NATIVE_COMPLETE_ARCH__={
   get westCurtainProjects(){return nativeWestCurtainProjects},
   get facadeEnabled(){return nativeWestTraceryEnabled},
   get mainPortalRecessEnabled(){return nativeMainPortalRecessEnabled},
+  get widePortalSilhouetteEnabled(){return nativeWidePortalSilhouetteEnabled},
+  setWidePortalSilhouetteEnabledForTest(on){
+    const q=new URLSearchParams(location.search);
+    if(!q.has('nativeCastleFacadeTest')&&!q.has('nativeCastleFramedTest'))
+      return false;
+    nativeWidePortalSilhouetteEnabled=Boolean(on);
+    return true;
+  },
   get mainPortalRecessClear(){return nativeMainPortalRecessClear},
   setMainPortalRecessEnabledForTest(on){
     const q=new URLSearchParams(location.search);
