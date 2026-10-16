@@ -14,6 +14,8 @@ const nativeBeforeFullRuin=ruinDetail;
 const nativeFullArchitecturalCounts={castle:{},ruins:{}};
 let nativeWestPortalReliefClear=true,nativeWestCurtainProjects=false;
 let nativeWestTraceryEnabled=true;
+let nativeOuterTowerReliefEnabled=true;
+let nativeOuterTowerReliefClear=true;
 
 function nativeGothicBox(x0,x1,y0,y1,z0,z1,meta) {
   if(!(x1>x0&&y1>y0&&z1>z0))return;
@@ -222,6 +224,72 @@ function nativeBuildCompleteCastle(){
     curtainDetails.some(so=>so.bb[0]<x+8&&so.bb[1]>x-8&&
       so.bb[4]<115));
 
+  // The two forward corner towers are existing octagonal source masonry.
+  // Add genuinely projecting, intentionally sparse tower silhouettes: two
+  // narrow blind lancet hoods in each front face, a chipped crown and
+  // discontinuous crockets following the sloped conical roof. A broad
+  // repeating band would make the already noisy ASCII wall less legible.
+  // These stones sit outside |x|>480 and far ABOVE the walkable entrance;
+  // none alters the underlying tower, source palette or the main gate.
+  before=solids.length;
+  if(nativeOuterTowerReliefEnabled)for(const side of [-1,1]){
+    const tx=side*560,tz=170,lipZ=44,roofBase=Y+760+36;
+    for(const [slot,offset] of [[0,-31],[1,31]]){
+      const cx=tx+offset,base=Y+365+slot*25;
+      const shoulder=base+164-slot*18,peak=shoulder+49+slot*5;
+      // Physical face reveals, not solid black cards. A gap remains
+      // between the raised jambs, framed by the original stone wall.
+      for(const edge of [-1,1]){
+        const jx=cx+edge*15;
+        nativeGothicBox(jx-5,jx+5,base,shoulder,lipZ-10,lipZ+11,{
+          courses:[base+41,base+113]
+        });
+        nativeGothicBeam(jx,shoulder,cx,peak,lipZ-9,6);
+      }
+      nativeGothicBox(cx-8,cx+8,peak-4,peak+11,lipZ-18,lipZ+7,{
+        courses:[peak+4]
+      });
+      if(slot===0)nativeGothicBox(cx-18,cx+18,base-19,base-11,
+        lipZ-21,lipZ+7);
+    }
+    // Keep the cornice discontinuous, with missing stones and uneven
+    // heights: distinct protrusions instead of a single bright stripe.
+    for(let k=0;k<9;k++){
+      if(k===2||k===6)continue;
+      const x=tx-82+k*20,yy=roofBase-17+(k%3)*5;
+      nativeGothicBox(x-7,x+7,yy,yy+12+(k%2)*12,
+        46-(k%2)*9,70,{courses:[yy+5]});
+    }
+    // Four sparse pairs of stone crockets trace the REAL sloping spire.
+    // At normalized height t its eight-sided cone shrinks with (1-t).
+    // Project only slightly beyond that radius, so the main silhouette
+    // breaks into individual Gothic finials rather than a sawtooth band.
+    for(const [tier,t] of [0.17,0.32,0.48,0.65].entries()){
+      const y=roofBase+620*t,rad=108*(1-t);
+      for(const edge of [-1,1]){
+        const x=tx+edge*(rad+13);
+        nativeGothicBox(x-6,x+6,y-13,y+9,
+          tz-17,tz+10,{courses:[y-4]});
+        nativeGothicBeam(tx+edge*(rad-6),y-10,
+          x+edge*13,y+21,tz-5,5);
+        if((tier+(side>0?1:0))%3!==0)
+          addCone(x+edge*7,tz-6,7,4,y+9,y+38,'spire');
+      }
+    }
+    // Stepped, chipped shoulders on the OUTER silhouette, not on the
+    // face covering the pier's arrow-slits. This breaks tower symmetry.
+    for(let i=0;i<3;i++){
+      if(side>0&&i===1)continue;
+      const x=tx+side*(87+i*10);
+      const y=Y+445+i*79+(side>0?13:0);
+      nativeGothicBox(x-7,x+7,y,y+42-i*8,
+        tz-17-i*7,tz+9,{courses:[y+11]});
+    }
+  }
+  feature.outerTowerRelief=solids.length-before;
+  nativeOuterTowerReliefClear=solids.slice(before).every(so=>
+    so.bb[1]<-480||so.bb[0]>480);
+
   for(let i=start;i<solids.length;i++){
     const s=solids[i],b=s.bb;
     s.id=i;s.cx=(b[0]+b[1])*.5;
@@ -336,6 +404,14 @@ window.__ASCII_NATIVE_COMPLETE_ARCH__={
   get westPortalReliefClear(){return nativeWestPortalReliefClear},
   get westCurtainProjects(){return nativeWestCurtainProjects},
   get facadeEnabled(){return nativeWestTraceryEnabled},
+  get outerTowerReliefEnabled(){return nativeOuterTowerReliefEnabled},
+  get outerTowerReliefClear(){return nativeOuterTowerReliefClear},
+  setOuterTowerReliefEnabledForTest(on){
+    if(!new URLSearchParams(location.search).has('nativeCastleFacadeTest'))
+      return false;
+    nativeOuterTowerReliefEnabled=Boolean(on);
+    return true;
+  },
   setFacadeEnabledForTest(on){
     if(!new URLSearchParams(location.search).has('nativeCastleFacadeTest'))
       return false;
