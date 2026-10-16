@@ -30,7 +30,9 @@ fs.mkdirSync(dir,{recursive:true});
      const source=JSON.stringify(MEADOW_MAP);
      if(game.mode!=='three')throw Error('Three native not running');
      if(!gothic.westPortalReliefClear)
-       throw Error('New Gothic solids cross true portal clearance |x|<145');
+       throw Error('New Gothic solids cross protected central facade |x|<300');
+     if(!gothic.westCurtainProjects)
+       throw Error('Gothic canopies hidden behind source gatehouse rather than projecting ahead of curtain');
      const c=gothic.features.castle;
      if(c.portalSideTracery<52||!c.rose||!c.portal||!c.buttresses)
        throw Error('Gothic relief missing real stone solids '+JSON.stringify(c));
@@ -45,7 +47,8 @@ fs.mkdirSync(dir,{recursive:true});
      const mapAfter=JSON.stringify(MEADOW_MAP);
      const actors=ents.length;
      return {mode:game.mode,site:'castle',features:c,
-       portalClear:gothic.westPortalReliefClear,sourceSolids:geomCount,
+       portalClear:gothic.westPortalReliefClear,
+       projectingCurtain:gothic.westCurtainProjects,sourceSolids:geomCount,
        mapUnchanged:source===mapAfter,actors,
        ruinSites:ruins.map(r=>r.id),glyphs:GB.n,
        gpuCanvases:document.querySelectorAll('#three-parity-canvas').length};
