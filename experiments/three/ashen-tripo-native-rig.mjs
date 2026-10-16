@@ -81,6 +81,7 @@ function animateRig(model,source,root,weapon){
   }
   const smooth=t=>{const a=clamp(t,0,1);return a*a*(3-2*a)};
   let phase=0,stride=0,runMix=0,airMix=0,bodyClock=0,heading=0,clip='Idle';
+  const capeRoll=[0,0,0],capeYaw=[0,0,0];
   let lastFrameData={speed:0,heading:0,run:false,airborne:false,phase:0,
     leftFootLift:0,rightFootLift:0,leftFootX:0,rightFootX:0,
     weaponAttached:true,footContact:[true,true],kneeBend:[0,0]};
@@ -149,15 +150,25 @@ function animateRig(model,source,root,weapon){
     sets.spine.position.copy(pos);
     sets.spine.position.y+=.004*Math.sin(bodyClock*1.8)*(1-stride)+
       Math.abs(Math.cos(phase))*stride*.012;
-    // Three actual GLB lower-garment chain bones. These weights affect
-    // cloth, but this is a small authored sway, not a cloth simulation.
-    const drag=stride*(.018+.018*runMix);
-    twist(sets.cape[0],[['iz',.012*Math.sin(bodyClock*1.1)-drag]]);
-    twist(sets.cape[1],[['iz',.020*Math.sin(bodyClock*1.5+.6)-drag*.80]]);
-    twist(sets.cape[2],[['iz',.024*Math.sin(bodyClock*1.25+1.1)-drag*.65]]);
+    // Preserve turning inertia through the three REAL Tripo cape joints.
+    // Small damped delays create secondary follow-through without faking
+    // cloth physics or changing the character's torso/body dimensions.
     const targetHeading=Number.isFinite(motion?.heading)?motion.heading:heading;
-    heading+=Math.atan2(Math.sin(targetHeading-heading),Math.cos(targetHeading-heading))*(1-Math.exp(-12*d));
+    const turnDelta=Math.atan2(Math.sin(targetHeading-heading),Math.cos(targetHeading-heading));
+    const headingStep=turnDelta*(1-Math.exp(-12*d));
+    heading+=headingStep;
     root.rotation.y=heading;
+    const turning=clamp(headingStep/d,-3.5,3.5);
+    const drag=stride*(.016+.038*runMix);
+    for(let i=0;i<sets.cape.length;i++){
+      const lag=i/2,slow=8/(1+.7*i);
+      const sway=(.011+.009*lag)*Math.sin(bodyClock*(1.2+.15*i)+i*.45);
+      const dragTarget=-drag*(1-.24*lag)+sway;
+      const turnTarget=clamp(-turning*(.006+.004*i),-.050,.050);
+      capeRoll[i]=damp(capeRoll[i],dragTarget,slow,d);
+      capeYaw[i]=damp(capeYaw[i],turnTarget,slow*.7,d);
+      twist(sets.cape[i],[['iz',capeRoll[i]],['iy',capeYaw[i]]]);
+    }
     clip=airborne?'Jump':runMix>.5&&stride>.4?'Run':stride>.2?'Walk':'Idle';
     lastFrameData={
       speed,run:running,airborne,heading,phase,
@@ -165,6 +176,7 @@ function animateRig(model,source,root,weapon){
       leftFootLift:left.lift,rightFootLift:right.lift,
       leftFootX:left.x,rightFootX:right.x,
       kneeBend:[left.knee,right.knee],
+      capeDeflection:capeRoll.map((roll,i)=>[roll,capeYaw[i]]),
       weaponAttached:!!weapon?.parent,
       animationVersion:'Tripo-IK-v3-model-space-axes'
     };
