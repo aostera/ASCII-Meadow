@@ -148,6 +148,9 @@ export class NativeKnightGlyphs {
     });
     this.scene.add(this.knight);
     this.clock = null; this.prev = null; this.disposed = false;
+    // Persistent travelled path length in the source GLB's bone units.
+    // Independent from the knight's camera-centred ASCII sprite position.
+    this.travelSource = 0;
     this.rasterClock = null;
     // Mobile gets lower GPU readback frequency; 60+ distinct animation
     // poses are still evaluated from the simulation's live time.
@@ -175,13 +178,28 @@ export class NativeKnightGlyphs {
     // ground speed in source pixels per second, for the clip cadence
     const fx = e.x * src.CW, fy = (e.y + .7) * src.CH;
     let speed = 0;
-    if (this.prev && dt > 0) speed = Math.hypot(fx - this.prev[0], fy - this.prev[1]) / dt / 10;
+    const dx=this.prev?fx-this.prev[0]:0;
+    const dy=this.prev?fy-this.prev[1]:0;
+    const travelPixels=Math.hypot(dx,dy);
     this.prev = [fx, fy];
     const walking = !(e.jump > 0) && (e.walk || 0) > .5;
+    if(dt>0)speed=travelPixels/dt/10;
     if (walking) speed = Math.max(speed, (e.run || 0) > .5 ? 15 : 8); else speed = 0;
-    this.knight.userData.pxPerMeter = src.KG.art * fch / 1.9;
+    const pxPerMetre=src.KG.art*fch/1.9;
+    this.knight.userData.pxPerMeter=pxPerMetre;
+    // Original actor x/y is the actual MAP position, unlike the fixed
+    // origin used for the little Tripo sprite's offscreen render.
+    // Convert actor map displacement to authentic GLB bone units.
+    // Discard large teleports/camera discontinuities and airborne jumps.
+    const sourceUnitsPerMetre=this.knight.userData.sourceUnitsPerMetre;
+    const movedMetres=travelPixels/Math.max(1,pxPerMetre);
+    if(walking&&Number.isFinite(sourceUnitsPerMetre)&&
+       movedMetres/dt<12&&movedMetres<.20)
+      this.travelSource+=movedMetres*sourceUnitsPerMetre;
+    this.stats.sourceTravel=this.travelSource;
     this.stats.motion = this.knight.userData.animate(dt, {
       speed, run: (e.run || 0) > .5, heading: headingForSourceD8(e.d8 || 0),
+      travelSource:this.travelSource,
       jumpClipTime: NativeKnightGlyphs.jumpClipTime(e, src.JUMP_T, src.AIR0, src.AIR1)
     }, now);
     this.stats.clip = this.knight.userData.gltf.clip;
