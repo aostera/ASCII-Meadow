@@ -1,8 +1,10 @@
 // Native-only sculpted ground shadow edges for source castle and ruins.
 // The original 3D raycasts are authoritative. This refines just their hard,
-// single-cell shadow boundaries after a world bake; no global brightness,
-// alpha, light direction, character shadow or source map changes.
-const nativeSourceBuildForShadows=build;
+// single-cell shadow boundaries immediately after architectural rays, BEFORE
+// foliage/stones add their own shadows. The editor snapshots bshadeCastle
+// after this exact pass: rebuild, move, undo and redo remain consistent.
+// No global brightness, alpha, light direction, character shadow or map edits.
+const nativeSourceBuildForShadows=buildWorld;
 const nativeShadowClamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
 function nativeShadowEdgeFilter(source,width,height,x,y) {
@@ -65,15 +67,21 @@ function nativeSoftenGothicShadows(){
   }
   return edits;
 }
-let nativeShadowEdits=0;
-build=function(){
+let nativeShadowEdits=0,nativeShadowBakes=0;
+buildWorld=function(){
+  // The source first resets bshade to zero and raycasts castle/ruin solids.
+  // This hook runs exactly once for each architecture rebuild, *before*
+  // source buildFlora/rebuildFlora add forest shadows and make bshadeCastle.
   const result=nativeSourceBuildForShadows();
   nativeShadowEdits=nativeSoftenGothicShadows();
+  nativeShadowBakes++;
   return result;
 };
 window.__ASCII_NATIVE_SHADOWS__={
   edgeFilter:nativeShadowEdgeFilter,
   get changedCells(){return nativeShadowEdits},
+  get bakes(){return nativeShadowBakes},
+  get phase(){return 'after-buildWorld-before-buildFlora'},
   refine:nativeSoftenGothicShadows,
-  sourceBuild:nativeSourceBuildForShadows
+  sourceBuildWorld:nativeSourceBuildForShadows
 };
