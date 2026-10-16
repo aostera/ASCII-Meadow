@@ -360,6 +360,8 @@ jobs:
           node --check experiments/three/native-shadow-soften.js
           node --check experiments/three/native-shadow-coverage.js
           node --check tools/check/three-native-shadow-coverage.cjs
+          node --check experiments/three/native-body-shadows.js
+          node --check tools/check/three-native-body-shadows.cjs
           node --check tools/check/three-native-art.cjs
           node --check experiments/three/native-architecture-depth.mjs
           node --check experiments/three/native-tree-depth.mjs
@@ -415,6 +417,7 @@ jobs:
           node tools/check/three-native-props-depth.cjs http://127.0.0.1:8181
           node tools/check/three-native-art.cjs http://127.0.0.1:8181
           node tools/check/three-native-grey-editor.cjs http://127.0.0.1:8181
+          node tools/check/three-native-body-shadows.cjs http://127.0.0.1:8181
           node tools/check/three-parity.cjs http://127.0.0.1:8181
           node tools/check/three-motion-parity.cjs http://127.0.0.1:8181
           node tools/check/three-performance.cjs http://127.0.0.1:8181
@@ -455,4 +458,5 @@ jobs:
             shots/three-native-props/
             shots/three-native-art/
             shots/three-native-grey-editor/
+            shots/three-native-body-shadows/
           if-no-files-found: warn
