@@ -61,7 +61,7 @@ fs.mkdirSync(out,{recursive:true});
       throw Error('Leg calibration must use real Tripo joints');
    if(data.pose.kneeBend.some(k=>k<0||k>1.25))
       throw Error('Leg must never hyperflex: '+JSON.stringify(data.pose.kneeBend));
-   if(data.pose.animationVersion!=='Tripo-IK-v10-distance-synced-foot-pins')
+   if(data.pose.animationVersion!=='Tripo-IK-v11-real-boot-pivot-lock')
       throw Error('Wrong shoulder/elbow controller: '+data.pose.animationVersion);
    if(mode==='Idle'){
     if(data.pose.kneeBend.some(k=>k<0||k>1.23))
@@ -168,7 +168,8 @@ fs.mkdirSync(out,{recursive:true});
     // Compare actual boot bone positions to virtual actor map distance.
     // Unlike virtual footAnchorWorldX, this detects IK reach clamping.
     let bones;root.traverse(o=>{if(!bones&&o.isSkinnedMesh)bones=o.skeleton.bones;});
-    const realSlip=[0,0],lastReal=[null,null];
+    const realSlip=[0,0],lastReal=[null,null],firstReal=[null,null],
+      totalRealSlip=[0,0];
     const bootPos=new (root.position.constructor)();
     const normToSource=root.userData.sourceUnitsPerMetre;
     let distance=0,pinnedFrames=0;
@@ -190,8 +191,11 @@ fs.mkdirSync(out,{recursive:true});
           const trueBootX=distance+bootPos.z*normToSource;
           if(lastReal[j]!==null)realSlip[j]=Math.max(realSlip[j],
             Math.abs(trueBootX-lastReal[j]));
+          if(firstReal[j]===null)firstReal[j]=trueBootX;
+          totalRealSlip[j]=Math.max(totalRealSlip[j],
+            Math.abs(trueBootX-firstReal[j]));
           lastReal[j]=trueBootX;
-        }else{last[j]=null;lastReal[j]=null;}
+        }else{last[j]=null;lastReal[j]=null;firstReal[j]=null;}
       }
     }
     const stoppedPhase=root.userData.pose().phase;
@@ -200,12 +204,14 @@ fs.mkdirSync(out,{recursive:true});
         speed:15,run:true,heading:0,travelSource:distance
       },i/60);
     return {pinnedFrames,slip,realBootSlipPerTick:realSlip,
+      maxRealBootContactDrift:totalRealSlip,
       stationaryPhaseError:
       Math.abs(root.userData.pose().phase-stoppedPhase),
       travelSource:root.userData.pose().travelSource};
   });
   console.log('REAL MAP-DISTANCE FOOT-PINNING QA '+JSON.stringify(footLock));
   if(footLock.pinnedFrames<80||footLock.slip.some(n=>n>.0004)||
+     footLock.maxRealBootContactDrift.some(n=>n>.03)||
      footLock.stationaryPhaseError>.000001)
     throw Error('Planted feet slipped or character moonwalked into a wall: '+
       JSON.stringify(footLock));
