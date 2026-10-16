@@ -177,6 +177,8 @@ export class NativeGreyMapEditor {
       window.addEventListener(type,this.editorPointer,true);
     }
     this.replacedPointerTypes=types;
+    // native-editor-touch.js replays a held-back first finger through this.
+    window.__ASCII_NATIVE_EDITOR_POINTER__=this.editorPointer;
   }
   refreshUi(){
     if(this.disposed)return;
@@ -274,6 +276,8 @@ export class NativeGreyMapEditor {
         window.removeEventListener(type,this.editorPointer,true);
         window.addEventListener(type,edPointer,true);
       }
+      if(window.__ASCII_NATIVE_EDITOR_POINTER__===this.editorPointer)
+        window.__ASCII_NATIVE_EDITOR_POINTER__=null;
     }
     this.selectionHelper.geometry.dispose();this.selectionHelper.material.dispose();
     for(const m of Object.values(this.materials))m.dispose();
