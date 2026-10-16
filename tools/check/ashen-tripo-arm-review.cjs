@@ -103,6 +103,36 @@ fs.mkdirSync(out,{recursive:true});
     minHipDistance:Math.min(...clearances.map(x=>x.minClearance)),
     minBladeDrop:Math.min(...clearances.map(x=>x.minVertical))
   }));
+  // Save a REAL 60 Hz Run gait as 12 sequence frames, not a still chosen
+  // at a flattering moment. The screenshots use the actual Tripo GPU skin.
+  await page.locator('[data-motion="Run"]').click();
+  await page.locator('[data-view="side"]').click();
+  await page.evaluate(()=>{
+    const root=window.__ASHEN_ANIMATION_LAB__.model;
+    root.position.y=0;
+    for(let i=0;i<45;i++)root.userData.animate(1/60,
+      {speed:15,run:true,heading:0},i/60);
+  });
+  const poseSamples=[];
+  for(let i=0;i<12;i++){
+    for(let j=0;j<3;j++)await page.locator('#frame').click();
+    const pose=await page.evaluate(()=>window.__ASHEN_ANIMATION_LAB__.state);
+    poseSamples.push({
+      phase:pose.phase,shoulder:pose.armPose.shoulderSwing,
+      elbow:pose.armPose.leftElbow,rightElbow:pose.armPose.rightElbow
+    });
+    await page.screenshot({
+      path:path.join(out,'run-cycle-'+String(i).padStart(2,'0')+'.png'),
+      clip:{x:300,y:92,width:415,height:635},timeout:30000
+    });
+  }
+  const swingRange=Math.max(...poseSamples.map(p=>p.shoulder))-
+    Math.min(...poseSamples.map(p=>p.shoulder));
+  const elbowRange=Math.max(...poseSamples.map(p=>p.rightElbow))-
+    Math.min(...poseSamples.map(p=>p.rightElbow));
+  if(swingRange<.17||elbowRange<.035)
+    throw Error('Rigid arm run cycle: '+JSON.stringify({swingRange,elbowRange,poseSamples}));
+  console.log('12 true 60 Hz run-swing images OK: '+JSON.stringify({swingRange,elbowRange}));
   await browser.close();
  }catch(e){await browser.close();throw e}
 })().catch(e=>{console.error(e);process.exitCode=1});
