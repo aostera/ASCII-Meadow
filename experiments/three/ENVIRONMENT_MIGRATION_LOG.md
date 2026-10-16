@@ -1,5 +1,16 @@
 # ASCII Meadow — реестр переноса окружения в Three.js
 
+## Текущий индекс (2026-10-16, 18:54 UTC)
+
+**Новый канонический статус:** [STATUS.md](STATUS.md) и [AUTO_ROADMAP.md](AUTO_ROADMAP.md). Ниже — **хронология**, включая устаревшие на дату чтения статусы "draft", которые нельзя применять как текущую очередь.
+
+- PR #59 merged (09369d662c): устранено обрезание source-cast окна замка, геометрическая 3×3 обработка shadow edges. [CI success](https://github.com/aostera/ASCII-Meadow/actions/runs/38931456659).
+- PR #60 merged (c1f12b6496): сглажена только контактная тень рыцаря/NPC/коров в траве, directional sun/fire/lightning сохранены. [CI success](https://github.com/aostera/ASCII-Meadow/actions/runs/38944223018), [editor/character success](https://github.com/aostera/ASCII-Meadow/actions/runs/38944215332).
+- PR #62 (T07 editor touch pan/pinch) открыт; PR #61 (T08 authored-world performance baseline) draft. PR #54/#58 (T02/T03 art) отложены. Никакой аппаратной приёмки FPS/Android/iOS не заявлено.
+
+---
+
+
 > Живой журнал изменений **экспериментальной ветки** `experiment/threejs-ascii-prototype`.
 > Ветка `main` — отдельная стабильная игра. Ни одно описанное ниже улучшение
 > само по себе не означает полного переноса, финального качества арта или
@@ -259,7 +270,7 @@ solids вдоль `-LGT` (те же `cast` и `BINS.sun`); граничные к
 ## 2026-10-16 — прямоугольная тень рыцаря в траве (по замечанию владельца)
 
 **Причина:** исходный `shadeCapsule()` (`src/world/shadows.js`) даёт полную силу
-всем клеткам внутри ~60% эллипса (`e=(1-q)*2.5`, обрезка до 1). Контактная тень
+всем клеткам внутри `60% эллипса (`e=(1-q)*2.5`, обрезка до 1). Контактная тень
 `CONTACT_S=.7` опускает свет травы ниже порога глифа на целом блоке клеток, и
 у ног трава исчезает тёмным прямоугольником с ровной нижней кромкой.
 
