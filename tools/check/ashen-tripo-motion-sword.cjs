@@ -48,6 +48,29 @@ fs.mkdirSync(output,{recursive:true});
        gameFrames:state.frameCount,sourceGlyphs:state.stats?.visibleGlyphs};
    });
    const idle=await read();
+   if(!mobile){
+     // Probe true actor displacement, rather than trusting the Run key.
+     const runIntoWall=await page.evaluate(async()=>{
+       const {NativeKnightGlyphs}=await import('./native-tripo-v2.mjs');
+       const samples=[];
+       const stub={clock:null,prev:null,travelSource:0,
+         stats:{frames:0},rasterClock:0,rasterInterval:Infinity,
+         knight:{userData:{sourceUnitsPerMetre:.5,gltf:{clip:'Idle'},
+           animate:(_dt,m)=>{samples.push([m.speed,m.travelSource]);return 'idle';},
+           pose:()=>({})}},
+         render(){},convert(){},emit(){}};
+       for(const [i,x] of [100,102,102].entries())
+         NativeKnightGlyphs.prototype.draw.call(stub,
+           {x,y:40,walk:1,run:1,d8:0,jump:0},null,1,1,
+           {t:(i+1)/30,CW:1,CH:1,KG:{art:44.4},JUMP_T:1,AIR0:.2,AIR1:.8});
+       return samples;
+     });
+     if(runIntoWall[0][0]!==0||runIntoWall[1][0]<=0||
+        runIntoWall[2][0]!==0||runIntoWall[1][1]<=0||
+        runIntoWall[2][1]!==runIntoWall[1][1])
+       throw Error('Player moonwalks while blocked: '+JSON.stringify(runIntoWall));
+     console.log('Run displacement / wall stop pass',runIntoWall);
+   }
    if(idle.error)throw Error('GLB/skin/ASCII player failed '+idle.error);
    if(!idle.ready||idle.glyphs<300||idle.cells<idle.glyphs||
       (idle.bounds?.[3]-idle.bounds?.[1])<28)
