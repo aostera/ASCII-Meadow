@@ -169,6 +169,7 @@ fs.mkdirSync(out,{recursive:true});
       const heelRanges=[[],[]],toeRanges=[[],[]],minRanges=[[],[]],
         sourceCandidateCounts=[0,0],sampledCounts=[0,0];
       let previousCorrection=null,maxCorrectionTick=0;
+      let plantedSamples=0,airborneSamples=0;
       for(let i=0;i<150;i++){
         rig.userData.animate(1/60,{speed,run,heading:0},i/60);
         const pose=rig.userData.pose();
@@ -194,9 +195,19 @@ fs.mkdirSync(out,{recursive:true});
           throw Error('Skinned boot ground references are absent');
         if(Math.abs(pose.contactCorrection)>.04501)
           throw Error('Unbounded real-sole pelvis correction');
-        if(mode!=='Idle'&&(pose.groundCorrection!=='skinned-sole'||
-           !Number.isFinite(pose.soleSurfaceFloorError)))
-          throw Error('Movement did not use actual weighted boot-sole contact');
+        // Run has a genuine double-flight interval. There cannot be a
+        // planted sole on those frames, so demanding "skinned-sole"
+        // unconditionally was a false-positive test failure.
+        if(mode!=='Idle'&&pose.footContact.some(Boolean)){
+          plantedSamples++;
+          if(pose.groundCorrection!=='skinned-sole'||
+             !Number.isFinite(pose.soleSurfaceFloorError))
+            throw Error('Grounded frame skipped original skinned sole contact');
+        }else if(mode!=='Idle'){
+          airborneSamples++;
+          if(pose.groundCorrection!=='off')
+            throw Error('Running flight unexpectedly corrects a planted foot');
+        }
         for(let j=0;j<2;j++){
           const sole=pose.soleSurface[j];
           if(!sole||!Number.isFinite(sole.minY)||!Number.isFinite(sole.maxY)||
@@ -215,14 +226,18 @@ fs.mkdirSync(out,{recursive:true});
       const range=a=>[Math.min(...a),Math.max(...a)];
       result.push({mode,sampledCounts,sourceCandidateCounts,
         heel:heelRanges.map(range),toe:toeRanges.map(range),
-        lowest: minRanges.map(range),maxCorrectionTick});
+        lowest: minRanges.map(range),maxCorrectionTick,
+        plantedSamples,airborneSamples});
     }
     return result;
   });
   console.log('GENUINE CPU-SKINNED TRIPO BOOT-SOLE SURFACE '+JSON.stringify(soleSurfaceProbe));
   if(soleSurfaceProbe.length!==3||
-     soleSurfaceProbe.some(s=>s.sampledCounts.some(n=>n<6)))
-    throw Error('Sole mesh QA did not scan both real boots');
+     soleSurfaceProbe.some(s=>s.sampledCounts.some(n=>n<6))||
+     soleSurfaceProbe.filter(s=>s.mode!=='Idle').some(s=>s.plantedSamples<55))
+    throw Error('Sole skin ground/flight sampler failed: '+JSON.stringify(soleSurfaceProbe));
+  if(soleSurfaceProbe.find(s=>s.mode==='Run').airborneSamples<3)
+    throw Error('Run never released BOTH genuine planted Tripo boots');
   // Intersect the actual diamond-section Gothic blade with the right boot
   // vertices (CPU-skinned every pose). This is stronger than hip envelope
   // clearance, but deliberately weaker than exhaustive triangle collision:
