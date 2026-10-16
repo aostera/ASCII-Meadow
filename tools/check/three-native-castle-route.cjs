@@ -104,7 +104,7 @@ fs.mkdirSync(dir,{recursive:true});
        const score=vis.count+vis.upper*2;
        if(!best||score>best.score)best={x,y,h:here,score,visible:vis};
        // A genuinely reachable terrace point with a visible doorway.
-       if(here>=90&&vis.count>=18&&vis.upper>=2&&y<gateY){
+       if(here>=119&&vis.count>=18&&vis.upper>=2&&y<gateY){
          possibleGoal++;end=n;break;
        }
        for(const [di,dj] of [[0,-1],[-1,0],[1,0],[0,1]]){
@@ -212,7 +212,7 @@ fs.mkdirSync(dir,{recursive:true});
    if(!route.routeFound||!route.oneNativeContext||
      !route.originalMapUnchanged||!route.geometryPass||
      route.frames?.view?.count<18||route.route.steps<12||
-     route.route.changesInSurfaceHeight<2)
+     route.route.changesInSurfaceHeight<9||route.route.maxHeight<119)
      throw Error(label+' connected stair-to-gate route not proven '+
        JSON.stringify(route).slice(0,3200));
    await ctx.close();
