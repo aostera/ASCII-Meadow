@@ -48,6 +48,10 @@ function coverFloraWithArchitecture(f) {
 let cloudBuf, cloudTick = 0;
 
 function render() {
+  // Diagnostic sections are measured only by the explicit perf benchmark;
+  // no clocks are read and no data is collected during normal gameplay.
+  const diag = window.__profileRender;
+  let mark = diag ? window.__realNow() : 0;
   ctx.clearRect(0, 0, W, H);
   GB.n = 0; castleDraw = null;
   ctx.save();
@@ -60,6 +64,7 @@ function render() {
   drawRuins();
   const C = cathedral;
   drawWindows();
+  if (diag) { diag.setup += window.__realNow() - mark; mark = window.__realNow(); }
   const order = visibleToads(visibleFlora([...ents, ...braziers])).sort((a, b) => a.y - b.y);
   let oi = 0;
   let cloudRow = 0;
@@ -190,6 +195,7 @@ function render() {
   }
   while (oi < order.length) { const e = order[oi++]; if (e.isFlora) { drawFlora(e); coverFloraWithArchitecture(e); } else if (e.isToad) drawToad(e); else if (e.isFire) drawBrazier(e); else { drawEntity(e); occlude(e); occludeRuins(e); } }
 
+  if (diag) { diag.terrain += window.__realNow() - mark; mark = window.__realNow(); }
   for (const d of dew) {
     const i = d.i, x = i % COLS, y = (i / COLS) | 0;
     if (kind[i] !== 1) continue;
@@ -214,12 +220,14 @@ function render() {
     ctx.stroke();
   }
 
+  if (diag) { diag.sprites += window.__realNow() - mark; mark = window.__realNow(); }
   updateFog();
   castleFogGlyphs();
   drawFog();
   ctx.restore();
   drawFogField();
   drawLights();
+  if (diag) { diag.fog += window.__realNow() - mark; mark = window.__realNow(); }
 
   // ash
   for (const m of motes) {
@@ -238,5 +246,7 @@ function render() {
   if (flash > 0.02) { ctx.fillStyle = `rgba(250,250,250,${flash * 0.05})`; ctx.fillRect(0, 0, W, H); }
   drawPrompt();
   if (editing) drawEditor();   // editor/editor.js: brush, markers, selection, over the fog and vignette
+  if (diag) { diag.overlay += window.__realNow() - mark; mark = window.__realNow(); }
   if (GL.ok) GL.flush(camX * CW, camY * CH, castleDraw); else flush2D(camX * CW, camY * CH, castleDraw);
+  if (diag) diag.flush += window.__realNow() - mark;
 }

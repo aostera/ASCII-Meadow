@@ -70,33 +70,43 @@ function applyGrassForces(dt) {
   }
 }
 
-// Solid scenery pushes nearby grass away from its true 3D footprint. Unlike
-// a moving body this is a steady boundary force; the blades still respond to
-// wind and spring back if a tent/fence is removed in the editor.
+// Static tent/fence contacts are baked with the map, not recalculated across
+// every visible ground cell each simulation frame. Keep the original spring
+// simulation and the physical footprint: only its *input force* is cached.
+let sceneGrassIndex = new Int32Array(0), sceneGrassBend = new Float32Array(0),
+  sceneGrassFlat = new Float32Array(0);
+function bakeSceneryGrassForces() {
+  const ids = [], bends = [], flats = [], G = campGround;
+  if (G) for (let y = 1; y < ROWS - 1; y++) for (let x = 1; x < COLS - 1; x++) {
+    const i = y * COLS + x, contact = G[i];
+    if (contact < .035 || kind[i] !== 1) continue;
+    const dx = G[i - 1] - G[i + 1], dy = G[i - COLS] - G[i + COLS];
+    const edge = Math.hypot(dx, dy);
+    const bend = edge > .008 ?
+      Math.min(2.4, edge * 9) * (.65 + contact * 1.15) * dx / edge : 0;
+    const flatten = contact > .25 ? Math.min(.22, (contact - .25) * .32) : 0;
+    if (!bend && !flatten) continue;
+    ids.push(i); bends.push(bend); flats.push(flatten);
+  }
+  sceneGrassIndex = Int32Array.from(ids);
+  sceneGrassBend = Float32Array.from(bends);
+  sceneGrassFlat = Float32Array.from(flats);
+}
 function applySceneryGrassForces() {
-  const G = campGround;
-  if (!G) return;
+  const ids = sceneGrassIndex;
+  if (!ids.length) return;
   const x0 = Math.max(1, VX0), x1 = Math.min(COLS - 2, VX1);
-  for (let y = Math.max(1, VY0 - 4); y <= Math.min(ROWS - 2, VY1 + 4); y++) {
-    const row = y * COLS;
-    for (let x = x0; x <= x1; x++) {
-      const i = row + x, contact = G[i];
-      if (contact < .035 || kind[i] !== 1) continue;
-      const dx = G[i - 1] - G[i + 1], dy = G[i - COLS] - G[i + COLS];
-      const edge = Math.hypot(dx, dy);
-      // A physical silhouette gives a steady outward push, like the knight's
-      // brush() but with no artificial motion wake. Normalize the boundary
-      // gradient: the old dx*1.25 was too weak to read next to the wind.
-      if (edge > .008) {
-        const shove = Math.min(2.4, edge * 9) * (.65 + contact * 1.15);
-        push[i] += shove * dx / edge;
-      }
-      // Rails run along X and can have a mostly Y-facing gradient; those
-      // blades shorten at the foot instead of magically leaning sideways.
-      // At the canvas hem roots remain visible, never a rectangular bald area.
-      if (contact > .25)
-        flat[i] = Math.max(flat[i], Math.min(.22, (contact - .25) * .32));
-    }
+  const y0 = Math.max(1, VY0 - 4), y1 = Math.min(ROWS - 2, VY1 + 4);
+  let lo = 0, hi = ids.length;
+  const start = y0 * COLS;
+  while (lo < hi) { const mid = (lo + hi) >>> 1; if (ids[mid] < start) lo = mid + 1; else hi = mid; }
+  const end = (y1 + 1) * COLS;
+  for (let j = lo; j < ids.length && ids[j] < end; j++) {
+    const i = ids[j], x = i % COLS;
+    if (x < x0 || x > x1 || kind[i] !== 1) continue;
+    push[i] += sceneGrassBend[j];
+    const flatten = sceneGrassFlat[j];
+    if (flatten) flat[i] = Math.max(flat[i], flatten);
   }
 }
 

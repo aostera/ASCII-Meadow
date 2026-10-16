@@ -1,0 +1,26 @@
+name: CPU frame budget (diagnostic)
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tools/check/perf-browser.cjs'
+      - 'tools/check/common.cjs'
+      - '.github/workflows/performance.yml'
+  workflow_dispatch:
+
+jobs:
+  performance:
+    name: Frame p50/p95 desktop tablet phone
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Measure game frame workload on several viewports
+        run: npm run bench:render
