@@ -85,3 +85,6 @@
 - [GitHub issue #53](https://github.com/aostera/ASCII-Meadow/issues/53)
 - [Реестр миграции](ENVIRONMENT_MIGRATION_LOG.md)
 - [Технический план 1:1 parity](PARITY_MIGRATION.md)
+
+
+- **T02 — IN_PROGRESS, большая физическая арка (2026-10-16).** [Геометрия 392c537f](https://github.com/aostera/ASCII-Meadow/commit/392c537fb09450fbd336344af7200274a745e15d): реальная ширина тёмного свода 152→200 единиц, вершина Y+287→Y+329, тяжёлые рёбра сдвинуты наружу. [Честный A/B a4e50289](https://github.com/aostera/ASCII-Meadow/commit/a4e50289d9ee07998f1d0f812e8dc8b4eb8e94cc) при native VZ=1 / одинаковой игровой камере: [CI 38912261726 SUCCESS](https://github.com/aostera/ASCII-Meadow/actions/runs/38912261726), изменились 71 059 PC / 103 371 phone GPU-пикселей, 3 444 / 1 521 source-клеток, 0 ошибок восстановления; **все 7 профильных CI зелёные**. Оригинальная карта, дубовая дверь, камера, цвета и персонажи сохранены. [Фактические кадры](https://github.com/aostera/ASCII-Meadow/actions/runs/38912261726/artifacts/12050319323) просмотрены: большая форма на PC пропорциональнее, на телефоне монотонная плотная ASCII-кладка всё ещё доминирует. **T02 ART NOT ACCEPTED / PR #54 DRAFT**, T03 не начинать. Далее — локально работать с большими массами кладки, не менять глобальный RGB/alpha, не создавать 2D подложек и не заявлять проверки настоящих устройств.
