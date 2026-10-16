@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createAshenGothicLongsword} from './ashen-gothic-longsword.mjs';
-import {locateBootSoleVertices} from './ashen-sole-contact.mjs';
+import {locateBootSoleVertices,groundedSoleTarget} from './ashen-sole-contact.mjs';
 
 export const TRIPO_V2_GLB = new URL('./assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb',import.meta.url).href;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -197,6 +197,10 @@ function animateRig(model,source,root,weapon){
     b.getWorldPosition(bootWorld);
     return root.worldToLocal(bootWorld.clone()).y;
   });
+  // Ground reference is the real original skinned sole in the neutral
+  // GLB rest pose. This is the same character-local metric used each
+  // frame, not a guessed foot-joint center or authored terrain height.
+  const restSoleY=soleSurfacePose().map(s=>s?.minY??null);
   // With original-map X/Z available, pin each true boot joint to a
   // measured planar world coordinate. The source actor moves independently
   // while this real skinned mesh stays at the offscreen sprite origin.
@@ -475,20 +479,28 @@ function animateRig(model,source,root,weapon){
       stride,jumpWeight,runMix,pelvisBob,0,travelSource,hasTravel,ground);
     const right=legPose(sets.rightLeg,legCalibration.right,.5,
       stride,jumpWeight,runMix,pelvisBob,1,travelSource,hasTravel,ground);
-    // Aim to place the actual original boot pivots on the ground,
-    // compensating for skin rest curvature and knee solver reach.
-    // This is pelvis-level vertical contact correction; it is not a
-    // per-triangle shoe collision model.
+    // v16: use actual skinned lower-boot surface minima for ground
+    // correction, not the usually elevated Tripo toe-joint pivots.
+    // Correct the shared pelvis by at most 4.5 cm in source rig units.
+    // This is a flat original-source-game ground proxy, NOT terrain IK.
+    const planted=[left.contact,right.contact];
+    let soleGround=null,groundCorrection='off';
     if(jumpWeight<.12&&stride>.12){
-      let sumY=0,num=0;
-      for(let i=0;i<2;i++){
-        if(!(i===0?left.contact:right.contact))continue;
-        shoePivot[i].getWorldPosition(bootWorld);
-        root.worldToLocal(bootWorld);
-        sumY+=bootWorld.y-restBootY[i];num++;
-      }
-      const target=num?
-        clamp(-(sumY/num)*sourcePerMetre,-.055,.055):0;
+      const skinBefore=soleSurfacePose();
+      soleGround=groundedSoleTarget(skinBefore,restSoleY,planted,sourcePerMetre);
+      let target=soleGround.target;
+      if(soleGround.count===0){
+        // No reliable weighted boot mesh: keep v14 pivot-based behaviour.
+        let sumY=0,num=0;
+        for(let i=0;i<2;i++){
+          if(!planted[i])continue;
+          shoePivot[i].getWorldPosition(bootWorld);
+          root.worldToLocal(bootWorld);
+          sumY+=bootWorld.y-restBootY[i];num++;
+        }
+        target=num?clamp(-(sumY/num)*sourcePerMetre,-.045,.045):0;
+        groundCorrection=num?'pivot-fallback':'off';
+      }else groundCorrection='skinned-sole';
       contactCorrection=damp(contactCorrection,target,28,d);
     }else contactCorrection=damp(contactCorrection,0,28,d);
     sets.pelvis.position.y+=contactCorrection;
@@ -548,7 +560,10 @@ function animateRig(model,source,root,weapon){
       planarBootSlipXZ:[left.planarError,right.planarError],
       hipAbduction:[left.hipRoll,right.hipRoll],
       actorGroundXZ:ground?ground.slice():null,
-      contactCorrection,
+      contactCorrection,groundCorrection,
+      soleCorrectionTarget:soleGround?.target??null,
+      soleSurfaceFloorError:soleGround?.meanHeightError??null,
+      soleRestY:restSoleY.slice(),
       // Real CPU-skinned boot surface diagnostics in character-local Y.
       // Used for geometry-level stance QA, NOT to override source physics.
       soleSurface:soleSurfacePose(),
@@ -561,7 +576,7 @@ function animateRig(model,source,root,weapon){
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v15-skinned-sole-contact-probe'
+      animationVersion:'Tripo-IK-v16-skinned-sole-floor-contact'
     };
     return clip.toLowerCase();
   }
