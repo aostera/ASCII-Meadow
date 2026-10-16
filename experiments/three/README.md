@@ -17,7 +17,7 @@ Native читает authored мир, `src/data/map.js`, персонажей и 
 
 ## Подтверждённое и незавершённое
 
-По состоянию на 16 октября в experiment объединены #46–51, #59 и #60; [последний проверенный CI](https://github.com/aostera/ASCII-Meadow/actions/runs/38944223018) — success на `c1f12b6496`. T07 mobile/editor [#62](https://github.com/aostera/ASCII-Meadow/pull/62) ещё открыт; T08 performance [#61](https://github.com/aostera/ASCII-Meadow/pull/61) draft; T02/#54 и T03/#58 отложены; остальные точные статусы — в [STATUS.md](STATUS.md). CI desktop/phone viewport не заменяет физические iPhone/iPad/Android и не подтверждает FPS на реальном GPU.
+По состоянию на 16 октября в experiment объединены #46–51, #59 и #60; [последний проверенный CI](https://github.com/aostera/ASCII-Meadow/actions/runs/38944223018) — success на `c1f12b6496`. T07 editor touch pan/pinch [#62](https://github.com/aostera/ASCII-Meadow/pull/62) merged (`73cf6c8`), остальной T07 в работе; T08 performance [#61](https://github.com/aostera/ASCII-Meadow/pull/61) draft; T02/#54 и T03/#58 отложены; остальные точные статусы — в [STATUS.md](STATUS.md). CI desktop/phone viewport не заменяет физические iPhone/iPad/Android и не подтверждает FPS на реальном GPU.
 
 ## QA и правила публикации
 

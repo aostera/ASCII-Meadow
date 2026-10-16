@@ -11,7 +11,7 @@
 - **Новый редактор:** https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev/experiments/three/native.html?edit=1
 - **Прогресс нового движка:** [STATUS.md](https://github.com/aostera/ASCII-Meadow/blob/experiment/threejs-ascii-prototype/experiments/three/STATUS.md) · [T00–T09 roadmap](https://github.com/aostera/ASCII-Meadow/blob/experiment/threejs-ascii-prototype/experiments/three/AUTO_ROADMAP.md) · [issue #53](https://github.com/aostera/ASCII-Meadow/issues/53) · [PR #37](https://github.com/aostera/ASCII-Meadow/pull/37) (draft).
 
-По срезу 16.10.2026 исправления теней #59/#60 объединены в experiment; T05/T06 ещё проверяются, T07 [#62](https://github.com/aostera/ASCII-Meadow/pull/62) открыт, T08 [#61](https://github.com/aostera/ASCII-Meadow/pull/61) draft, T02/T03 art отложены. Сверяй актуальный GitHub head перед заявлениями о готовности.
+По срезу 16.10.2026 исправления теней #59/#60 объединены в experiment; T05/T06 ещё проверяются, жесты редактора T07 [#62](https://github.com/aostera/ASCII-Meadow/pull/62) влиты (остальной T07 в работе), T08 [#61](https://github.com/aostera/ASCII-Meadow/pull/61) draft, T02/T03 art отложены. Сверяй актуальный GitHub head перед заявлениями о готовности.
 
 ## Запуск локально
 
@@ -35,7 +35,7 @@ python3 -m http.server 8080
 | Порыв ветра | G |
 | Редактор | M или кнопка внизу слева |
 
-Редактор умеет двигать/вращать объекты, работать кистями, туманом, NPC, кострами, лагерем и руинами, выполнять undo/redo. Сенсорные улучшения экспериментального редактора нельзя считать опубликованными до merge PR #62.
+Редактор умеет двигать/вращать объекты, работать кистями, туманом, NPC, кострами, лагерем и руинами, выполнять undo/redo. В экспериментальном `native.html` редактор на телефоне/планшете двигается двумя пальцами и масштабируется щипком (PR #62, проверено в эмуляции Chromium, не на реальных устройствах).
 
 ## Авторская карта — не регенерировать
 

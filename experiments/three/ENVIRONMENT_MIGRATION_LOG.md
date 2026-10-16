@@ -6,7 +6,7 @@
 
 - PR #59 merged (09369d662c): устранено обрезание source-cast окна замка, геометрическая 3×3 обработка shadow edges. [CI success](https://github.com/aostera/ASCII-Meadow/actions/runs/38931456659).
 - PR #60 merged (c1f12b6496): сглажена только контактная тень рыцаря/NPC/коров в траве, directional sun/fire/lightning сохранены. [CI success](https://github.com/aostera/ASCII-Meadow/actions/runs/38944223018), [editor/character success](https://github.com/aostera/ASCII-Meadow/actions/runs/38944215332).
-- PR #62 (T07 editor touch pan/pinch) открыт; PR #61 (T08 authored-world performance baseline) draft. PR #54/#58 (T02/T03 art) отложены. Никакой аппаратной приёмки FPS/Android/iOS не заявлено.
+- PR #62 (T07 editor touch pan/pinch) merged (`73cf6c8`); PR #61 (T08 authored-world performance baseline) draft. PR #54/#58 (T02/T03 art) отложены. Никакой аппаратной приёмки FPS/Android/iOS не заявлено.
 
 ---
 
@@ -280,3 +280,28 @@ solids вдоль `-LGT` (те же `cast` и `BINS.sun`); граничные к
 рыцарем: 34 → 5 (desktop), 37 → 6 (phone). Тест
 `tools/check/three-native-body-shadows.cjs` в `three-shadow-layer-qa.yml`.
 Касается рыцаря, NPC и коров одинаково. Источник не изменён.
+Ревью #60 (Codex): смягчается только контактное пятно (`fade === 0`); тени
+солнца, костра и жёсткая тень молнии идут через исходный `shadeCapsule`
+без изменений, тест проверяет их побитовое совпадение. Merged `c1f12b6`.
+
+## 2026-10-16 — T07: жесты двумя пальцами в редакторе карты (PR #62)
+
+**Проблема:** в `native.html?edit=1` на телефоне/планшете камера редактора не
+двигалась: pan только средней/правой кнопкой мыши или Space, zoom только Ctrl+wheel.
+
+**Сделано:** `experiments/three/native-editor-touch.js` (до `src/editor/editor.js`,
+capture на window). Первый палец придерживается до сдвига 8 px или отпускания;
+второй палец в этот момент = жест камеры (pan по центроиду, pinch через
+`edZoomTo` в пределах `ED_ZOOMS`), ничего не рисуется. Иначе down/move
+воспроизводятся в активный обработчик (`edPointer` или делегат поворота серых
+руин из `native-editor-models.mjs`). Поздний второй палец завершает начатое
+через `pointercancel` (мазок = одна запись undo, поворот руины отменяется).
+Закрытие редактора под пальцем не оставляет «залипших» касаний. Без таймера.
+
+**Проверки:** `tools/check/three-native-editor-touch.cjs` — настоящие CDP touch
+на phone 390×844 и tablet 820×1180: pinch, pan с запозданием второго пальца,
+диапазон зума, мазок/тап одним пальцем, поздний второй палец, закрытие
+редактора, undo возвращает `mapFileText()` побайтно. `three-native-grey-editor`
+(поворот руины пальцем) проходит. Merged `73cf6c8`.
+
+**Не подтверждено:** реальные Android/iOS Safari, публичный branch-preview.

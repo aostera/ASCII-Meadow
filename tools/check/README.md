@@ -60,9 +60,10 @@ python3 tools/check/diff.py /tmp/shots/b /tmp/shots/a --out /tmp/shots/diff   # 
 | Тест/набор | Охват |
 |---|---|
 | `three-native-game.cjs`, `three-parity.cjs` | Настоящий native runtime, одно WebGL2-окно, source-сцена, fallback, frozen parity |
-| `three-native-shadow-layer.cjs`, `three-native-body-shadows.cjs` | Слой архитектурных теней; контактная тень рыцаря/NPC/коров без изменения directional casts |
+| `three-native-shadow-layer.cjs`, `three-native-shadow-coverage.cjs`, `three-native-body-shadows.cjs` | Слой архитектурных теней; тень замка за пределами исходного окна и края 3×3; контактная тень рыцаря/NPC/коров без изменения directional casts |
 | `three-native-tree-depth.cjs`, `three-native-bush-depth.cjs`, `three-native-stone-depth.cjs` | Объекты и GPU depth/occlusion на desktop и phone viewport |
-| `three-native-grey-editor.cjs`, `three-native-recovery.cjs`, `three-native-mobile.mjs` | Серые модели, редактор, восстановление контекста, mobile lifecycle |
+| `three-native-grey-editor.cjs`, `three-native-editor-touch.cjs` | Серые модели и поворот руин; pan двумя пальцами и pinch-zoom редактора (CDP touch, phone + tablet), undo восстанавливает карту побайтно |
+| `three-native-recovery.cjs`, `three-native-android.cjs`, `three-native-mobile.mjs` | Потеря/восстановление WebGL, Android portrait/landscape, смена плотности, pointercancel, fallback без WebGL2 |
 | `three-performance.cjs`, `three-device-profiler.cjs` | Лабораторная нагрузка; **не** аппаратные FPS |
 
-Соответствующие workflow находятся в `.github/workflows/three-*`. Проверки нового редактора/оптимизации в PR #62/#61 нельзя считать базовыми, пока PR не влит. Источник статуса — [Three STATUS](https://github.com/aostera/ASCII-Meadow/blob/experiment/threejs-ascii-prototype/experiments/three/STATUS.md).
+Соответствующие workflow находятся в `.github/workflows/three-*`. Жесты редактора (#62) влиты; проверки оптимизации из PR #61 нельзя считать базовыми, пока PR не влит. Для локального прогона без доступа к CDN three.js нужен локальный пакет `three@0.186.1` (сеть контейнера может блокировать jsdelivr). Источник статуса — [Three STATUS](https://github.com/aostera/ASCII-Meadow/blob/experiment/threejs-ascii-prototype/experiments/three/STATUS.md).
