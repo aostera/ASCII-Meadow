@@ -41,9 +41,11 @@ fs.mkdirSync(out,{recursive:true});
    const data=await inspect();
    // Always retain a genuine render even when an anatomy assertion fails.
    await page.screenshot({path:path.join(out,mode.toLowerCase()+'-'+view+'.png')});
-   if(data.pose.animationVersion!=='Tripo-IK-v6-arm-followthrough')
+   if(data.pose.animationVersion!=='Tripo-IK-v7-forward-knee-limits')
       throw Error('Wrong shoulder/elbow controller: '+data.pose.animationVersion);
    if(mode==='Idle'){
+    if(data.pose.kneeBend.some(k=>k<0||k>1.23))
+      throw Error('Invalid forward-knee IK flexion: '+JSON.stringify(data.pose.kneeBend));
     if(!data.anchor.valid||data.anchor.count<12)
       throw Error('Weapon did not find weighted wrist vertices: '+JSON.stringify(data));
     for(const arm of [data.left,data.right]){
