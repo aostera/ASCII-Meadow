@@ -151,3 +151,17 @@ This pass modifies only `experiments/three/ashen-tripo-native-rig.mjs` on the is
 - **Quality checks added:** 240 × 60 Hz genuine toe-bone, rocker-stage and left/right support diagnostics with opposite-arm and knee bounds; a jump-off-ground gate; all earlier 280-step world-XZ planar foot/turn checks, desktop/mobile native in-game checks, 4 movement modes and 8-heading sword clearance still required. The JS source parses and the native actor adapter's 6 movement/block/teleport scenarios pass in isolation; **this is not equivalent to a successful full Three GLB browser CI**.
 
 **Not accepted for release.** Still requires visual browser screenshots, physical mobile-device testing, true sole mesh contact/heel pivot measurements, collision inspection of the swinging sword against cloth/leg armor and performance measurement. Current automated GitHub status was not available at the last check; PR #56 stays draft. No claim of mocap, 60 rendered FPS, real cloth simulation, or final natural gait.
+
+### 2026-10-16 — v14 grounded transitions and no-snap rocker QA
+
+This checkpoint is **implemented on the isolated draft workshop branch**, not merged or approved as final animation. It builds on the genuine 40-joint Tripo V2 model and v12 planar boot contact; no changes to the original ASCII world or author map. No paid generation or motion capture was used.
+
+**Fixes:**
+- The shared `sourceKnightMotion` helper now derives gait speed from actual source-map displacement and rejects a held Run against an obstacle, map teleport jumps and airborne travel, matching the behaviour already implemented in the real native Tripo game adapter.
+- Support-weight diagnostics and the small pelvis and upper-body counterbalance all unload smoothly to zero in Idle and airborne Jump. This corrects the old state inconsistency where foot load could be reported during a jump even while the foot-rocker was disabled.
+- Original heel-strike and toe-off envelopes previously had a discontinuity at the stance/swing boundary. Their new smooth, zero-at-both-ends rocker curves avoid a single-frame ~0.052 rad toe-joint snap; actual Tripo ankle/toe bones still animate rather than substituting sprites.
+
+**Regression gates:**
+- Added a zero-WebGL `tools/check/ashen-tripo-source-motion.cjs` test (spawn, diagonal, reverse, stuck Run, teleport, jump, false intent-only sprint and eight headings), and included it in **both** Github Actions workflows and their path triggers.
+- Added a **670-step / 60 Hz uninterrupted** genuine-boot-joint playback on the Tripo studio rig: Idle → Walk → Run → turn → stuck Run → Jump → Idle. Assert no phase restart, no one-frame boot-joint teleport, bounded knees/hip, no stationary moonwalk, unloaded jump and final idle. The earlier **280-step X/Z true-boot contact**, 240-step heel/toe and 32-directional sword clearance checks remain active. The toe/ankle test now also rejects one-frame angular jumps from the real GLB bone quaternions.
+- Source/helper runtime scenarios and JavaScript grammar were checked directly. **Full Playwright/WebGL CI results, final sword/body mesh clearance, actual sole contact, and physical phone performance were not confirmed.** The suite is a meaningful regression definition, not proof that a real mobile game has passed QA; PR #56 remains draft.
