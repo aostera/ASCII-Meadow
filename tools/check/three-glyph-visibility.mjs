@@ -1,6 +1,6 @@
 // Preserve original source glyph order, alpha and output for all intersecting rects.
 import assert from 'node:assert/strict';
-import {glyphClipWindow,packVisibleGlyphs} from '../../experiments/three/glyph-visibility.mjs';
+import {glyphClipWindow,packVisibleGlyphs,countVisibleGlyphs} from '../../experiments/three/glyph-visibility.mjs';
 const clip=glyphClipWindow(10,20,100,90,2,4);
 assert.deepEqual(clip,{left:8,top:18,right:62,bottom:67});
 const orig=new Float32Array([
@@ -39,3 +39,57 @@ assert.deepEqual(Array.from(depths.slice(0,8)).map((v,i)=>
 assert.deepEqual(Array.from(orig),Array.from(baseline));
 assert.throws(()=>packVisibleGlyphs(orig,0,6,r,ids,clip,new Float32Array(4),range));
 console.log('PASS safe authored glyph viewport clip: 4/6 visible, source order/alpha and actor-Z ranges retained');
+
+// T08: > 65,536 authored glyphs but fewer than that survive viewport clip.
+// Compare preflight+compact attributes byte-for-byte with the original full
+// capacity pack, including artist alpha, exact source ordering and actor depth.
+const largeCount=65549;
+const bigSource=new Float32Array(largeCount*6);
+for(let i=0;i<largeCount;i++){
+ const p=i*6,inView=i%5!==0;
+ bigSource[p]=inView?14:-200;
+ bigSource[p+1]=inView?24:-200;
+ bigSource[p+2]=inView?19:-195;
+ bigSource[p+3]=inView?29:-195;
+ bigSource[p+4]=i%1024;
+ bigSource[p+5]=.5+(i%17)/40;
+}
+const before=bigSource.slice(),expectedCount=largeCount-Math.ceil(largeCount/5);
+assert.equal(countVisibleGlyphs(bigSource,0,largeCount,clip),expectedCount);
+assert.equal(countVisibleGlyphs(bigSource,0,largeCount,null),largeCount);
+assert.throws(()=>countVisibleGlyphs(bigSource,1,largeCount,clip));
+const globalRanges=[
+ {start:0,end:10000,depth:.3,footY:88},
+ {start:12000,end:41000,depth:.58,footY:96},
+ {start:50000,end:largeCount,depth:.82,footY:104}
+];
+const fullRects=new Float32Array(largeCount*4);
+const fullIds=new Float32Array(largeCount*2);
+const fullDepth=new Float32Array(largeCount*2);
+const nFull=packVisibleGlyphs(bigSource,0,largeCount,
+ fullRects,fullIds,clip,fullDepth,globalRanges);
+const rectsSmall=new Float32Array(expectedCount*4);
+const idsSmall=new Float32Array(expectedCount*2);
+const depthSmall=new Float32Array(expectedCount*2);
+const nCompact=packVisibleGlyphs(bigSource,0,largeCount,
+ rectsSmall,idsSmall,clip,depthSmall,globalRanges);
+assert.equal(nFull,nCompact);
+assert.equal(nCompact,expectedCount);
+assert.deepEqual(
+ Buffer.from(rectsSmall.buffer),
+ Buffer.from(fullRects.buffer,0,nCompact*4*4));
+assert.deepEqual(
+ Buffer.from(idsSmall.buffer),
+ Buffer.from(fullIds.buffer,0,nCompact*2*4));
+assert.deepEqual(
+ Buffer.from(depthSmall.buffer),
+ Buffer.from(fullDepth.buffer,0,nCompact*2*4));
+assert.deepEqual(bigSource,before,'authored source was mutated');
+assert.throws(()=>packVisibleGlyphs(bigSource,0,largeCount,
+ new Float32Array(expectedCount*4-4),idsSmall,clip,depthSmall,globalRanges),
+ /Insufficient glyph instance capacity/);
+assert.throws(()=>packVisibleGlyphs(bigSource,0,largeCount,
+ rectsSmall,idsSmall,clip,new Float32Array(expectedCount*2-2),globalRanges),
+ /Insufficient actor depth capacity/);
+console.log('PASS T08 >65K preflight: '+largeCount+' source, '+
+ expectedCount+' visible; compact rects/IDs/alpha/actor depth byte-identical');

@@ -2,7 +2,7 @@
 // No resynthesized geometry: the original simulation, art, map, renderer/render.js,
 // knight, cows, fog, trees, grass, lighting, collision and editor stay authoritative.
 import * as THREE from 'three';
-import {packVisibleGlyphs,glyphClipWindow} from './glyph-visibility.mjs';
+import {packVisibleGlyphs,countVisibleGlyphs,glyphClipWindow} from './glyph-visibility.mjs';
 
 const VERT = [
   'precision highp float; precision highp int;',
@@ -181,7 +181,14 @@ export class ThreeGlyphBackend {
     layer.uniforms.uTexture.value=this[which];
   }
   upload(layer,buf,start,count,clip=null,actorRanges=null) {
-    this.grow(layer,Math.max(1,count));
+    // Large authored source scenes can exceed 65,536 glyphs while the
+    // visible crop remains under it. A source-count grow() doubled the entire
+    // GPU instance stream to 131,072 for invisible stone. Do one cheap count
+    // pass ONLY when growth might be required; then pack survivor glyphs
+    // exactly once in the existing stable depth/alpha/source order.
+    const needed=clip&&count>layer.capacity?
+      countVisibleGlyphs(buf,start,count,clip):count;
+    this.grow(layer,Math.max(1,needed));
     const visible=packVisibleGlyphs(buf,start,count,layer.rect,layer.idAlpha,clip,
       this.actorDepthTexture?layer.actorInfo:null,actorRanges);
     layer.geo.instanceCount=visible;
@@ -238,7 +245,10 @@ export class ThreeGlyphBackend {
       depthActorRanges:ranges?.length||0,
       depthEnabled:!!this.actorDepthTexture,
       drawCalls:this.renderer.info.render.calls,
-      triangles:this.renderer.info.render.triangles,frame:this.stats.frame+1
+      triangles:this.renderer.info.render.triangles,frame:this.stats.frame+1,
+      glyphCapacity:this.glyphs.capacity,
+      glyphInstanceAttributeBytes:this.glyphs.rect.byteLength+
+        this.glyphs.idAlpha.byteLength+this.glyphs.actorInfo.byteLength
     };
     GB.n=originalCount;
   }

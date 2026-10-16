@@ -85,7 +85,9 @@ const percentile=(v,p)=>{
              depthTriangles:depth.propTriangles??0,
              depthActorRanges:s.depthActorRanges??0,
              glTextures:mem.textures??null,
-             glGeometries:mem.geometries??null
+             glGeometries:mem.geometries??null,
+             glyphCapacity:s.glyphCapacity,
+             glyphInstanceAttributeBytes:s.glyphInstanceAttributeBytes
            });
            singleCanvas&&=document.querySelectorAll(
              '#three-parity-canvas').length===1;
@@ -129,6 +131,8 @@ const percentile=(v,p)=>{
        nativeActors:mid.depthActorRanges,
        glTrackedTextures:mid.glTextures,
        glTrackedGeometries:mid.glGeometries,
+       glyphCapacity:mid.glyphCapacity,
+       glyphInstanceAttributeBytes:mid.glyphInstanceAttributeBytes,
        // Dynamic glyph uploads are 6 vec4+vec2 floats for normal scene
        // and a further vec2 when the architecture actor-Z mask is active.
        // This is a CPU-written buffer estimate, not actual GPU VRAM.
@@ -136,6 +140,25 @@ const percentile=(v,p)=>{
          4*4+2*4+(mid.nativeActors?2*4:0)),
        sampleCount:grouped.length
      };
+     // On desktop the actual Gothic abbey creates >65,536 original glyphs,
+     // yet its viewport crop fits inside 65,536 slots. The old source-count
+     // grow() silently doubled all three typed attribute arrays to 131,072.
+     // Verify the real native renderer no longer reallocates for invisible
+     // glyphs. This is a capacity regression, not an FPS claim.
+     if(!mobile&&raw.id==='abbey-front'){
+       if(!(record.originalGlyphMedian>65536&&
+          record.visibleGlyphMedian<=65536))
+         throw Error('T08 abbey failed to exercise >65536 source case '+
+           JSON.stringify(record));
+       if(record.glyphCapacity!==65536||
+          record.glyphInstanceAttributeBytes!==65536*32)
+         throw Error('T08 offscreen source glyphs still double buffers '+
+           JSON.stringify(record));
+     }
+     if(record.glyphCapacity<record.visibleGlyphMedian||
+       record.glyphInstanceAttributeBytes!==record.glyphCapacity*32)
+       throw Error('T08 invalid glyph buffer accounting '+
+         JSON.stringify(record));
      scenes.push(record);
      await page.screenshot({path:path.join(root,
        label+'-'+raw.id+'.png'),timeout:60000});
