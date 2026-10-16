@@ -7,7 +7,7 @@
 - **Production:** `main`; https://ascii-meadow.aloster36.workers.dev/ — исходная игра, не менять без отдельной команды владельца.
 - **Рабочая база переноса:** `experiment/threejs-ascii-prototype`; https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev/experiments/three/native.html — настоящая игровая страница нового рендера, но **не завершённая миграция**.
 - `experiments/three/index.html` / `parity.html` — лаборатории и сравнения; `procedural.html` — устаревший прототип, **не** конечная игра.
-- Критичные файлы: `native.html`, `native.js`, `native-gl.js`, `three-glyphs.js`, `native-architecture-depth.mjs`, `native-shadow-coverage.js`, `native-body-shadows.js`, `native-bushes.js`, `native-npcs.js`, `native-mobile-lifecycle.mjs`. Весь оригинальный `src/` читается без записи. Авторская `src/data/map.js` неизменна.
+- Критичные файлы: `native.html`, `native.js`, `native-gl.js`, `three-glyphs.js`, `native-architecture-depth.mjs`, `native-shadow-coverage.js`, `native-body-shadows.js`, `native-bushes.js`, `native-npcs.js`, `native-mobile-lifecycle.mjs`, `native-editor-models.mjs`, `native-editor-touch.js`. Порядок загрузки в `native.html` значим: `native-body-shadows.js` сразу после `src/world/shadows.js`, `native-editor-touch.js` до `src/editor/editor.js`, `native-shadow-coverage.js` до `native-shadow-soften.js`. Весь оригинальный `src/` читается без записи. Авторская `src/data/map.js` неизменна.
 
 ## Доказанное на базовой ветке
 
@@ -22,7 +22,7 @@
 | --- | --- | --- |
 | T00 | DONE | Проверки исходной базы проведены |
 | T01 | DONE — аудит, не арт-приёмка | Восемь кадров замка и трёх руин изучены; дефекты в `ARCHITECTURE_VISUAL_AUDIT_T01.md` |
-| T04 | IN_REVIEW | #59/#60 merged и CI зелёный; проверить весь спектр теней, проёмы, повороты, undo/redo, ghost-shadow на живой карте |
+| T04 | IN_REVIEW | #59/#60 merged и CI зелёный; проверить весь спектр теней, проёмы, повороты, undo/redo, ghost-shadow на живой карте. **Нужен взгляд владельца:** после #59 тень шпилей реально ложится на траву к северо-востоку от замка, эта зона заметно темнее прежнего |
 | T05 | IN_PROGRESS | Системы физики и Z растительности частично работают; проверить видимость NPC в густых кустах, GPU clipping и восстановление ветвей на реальном телефоне |
 | T06 | IN_PROGRESS | Довести шатры, заборы, костры, дороги/декор, истинные основания/коллизии без заглушек |
 | T07 | IN_PROGRESS | Сенсорный pan/pinch редактора — [PR #62](https://github.com/aostera/ASCII-Meadow/pull/62) **merged** (`73cf6c8`, CI зелёный, только эмуляция Chromium); mobile lifecycle, HUD, WebGL recovery и реальный Safari остаются gate |
@@ -30,7 +30,9 @@
 | T02 / T03 | PARKED | Детализация замка [#54](https://github.com/aostera/ASCII-Meadow/pull/54) и трёх руин [#58](https://github.com/aostera/ASCII-Meadow/pull/58) — draft, не мержить до снятия приоритета системного переноса; у #54 был визуально невидимый relief |
 | T09 | TODO | Сквозная parity, реальные Android/iOS, art sign-off и только потом **явное** разрешение владельца на `main` |
 
-Персонажи/Ashen Vow/Tripo — отдельные draft PR #38, #41–45, #52, #54–56 по фактическому набору. **Не смешивать** с экологической очередью T04–T09 и не списывать платные кредиты без разрешения. Наличие GLB в feature-ветке не означает интеграцию в базу.
+Персонажи/Ashen Vow/Tripo — отдельные draft PR #38, #41–45, #52, #55, #56 (#54 — это T02 замок, не персонаж). **Не смешивать** с экологической очередью T04–T09 и не списывать платные кредиты без разрешения. Наличие GLB в feature-ветке не означает интеграцию в базу.
+
+**Открытый PR в `main`:** [#36](https://github.com/aostera/ASCII-Meadow/pull/36) (оптимизация рендера от 13.10) не draft и направлен в production. Не мержить без отдельного решения владельца; к очереди T00–T09 не относится.
 
 ## Протокол для двух исполнителей
 
