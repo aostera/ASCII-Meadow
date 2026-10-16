@@ -35,7 +35,7 @@ function nativeShadowEdgeFilter(source,width,height,x,y) {
   return nativeShadowClamp(feather,
     Math.max(0,v-.16),Math.min(.7,v+.16));
 }
-function nativeSoftShadowPatch(x0,y0,x1,y1){
+function nativeSoftShadowPatch(x0,y0,x1,y1,original){
   const xa=Math.max(4,Math.floor(x0)),ya=Math.max(4,Math.floor(y0));
   const xb=Math.min(COLS-5,Math.ceil(x1)),yb=Math.min(ROWS-5,Math.ceil(y1));
   if(xb<=xa||yb<=ya)return 0;
@@ -44,7 +44,7 @@ function nativeSoftShadowPatch(x0,y0,x1,y1){
   for(let y=0;y<h;y++){
     const wy=ya-padding+y;
     const from=wy*COLS+xa-padding;
-    src.set(bshade.subarray(from,from+w),y*w);
+    src.set(original.subarray(from,from+w),y*w);
   }
   let edits=0;
   for(let y=ya;y<=yb;y++)for(let x=xa;x<=xb;x++){
@@ -59,16 +59,19 @@ function nativeSoftShadowPatch(x0,y0,x1,y1){
 }
 function nativeSoftenGothicShadows(){
   if(!bshade||!bshade.length||!cathedral?.cv)return 0;
+  // Every castle/ruin patch reads the SAME raw source. Otherwise overlapping
+  // bounding regions apply the blur twice, darkening slender open portals.
+  const original=bshade.slice();
   const C=cathedral;
   const margin=Math.ceil((210*WS)/CW)+10;
   let edits=nativeSoftShadowPatch(C.cx0-margin,C.cy0-margin,
-    C.cx0+C.BW+margin,C.cy0+C.BH+margin);
+    C.cx0+C.BW+margin,C.cy0+C.BH+margin,original);
   // Ruin rays already exclude missing walls and open arch spans. Feather the
   // actual penumbra at the boundary of those shadows, not each ruin's box.
   for(const r of ruins){
     const extra=Math.ceil((r.height*.8*WS)/CW)+12;
     edits+=nativeSoftShadowPatch(r.x0-extra,r.y0-extra,
-      r.x1+extra,r.y1+extra);
+      r.x1+extra,r.y1+extra,original);
   }
   return edits;
 }
