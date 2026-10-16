@@ -98,6 +98,23 @@ export function createAshenGothicLongsword(){
   }
   band(sword,-.038,.011,iron,'Grip lower collar',.009);
   band(sword,.051,.012,iron,'Grip upper collar',.009);
+  // The original 40-joint glove has no separately articulated fingers.
+  // A low-profile physical retention clasp bridges the leather grip near
+  // the palm instead of pretending the open hand meshes can close.
+  // It follows this genuine wrist-bound sword but does not change the GLB.
+  for(const side of [-1,1]){
+    const ridge=bar(sword,[side*.022,.018,.015],
+      [side*.022,-.018,.015],.0048,.0040,iron,
+      'Retaining gauntlet bridge '+side);
+    ridge.userData.artReviewOnly=true;
+    bar(sword,[side*.022,.018,.015],
+      [side*.010,.027,.006],.0040,.0026,steel,
+      'Upper leather-grip keeper '+side);
+    bar(sword,[side*.022,-.018,.015],
+      [side*.010,-.023,.006],.0040,.0026,steel,
+      'Lower leather-grip keeper '+side);
+  }
+  sword.userData.retentionBraces=6;
   const pommel=mesh(sword,new THREE.OctahedronGeometry(.019,0),iron,'Eight-facet iron pommel');
   pommel.position.y=.071;pommel.scale.set(.84,1.15,.54);
   const ruby=mesh(sword,new THREE.OctahedronGeometry(.008,0),gem,'Pommel burgundy cabochon');
