@@ -56,7 +56,12 @@ fs.mkdirSync(out,{recursive:true});
    const data=await inspect();
    // Always retain a genuine render even when an anatomy assertion fails.
    await page.screenshot({path:path.join(out,mode.toLowerCase()+'-'+view+'.png')});
-   if(data.pose.animationVersion!=='Tripo-IK-v7-forward-knee-limits')
+   if(Math.abs(data.pose.legCalibration.left.thigh-.209)>.008 ||
+      Math.abs(data.pose.legCalibration.right.shin-.169)>.008)
+      throw Error('Leg calibration must use real Tripo joints');
+   if(data.pose.kneeBend.some(k=>k<0||k>1.25))
+      throw Error('Leg must never hyperflex: '+JSON.stringify(data.pose.kneeBend));
+   if(data.pose.animationVersion!=='Tripo-IK-v8-rest-calibrated-gait')
       throw Error('Wrong shoulder/elbow controller: '+data.pose.animationVersion);
    if(mode==='Idle'){
     if(data.pose.kneeBend.some(k=>k<0||k>1.23))
