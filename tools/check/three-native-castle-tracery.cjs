@@ -25,11 +25,14 @@ fs.mkdirSync(dir,{recursive:true});
    await page.waitForFunction(()=>window.__ASCII_NATIVE__?.ready&&
      window.__ASCII_NATIVE_COMPLETE_ARCH__?.features?.castle?.portalSideTracery>40&&
      window.__ASCII_NATIVE_COMPLETE_ARCH__?.features?.castle?.outerTowerRelief>65&&
+     window.__ASCII_NATIVE_COMPLETE_ARCH__?.features?.castle?.centralBrokenGables>25&&
      window.__ASCII_NATIVE__.frameCount>3,undefined,{timeout:120000});
    const stats=await page.evaluate(()=>{
      const game=window.__ASCII_NATIVE__,gothic=window.__ASCII_NATIVE_COMPLETE_ARCH__;
      const source=JSON.stringify(MEADOW_MAP);
      if(game.mode!=='three')throw Error('Three native not running');
+     if(!gothic.centralGablePortalClear||!gothic.centralGableProjects)
+       throw Error('New central Gothic gable fills the portal or fails to project');
      if(!gothic.outerTowerReliefClear)
        throw Error('Outer tower relief reaches protected gate: '+
          JSON.stringify(gothic.outerTowerIntrusions));
@@ -39,6 +42,7 @@ fs.mkdirSync(dir,{recursive:true});
        throw Error('Gothic canopies hidden behind source gatehouse rather than projecting ahead of curtain');
      const c=gothic.features.castle;
      if(c.portalSideTracery<52||c.outerTowerRelief<65||
+        c.centralBrokenGables<25||
         !c.rose||!c.portal||!c.buttresses)
        throw Error('Gothic relief missing real stone solids '+JSON.stringify(c));
      // Move only the temporary player for the screenshot. Author map, ruins
@@ -70,9 +74,10 @@ fs.mkdirSync(dir,{recursive:true});
      const mapOriginal=JSON.stringify(MEADOW_MAP);
      const gl=native.renderer.getContext(),canvas=native.renderer.domElement;
      const oldRandom=Math.random;
-     function snapshot(enabled,towerEnabled=enabled){
+     function snapshot(enabled,towerEnabled=enabled,centralEnabled=enabled){
        if(!gothic.setFacadeEnabledForTest(enabled)||
-          !gothic.setOuterTowerReliefEnabledForTest(towerEnabled))
+          !gothic.setOuterTowerReliefEnabledForTest(towerEnabled)||
+          !gothic.setCentralGableEnabledForTest(centralEnabled))
          throw Error('Test-only castle geometry toggles are inaccessible');
        // Rebuild the complete original renderer world, including source
        // sprites, all architecture rays, shadow, flora and depth worldGen.
@@ -111,12 +116,15 @@ fs.mkdirSync(dir,{recursive:true});
        let on=snapshot(true);
        const onFeatures=gothic.features.castle.portalSideTracery;
        const onTowers=gothic.features.castle.outerTowerRelief;
+       const onCentral=gothic.features.castle.centralBrokenGables;
        let off=snapshot(false);
        const offFeatures=gothic.features.castle.portalSideTracery;
        const offTowers=gothic.features.castle.outerTowerRelief;
+       const offCentral=gothic.features.castle.centralBrokenGables;
        let restored=snapshot(true);
        const restoredFeatures=gothic.features.castle.portalSideTracery;
        const restoredTowers=gothic.features.castle.outerTowerRelief;
+       const restoredCentral=gothic.features.castle.centralBrokenGables;
        let changed=0,restoreErrors=0,offToRestored=0,warmupToOn=0;
        let sourceChanged=0,sourceVisibleChanged=0,sourceChangedBounds=null;
        let towerChanged=0,towerFocus=null;
@@ -194,14 +202,17 @@ fs.mkdirSync(dir,{recursive:true});
          if(different(warmup.pixels,on.pixels))warmupToOn++;
        }
        if(!(onFeatures>=52&&offFeatures===0&&restoredFeatures>=52&&
-          onTowers>=65&&offTowers===0&&restoredTowers>=65))
+          onTowers>=65&&offTowers===0&&restoredTowers>=65&&
+          onCentral>=25&&offCentral===0&&restoredCentral>=25))
          throw Error('QA toggle did not actually rebuild source solids '+JSON.stringify({
            onFeatures,offFeatures,restoredFeatures,
-           onTowers,offTowers,restoredTowers
+           onTowers,offTowers,restoredTowers,
+           onCentral,offCentral,restoredCentral
          }));
        if(!gothic.westCurtainProjects||!gothic.westPortalReliefClear||
           !gothic.outerTowerReliefClear||!gothic.outerTowerReliefEnabled||
-          !gothic.facadeEnabled)
+          !gothic.centralGablePortalClear||!gothic.centralGableProjects||
+          !gothic.centralGableEnabled||!gothic.facadeEnabled)
          throw Error('Castle features not physically restored');
        if(JSON.stringify(MEADOW_MAP)!==mapOriginal)
          throw Error('QA-only castle rebuild touched authored map');
@@ -270,7 +281,83 @@ fs.mkdirSync(dir,{recursive:true});
              towerSecondRenderErrors++;
          }
        }
+       // Isolate the NEW two-depth central ogival gables. The first
+       // curtain and both tower stages remain enabled during every
+       // frame of this independent source/GPU comparison.
+       let centralSourceChanged=0,centralVisibleCells=0,
+         centralGpuChanged=0,centralRestoreErrors=0,
+         centralSourceRestoreErrors=0,centralFocus=null;
+       {
+         const cOn=snapshot(true,true,true);
+         const cOff=snapshot(true,true,false);
+         const cRest=snapshot(true,true,true);
+         if(gothic.features.castle.centralBrokenGables!==onCentral)
+           throw Error('Central Gothic rebuild failed');
+         const a=cOn.source,b=cOff.source;
+         const columns=new Uint32Array(a.width);
+         const changedRows=[];
+         for(let k=0;k<a.lum.length;k++){
+           if(Math.abs(a.lum[k]-b.lum[k])<.01&&
+              a.glyph[k]===b.glyph[k]&&
+              Math.abs(a.dep[k]-b.dep[k])<1)continue;
+           const cx=a.left+k%a.width,cy=a.top+Math.floor(k/a.width);
+           const localX=((cx+.5)*CW-cathedral.kx)/MS;
+           if(Math.abs(localX)>220)continue;
+           centralSourceChanged++;
+           columns[k%a.width]++;
+           changedRows.push(cy);
+         }
+         let best=0,colIndex=0;
+         for(let k=0;k<columns.length;k++)
+           if(columns[k]>best){best=columns[k];colIndex=k;}
+         if(changedRows.length){
+           changedRows.sort((a,b)=>a-b);
+           // Center on middle altered row, not an unrelated lower ground
+           // shadow or a roof tip outside the true mobile viewport.
+           centralFocus={col:a.left+colIndex,
+             row:changedRows[Math.floor(changedRows.length*.5)]};
+           player.x=centralFocus.col;player.tx=player.x;
+           player.y=centralFocus.row+VR*.4;player.ty=player.y;
+           updateCamera(0,true);
+           snapshot(true,true,true); // viewport warmup
+           const focusedOn=snapshot(true,true,true);
+           const focusedOff=snapshot(true,true,false);
+           const focusedRest=snapshot(true,true,true);
+           const visible=focusedOn.source.viewport;
+           for(let k=0;k<focusedOn.source.lum.length;k++){
+             const aa=focusedOn.source,bb=focusedOff.source;
+             if(Math.abs(aa.lum[k]-bb.lum[k])<.01&&
+                aa.glyph[k]===bb.glyph[k]&&
+                Math.abs(aa.dep[k]-bb.dep[k])<1)continue;
+             const cx=aa.left+k%aa.width,cy=aa.top+Math.floor(k/aa.width),
+               localX=((cx+.5)*CW-cathedral.kx)/MS;
+             if(Math.abs(localX)<=220&&cx>=visible[0]&&
+                cx<=visible[1]&&cy>=visible[2]&&cy<=visible[3])
+               centralVisibleCells++;
+             if(Math.abs(aa.lum[k]-focusedRest.source.lum[k])>.01||
+                aa.glyph[k]!==focusedRest.source.glyph[k]||
+                Math.abs(aa.dep[k]-focusedRest.source.dep[k])>1)
+               centralSourceRestoreErrors++;
+           }
+           for(let k=0;k<focusedOn.pixels.length;k+=4){
+             const delta=(l,r)=>Math.max(
+               Math.abs(l[k]-r[k]),Math.abs(l[k+1]-r[k+1]),
+               Math.abs(l[k+2]-r[k+2]))>8;
+             if(delta(focusedOn.pixels,focusedOff.pixels))
+               centralGpuChanged++;
+             if(delta(focusedOn.pixels,focusedRest.pixels))
+               centralRestoreErrors++;
+           }
+         }
+       }
+       if(!gothic.centralGableEnabled||
+          !gothic.centralGablePortalClear||!gothic.centralGableProjects)
+         throw Error('Central relief not restored or portal not clear');
        return {changedPixels:changed,restoreErrors,
+         centralSourceChanged,centralVisibleCells,
+         centralGpuChanged,centralRestoreErrors,
+         centralSourceRestoreErrors,centralFocus,
+         onCentral,offCentral,restoredCentral,
          towerChanged,towerFocus,towerVisibleCells,
          towerGpuChanged,towerRestoreErrors,towerSourceRestoreErrors,
          towerSecondRenderErrors,towerRestoreBounds,
@@ -285,22 +372,39 @@ fs.mkdirSync(dir,{recursive:true});
          mapUnchanged:true};
      }finally{
        Math.random=oldRandom;
-       if(!gothic.facadeEnabled||!gothic.outerTowerReliefEnabled){
+       if(!gothic.facadeEnabled||!gothic.outerTowerReliefEnabled||
+          !gothic.centralGableEnabled){
          gothic.setFacadeEnabledForTest(true);
          gothic.setOuterTowerReliefEnabledForTest(true);
+         gothic.setCentralGableEnabledForTest(true);
          build();
        }
      }
    });
    await page.screenshot({path:path.join(dir,mode+'-castle-tracery.png'),
      timeout:60000});
-   if(comparison.towerChanged<100||comparison.towerVisibleCells<40||
+   if(comparison.centralSourceChanged<70||
+      comparison.centralVisibleCells<30||
+      comparison.centralGpuChanged<(mobile?30:100)||
+      comparison.centralRestoreErrors>120||
+      comparison.centralSourceRestoreErrors!==0||
+      comparison.towerChanged<100||comparison.towerVisibleCells<40||
       comparison.towerGpuChanged<(mobile?30:100)||
       comparison.towerRestoreErrors>120||
       comparison.sourceChanged<100||comparison.sourceVisibleAfterFocus<100||
       comparison.changedPixels<(mobile?30:100)||
       comparison.restoreErrors>120)
      throw Error(mode+' castle geometry does not make stable visible GPU pixels '+JSON.stringify(comparison));
+   console.log('NATIVE CASTLE CENTRAL GABLES VISIBLE '+mode+' '+JSON.stringify({
+     centralSourceChanged:comparison.centralSourceChanged,
+     centralVisibleCells:comparison.centralVisibleCells,
+     centralGpuChanged:comparison.centralGpuChanged,
+     centralRestoreErrors:comparison.centralRestoreErrors,
+     centralSourceRestoreErrors:comparison.centralSourceRestoreErrors,
+     centralFocus:comparison.centralFocus,
+     onCentral:comparison.onCentral,offCentral:comparison.offCentral,
+     restoredCentral:comparison.restoredCentral
+   }));
    console.log('NATIVE CASTLE TOWERS VISIBLE '+mode+' '+JSON.stringify({
      towerChanged:comparison.towerChanged,
      towerVisibleCells:comparison.towerVisibleCells,
