@@ -52,6 +52,17 @@ fs.mkdirSync(shots,{recursive:true});
           !(f.weathering>=10)||!(f[category]>=6))
          throw Error('Missing actual authored Gothic detail '+id+': '+JSON.stringify(f));
      }
+     // T03: all three physical ruin silhouettes, not common billboard art.
+     // Their new convex solids sit fully above original arch clearance.
+     const structuralCounts={
+       'broken-gate':6,'abbey-front':6,'cloister-walk':8
+     };
+     for(const [id,count] of Object.entries(structuralCounts)){
+       const f=counts.ruins[id];
+       if(f?.massiveBrokenSilhouette!==count||f.walkThroughUnchanged!==true)
+         throw Error('T03 original walk-through blocked or distinct Gothic ruin missing '+
+           id+' '+JSON.stringify(f));
+     }
      const shadows=window.__ASCII_NATIVE_SHADOWS__;
      const bushes=window.__ASCII_NATIVE_BUSHES__;
      const shadowSample=new Float32Array(11*11);

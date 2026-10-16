@@ -698,6 +698,72 @@ function nativeRuinGothicComplete(site){
     nativeGothicBrokenCoping(w*.38,w*.5,h*.67,back,31);
     feature.cloisterVaultsAndBays=solids.length-before;
   }
+
+  // T03: three DIFFERENT huge ruined silhouettes, behind none of the
+  // source's walkway. They are physical world-coordinate convex stone; the
+  // existing ruinRotateMesh applies the same yaw to all added halves.
+  // All material is suspended above the ORIGINAL ogival door clearance,
+  // so neither a passing knight nor the two side-wall collision footprints
+  // can be accidentally sealed by decorative arches.
+  const silhouetteStart=solids.length;
+  const rise=Math.max(ah+29,h*.69),frontZ=front-32;
+  if(site.type==='gate'){
+    // Broken barbican: tall LEFT pier and two disconnected, unequal
+    // flying half-arches. The negative sky-gap stays truly open.
+    const left=-w*.39,right=w*.39;
+    nativeGothicBox(left-21,left+21,rise,rise+h*.20,
+      frontZ-18,frontZ+18,{courses:[rise+h*.09]});
+    nativeGothicBox(right-15,right+15,rise,rise+h*.075,
+      frontZ-13,frontZ+13);
+    nativeGothicBeam(left,rise+h*.20,-w*.075,rise+h*.37,
+      frontZ-9,18);
+    nativeGothicBeam(w*.23,rise+h*.24,right,rise+h*.125,
+      frontZ-17,14);
+    nativeGothicBox(left-27,left+22,rise+h*.20,rise+h*.235,
+      frontZ-23,frontZ+15);
+    // Lost right finial: no symmetrical crown, only a detached shard.
+    nativeGothicBox(w*.32-9,w*.32+9,rise+h*.19,rise+h*.24,
+      frontZ-27,frontZ+7);
+  }else if(site.type==='abbey'){
+    // Roofless abbey: twin gigantic pointed gable wings framing genuinely
+    // empty sky above the existing pierced round rose. The central apex
+    // is MISSING, preventing a visually closed roof silhouette.
+    for(const side of [-1,1]){
+      const edge=side*w*.39;
+      nativeGothicBox(edge-15,edge+15,rise,rise+h*.22,
+        frontZ-20,frontZ+16,{courses:[rise+h*.13]});
+      // Source raster ceiling is site.height*1.08 in the original game.
+      // h*.42 used to reach 1.11h and silently clip the new apex!
+      nativeGothicBeam(edge,rise+h*.24,side*w*.13,rise+h*.36,
+        frontZ-12,21);
+      nativeGothicBox(side*w*.21-13,side*w*.21+13,
+        rise+h*.32,rise+h*.36,frontZ-26,frontZ+10);
+    }
+  }else{
+    // Roofless cloister: TWO separated broken transverse vaults, at
+    // different depths, with daylight through their missing middle ribs.
+    // True depth/parallax is visible at the original camera yaw.
+    for(const [k,z] of [front*.48,back*.48].entries()){
+      const zz=z-(k===0?20:4),shift=k===0?0:13;
+      for(const side of [-1,1]){
+        const edge=side*(w*.42+shift);
+        nativeGothicBox(edge-14,edge+14,rise,rise+h*.15,
+          zz-15,zz+17);
+        nativeGothicBeam(edge,rise+h*.16,
+          side*w*.16,rise+h*(k===0?.29:.33),
+          zz-11,16);
+      }
+    }
+  }
+  const added=solids.slice(silhouetteStart);
+  const allClear=added.every(so=>so.bb[2]>ah+10&&
+    so.bb.every(Number.isFinite)&&
+    so.pl.every(p=>p.every(Number.isFinite)));
+  if(added.length!==({gate:6,abbey:6,cloister:8}[site.type])||!allClear)
+    throw Error('T03 ruin large-silhouette blocks original ogival entrance: '+
+      JSON.stringify({site:site.id,count:added.length,archHeight:ah}));
+  feature.massiveBrokenSilhouette=added.length;
+  feature.walkThroughUnchanged=allClear;
   nativeFullArchitecturalCounts.ruins[site.id]=feature;
 }
 

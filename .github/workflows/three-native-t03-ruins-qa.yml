@@ -1,0 +1,59 @@
+name: Three Native Three Ruins Silhouette QA
+
+on:
+  push:
+    branches:
+      - 'feat/three-ruins-*'
+  pull_request:
+    branches:
+      - experiment/threejs-ascii-prototype
+      - 'feat/three-castle-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: three-native-ruin-silhouette-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  three-real-ruins:
+    name: Three distinct ruined Gothic monuments and original passages
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Validate browser QA and native Gothic solids JS
+        run: |
+          node --check experiments/three/native-gothic-complete.js
+          node --check tools/check/three-native-art.cjs
+          node --check tools/check/ruins-browser.cjs
+          node --check tools/check/three-native-t03-geometry.cjs
+      - name: Verify native Three world PC and phone with all 3 ruins
+        run: |
+          python3 -m http.server 8181 >/tmp/three-t03-http.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8181/experiments/three/native.html >/dev/null && break
+            sleep 1
+          done
+          node tools/check/three-native-art.cjs http://127.0.0.1:8181
+          node tools/check/three-native-t03-geometry.cjs http://127.0.0.1:8181
+          node tools/check/ruins-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: three-native-t03-broken-gate-abbey-cloister
+          path: |
+            shots/three-native-art
+            shots/ruins
+            shots/three-native-t03-angles
+          if-no-files-found: warn
