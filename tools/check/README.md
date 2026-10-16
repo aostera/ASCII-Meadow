@@ -53,3 +53,8 @@ python3 tools/check/diff.py /tmp/shots/b /tmp/shots/a --out /tmp/shots/diff   # 
 | `npc-readability.cjs` | Два постоянных NPC: занятость мелкой 12×14 ASCII-сетки и тональный диапазон во всех 576 кадрах |
 
 | `standalone-npc.cjs` | Встроенные villager/hermit PNG в автономной HTML и body-сборке, побайтовая сверка, отсутствие внешних путей |
+
+
+## Новая версия Three.js — отдельная ветка
+
+Эта таблица описывает в основном исходную игру `main`. Проверки Three.js расположены **только** в `experiment/threejs-ascii-prototype` и `tools/check/three-*`. Их запуск, область и текущий статус указаны в [Three STATUS](https://github.com/aostera/ASCII-Meadow/blob/experiment/threejs-ascii-prototype/experiments/three/STATUS.md), [AUTO_ROADMAP](https://github.com/aostera/ASCII-Meadow/blob/experiment/threejs-ascii-prototype/experiments/three/AUTO_ROADMAP.md) и GitHub Actions. CI-viewport телефона не эквивалентен физическому iPhone/Android; одинаковые pixels только в строгих parity-парах, а не для новых физических эффектов native.
