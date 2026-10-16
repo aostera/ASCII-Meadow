@@ -127,6 +127,54 @@ function locateRightPalm(meshes,wrist){
   return {point,vertices,valid:true};
 }
 
+// Select small, actual weighted lower-boot mesh regions once at load.
+// Sample REAL CPU-skinned GLB triangles thereafter, not joint positions.
+// The sole proxy remains a vertex-point diagnostic, NOT collision physics.
+function locateBootSoleVertices(meshes,legSets){
+  const pairs=[legSets.leftLeg,legSets.rightLeg];
+  return pairs.map((leg,side)=>{
+    let best=null;
+    for(const mesh of meshes){
+      if(!mesh.isSkinnedMesh||!mesh.skeleton)continue;
+      const geo=mesh.geometry,p=geo?.attributes?.position;
+      const si=geo?.attributes?.skinIndex,sw=geo?.attributes?.skinWeight;
+      if(!p||!si||!sw)continue;
+      const footJointIndices=new Set([leg[2],leg[3]].map(b=>mesh.skeleton.bones.indexOf(b))
+        .filter(i=>i>=0));
+      if(!footJointIndices.size)continue;
+      const candidates=[];let lowY=Infinity;
+      for(let i=0;i<p.count;i++){
+        let weight=0;
+        for(let j=0;j<4;j++)if(footJointIndices.has(si.getComponent(i,j)))
+          weight+=sw.getComponent(i,j);
+        if(weight<.42)continue;
+        const x=p.getX(i),y=p.getY(i);
+        if(!Number.isFinite(x+y))continue;
+        candidates.push({i,x,y});
+        lowY=Math.min(lowY,y);
+      }
+      if(!candidates.length)continue;
+      // The bottom ~7cm of the source GLB boots. A rigid mesh component
+      // outside this band is never mistaken for the ground-contact sole.
+      const lower=candidates.filter(v=>v.y<=lowY+.07);
+      if(lower.length<12)continue;
+      lower.sort((a,b)=>a.x-b.x);
+      const choose=(a,start,end,count)=>Array.from({length:count},(_,k)=>
+        a[Math.round(start+(end-start)*(k+.5)/count)]?.i).filter(Number.isInteger);
+      const n=lower.length;
+      const heel=choose(lower,0,Math.max(0,n*.24),4);
+      const toe=choose(lower,Math.max(0,n*.76),n-1,4);
+      const middle=choose(lower,Math.max(0,n*.30),Math.max(0,n*.70),4);
+      const indices=[...new Set([...heel,...middle,...toe])];
+      if(!best||lower.length>best.candidateCount)
+        best={mesh,side,candidateCount:lower.length,indices,
+          heel:heel.filter(i=>indices.includes(i)),
+          toe:toe.filter(i=>indices.includes(i))};
+    }
+    return best;
+  });
+}
+
 // Anatomical, phase-continuous walk/run with stance/swing foot targets.
 // Every joint below deforms the authentic Tripo SKIN rather than a fake puppet.
 function animateRig(model,source,root,weapon){
@@ -159,6 +207,33 @@ function animateRig(model,source,root,weapon){
   sets.pelvis.worldToLocal(rightHipInPelvis);
   const leftSideSign=Math.sign(leftHipInPelvis.z-rightHipInPelvis.z)||1;
   const shoePivot=[sets.leftLeg[3],sets.rightLeg[3]];
+  const soles=locateBootSoleVertices(source.meshes,sets);
+  const soleVertex=new THREE.Vector3(),soleWorld=new THREE.Vector3();
+  function soleSurfacePose(){
+    return soles.map(foot=>{
+      if(!foot)return null;
+      foot.mesh.updateWorldMatrix(true,false);
+      let low=Infinity,high=-Infinity,heelSum=0,toeSum=0;
+      const levels=new Map();
+      for(const index of foot.indices){
+        // SkinnedMesh.getVertexPosition returns the current bone-weighted
+        // point on the genuine Tripo surface, not its rest/bind position.
+        foot.mesh.getVertexPosition(index,soleVertex);
+        soleWorld.copy(soleVertex).applyMatrix4(foot.mesh.matrixWorld);
+        root.worldToLocal(soleWorld);
+        levels.set(index,soleWorld.y);
+        low=Math.min(low,soleWorld.y);
+        high=Math.max(high,soleWorld.y);
+      }
+      for(const i of foot.heel)heelSum+=levels.get(i)??0;
+      for(const i of foot.toe)toeSum+=levels.get(i)??0;
+      return {sampleCount:foot.indices.length,
+        candidateCount:foot.candidateCount,
+        minY:low,maxY:high,
+        heelY:foot.heel.length?heelSum/foot.heel.length:null,
+        toeY:foot.toe.length?toeSum/foot.toe.length:null};
+    });
+  }
   const pin=[{contact:false,travel:0,x:0},{contact:false,travel:0,x:0}];
   const bootWorld=new THREE.Vector3();
   let lastTravel=null, contactCorrection=0;
@@ -521,6 +596,9 @@ function animateRig(model,source,root,weapon){
       hipAbduction:[left.hipRoll,right.hipRoll],
       actorGroundXZ:ground?ground.slice():null,
       contactCorrection,
+      // Real CPU-skinned boot surface diagnostics in character-local Y.
+      // Used for geometry-level stance QA, NOT to override source physics.
+      soleSurface:soleSurfacePose(),
       anklePitch:[left.anklePitch,right.anklePitch],
       stancePhase:[left.stance,right.stance],
       footY:[left.y,right.y],
@@ -530,7 +608,7 @@ function animateRig(model,source,root,weapon){
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v14-grounded-transitions'
+      animationVersion:'Tripo-IK-v15-skinned-sole-contact-probe'
     };
     return clip.toLowerCase();
   }
