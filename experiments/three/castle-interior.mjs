@@ -16,8 +16,8 @@ export class CastleInterior{
   const linear=hex=>new THREE.Color().setRGB(
     ((hex>>16)&255)/255,((hex>>8)&255)/255,(hex&255)/255,
     THREE.LinearSRGBColorSpace);
-  this.scene=new THREE.Scene();this.scene.background=linear(0x0b0e10);
-  this.scene.fog=new THREE.Fog(linear(0x0b0e10),43,95);
+  this.scene=new THREE.Scene();this.scene.background=linear(0x0e1113);
+  this.scene.fog=new THREE.Fog(linear(0x0e1113),51,108);
   this.scene.add(new THREE.HemisphereLight(linear(0xaab6bb),linear(0x303639),1.55));
   const sun=new THREE.DirectionalLight(linear(0xc5ccd0),1.15);
   sun.position.set(-18,36,25);this.scene.add(sun);
@@ -25,8 +25,8 @@ export class CastleInterior{
   this.group=new THREE.Group();this.scene.add(this.group);
   this.upperGroup=new THREE.Group();this.group.add(this.upperGroup);
   this.upperGroup.visible=false;
-  const palette={floor:0x292c2e,wall:0x4c4e4e,rib:0x63686a,iron:0x293033,
-   stone:0x737a7c,black:0x14181b};
+  const palette={floor:0x363b3e,wall:0x596065,rib:0x7d898c,iron:0x3b444a,
+   stone:0x8b9598,black:0x20262b};
   this.mat={};for(const [name,color]of Object.entries(palette))
    this.mat[name]=new THREE.MeshLambertMaterial({
     color:linear(color),flatShading:true});
@@ -202,7 +202,15 @@ export class CastleInterior{
   const helm=new THREE.Mesh(new THREE.SphereGeometry(.48,7,5),this.mat.iron);
   helm.position.y=2.42;p.add(helm);
   this.box(0,1.95,.36,.5,.12,.16,'rib',p);
+  // Restrained bright contours let the knight remain legible against slate.
+  for(const x of [-.53,.53]){
+   this.box(x,1.94,0,.38,.36,.58,'rib',p);
+   this.box(x,1.13,0,.15,.64,.2,'iron',p);
+  }
+  this.box(0,2.42,-.42,.7,.12,.12,'black',p);
+  this.box(0,1.67,.37,.32,.36,.09,'stone',p);
   const sword=this.box(.77,1.28,0,.11,1.92,.11,'stone',p);sword.rotation.z=-.2;
+  this.box(.77,.87,.05,.53,.11,.14,'rib',p);
   this.legs=[];
   for(const x of [-.25,.25]){
    const leg=new THREE.Group();leg.position.set(x,1,0);
@@ -225,15 +233,12 @@ export class CastleInterior{
    '<button data-key="ArrowLeft" aria-label="Влево">◀</button>'+
    '<button data-key="ArrowDown" aria-label="Назад">▼</button>'+
    '<button data-key="ArrowRight" aria-label="Вправо">▶</button></div></div>'+
-   '<button class="castle-interior-action" type="button" hidden></button>'+
-   '<button class="castle-interior-leave">Вернуться во двор</button>';
+   '<button class="castle-interior-action" type="button" hidden></button>';
   document.body.append(shell);this.ui=shell;
   this.roomLabel=shell.querySelector('.castle-interior-room');
   this.floorLabel=shell.querySelector('.castle-interior-floor');
   this.actionButton=shell.querySelector('.castle-interior-action');
   this.actionButton.addEventListener('click',()=>this.useNearby());
-  this.leaveButton=shell.querySelector('.castle-interior-leave');
-  this.leaveButton.addEventListener('click',()=>this.leave());
   for(const b of shell.querySelectorAll('[data-key]')){
    const key=b.dataset.key;
    b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();
@@ -365,7 +370,6 @@ export class CastleInterior{
      'E · Спуститься по '+stair.label.toLowerCase():
      'E · Подняться по '+stair.label.toLowerCase();
   if(leave)this.actionButton.textContent='E · Выйти через ворота';
-  this.leaveButton.hidden=!leave;
  }
 
  render(){
