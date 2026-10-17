@@ -2,12 +2,13 @@
 // Cutaway Gothic stone rooms: true gate, two tower corridors and side chambers.
 // Native-only. Source map, production castle and character atlas are untouched.
 import * as THREE from 'three';
-import {CASTLE_ROOMS,CASTLE_SPAWN,castleMove,castleLocation,castleNearExit} from './castle-interior-layout.mjs';
+import {CASTLE_ROOMS,CASTLE_UPPER_ROOMS,CASTLE_UPPER_HEIGHT,CASTLE_STAIRS,CASTLE_SPAWN,castleMove,castleLocation,castleNearExit,castleNearbyStair} from './castle-interior-layout.mjs';
 
 export class CastleInterior{
  constructor(renderer,{onLeave,canEnter}){
   this.renderer=renderer;this.canEnter=canEnter;this.onLeave=onLeave;
   this.active=false;this.frame=0;this.pos={...CASTLE_SPAWN};
+  this.level=0;this.y=0;this.transition=null;this.moving=false;this.walkPhase=0;
   this.keys=new Set();
   // Native glyph backend explicitly outputs LINEAR RGB to preserve its
   // authored source pixels. Material hex colours would be converted from
@@ -15,18 +16,23 @@ export class CastleInterior{
   const linear=hex=>new THREE.Color().setRGB(
     ((hex>>16)&255)/255,((hex>>8)&255)/255,(hex&255)/255,
     THREE.LinearSRGBColorSpace);
-  this.scene=new THREE.Scene();this.scene.background=linear(0x0b0e10);
-  this.scene.fog=new THREE.Fog(linear(0x0b0e10),43,95);
+  this.scene=new THREE.Scene();this.scene.background=linear(0x0e1113);
+  this.scene.fog=new THREE.Fog(linear(0x0e1113),51,108);
   this.scene.add(new THREE.HemisphereLight(linear(0xaab6bb),linear(0x303639),1.55));
   const sun=new THREE.DirectionalLight(linear(0xc5ccd0),1.15);
   sun.position.set(-18,36,25);this.scene.add(sun);
   this.camera=new THREE.OrthographicCamera(-18,18,18,-18,.1,180);
   this.group=new THREE.Group();this.scene.add(this.group);
-  const palette={floor:0x292c2e,wall:0x4c4e4e,rib:0x63686a,iron:0x293033,
-   stone:0x737a7c,black:0x14181b};
+  this.upperGroup=new THREE.Group();this.group.add(this.upperGroup);
+  this.upperGroup.visible=false;
+  const palette={floor:0x363b3e,wall:0x596065,rib:0x7d898c,iron:0x3b444a,
+   stone:0x8b9598,black:0x20262b};
   this.mat={};for(const [name,color]of Object.entries(palette))
    this.mat[name]=new THREE.MeshLambertMaterial({
     color:linear(color),flatShading:true});
+  // Cold light only: pale moonlight and ash-blue braziers, no orange/red.
+  this.lampMat=new THREE.MeshBasicMaterial({color:linear(0x8cabb3)});
+  this.lights=[];
   this.build();this.initUi();this.installInput();
  }
  box(x,y,z,w,h,d,mat='wall',parent=this.group){
@@ -75,11 +81,49 @@ export class CastleInterior{
    this.box((p.x0+p.x1)/2,.001,z,p.x1-p.x0,.02,.055,'black');
  }
  stair(cx,cz,reverse=false){
-  for(let i=0;i<8;i++){
-   const a=-.9+i*.4;
-   const b=this.box(cx+Math.cos(a)*2.4,.16+i*.19,
-     cz+Math.sin(a)*2.4,2,.32,.72,i%3===0?'rib':'wall');
-   b.rotation.y=(reverse?-1:1)*a;
+  // Twelve genuine helical treads leading to the playable upper tower;
+  // E by the stair animates the player's climb to the next level.
+  for(let i=0;i<12;i++){
+   const a=i*Math.PI*1.84/11+(reverse?Math.PI:0);
+   const b=this.box(cx+Math.cos(a)*1.95,.17+i*(CASTLE_UPPER_HEIGHT/12),
+     cz+Math.sin(a)*1.95,1.7,.34,.82,i%4===0?'rib':'wall');
+   b.rotation.y=-a;
+  }
+  this.box(cx,CASTLE_UPPER_HEIGHT/2,cz,.9,CASTLE_UPPER_HEIGHT, .9,'rib');
+ }
+ lamp(x,z,h=3.25){
+  // One cold luminaire per space; keep light source count small for WebGL2 phones.
+  const ember=new THREE.Mesh(new THREE.OctahedronGeometry(.22,0),this.lampMat);
+  ember.position.set(x,h,z);this.group.add(ember);
+  this.box(x,h-.42,z,.06,.9,.06,'iron');
+  if(this.lights.length<5){
+   const light=new THREE.PointLight(0xa0c0c9,.9,12,2);
+   light.position.set(x,h,z);this.scene.add(light);this.lights.push(light);
+  }
+ }
+ buildUpper(){
+  // Two tower upper storeys and their adjacent stone galleries. Floors and
+  // railings are real model geometry, but remain hidden on the ground floor
+  // so a roof cannot obscure the player in this cutaway camera.
+  for(const room of CASTLE_UPPER_ROOMS){
+   const cx=(room.x0+room.x1)/2,cz=(room.z0+room.z1)/2;
+   this.box(cx,CASTLE_UPPER_HEIGHT-.26,cz,
+     room.x1-room.x0,.5,room.z1-room.z0,'floor',this.upperGroup);
+   // Irregular, broad slabs rather than noisy high-poly tile textures.
+   for(let z=Math.ceil(room.z0/5)*5;z<room.z1;z+=5)
+    this.box(cx,CASTLE_UPPER_HEIGHT+.004,z,
+     room.x1-room.x0,.02,.06,'black',this.upperGroup);
+   const railY=CASTLE_UPPER_HEIGHT+.52;
+   this.box(cx,railY,room.z0,room.x1-room.x0,1.05,.2,'rib',this.upperGroup);
+   this.box(cx,railY,room.z1,room.x1-room.x0,1.05,.2,'rib',this.upperGroup);
+  }
+  for(const side of [-1,1]){
+   const x=side*28.5;
+   this.box(x,CASTLE_UPPER_HEIGHT+.75,0,.5,1.5,16,'wall',this.upperGroup);
+   // An inner guardrail keeps the elevated walkway visually believable.
+   this.box(side*11.5,CASTLE_UPPER_HEIGHT+.48,0,.2,.96,5,'rib',this.upperGroup);
+   for(const z of [-6.5,6.5])
+    this.box(side*23,CASTLE_UPPER_HEIGHT+.64,z,7,.3,.38,'rib',this.upperGroup);
   }
  }
  build(){
@@ -134,6 +178,20 @@ export class CastleInterior{
    this.box(x,5.55,z,.15,.25,1.1,'rib');
   }
   this.box(0,.03,23,3.1,.07,1.55,'rib');
+  // Sparse, grounded details: keep the nave, doors and aisle unobstructed.
+  for(const [x,z] of [[-9,-25],[9,-25],[-9,12],[9,12],[-25,5],[25,5]])
+   this.lamp(x,z);
+  for(const x of [-6.2,6.2]){
+   this.box(x,2.7,-29,.48,5.4,.48,'rib');
+   const finial=new THREE.Mesh(new THREE.ConeGeometry(.48,1.5,4),this.mat.stone);
+   finial.position.set(x,5.65,-29);this.group.add(finial);
+  }
+  // Consistent wall tracery where there is real masonry, no fake passage.
+  for(const x of [-10.52,10.52])for(const z of [-11,-3,5]){
+   this.box(x,4.7,z,.2,2.3,.3,'black');
+   this.box(x,6,z,.25,.24,.75,'rib');
+  }
+  this.buildUpper();
   this.buildPlayer();
  }
  buildPlayer(){
@@ -144,7 +202,22 @@ export class CastleInterior{
   const helm=new THREE.Mesh(new THREE.SphereGeometry(.48,7,5),this.mat.iron);
   helm.position.y=2.42;p.add(helm);
   this.box(0,1.95,.36,.5,.12,.16,'rib',p);
+  // Restrained bright contours let the knight remain legible against slate.
+  for(const x of [-.53,.53]){
+   this.box(x,1.94,0,.38,.36,.58,'rib',p);
+   this.box(x,1.13,0,.15,.64,.2,'iron',p);
+  }
+  this.box(0,2.42,-.42,.7,.12,.12,'black',p);
+  this.box(0,1.67,.37,.32,.36,.09,'stone',p);
   const sword=this.box(.77,1.28,0,.11,1.92,.11,'stone',p);sword.rotation.z=-.2;
+  this.box(.77,.87,.05,.53,.11,.14,'rib',p);
+  this.legs=[];
+  for(const x of [-.25,.25]){
+   const leg=new THREE.Group();leg.position.set(x,1,0);
+   this.box(0,-.46,0,.23,.92,.27,'iron',leg);
+   this.box(0,-.93,-.13,.28,.16,.5,'black',leg);
+   p.add(leg);this.legs.push(leg);
+  }
   this.scene.add(p);
  }
  initUi(){
@@ -152,18 +225,20 @@ export class CastleInterior{
   shell.className='castle-interior-ui';shell.hidden=true;
   shell.setAttribute('aria-label','Внутренние помещения замка');
   shell.innerHTML='<div class="castle-interior-head">'+
-   '<small>ASCII MEADOW / ЗАМОК</small><strong class="castle-interior-room"></strong>'+
-   '<span>WASD / стрелки — идти · Shift — бег · E — выход у ворот · Esc — наружу</span></div>'+
+   '<small>ASCII MEADOW / ЗАМОК · <b class="castle-interior-floor">I ЯРУС</b></small>'+
+   '<strong class="castle-interior-room" aria-live="polite"></strong>'+
+   '<span>WASD / стрелки — ходьба · Shift — бег · E — лестница / ворота · Esc — наружу</span></div>'+
    '<div class="castle-interior-pad" aria-label="Управление движением">'+
    '<button data-key="ArrowUp" aria-label="Вперёд">▲</button><div>'+
    '<button data-key="ArrowLeft" aria-label="Влево">◀</button>'+
    '<button data-key="ArrowDown" aria-label="Назад">▼</button>'+
    '<button data-key="ArrowRight" aria-label="Вправо">▶</button></div></div>'+
-   '<button class="castle-interior-leave">Вернуться во двор</button>';
+   '<button class="castle-interior-action" type="button" hidden></button>';
   document.body.append(shell);this.ui=shell;
   this.roomLabel=shell.querySelector('.castle-interior-room');
-  this.leaveButton=shell.querySelector('.castle-interior-leave');
-  this.leaveButton.addEventListener('click',()=>this.leave());
+  this.floorLabel=shell.querySelector('.castle-interior-floor');
+  this.actionButton=shell.querySelector('.castle-interior-action');
+  this.actionButton.addEventListener('click',()=>this.useNearby());
   for(const b of shell.querySelectorAll('[data-key]')){
    const key=b.dataset.key;
    b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();
@@ -184,8 +259,8 @@ export class CastleInterior{
   this.down=e=>{
    if(!this.active||!control.includes(e.code))return;
    e.preventDefault();e.stopImmediatePropagation();this.keys.add(e.code);
-   if(!e.repeat&&(e.code==='Escape'||e.code==='KeyE'&&castleNearExit(this.pos.x,this.pos.z)))
-    this.leave();
+   if(!e.repeat&&(e.code==='Escape'||e.code==='KeyE'))
+    this.useNearby(e.code==='Escape');
   };
   this.up=e=>{
    if(!this.active||!control.includes(e.code))return;
@@ -207,6 +282,8 @@ export class CastleInterior{
  enter(){
   if(this.active)return;
   this.active=true;this.frame=0;this.pos={...CASTLE_SPAWN};
+  this.level=0;this.y=0;this.transition=null;this.moving=false;
+  this.upperGroup.visible=false;
   this.keys.clear();this.ui.hidden=false;this.gateButton.hidden=true;
   document.getElementById('c').style.visibility='hidden';
   document.querySelector('.hud')?.classList.add('castle-interior-hidden');
@@ -216,29 +293,85 @@ export class CastleInterior{
  leave(){
   if(!this.active)return;
   this.active=false;this.keys.clear();this.ui.hidden=true;
+  this.transition=null;this.level=0;this.y=0;this.upperGroup.visible=false;
   document.getElementById('c').style.visibility='visible';
   document.querySelector('.hud')?.classList.remove('castle-interior-hidden');
   document.querySelector('.stats')?.classList.remove('castle-interior-hidden');
   this.onLeave?.();
  }
+ stairAction(stair){
+  if(!stair||this.transition)return false;
+  const startY=this.y,targetLevel=1-this.level;
+  this.transition={stair,from:this.level,to:targetLevel,fromY:startY,
+    toY:targetLevel*CASTLE_UPPER_HEIGHT,t:0,
+    start:{...this.pos}};
+  this.keys.clear();
+  // Make the upper landing appear before reaching it, but avoid hiding the
+  // lower nave until the player actually starts climbing.
+  this.upperGroup.visible=true;
+  return true;
+ }
+ useNearby(forceLeave=false){
+  if(!this.active)return false;
+  if(forceLeave){this.leave();return true;}
+  if(this.transition)return false;
+  if(castleNearExit(this.pos.x,this.pos.z,this.level)){
+   this.leave();return true;
+  }
+  return this.stairAction(castleNearbyStair(this.pos.x,this.pos.z,this.level));
+ }
  update(dt){
   if(!this.active)return;
-  const has=(...codes)=>codes.some(c=>this.keys.has(c));
-  let x=0,z=0;
-  if(has('KeyA','ArrowLeft'))x--;
-  if(has('KeyD','ArrowRight'))x++;
-  if(has('KeyW','ArrowUp'))z--;
-  if(has('KeyS','ArrowDown'))z++;
-  if(x||z){
-   const speed=has('ShiftLeft','ShiftRight')?11:6.7;
-   const step=Math.min(.08,Math.max(0,dt))*speed/Math.hypot(x,z);
-   this.pos=castleMove(this.pos,x*step,z*step);
-   this.avatar.rotation.y=Math.atan2(x,-z);
+  const elapsed=Math.min(.08,Math.max(0,dt));
+  if(this.transition){
+   const tr=this.transition;
+   tr.t=Math.min(1,tr.t+elapsed/1.15);
+   const phase=tr.t;
+   const smooth=phase*phase*(3-2*phase);
+   this.y=tr.fromY+(tr.toY-tr.fromY)*smooth;
+   const a=phase*Math.PI*1.9;
+   const orbit={x:tr.stair.x+Math.cos(a)*1.35,z:tr.stair.z+Math.sin(a)*1.35};
+   const join=Math.min(1,phase*3);
+   this.pos={x:tr.start.x+(orbit.x-tr.start.x)*join,
+     z:tr.start.z+(orbit.z-tr.start.z)*join};
+   if(phase===1){
+    this.level=tr.to;this.transition=null;
+    this.pos={x:tr.stair.x+1.35,z:tr.stair.z};
+    this.y=this.level*CASTLE_UPPER_HEIGHT;
+    this.upperGroup.visible=this.level===1;
+   }
+  }else{
+   const has=(...codes)=>codes.some(c=>this.keys.has(c));
+   let x=0,z=0;
+   if(has('KeyA','ArrowLeft'))x--;
+   if(has('KeyD','ArrowRight'))x++;
+   if(has('KeyW','ArrowUp'))z--;
+   if(has('KeyS','ArrowDown'))z++;
+   this.moving=!!(x||z);
+   if(this.moving){
+    const speed=has('ShiftLeft','ShiftRight')?11:6.7;
+    const step=elapsed*speed/Math.hypot(x,z);
+    this.pos=castleMove(this.pos,x*step,z*step,.55,this.level);
+    this.avatar.rotation.y=Math.atan2(x,-z);
+    this.walkPhase+=elapsed*speed*1.75;
+   }
+   this.y=this.level*CASTLE_UPPER_HEIGHT;
   }
-  this.avatar.position.set(this.pos.x,0,this.pos.z);
-  this.roomLabel.textContent=castleLocation(this.pos.x,this.pos.z);
-  this.leaveButton.hidden=!castleNearExit(this.pos.x,this.pos.z);
+  this.avatar.position.set(this.pos.x,this.y,this.pos.z);
+  for(let i=0;i<this.legs.length;i++)
+   this.legs[i].rotation.x=this.moving&&!this.transition
+     ?Math.sin(this.walkPhase+Math.PI*i)*.36:0;
+  this.roomLabel.textContent=castleLocation(this.pos.x,this.pos.z,this.level);
+  this.floorLabel.textContent=this.level?'II ЯРУС':'I ЯРУС';
+  const stair=this.transition?null:castleNearbyStair(this.pos.x,this.pos.z,this.level);
+  const leave=castleNearExit(this.pos.x,this.pos.z,this.level);
+  this.actionButton.hidden=!(stair||leave)||!!this.transition;
+  if(stair)this.actionButton.textContent=this.level?
+     'E · Спуститься по '+stair.label.toLowerCase():
+     'E · Подняться по '+stair.label.toLowerCase();
+  if(leave)this.actionButton.textContent='E · Выйти через ворота';
  }
+
  render(){
   if(!this.active)return;
   const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),aspect=w/h;
@@ -248,16 +381,24 @@ export class CastleInterior{
   // Look slightly into the hall so the player stays in the lower third
   // instead of staring at the empty field outside the castle gate.
   const focusZ=this.pos.z-6.5;
-  this.camera.position.set(this.pos.x+20,33,focusZ+24);
-  this.camera.lookAt(this.pos.x,0,focusZ);
+  // Keep the existing native renderer resolution in sync after phone rotate,
+  // without allocating a second WebGL context.
+  const size=this.renderer.getSize(new THREE.Vector2());
+  if(Math.abs(size.x-w)>.5||Math.abs(size.y-h)>.5)
+   this.renderer.setSize(w,h,false);
+  this.camera.position.set(this.pos.x+20,this.y+33,focusZ+24);
+  this.camera.lookAt(this.pos.x,this.y,focusZ);
   this.renderer.setRenderTarget(null);
   this.renderer.setViewport(0,0,w,h);this.renderer.setScissorTest(false);
   this.renderer.clear(true,true,true);
   this.renderer.render(this.scene,this.camera);this.frame++;
  }
  get stats(){return{active:this.active,frames:this.frame,x:this.pos.x,z:this.pos.z,
-  room:castleLocation(this.pos.x,this.pos.z),rooms:CASTLE_ROOMS.length,
-  exitNearby:castleNearExit(this.pos.x,this.pos.z),usesNativeRenderer:true}}
+  room:castleLocation(this.pos.x,this.pos.z,this.level),rooms:CASTLE_ROOMS.length,
+  upperRooms:CASTLE_UPPER_ROOMS.length,level:this.level,
+  height:this.y,transitioning:!!this.transition,
+  stairNearby:castleNearbyStair(this.pos.x,this.pos.z,this.level)?.id||null,
+  exitNearby:castleNearExit(this.pos.x,this.pos.z,this.level),usesNativeRenderer:true}}
  dispose(){
   this.leave();this.gateButton.remove();this.ui.remove();
   window.removeEventListener('keydown',this.down,true);
@@ -265,6 +406,7 @@ export class CastleInterior{
   window.removeEventListener('blur',this.blur);
   document.removeEventListener('visibilitychange',this.blur);
   this.scene.traverse(o=>o.geometry?.dispose());
-  for(const mat of Object.values(this.mat))mat.dispose();this.scene.clear();
+  for(const mat of Object.values(this.mat))mat.dispose();
+  this.lampMat.dispose();this.scene.clear();
  }
 }

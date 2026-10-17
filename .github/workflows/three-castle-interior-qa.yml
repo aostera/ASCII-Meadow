@@ -32,6 +32,7 @@ jobs:
         run: |
           node --check experiments/three/castle-interior.mjs
           node --check experiments/three/native.js
+          node --check tools/check/three-castle-stairs.cjs
           node tools/check/three-castle-interior-layout.mjs
       - name: Build actual Cloudflare preview and verify the published native route
         run: |
@@ -54,6 +55,7 @@ jobs:
             sleep 1
           done
           node tools/check/three-castle-interior.cjs http://127.0.0.1:8181
+          node tools/check/three-castle-stairs.cjs http://127.0.0.1:8181
           python3 -m http.server 8182 --directory dist >/tmp/castle-dist-http.log 2>&1 &
           publish_server=$!
           trap 'kill $server $publish_server 2>/dev/null || true' EXIT
@@ -62,6 +64,7 @@ jobs:
             sleep 1
           done
           node tools/check/three-castle-interior.cjs http://127.0.0.1:8182
+          node tools/check/three-castle-stairs.cjs http://127.0.0.1:8182
       - uses: actions/upload-artifact@v4
         if: always()
         with:
