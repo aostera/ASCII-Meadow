@@ -34,6 +34,10 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Check real Three runtime/editor syntax
         run: |
+          node --check experiments/three/castle-interior.mjs
+          node --check experiments/three/castle-interior-layout.mjs
+          node --check tools/check/three-castle-interior.cjs
+          node tools/check/three-castle-interior-layout.mjs
           node --check experiments/three/native-editor-models.mjs
           node --check tools/check/three-native-grey-editor.cjs
           node --check experiments/three/native-editor-touch.js
@@ -51,6 +55,7 @@ jobs:
           node tools/check/three-native-grey-editor.cjs http://127.0.0.1:8181
           node tools/check/three-native-editor-touch.cjs http://127.0.0.1:8181
           node tools/check/three-ashen-vow.cjs http://127.0.0.1:8181
+          node tools/check/three-castle-interior.cjs http://127.0.0.1:8181
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -59,4 +64,5 @@ jobs:
             shots/three-native-grey-editor
             shots/three-native-editor-touch
             shots/three-ashen-vow
+            shots/three-castle-interior
           if-no-files-found: warn

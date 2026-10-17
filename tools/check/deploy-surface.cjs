@@ -96,13 +96,21 @@ if (mode === '--source') {
   visit('styles', new Set(['.css']));
   if (fs.existsSync(path.join(root, 'assets/npc')))
     visit('assets/npc', assetExtensions);
+  const three=path.join(root,'experiments/three');
+  if(fs.existsSync(path.join(three,'native.html'))){
+    for(const name of fs.readdirSync(three)){
+      if(name==='native.html'||/\.(?:js|mjs|css)$/.test(name))
+        visit('experiments/three/'+name,
+          new Set(['.html','.js','.mjs','.css']),false);
+    }
+  }
 } else {
   // The published directory must include only assets explicitly approved below.
   const dist = outputAbs;
   if (!fs.existsSync(dist) || fs.lstatSync(dist).isSymbolicLink()) {
     report('missing-or-symlink-dist', 'dist');
   } else {
-    const allowed = new Set(['src', 'styles', 'assets', 'index.html', 'build.json', '_headers', '.nojekyll']);
+    const allowed = new Set(['src', 'styles', 'assets', 'experiments', 'index.html', 'build.json', '_headers', '.nojekyll']);
     for (const filename of fs.readdirSync(dist)) {
       if (!allowed.has(filename)) report('unexpected-published-file', 'dist/' + filename);
     }
@@ -114,6 +122,18 @@ if (mode === '--source') {
       const dirs = fs.readdirSync(path.join(dist, 'assets'));
       for (const d of dirs) if (d !== 'npc') report('unexpected-published-asset-dir', 'dist/assets/' + d);
       if (fs.existsSync(path.join(dist, 'assets/npc'))) visit(path.join(output, 'assets/npc'), assetExtensions);
+    }
+    if(fs.existsSync(path.join(dist,'experiments'))){
+      for(const sub of fs.readdirSync(path.join(dist,'experiments')))
+        if(sub!=='three')report('unapproved-experiment-directory','dist/experiments/'+sub);
+      if(fs.existsSync(path.join(dist,'experiments/three'))){
+        for(const name of fs.readdirSync(path.join(dist,'experiments/three'))){
+          if(name!=='native.html'&&!/\.(?:js|mjs|css)$/.test(name))
+            report('unapproved-experiment-file','dist/experiments/three/'+name);
+        }
+        visit(path.join(output,'experiments/three'),
+          new Set(['.html','.js','.mjs','.css']));
+      }
     }
     // These are intentionally the only extensionless/hidden deployment metadata.
     for (const name of ['_headers', '.nojekyll']) {

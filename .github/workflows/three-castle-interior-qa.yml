@@ -1,0 +1,70 @@
+name: Three Castle Interior QA
+
+on:
+  push:
+    branches:
+      - feat/three-castle-interior-*
+  pull_request:
+    branches:
+      - experiment/threejs-ascii-prototype
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: three-castle-interior-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  castle:
+    name: Castle interior layout, collision, desktop and phone
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Test real room topology, arch openings, gate and walls
+        run: |
+          node --check experiments/three/castle-interior.mjs
+          node --check experiments/three/native.js
+          node tools/check/three-castle-interior-layout.mjs
+      - name: Build actual Cloudflare preview and verify the published native route
+        run: |
+          sh tools/build_site.sh dist
+          test -f dist/experiments/three/native.html
+          test -f dist/experiments/three/castle-interior.mjs
+          test -f dist/experiments/three/castle-interior-layout.mjs
+          test ! -f dist/experiments/three/CASTLE_INTERIOR.md
+          grep -Fq "https://cdn.jsdelivr.net" dist/_headers
+          grep -Fq "sha256-" dist/_headers
+          node tools/check/deploy-surface.cjs --dist dist
+      - run: npx playwright install --with-deps chromium
+      - name: Navigate the live game interior in WebGL2 and touch viewport
+        run: |
+          python3 -m http.server 8181 >/tmp/castle-http.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            curl -fsS http://127.0.0.1:8181/experiments/three/native.html >/dev/null && break
+            sleep 1
+          done
+          node tools/check/three-castle-interior.cjs http://127.0.0.1:8181
+          python3 -m http.server 8182 --directory dist >/tmp/castle-dist-http.log 2>&1 &
+          publish_server=$!
+          trap 'kill $server $publish_server 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            curl -fsS http://127.0.0.1:8182/experiments/three/native.html >/dev/null && break
+            sleep 1
+          done
+          node tools/check/three-castle-interior.cjs http://127.0.0.1:8182
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: castle-interior-desktop-phone
+          path: shots/three-castle-interior/
+          if-no-files-found: warn
