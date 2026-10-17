@@ -12,10 +12,12 @@ let backend=null,depthPass=null,editorModels=null,castleInterior=null,disposed=f
 let testDepthDisabled=false;
 // The player is the Ashen Vow knight repaired in Blender (blender/ashen/): a skinned GLB with baked
 // clips, rendered offscreen and printed as the game's own knight glyphs (native-ashen-blender.mjs).
-// ?ashenVow=0 keeps the original baked ASCII knight; so does any failure, editing, and the time
-// until the GLB has loaded.
+// ?ashenVow=0 keeps the original baked ASCII knight; so do the editor and a 3D knight that cannot
+// run (no Three backend, lost WebGL, a load or draw error). While the GLB is still on its way the
+// player is not drawn as the old knight: only his name tag marks the spot.
 const ashenVowOn=new URLSearchParams(location.search).get('ashenVow')!=='0';
 let ashenVow=null,ashenVowError=null;
+const ashenVowStart=performance.now(),ASHEN_WAIT_MS=45000;   // after this the old knight stands in
 if(ashenVowOn){
   const originalDrawKnight=drawKnight;
   drawKnight=function nativeAshenDrawKnight(e,G,fcw,fch){
@@ -30,6 +32,12 @@ if(ashenVowOn){
         console.error('The Ashen Vow knight failed; original knight restored:',error);
         ashenVow?.dispose();ashenVow=null;
       }
+    }
+    // still loading: no old knight in between (it would swap to the new one a few seconds in)
+    if(e===player&&!editing&&GL.ok&&!GL.lost&&backend&&!ashenVowError&&!ashenVow?.stats?.error&&!ashenVow?.ready&&
+      performance.now()-ashenVowStart<ASHEN_WAIT_MS){
+      drawTag(e,G.gx,G.gy);
+      return;
     }
     return originalDrawKnight(e,G,fcw,fch);
   };
@@ -267,7 +275,7 @@ if(new URLSearchParams(location.search).get('knightDiag')==='1'){
     const s=ashenVow?.stats,err=ashenVowError||s?.error||s?.asyncError||null;
     const knight=!ashenVowOn?'original (ashenVow=0)':!backend?'original (no Three backend)':
       !(GL.ok&&!GL.lost)?'original (WebGL off/lost)':editing?'original (editor)':
-      ashenVow?.ready?'Ashen Vow':ashenVow?'original (model loading)':err?'original (failed)':'original (module loading)';
+      ashenVow?.ready?'Ashen Vow':err?'original (failed)':ashenVow?'hidden (model loading)':'hidden (module loading)';
     diag.textContent=`knight: ${knight}\nmode: ${GL.ok&&!GL.lost?'three':'canvas2d'}${fallbackReason?' ('+fallbackReason+')':''}`+
       `\nlod: ${s?.lod||'-'} frames: ${s?.frames||0} read: ${s?.asyncRead?'async':'sync'}`+load+(err?`\nerror: ${err}`:'')+
       (pageErrors.length?`\npage: ${pageErrors.slice(-2).join(' | ')}`:'');

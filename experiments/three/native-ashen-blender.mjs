@@ -12,16 +12,18 @@ import {headingForSourceD8} from './source-motion.mjs';
 // second, from the measured read + convert cost; phones get fewer.
 function chooseNativeRasterHz({gpuReadMs = 20, glyphConvertMs = 4, touch = false} = {}) {
   const total = gpuReadMs + glyphConvertMs;
-  if (!Number.isFinite(total) || total < 0) return touch ? 12 : 20;
-  if (touch) return total < 10 ? 20 : total < 18 ? 16 : 12;
+  if (!Number.isFinite(total) || total < 0) return touch ? 15 : 20;
+  // phones: the pose changes 60 times a second, so a 12 Hz raster reads as a stutter; spend more
+  // while the measured cost allows it
+  if (touch) return total < 8 ? 30 : total < 14 ? 24 : total < 22 ? 20 : 15;
   return total < 10 ? 30 : total < 19 ? 24 : 20;
 }
 
 const COLS = 104, ROWS = 54, FX = 52, FY = 51.6, ART = 44.4;   // the source knight grid (KG)
 const SPRITE_ELEV = .35;
-export const ASHEN_BLENDER_GLB = new URL('./assets/ashen-vow/ashen_tripo_blender_repaired_v01.glb', import.meta.url).href;
+export const ASHEN_BLENDER_GLB = new URL('./assets/ashen-vow/ashen_vow_v01q.glb', import.meta.url).href;
 // 30k-triangle variant for touch devices (same 40 joints, clips and sword); ?ashenLod=full|mobile
-export const ASHEN_BLENDER_GLB_MOBILE = new URL('./assets/ashen-vow/ashen_tripo_blender_repaired_v01_mobile.glb', import.meta.url).href;
+export const ASHEN_BLENDER_GLB_MOBILE = new URL('./assets/ashen-vow/ashen_vow_v01q_mobile.glb', import.meta.url).href;
 const CLIP_SPEED = {Walk: .529, Run: 1.571};
 const NO_ASYNC = new URLSearchParams(globalThis.location?.search || '').get('ashenAsync') === '0';   // A/B switch
 // Share of cells per ramp level (0 = dark plate, 1..9 = ". : - = + * # % @") in the original baked
@@ -31,6 +33,7 @@ const LEVEL_CDF = LEVEL_SHARE.reduce((acc, v, i) => (acc.push((acc[i - 1] || 0) 
   .map((v, i, a) => v / a[a.length - 1]);      // model heights per second the baked clips cover
 const JUMP_FRAMES = {takeoff: 22, land: 48, end: 72, fps: 60};   // anim_ashen.py JUMP                            // camera elevation of the sprite view, rad
 const MODEL_TOP = 1.0;                              // top of the hood (the GLB is height-normalised)
+const EDGE_MIN = 1.15;                              // edgeStroke(): gradient for a stroke glyph
 const SS = 4;                                       // render pixels per cell side
 const PW = COLS * SS, PH = ROWS * SS;               // offscreen target
 const GW = COLS * 2, GH = ROWS * 2;                 // to_ascii works on 2 x 2 samples per cell
@@ -166,7 +169,7 @@ export class NativeKnightGlyphs {
     this.asyncRead = false; this.readPending = false; this.freshPixels = false;
     if (new URLSearchParams(globalThis.location?.search || '').get('ashenPerf') === '1') this.perf = perfOverlay();
     this.rasterClock = null;
-    this.rasterInterval = 1 / (this.touchDevice ? 12 : 20);
+    this.rasterInterval = 1 / (this.touchDevice ? 15 : 20);
     this.rasterCostAvg = null;
     this.glyphDirty = true;
     Object.assign(this.stats, {rasterHz: 1 / this.rasterInterval, rasterFrames: 0, glyphBuilds: 0});
@@ -344,7 +347,7 @@ export class NativeKnightGlyphs {
     if (this.tone) { lo = this.tone[0] + (lo - this.tone[0]) * .25; hi = this.tone[1] + (hi - this.tone[1]) * .25; }
     this.tone = [lo, hi];
     const span = Math.max(1e-3, hi - lo);
-    let glyphs = 0, cloak = 0;
+    let glyphs = 0, cloak = 0, strokes = 0;
     // to_ascii's tone per cell, then matched to the ORIGINAL knight's glyph statistics: cells are
     // ranked by tone and given ramp levels in the same proportions as the baked ASCII frames
     // (LEVEL_CDF), so steel, legs and blade sit on the original's levels instead of a brighter
@@ -373,9 +376,18 @@ export class NativeKnightGlyphs {
       K.cl[j] = this.cloakFrac[c] > .5 ? 1 : 0;
       cloak += K.cl[j];
       if (level === 0) { K.code[j] = -1; continue; }
-      K.code[j] = src.rampCode(level);
+      // The character carries the density (level), the glyph's own tone (8 per character) the
+      // cell's measured light, so two cells on one level still differ in brightness; edges of the
+      // silhouette and of strong folds are drawn as strokes along the edge.
+      const stroke = level >= 2 ? this.edgeStroke(cx, cy, tone) : -1;
+      const ci = stroke >= 0 ? stroke : level;
+      const lt = Math.min(7, Math.max(0, Math.round((tone[c] - .37) / .63 * 7 + BAYER[(cy & 3) * 4 + (cx & 3)] * .9)));
+      const fixed = src.rampCode(level) & 7;
+      K.code[j] = ci * 8 + Math.round(fixed * .45 + lt * .55);
+      if (stroke >= 0) strokes++;
       glyphs++;
     }
+    this.stats.strokes = strokes;
     this.stats.glyphs = glyphs; this.stats.cloakCells = cloak;
     // how many cells sit on each ramp level (0 = dark plate only, 1..9 = " .:-=+*#%@" minus space)
     const levels = new Array(10).fill(0);
@@ -384,6 +396,33 @@ export class NativeKnightGlyphs {
     let y0 = ROWS, y1 = 0, x0 = COLS, x1 = 0;
     for (let j = 0; j < K.n; j++) { y0 = Math.min(y0, K.cy[j]); y1 = Math.max(y1, K.cy[j]); x0 = Math.min(x0, K.cx[j]); x1 = Math.max(x1, K.cx[j]); }
     this.stats.bounds = [x0, y0, x1, y1];
+  }
+
+  // A stroke glyph for a cell on an edge, or -1. The gradient is taken on cell coverage (the
+  // silhouette) plus the tone (folds, plates, the blade); the stroke runs along the edge:
+  // '-' (3), '|' (12), '/' (10), '\\' (11) in the knight atlas (src/renderer/glyphs.js KCH).
+  edgeStroke(cx, cy, tone) {
+    if (cx < 1 || cy < 1 || cx >= COLS - 1 || cy >= ROWS - 1) return -1;
+    const {A} = this;
+    const a = (x, y) => Math.min(1, A[y * COLS + x]);
+    const v = (x, y) => { const c = y * COLS + x; return A[c] >= .3 ? tone[c] : 0; };
+    let gx = 0, gy = 0;
+    for (const f of [a, v]) {
+      const w = f === a ? 1 : .8;
+      gx += w * ((f(cx + 1, cy - 1) + 2 * f(cx + 1, cy) + f(cx + 1, cy + 1)) - (f(cx - 1, cy - 1) + 2 * f(cx - 1, cy) + f(cx - 1, cy + 1)));
+      gy += w * ((f(cx - 1, cy + 1) + 2 * f(cx, cy + 1) + f(cx + 1, cy + 1)) - (f(cx - 1, cy - 1) + 2 * f(cx, cy - 1) + f(cx + 1, cy - 1)));
+    }
+    // cells are about twice as tall as wide: weigh the vertical gradient back to square pixels
+    gy *= .5;
+    const g = Math.hypot(gx, gy);
+    if (g < EDGE_MIN + GRAIN[cy * COLS + cx] * 2) return -1;
+    // edge direction is perpendicular to the gradient; angle in screen space (y down), folded to 0..180
+    let ang = Math.atan2(gx, -gy) * 180 / Math.PI;
+    if (ang < 0) ang += 180;
+    if (ang < 22.5 || ang >= 157.5) return 3;    // horizontal edge
+    if (ang < 67.5) return 11;                   // running down-right
+    if (ang < 112.5) return 12;                  // vertical
+    return 10;                                   // running down-left
   }
 
   // dark plates and glyphs into the source batch, every frame (firelight is live)

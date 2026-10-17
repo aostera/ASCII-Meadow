@@ -13,6 +13,9 @@ const SRC = path.join(ROOT, 'experiments/three/assets/ashen-vow/ashen_tripo_v2_s
 const TARGETS = [
   {file: path.join(ROOT, 'experiments/three/assets/ashen-vow/ashen_tripo_blender_repaired_v01.glb'), maxTris: 90000},
   {file: path.join(ROOT, 'experiments/three/assets/ashen-vow/ashen_tripo_blender_repaired_v01_mobile.glb'), maxTris: 35000},
+  // the published copies: the same meshes, clips and joints with KHR_mesh_quantization (gltf-transform quantize)
+  {file: path.join(ROOT, 'experiments/three/assets/ashen-vow/ashen_vow_v01q.glb'), maxTris: 90000},
+  {file: path.join(ROOT, 'experiments/three/assets/ashen-vow/ashen_vow_v01q_mobile.glb'), maxTris: 35000},
 ];
 const SRC_SHA = '5e1e2ff4686ba1503de61192a0537a85c6b9fdb51d2be8352b894fd91e2ac2b5';
 const CLIPS = ['Idle', 'Walk', 'Run', 'Jump'];

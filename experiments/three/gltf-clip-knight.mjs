@@ -6,6 +6,7 @@
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 
 const FADE = .18;
+const GAITS = new Set(['Walk', 'Run']);
 
 export function createClipKnight(THREE, {
   url, clips = ['Idle', 'Walk', 'Run', 'Jump'], modelHeight = 1, rigHeight = 8.9,
@@ -60,8 +61,12 @@ export function createClipKnight(THREE, {
       if (time !== null) next.time = time;
       return;
     }
+    const prev = st.current;
     next.reset();
     if (time !== null) next.time = time;
+    // Walk <-> Run keep the gait phase (same foot forward), so the switch has no hitch
+    else if (prev && GAITS.has(prev.getClip().name) && GAITS.has(name))
+      next.time = (prev.time / prev.getClip().duration) * next.getClip().duration;
     next.enabled = true;
     next.setEffectiveWeight(1);
     next.play();
@@ -93,11 +98,12 @@ export function createClipKnight(THREE, {
           const ups = speed * 10 / root.userData.pxPerUnit;
           ts = Math.min(2.5, Math.max(.5, ups / clipSpeed[name]));
         }
-        st.actions[name].timeScale = ts;
-        st.timeScale = ts;
+        // the measured speed jitters from frame to frame; ease the cadence instead of following it
+        st.timeScale += (ts - st.timeScale) * Math.min(1, dt * 8);
+        st.actions[name].timeScale = st.timeScale;
         st.motion = movement.run ? 'run' : 'walk';
       } else {
-        play('Idle');
+        play('Idle', .26);   // settling into the stance is slower than starting off
         st.actions.Idle.timeScale = 1;
         st.timeScale = 1;
         st.motion = 'idle';

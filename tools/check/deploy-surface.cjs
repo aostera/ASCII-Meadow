@@ -21,7 +21,7 @@ if (mode === '--dist' && outputAbs !== path.join(root, 'dist') && outputAbs !== 
 const assetExtensions = new Set(['.png', '.webp']);
 const textExtensions = new Set(['.js', '.css', '.html', '.json', '.mjs']);
 // The native game's player model: the only binary model allowed on the public site, by exact name.
-const approvedModels = new Set(['ashen_tripo_blender_repaired_v01.glb', 'ashen_tripo_blender_repaired_v01_mobile.glb']);
+const approvedModels = new Set(['ashen_vow_v01q.glb', 'ashen_vow_v01q_mobile.glb']);
 const modelDir = 'experiments/three/assets/ashen-vow';
 const blockers = [
   ['private-key', /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----/i],

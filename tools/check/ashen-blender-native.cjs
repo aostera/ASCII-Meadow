@@ -34,7 +34,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    const baseCanvases=await page.evaluate(()=>document.querySelectorAll('canvas').length);
 
    const glbPresent=await page.evaluate(async()=>{
-     try{return (await fetch('experiments/three/assets/ashen-vow/ashen_tripo_blender_repaired_v01.glb',
+     try{return (await fetch('experiments/three/assets/ashen-vow/ashen_vow_v01q.glb',
        {method:'HEAD'})).ok}catch(_){return false}
    });
    await page.goto(base+'/experiments/three/native.html?edit=0',{waitUntil:'domcontentloaded'});

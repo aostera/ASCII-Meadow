@@ -42,7 +42,7 @@ if [ -f experiments/three/native.html ]; then
     cp "$file" "$out/experiments/three/"
   done
   # The approved player model of the native game (PR #77), by exact name only.
-  for glb in ashen_tripo_blender_repaired_v01.glb ashen_tripo_blender_repaired_v01_mobile.glb; do
+  for glb in ashen_vow_v01q.glb ashen_vow_v01q_mobile.glb; do
     src="experiments/three/assets/ashen-vow/$glb"
     [ -f "$src" ] || continue
     mkdir -p "$out/experiments/three/assets/ashen-vow"
