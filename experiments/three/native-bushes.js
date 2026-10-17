@@ -1,7 +1,7 @@
 // Native-only contact interaction for the ORIGINAL authored Gothic bush.
 // Branch groups bend with delayed springs around passing animals/people.
-// The former implementation opened a single rigid rectangular slit; now
-// backing and leaves travel together and follow a nonuniform crown profile.
+// Backing and leaves travel together and follow a nonuniform crown profile;
+// a body in the crown parts it as a tapered wake, never as a straight slit.
 // No change to authored glyph IDs, luminance, alpha, map or source assets.
 const nativeOriginalUpdateFlora=updateFlora;
 const nativeOriginalDrawFlora=drawFlora;
@@ -48,31 +48,38 @@ function nativeBushSpring(position,velocity,target,dt){
   const v=(velocity+(target-position)*k*step)*Math.exp(-damping*step);
   return [nativeClamp(position+v*step,-1.6,1.6),v];
 }
-// The body of the actor inside the crown is a volume foliage cannot occupy.
-// Leaves and clumps in the body column are pushed sideways, compressing the
-// crown beside it rather than piling into a straight-edged slit. The woody
-// base stays anchored, and the clearance follows nativePart, so the crown
-// closes again smoothly after the actor has left. `pad` widens the column
-// for 3D depth clumps by their own radius; `clearH` is their true height
-// above the ground (the screen height of a clump in front of the body is
-// lower than its real height, and would leave it anchored like the stems).
-function nativeBushBodyClear(f,x,h,shift,pad){
+// The actor pushes the boughs aside; it never slices them. A real bough
+// bends about its root, so the wake is widest where the body passes the
+// crown top and fades smoothly to nothing towards the woody base: the legs
+// stay behind foliage, as they would in a real thicket, and the parting has
+// slanted, rounded sides instead of a full-height vertical slit. Each leaf
+// cluster rides its own bough (smooth noise over the crown, shared by the
+// leaves, their dark backing and the 3D clumps), so the edge is irregular
+// without glyphs scattering, and the push falls off smoothly with distance, so the
+// crown beside the body thins out gradually instead of piling into a wall.
+// A bough rotated outward also sags a little. `pad` is a 3D depth clump's
+// radius, so its edge, not only its centre, follows the leaves; `clearH` is
+// its true height above the ground (a clump in front of the body sits lower
+// on screen than its real height). The wake follows nativePart, so the
+// crown closes again smoothly after the actor has left.
+const NATIVE_BUSH_WAKE_BASE=.2,NATIVE_BUSH_SAG=.12;
+function nativeBushWake(f,x,h,pad){
   const part=f.nativePart||0,width=f.nativePartWidth||0;
-  if(!(part>.003)||!(width>0))return shift;
-  const w=width+(pad||0),d=x-(f.nativePartCenter||0),reach=w*2;
-  if(Math.abs(d)>=reach+Math.abs(shift))return shift;
-  const base=nativeClamp(h/.28,0,1),anchor=base*base*(3-2*base);
-  const ragged=.86+.14*Math.sin(h*9.7+(f.ph||0)*3.1);
-  // The opening scales with contact; a clump's radius is added in full on
-  // top of it (ramped in over the first quarter of contact, so it does not
-  // pop), so its edge, not only its centre, leaves the opening.
-  const open=width*part*anchor*ragged;
-  if(!(open>.05))return shift;
-  const clear=open+(pad||0)*Math.min(1,part*4)*anchor;
-  const side=d<-1e-4?-1:d>1e-4?1:(shift<0?-1:1),a=Math.abs(d);
-  const pushed=a<reach?a+clear*(1-a/reach):a;
-  const p=Math.max(side*(d+shift),pushed,clear);
-  return side*p-d;
+  if(!(part>.003)||!(width>0))return 0;
+  const rise=nativeClamp((h-NATIVE_BUSH_WAKE_BASE)/(1-NATIVE_BUSH_WAKE_BASE),0,1);
+  const profile=rise*rise*(3-2*rise);
+  if(!(profile>0))return 0;
+  const ph=f.ph||0,R=Math.max(4,f.v.R);
+  const bough=vnoise(x/(R*.24)+ph*7.3,h*3.1+ph*2.9);
+  const ragged=.74+.52*bough;
+  // Clump radius ramps in over the first quarter of contact: no pop.
+  const open=(width*part+(pad||0)*Math.min(1,part*4))*profile*ragged;
+  if(!(open>.05))return 0;
+  const d=x-(f.nativePartCenter||0);
+  const side=d<-1e-3?-1:d>1e-3?1:(bough<.5?-1:1);
+  const reach=Math.max(open*2.4,width*2+(pad||0));
+  const fall=nativeClamp(1-Math.abs(d)/reach,0,1);
+  return side*open*fall*fall;
 }
 function nativeBushBranchShift(f,x,yFactor,pad,clearH){
   const R=Math.max(4,f.v.R),branches=f.nativeTwigs;
@@ -85,9 +92,15 @@ function nativeBushBranchShift(f,x,yFactor,pad,clearH){
   // and the soft upper tips have lighter movement, not a circular empty hole.
   const h=nativeClamp(yFactor,0,1);
   const flex=Math.pow(Math.sin(Math.PI*(h*.83+.07)),.75);
-  return nativeBushBodyClear(f,x,clearH===undefined?h:nativeClamp(clearH,0,1),
-    bend*R*.46*flex,pad);
+  return bend*R*.46*flex+nativeBushWake(f,x,
+    clearH===undefined?h:nativeClamp(clearH,0,1),pad);
 }
+// Downward sag (screen pixels) of the same pushed bough.
+nativeBushBranchShift.drop=function(f,x,yFactor,pad,clearH){
+  if(!f.nativeTwigs)return 0;
+  const h=nativeClamp(clearH===undefined?yFactor:clearH,0,1);
+  return Math.abs(nativeBushWake(f,x,h,pad))*NATIVE_BUSH_SAG*h;
+};
 updateFlora=function(dt){
   nativeOriginalUpdateFlora(dt);
   if(!(dt>0))return;
@@ -160,8 +173,9 @@ drawFlora=function(f){
     for(let cell=from;cell<to;cell+=2){
       const n=Math.min(2,to-cell),local=(cell+n*.5)*fw+sw;
       const shift=nativeBushBranchShift(f,local,hf);
+      const sag=nativeBushBranchShift.drop(f,local,hf);
       // A slightly ragged silhouette, instead of one straight crop.
-      grect(bx+cell*fw+sw+shift-.3,by+y*fh-.3,
+      grect(bx+cell*fw+sw+shift-.3,by+y*fh+sag-.3,
         n*fw+.6,fh+.6,.97*fade);
     }
   }
@@ -171,15 +185,16 @@ drawFlora=function(f){
     const x=L[k]*fw+lean*hf*Math.sqrt(hf)+
       j*(hash(k+7,tick)-.5)*2.4;
     const shift=nativeBushBranchShift(f,x,hf);
+    const sag=nativeBushBranchShift.drop(f,x,hf);
     gput(L[k+2],bx+x+shift,
-      by+L[k+1]*fh+j*(hash(k,tick+3)-.5)*1.6,
+      by+L[k+1]*fh+sag+j*(hash(k,tick+3)-.5)*1.6,
       fade*L[k+3]*.01*(1-j*.45));
   }
 };
 window.__ASCII_NATIVE_BUSHES__={
   approach:nativeBushApproach,shift:nativeBushLeafShift,
   contact:nativeBushContact,spring:nativeBushSpring,
-  branchShift:nativeBushBranchShift,bodyClear:nativeBushBodyClear,sourceDraw:nativeOriginalDrawFlora,
+  branchShift:nativeBushBranchShift,wake:nativeBushWake,drop:nativeBushBranchShift.drop,sourceDraw:nativeOriginalDrawFlora,
   get counts(){return {
     active:flora.filter(f=>f.v.type==='bush'&&
       (f.nativePart>.05||f.nativeTwigs?.some(x=>Math.abs(x)>.05))).length,

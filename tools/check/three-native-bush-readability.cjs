@@ -3,7 +3,9 @@
 // and phone. For each of the densest bush clusters the villager is placed in
 // the bush, contact runs through updateFlora(), and the visible NPC pixels
 // (frame with the NPC minus frame without it) are compared with the same NPC
-// at the same spot with no bushes at all and with the previous behaviour (no body clearance).
+// at the same spot with no bushes at all and with no body wake. The wake must
+// look like boughs pushed aside, not a knife cut: open around the torso at
+// the crown top, still leafy in front of the legs low down.
 // Then the actor leaves and the boughs must settle back to the exact source
 // drawing without a jump.
 const {chromium}=require('playwright');
@@ -99,20 +101,22 @@ fs.mkdirSync(out,{recursive:true});
             for(const o of touched){widths.set(o,o.nativePartWidth);o.nativePartWidth=0}
             const before=visible();
             for(const [o,w] of widths)o.nativePartWidth=w;
-            // No leaf of the bush itself may stay inside the body column
-            // above its anchored woody base.
+            // Leaves of the bush itself inside the body column: the upper
+            // crown must be pushed open, the lower crown must not be cut.
             const start=GB.n;drawFlora(b);
             const c=Math.round(b.x)*CW+b.nativePartCenter,H=b.v.crownH;
             const column=b.nativePartWidth*b.nativePart*.8,by=b.br*CH;
-            let inside=0,leaves=0;
+            let high=0,low=0,leaves=0;
             for(let i=start;i<GB.n;i++){
               const j=i*6;if(GB.buf[j+4]===SOLID_K)continue;
               leaves++;
               const h=(by-GB.buf[j+1])/H;
-              if(h>.3&&h<.95&&Math.abs(GB.buf[j]-c)<column*.6)inside++;
+              if(Math.abs(GB.buf[j]-c)>=column*.6)continue;
+              if(h>.7&&h<.95)high++;
+              else if(h>.15&&h<.45)low++;
             }
             GB.n=start;
-            rows.push({x:Math.round(b.x),clear,now,before,leaves,inside});
+            rows.push({x:Math.round(b.x),clear,now,before,leaves,high,low});
           }
           // Recovery: the actor leaves, the crown closes with no jump and
           // returns to the exact source drawing.
@@ -153,12 +157,17 @@ fs.mkdirSync(out,{recursive:true});
       const sumBefore=result.rows.reduce((s,r)=>s+r.before,0);
       const median=now[now.length>>1];
       const problems=[];
-      if(median<.6)problems.push('median visibility '+median.toFixed(2)+' < 0.60');
-      if(now[0]<.4)problems.push('worst thicket visibility '+now[0].toFixed(2)+' < 0.40');
-      if(sumNow<sumBefore*1.5)problems.push('clearance gain '+(sumNow/sumBefore).toFixed(2)+' < 1.5');
+      // Legs stay behind foliage now, so visibility is lower than a full
+      // slit gave (.73/.59 desktop) yet far above no wake (.15-.18 worst).
+      if(median<.5)problems.push('median visibility '+median.toFixed(2)+' < 0.50');
+      if(now[0]<.3)problems.push('worst thicket visibility '+now[0].toFixed(2)+' < 0.30');
+      if(sumNow<sumBefore*1.3)problems.push('clearance gain '+(sumNow/sumBefore).toFixed(2)+' < 1.3');
       for(const r of result.rows){
         if(r.now<r.before*.95)problems.push('thicket '+r.x+' got worse');
-        if(r.inside)problems.push('thicket '+r.x+' has '+r.inside+' leaves inside the body column');
+        // A few crossing twigs up top are natural; the upper column must stay
+        // far emptier than the lower one.
+        if(r.high>Math.max(3,r.low*.35))problems.push('thicket '+r.x+' upper crown not pushed open ('+r.high+' leaves)');
+        if(r.low<5)problems.push('thicket '+r.x+' cut to the root like a slit ('+r.low+' low leaves)');
       }
       const rc=result.recovery;
       if(!rc.settled)problems.push('boughs did not settle');

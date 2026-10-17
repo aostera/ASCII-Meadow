@@ -49,8 +49,9 @@ fs.mkdirSync(dir,{recursive:true});
        if(!(opened>.45&&opened<=1))
          throw Error('Contact did not bend real bush: '+opened);
        // Freezing the source plant movement isolates geometry only. Render
-       // the same plant with both methods and compare every leaf glyph id,
-       // unchanged y and unchanged RGB/alpha. Only x may physically move.
+       // the same plant with both methods and compare every leaf glyph id
+       // and unchanged RGB/alpha. Leaves move sideways; a pushed bough may
+       // only sag a little (down, never up), as it rotates about its root.
        // A source bush at rest uses 14 atlas slices. Force its EXISTING\n       // per-leaf rustle route for a like-for-like glyph comparison.\n       f.sw=0;f.rust=1;f.flut=0;f.fade=1;
        GB.n=0;api.sourceDraw(f);
        const getLeaves=()=>Array.from({length:GB.n},(_,i)=>{
@@ -62,16 +63,17 @@ fs.mkdirSync(dir,{recursive:true});
        const after=getLeaves();
        if(before.length!==after.length||before.length<4)
          throw Error('Bush replacement removed or invented leaves');
-       let shifted=0,alphaChanged=0,sourceChanged=0;
+       let shifted=0,alphaChanged=0,sourceChanged=0,maxSag=0;
        for(let j=0;j<before.length;j++){
          const a=before[j],b=after[j];
          if(a[0]!==b[0])shifted++;
          if(a[3]!==b[3])alphaChanged++;
-         if(a[1]!==b[1]||a[2]!==b[2])sourceChanged++;
+         const sag=b[1]-a[1];maxSag=Math.max(maxSag,sag);
+         if(a[2]!==b[2]||sag<-1e-6||sag>f.v.crownH*.12)sourceChanged++;
        }
        if(shifted<2||alphaChanged||sourceChanged)
          throw Error('Foliage mismatch '+JSON.stringify({
-           leaves:before.length,shifted,alphaChanged,sourceChanged}));
+           leaves:before.length,shifted,alphaChanged,sourceChanged,maxSag}));
        player.x=-999999;player.y=-999999;
        for(let i=0;i<240;i++)updateFlora(1/60);
        const returned=f.nativePart||0;
