@@ -3,7 +3,14 @@
 # while every release requests its own JS/CSS URLs so a browser cannot reuse
 # an obsolete map or grass renderer across deployments.
 set -eu
-out=${1:?usage: sh tools/build_site.sh <out dir>}
+out=${1:?usage: sh tools/build_site.sh dist}
+# Fail closed: never clean arbitrary paths, follow symlinks or publish unapproved sources.
+if [ "$out" != "dist" ] || [ -L "$out" ]; then
+  echo 'Security: deploy output must be a non-symlink dist directory' >&2
+  exit 1
+fi
+node tools/check/deploy-surface.cjs --source
+rm -rf -- "$out"
 mkdir -p "$out"
 cp -r index.html styles src "$out"/
 if [ -d assets/npc ]; then
@@ -43,3 +50,4 @@ cat > "$out/_headers" <<'HEADERS'
   Cache-Control: no-store
 HEADERS
 touch "$out/.nojekyll"
+node tools/check/deploy-surface.cjs --dist
