@@ -29,6 +29,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Verify secret-leak blockers and portable Git hooks
+        run: node tools/check/security-regression.cjs
       - run: npx playwright install --with-deps chromium
       - name: Check real Three runtime/editor syntax
         run: |
