@@ -19,6 +19,23 @@ It contains ~220 individual mesh objects and no ARMATURE object. Current hosted 
 **DO NOT APPROVE V22 ARMS.** They visibly remain incorrect. The last complete native game regression for V22 **FAILED** with
 `AssertionError: left glove should hang BESIDE the hips`, measured `drop≈0.666`; source: [CI run 39012619827](https://github.com/aostera/ASCII-Meadow/actions/runs/39012619827). Other green smoke checks verified model loading, not art approval. Four actual wrong-arm screenshots were uploaded in [V22 shoulder artifact](https://github.com/aostera/ASCII-Meadow/actions/runs/39012619767).
 
+## Important Tripo workflow correction — 2026-10-17
+
+The user makes and revises the Tripo model using **AI generation/prompting**, not manual sub-object sculpting or a DCC-style hierarchy editor. **Do not instruct the user to click a presumed manual "Segment → Detailed" workflow**, and do not claim that an AI segmentation result preserves bone names, weights, UV, original topology or a working rig. Tripo AI may provide separate modular outputs if the model/version supports such outputs; Blender is where independent meshes, hierarchy, geometry, weights, constraints and cloth controls must be verified and authored. The source original is the reference; prompt-driven re-generation is OPTIONAL and requires user approval if it changes the silhouette.
+
+## Additional first-class scope: LEGS, GAIT AND BOOTS — user-requested
+
+The existing original rig maps thigh/knee/ankle/toe (left: source joints 31-34; right: 26-29). The imported source knees are *not* straight in the rest pose; hip/knee joint axes must be calibrated from actual source bind matrices in Blender, otherwise IK double-bends or pushes the knee sideways. Keep this separate from repairing shoulders.
+
+Concrete issues found in `ashen-tripo-native-rig.mjs`:
+- **Stride mismatch**: phase/distance uses `stepLength=.076+runMix*.052`, while foot IK swing target uses `step=.079+run*.065`. This mismatch can cause contact timing/stride length disagreement (not proof of exact slip amount); match cycle displacement to actually measured Blender gait and game displacement.
+- **Visibility**: front tabard/tassets hide knees and ankle motion; separate their geometry/rig controls in Blender so the boot silhouette can read during Run at game scale. Never slice the original robe destructively without an original backup and 3-view approval.
+- **Real soles**: the current code samples skin-weighted boot-sole vertices, supports stance X/Z anchors and gradual pelvis correction. Preserve actual heel-toe contact, not just ankle pivot height. Verify heel-strike → midstance → toe-off → swing and both-feet-off-ground Run frames.
+- **Knees/hips**: enforce correct bilateral forward knee flexion, independent foot direction, hip range and pelvis timing. Inspect front/side/back for knee valgus, hyperextension and crossing ankles during 45°/90° turns.
+- **Feet/toes**: dedicated left/right boot and toe parts if independent control is required; place meaningful ankle pivot, toe hinge and foot roll. Check boot penetration, hovering, mirrored weights, and foot stability during idle/jump landing.
+
+Claude/Blender acceptance: export matched whole-body Idle and at least 60 frames each of Walk, Run, Jump; add named foot targets/heel/toe controls or provide consistent original-bone mapping. Capture **full-resolution** source-vs-edited feet/knees/front robe at front, side and back plus at least one 60-frame contact sheet and native ASCII map screenshots (links to full files, not small chat thumbnails). For every planted 60 Hz sample report actual boot-sole ground penetration, lateral pin-slip distance, left/right knee angles, toe-off and foot rocker envelope; do not claim "perfect" just from the movement clip.
+
 ## Scope for Claude / Blender
 
 - Import the unmodified Tripo source into a NEW Blender file and save untouched baseline. Import the V22 reference GLB into a **separate** Blender file. Never replace original with the broken animation reference.
