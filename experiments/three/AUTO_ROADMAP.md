@@ -11,7 +11,7 @@
 | T00 | DONE | Первоначальный full CI экспериментального native |
 | T01 | DONE (аудит) | Desktop + mobile viewport, 4 здания; это не финальный art sign-off |
 | T04 | IN_REVIEW | [#59](https://github.com/aostera/ASCII-Meadow/pull/59) + [#60](https://github.com/aostera/ASCII-Meadow/pull/60) merged. Проверить тени всех объектов с проёмами, поворотами и undo/redo без прямоугольников/ghost-shadows |
-| T05 | IN_PROGRESS | Растительность/глубина/пружины; мобильная читаемость NPC и физические контакты/восстановление |
+| T05 | IN_REVIEW | Растительность/глубина/пружины; читаемость NPC в кустах и восстановление веток — [PR #64](https://github.com/aostera/ASCII-Meadow/pull/64); реальный телефон остаётся gate |
 | T06 | IN_PROGRESS | Tents/fences/fires/road/stone/Gothic props, collision и grounding без плоских подмен |
 | T07 | IN_PROGRESS | Touch pan/pinch [#62](https://github.com/aostera/ASCII-Meadow/pull/62) merged (`73cf6c8`); editor scroll, HUD, lifecycle, контекст и настоящий Safari |
 | T08 | IN_PROGRESS (baseline draft) | [#61](https://github.com/aostera/ASCII-Meadow/pull/61) — baseline native perf, никаких недоказанных FPS |

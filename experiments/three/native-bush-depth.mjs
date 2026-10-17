@@ -67,6 +67,7 @@ export class NativeBushDepth{
       let shape=this.cache.get(variant);
       if(!shape){
         shape=source.t3Tree('bush',variant+41);
+        shape.nativeTop=Math.max(1,...shape.S.map(s=>s[1]));
         this.cache.set(variant,shape);
       }
       const originX=-Math.round(f.x)*CW;
@@ -81,8 +82,11 @@ export class NativeBushDepth{
         const sway=lean*h*Math.sqrt(h);
         // EXACT same independent nine-twig spring interpolation used when
         // the source ASCII backing and leaves move in native-bushes.js.
-        const shift=source.nativeBushBranchShift(f,x+sway,h);
         const radius=r*(kind===0?.73:1);
+        // The clump clears the actor's body column by its own radius, so
+        // its edge, not only its centre, leaves the opening the leaves show.
+        const shift=source.nativeBushBranchShift(f,x+sway,h,radius,
+          y/shape.nativeTop);
         this.matrix.makeScale(radius,radius,radius);
         this.matrix.setPosition(originX-x-sway-shift,
           originY+y,originZ+z);
