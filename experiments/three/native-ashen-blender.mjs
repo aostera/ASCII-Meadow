@@ -12,6 +12,8 @@ import {chooseNativeRasterHz} from './ashen-glyph-emitter.mjs';
 const COLS = 104, ROWS = 54, FX = 52, FY = 51.6, ART = 44.4;   // the source knight grid (KG)
 const SPRITE_ELEV = .35;
 export const ASHEN_BLENDER_GLB = new URL('./assets/ashen-vow/ashen_tripo_blender_repaired_v01.glb', import.meta.url).href;
+// 30k-triangle variant for touch devices (same 40 joints, clips and sword); ?ashenLod=full|mobile
+export const ASHEN_BLENDER_GLB_MOBILE = new URL('./assets/ashen-vow/ashen_tripo_blender_repaired_v01_mobile.glb', import.meta.url).href;
 const CLIP_SPEED = {Walk: .529, Run: 1.571};
 const NO_ASYNC = new URLSearchParams(globalThis.location?.search || '').get('ashenAsync') === '0';   // A/B switch
 // Share of cells per ramp level (0 = dark plate, 1..9 = ". : - = + * # % @") in the original baked
@@ -128,11 +130,14 @@ export class NativeKnightGlyphs {
     this.K = {n: 0, code: new Int16Array(COLS * ROWS), cx: new Int16Array(COLS * ROWS),
       cy: new Int16Array(COLS * ROWS), cl: new Uint8Array(COLS * ROWS)};
     this.tone = null;
-    this.stats = {model: 'ashen-blender-v01', frames: 0, loaded: false, error: null, clip: null,
+    const touch = Boolean(globalThis.matchMedia?.('(pointer:coarse)')?.matches);
+    const lodParam = new URLSearchParams(globalThis.location?.search || '').get('ashenLod');
+    const lod = lodParam === 'full' || lodParam === 'mobile' ? lodParam : touch ? 'mobile' : 'full';
+    this.stats = {model: 'ashen-blender-v01', lod, frames: 0, loaded: false, error: null, clip: null,
       motion: 'idle', cells: 0, glyphs: 0, cloakCells: 0, readMs: 0, convertMs: 0,
       animationSource: 'baked glTF clips (Blender)'};
     this.knight = createClipKnight(THREE, {
-      url: ASHEN_BLENDER_GLB, modelHeight: MODEL_TOP, forward: '+X', clipSpeed: CLIP_SPEED,
+      url: lod === 'mobile' ? ASHEN_BLENDER_GLB_MOBILE : ASHEN_BLENDER_GLB, modelHeight: MODEL_TOP, forward: '+X', clipSpeed: CLIP_SPEED,
       onLoad: rig => {
         this.stats.loaded = true;
         this.stats.clips = Object.keys(rig.userData.gltf.actions);

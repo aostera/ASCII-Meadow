@@ -3,17 +3,19 @@
 // - one skin with the source's 40 joints, same names in the same order;
 // - animations Idle / Walk / Run / Jump, each at least 60 frames at 60 fps;
 // - the sword is its own mesh node, a child of the right hand joint (bone_19);
-// - vertex colours present; body triangles within the web budget.
+// - vertex colours present; body triangles within the budget (desktop 90k, mobile 35k).
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SRC = path.join(ROOT, 'experiments/three/assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb');
-const OUT = path.join(ROOT, 'experiments/three/assets/ashen-vow/ashen_tripo_blender_repaired_v01.glb');
+const TARGETS = [
+  {file: path.join(ROOT, 'experiments/three/assets/ashen-vow/ashen_tripo_blender_repaired_v01.glb'), maxTris: 90000},
+  {file: path.join(ROOT, 'experiments/three/assets/ashen-vow/ashen_tripo_blender_repaired_v01_mobile.glb'), maxTris: 35000},
+];
 const SRC_SHA = '5e1e2ff4686ba1503de61192a0537a85c6b9fdb51d2be8352b894fd91e2ac2b5';
 const CLIPS = ['Idle', 'Walk', 'Run', 'Jump'];
-const MAX_TRIS = 90000;
 
 function readGlb(file) {
   const buf = fs.readFileSync(file);
@@ -34,16 +36,20 @@ const sha = crypto.createHash('sha256').update(fs.readFileSync(SRC)).digest('hex
 if (sha !== SRC_SHA) fail.push('source GLB changed: ' + sha);
 
 const src = readGlb(SRC);
-const out = readGlb(OUT);
+
 const names = g => g.json.skins[0].joints.map(j => g.json.nodes[j].name);
 const srcJoints = names(src);
+const reports = [];
+for (const {file: OUT, maxTris: MAX_TRIS} of TARGETS) {
+const out = readGlb(OUT);
 const outJoints = names(out);
-if (out.json.skins.length !== 1) fail.push('expected one skin, got ' + out.json.skins.length);
-if (outJoints.length !== 40) fail.push('expected 40 joints, got ' + outJoints.length);
+const tag = path.basename(OUT) + ': ';
+if (out.json.skins.length !== 1) fail.push(tag + 'expected one skin, got ' + out.json.skins.length);
+if (outJoints.length !== 40) fail.push(tag + 'expected 40 joints, got ' + outJoints.length);
 // Blender re-imports `tripo::X` as-is; compare by name, order included
 const norm = s => s.replace(/[^A-Za-z0-9_]/g, '');
 if (srcJoints.map(norm).join() !== outJoints.map(norm).join())
-  fail.push('joint names/order differ from the source:\n  ' + srcJoints.join(',') + '\n  ' + outJoints.join(','));
+  fail.push(tag + 'joint names/order differ from the source:\n  ' + srcJoints.join(',') + '\n  ' + outJoints.join(','));
 
 const anims = {};
 for (const a of out.json.animations || []) {
@@ -52,15 +58,15 @@ for (const a of out.json.animations || []) {
   anims[a.name] = {seconds: +t.toFixed(3), frames: Math.round(t * 60) + 1, channels: a.channels.length};
 }
 for (const c of CLIPS) {
-  if (!anims[c]) fail.push('missing animation ' + c);
-  else if (anims[c].frames < 60) fail.push(`${c} has ${anims[c].frames} frames (< 60)`);
+  if (!anims[c]) fail.push(tag + 'missing animation ' + c);
+  else if (anims[c].frames < 60) fail.push(tag + `${c} has ${anims[c].frames} frames (< 60)`);
 }
 
 const hand = out.json.nodes.findIndex(n => n.name === 'bone_19');
 const sword = out.json.nodes.findIndex(n => n.name === 'Ashen_Sword');
-if (sword < 0) fail.push('no Ashen_Sword node');
+if (sword < 0) fail.push(tag + 'no Ashen_Sword node');
 else if (hand < 0 || !(out.json.nodes[hand].children || []).includes(sword))
-  fail.push('Ashen_Sword is not a child of bone_19');
+  fail.push(tag + 'Ashen_Sword is not a child of bone_19');
 
 let bodyTris = 0, colours = false;
 for (const n of out.json.nodes) {
@@ -70,17 +76,18 @@ for (const n of out.json.nodes) {
     if (p.attributes.COLOR_0 !== undefined) colours = true;
   }
 }
-if (!colours) fail.push('body has no COLOR_0');
-if (bodyTris > MAX_TRIS) fail.push(`body has ${bodyTris} triangles (> ${MAX_TRIS})`);
+if (!colours) fail.push(tag + 'body has no COLOR_0');
+if (bodyTris > MAX_TRIS) fail.push(tag + `body has ${bodyTris} triangles (> ${MAX_TRIS})`);
 
-const report = {
-  source: {sha256: sha.slice(0, 16) + '…', joints: srcJoints.length},
-  repaired: {bytes: fs.statSync(OUT).size, joints: outJoints.length, bodyTris, colours, swordOnHand: sword >= 0},
+reports.push({
+  file: path.basename(OUT), bytes: fs.statSync(OUT).size, joints: outJoints.length, bodyTris, colours,
+  swordOnHand: sword >= 0,
   animations: anims,
-};
+});
+}
 if (fail.length) {
   console.error('ASHEN BLENDER GLB FAIL\n- ' + fail.join('\n- '));
-  console.error(JSON.stringify(report, null, 1));
+  console.error(JSON.stringify(reports, null, 1));
   process.exit(1);
 }
-console.log('ASHEN BLENDER GLB PASS', JSON.stringify(report));
+console.log('ASHEN BLENDER GLB PASS', JSON.stringify({source: sha.slice(0, 16) + '…', reports}));

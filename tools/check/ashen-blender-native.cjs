@@ -69,6 +69,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    const idle=await shot('idle');
    if(glbPresent&&!idle.loaded)throw Error('GLB present but not loaded: '+idle.error);
    if(idle.model!=='ashen-blender-v01')throw Error('default knight is not the Blender model: '+idle.model);
+   if(idle.lod!==(mobile?'mobile':'full'))throw Error(`${name} loaded the ${idle.lod} model`);
    if(glbPresent&&(idle.clips||[]).join()!=='Idle,Walk,Run,Jump')throw Error('clips: '+idle.clips);
    if(!glbPresent&&(!idle.error||idle.frames))
      throw Error('GLB absent: the original ASCII knight must stay, got '+JSON.stringify(idle));

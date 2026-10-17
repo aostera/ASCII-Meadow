@@ -24,7 +24,9 @@ for c in ("Idle", "Walk", "Run", "Jump"):
 an["export_glb"]()
 ```
 
-Then restore the source joint order (Blender writes its own) and check:
+For phones and tablets also `an["export_glb"](an["GLB_MOBILE"], tris=an["MOBILE_TRIS"])` (30k
+triangles, loaded on `pointer:coarse` devices). Then restore the source joint order (Blender writes
+its own) in each exported file and check:
 
 ```
 node blender/ashen/fix_joint_order.cjs experiments/three/assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb experiments/three/assets/ashen-vow/ashen_tripo_blender_repaired_v01.glb
@@ -40,7 +42,7 @@ node tools/check/ashen-blender-glb.cjs
 | Skeleton | 40 bones | the same 40 bones; names and joint order/indices identical (checked) |
 | Hands | open gloves | right glove closed on the grip with its own finger chains (`bone_23-25` fingers, `bone_20-22` thumb); left fingers relaxed |
 | Sword | none in the source (V22 had a wrist-bound JS sword) | separate procedural Gothic longsword mesh, child of `bone_19` |
-| Mesh | 400k triangles in 1171 pieces, a stray `Icosphere` | 70k triangles in the GLB (decimated copy at export), stray sphere removed |
+| Mesh | 400k triangles in 1171 pieces, a stray `Icosphere` | 70k triangles in the GLB, 30k in `_mobile.glb` (decimated copies at export), stray sphere removed |
 | Material | one flat grey material, no UVs | vertex colours per piece: dark steel; burgundy cape, hood, scarf and shoulder mantle (as marked by the author); wine tabard; leather straps |
 | Animation | none | Idle 121, Walk 69, Run 85, Jump 73 frames at 60 fps, in place, plain FK keys; feet planted by per-frame IK while authoring |
 

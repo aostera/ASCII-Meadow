@@ -407,6 +407,8 @@ import os
 ROOT_DIR = globals().get("ASHEN_ROOT", r"C:\Users\alost\Desktop\Other\ASCII-Meadow")
 GLB = os.path.join(ROOT_DIR, "experiments", "three", "assets", "ashen-vow", "ashen_tripo_blender_repaired_v01.glb")
 WEB_TRIS = 70000            # 400k source triangles; at 70k the hood, plates and tatters still read
+MOBILE_TRIS = 30000         # phones/tablets (pointer:coarse): about 2.3x lighter to skin and raster
+GLB_MOBILE = GLB.replace("_v01.glb", "_v01_mobile.glb")
 
 
 def web_body(body, tris=WEB_TRIS):
@@ -433,7 +435,7 @@ def web_body(body, tris=WEB_TRIS):
     return web
 
 
-def export_glb(path=GLB, clips=None):
+def export_glb(path=GLB, clips=None, tris=WEB_TRIS):
     """Body (decimated copy), 40-bone skin, the sword as a child of the right hand bone, one
     glTF animation per clip (NLA tracks), Y-up, vertex colours."""
     clips = clips or list(CLIPS)
@@ -450,7 +452,7 @@ def export_glb(path=GLB, clips=None):
         tr.strips.new(clip, 0, bpy.data.actions[clip])
     for pb in arm.pose.bones:
         pb.matrix_basis = Matrix()
-    web = web_body(body)
+    web = web_body(body, tris)
     body_vis = body.hide_get()
     body.hide_set(True)
     hidden = {o: o.hide_get() for o in (arm, web, sword)}
