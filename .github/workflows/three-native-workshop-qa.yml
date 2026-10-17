@@ -5,6 +5,7 @@ on:
     branches:
       - experiment/threejs-ascii-prototype
       - 'fix/three-*'
+      - 'claude/three-*'
   pull_request:
     branches:
       - experiment/threejs-ascii-prototype
