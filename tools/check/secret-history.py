@@ -4,6 +4,7 @@
 Use after fetching all remote branches and pull-request heads.
 Heuristic checks: also enable GitHub secret scanning and rotate any exposed keys.
 """
+import os
 import re
 import subprocess
 import sys
@@ -133,11 +134,19 @@ def main():
     if not findings:
         print("No detections using configured patterns. Not a guarantee against all leaks.")
         return 0
-    for category, path, lineno, sha in sorted(findings)[:80]:
-        loc = f":{lineno}" if lineno else ""
-        print(f"FINDING: {category} {path}{loc} (object {sha})")
-    if len(findings) > 80:
-        print(f"Additional findings not shown: {len(findings) - 80}")
+    if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
+        # Public CI logs must not reveal where leaked credentials can be retrieved.
+        categories = sorted({category for category, _, _, _ in findings})
+        for category in categories:
+            count = sum(1 for item in findings if item[0] == category)
+            print(f"FINDING TYPE: {category}; count: {count}; locations redacted")
+        print("For paths and object hashes, run this scanner in a trusted local clone.")
+    else:
+        for category, path, lineno, sha in sorted(findings)[:80]:
+            loc = f":{lineno}" if lineno else ""
+            print(f"FINDING: {category} {path}{loc} (object {sha})")
+        if len(findings) > 80:
+            print(f"Additional findings not shown: {len(findings) - 80}")
     print(f"Total findings: {len(findings)}. Secret VALUES are intentionally never displayed.")
     return 2
 
