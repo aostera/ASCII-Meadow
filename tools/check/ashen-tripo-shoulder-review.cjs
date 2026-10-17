@@ -36,6 +36,8 @@ fs.mkdirSync(out,{recursive:true});
      return {drop:(s[1]-e[1])/length,
        out:Math.hypot(e[0]-s[0],e[2]-s[2])/length,
        wristBelowElbow:w[1]<e[1],
+       forearmDrop:(e[1]-w[1])/forearm,
+       forearmOut:Math.hypot(w[0]-e[0],w[2]-e[2])/forearm,
        length,forearm,
        shoulder:s,elbow:e,wrist:w,hand:h};
    };
@@ -47,11 +49,12 @@ fs.mkdirSync(out,{recursive:true});
   await page.waitForFunction(()=>window.__ASHEN_AB_COMPARE__.frames>=60,
     undefined,{timeout:60000});
   const front=await getPose();
-  if(front.pose?.animationVersion!=='Tripo-IK-v21-anatomical-arm-calibration'||
+  if(front.pose?.animationVersion!=='Tripo-IK-v22-segment-aligned-arms'||
      front.palette||!front.sourceMaterialEqual)
     throw Error('Not authentic unpainted v21 source: '+JSON.stringify(front));
   for(const [i,arm] of front.arms.entries()){
-   if(!Number.isFinite(arm.drop)||arm.drop<.70||arm.drop>.98||
+   if(!Number.isFinite(arm.drop)||arm.drop<.90||arm.drop>.995||
+      arm.forearmDrop<.82||arm.forearmDrop>.999||
       arm.length<.10||arm.forearm<.08||!arm.wristBelowElbow)
     throw Error('Broken shoulder->elbow or forearm chain '+i+': '+JSON.stringify(arm));
   }
@@ -71,7 +74,7 @@ fs.mkdirSync(out,{recursive:true});
    await page.screenshot({path:path.join(out,name+'.png'),timeout:30000});
   }
   await screenshot('01-original-vs-repaired-idle-front',
-    'V21 TRUE SHOULDER BONE CALIBRATION\nFront: same GLB, unchanged materials\n'+
+    'V22 SHOULDER + ELBOW SEGMENT ALIGNMENT\nFront: same GLB, unchanged materials\n'+
     front.arms.map((a,i)=>'Arm '+i+'  down='+a.drop.toFixed(3)+
       '  length='+a.length.toFixed(3)).join('\n'));
   // Two 45-degree turns; 0.65 seconds to settle damping and avoid mismatched yaw.
@@ -79,12 +82,12 @@ fs.mkdirSync(out,{recursive:true});
   await page.waitForFunction(()=>window.__ASHEN_AB_COMPARE__.frames>=105,
     undefined,{timeout:60000});
   await screenshot('02-original-vs-repaired-idle-side',
-    'V21 SHOULDER AND ELBOW \n90 degree identical cameras / real GLB');
+    'V22 SHOULDER + ELBOW \n90 degree identical cameras / real GLB');
   for(let i=0;i<2;i++)await page.locator('#turn').click();
   await page.waitForFunction(()=>window.__ASHEN_AB_COMPARE__.frames>=154,
     undefined,{timeout:60000});
   await screenshot('03-original-vs-repaired-idle-back',
-    'V21 SHOULDER AND PAULDRON \n180 degree same camera / source mesh');
+    'V22 PAULDRON AND ARM \n180 degree same camera / source mesh');
   for(let i=0;i<4;i++)await page.locator('#turn').click();
   await page.locator('[data-mode="Run"]').click();
   const before=(await getPose()).frames;
@@ -94,10 +97,10 @@ fs.mkdirSync(out,{recursive:true});
   },before,{timeout:60000});
   const running=await getPose();
   await screenshot('04-original-vs-repaired-running-arms',
-    'V21 RUN / source Tripo pose LEFT / new hinge swing RIGHT\n'+
+    'V22 RUN / source Tripo pose LEFT / new hinge swing RIGHT\n'+
     running.arms.map((a,i)=>'Arm '+i+' down='+a.drop.toFixed(3)).join('  '));
   if(errors.length)throw Error('Page errors '+JSON.stringify(errors));
-  console.log('PASS V21 shoulder A/B front+side+back+run, 4 REAL GLB images: '+
+  console.log('PASS V22 shoulder + forearm A/B front+side+back+run, 4 REAL GLB images: '+
     JSON.stringify({arms:front.arms.map(a=>({drop:a.drop,
       outward:a.out,forearm:a.forearm})),boneCount:front.boneCount,
       run:running.arms.map(a=>({drop:a.drop,out:a.out}))}));
