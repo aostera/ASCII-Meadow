@@ -364,6 +364,8 @@ jobs:
           node --check tools/check/three-native-grey-editor.cjs
           node --check experiments/three/native-editor-touch.js
           node --check tools/check/three-native-editor-touch.cjs
+          node --check tools/check/three-native-touch-controls.cjs
+          node --check experiments/three/native-touch-controls.js
           node --check experiments/three/native-shadow-soften.js
           node --check experiments/three/native-shadow-coverage.js
           node --check tools/check/three-native-shadow-coverage.cjs
@@ -427,6 +429,7 @@ jobs:
           node tools/check/three-native-art.cjs http://127.0.0.1:8181
           node tools/check/three-native-grey-editor.cjs http://127.0.0.1:8181
           node tools/check/three-native-editor-touch.cjs http://127.0.0.1:8181
+          node tools/check/three-native-touch-controls.cjs http://127.0.0.1:8181
           node tools/check/three-native-body-shadows.cjs http://127.0.0.1:8181
           node tools/check/three-parity.cjs http://127.0.0.1:8181
           node tools/check/three-motion-parity.cjs http://127.0.0.1:8181
@@ -471,5 +474,6 @@ jobs:
             shots/three-native-art/
             shots/three-native-grey-editor/
             shots/three-native-editor-touch/
+            shots/three-native-touch-controls/
             shots/three-native-body-shadows/
           if-no-files-found: warn

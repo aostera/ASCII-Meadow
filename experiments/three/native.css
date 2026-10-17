@@ -117,3 +117,28 @@ html,body { overscroll-behavior: none; }
  .castle-interior-head strong{font-size:14px}
  .castle-interior-head span{font-size:10px}
 }
+
+/* T10 touch controls (native-touch-controls.js): a floating stick drawn where
+   the thumb lands, and press-to-act buttons. Monochrome HUD look; only shown on
+   touch screens, never in the editor or the castle interior. */
+.native-stick{position:fixed;z-index:5;left:0;top:0;width:0;height:0;pointer-events:none}
+.native-stick[hidden]{display:none!important}
+.native-stick::before,.native-stick i{content:"";position:absolute;border-radius:50%;
+ border:1px solid rgba(250,250,250,.2);transform:translate(-50%,-50%)}
+.native-stick::before{width:144px;height:144px}
+.native-stick i{width:92px;height:92px;border-color:rgba(250,250,250,.09)}
+.native-stick b{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;
+ background:rgba(250,250,250,.32)}
+.native-stick.running::before{border-color:rgba(250,250,250,.36)}
+.native-stick.running b{background:rgba(250,250,250,.52)}
+.native-touch-pad{display:none;position:fixed;z-index:5;
+ right:max(14px,env(safe-area-inset-right,0px));bottom:calc(58px + env(safe-area-inset-bottom,0px));
+ gap:10px;align-items:flex-end}
+.native-touch-pad button{min-width:58px;height:58px;padding:0 14px;border:1px solid #5a5a5a;
+ background:rgba(14,14,14,.82);color:#dedede;font:500 13px/1 var(--mono,monospace);
+ touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;cursor:pointer}
+.native-touch-pad .native-touch-jump{width:58px;padding:0;font-size:22px;border-radius:50%}
+.native-touch-pad button:active{background:#3a3a3a;border-color:#b0b0b0}
+.native-touch-pad [hidden]{display:none!important}
+@media (pointer:coarse){.native-touch-pad{display:flex}.native-touch-pad[hidden]{display:none}}
+#c{-webkit-touch-callout:none}
