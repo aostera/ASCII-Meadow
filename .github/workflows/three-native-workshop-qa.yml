@@ -42,6 +42,8 @@ jobs:
           node --check tools/check/three-native-grey-editor.cjs
           node --check experiments/three/native-editor-touch.js
           node --check tools/check/three-native-editor-touch.cjs
+          node --check experiments/three/native-touch-controls.js
+          node --check tools/check/three-native-touch-controls.cjs
           node --check tools/check/three-ashen-vow.cjs
       - name: Run actual WebGL2 map-editor touch, rotation and undo tests
         run: |
@@ -54,6 +56,7 @@ jobs:
           done
           node tools/check/three-native-grey-editor.cjs http://127.0.0.1:8181
           node tools/check/three-native-editor-touch.cjs http://127.0.0.1:8181
+          node tools/check/three-native-touch-controls.cjs http://127.0.0.1:8181
           node tools/check/three-ashen-vow.cjs http://127.0.0.1:8181
           node tools/check/three-castle-interior.cjs http://127.0.0.1:8181
       - uses: actions/upload-artifact@v4
@@ -63,6 +66,7 @@ jobs:
           path: |
             shots/three-native-grey-editor
             shots/three-native-editor-touch
+            shots/three-native-touch-controls
             shots/three-ashen-vow
             shots/three-castle-interior
           if-no-files-found: warn
