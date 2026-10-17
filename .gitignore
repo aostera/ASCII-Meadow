@@ -18,3 +18,19 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Blender work (blender/): only scripts and review sheets are tracked. Sources, .blend files,
+# per-view renders and the handoff ZIP are large or third-party; rebuild them with the scripts.
+blender/**/*.blend
+blender/**/*.blend1
+blender/ASCII-Meadow-Claude-Blender-TRIPO-Handoff/
+blender/Masked_Knight_src/
+blender/SF_Knight_v1.0/
+blender/anim/
+blender/previews/
+blender/previews_masked/
+blender/refs/
+blender/ashen/review/*.png
+!blender/ashen/review/compare_*.png
+/SF_medival_knight_no_supports/
+/SF_medival_knight_with_supports/
