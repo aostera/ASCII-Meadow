@@ -3,7 +3,27 @@
 # while every release requests its own JS/CSS URLs so a browser cannot reuse
 # an obsolete map or grass renderer across deployments.
 set -eu
-out=${1:?usage: sh tools/build_site.sh <out dir>}
+out=${1:?usage: sh tools/build_site.sh dist}
+# Fail closed: never clean arbitrary paths, follow symlinks or publish unapproved sources.
+case "$out" in
+  dist|/tmp/site/ASCII-Meadow) ;;
+  /tmp/ascii-meadow-assets-*)
+    suffix=${out#/tmp/ascii-meadow-assets-}
+    case "$suffix" in ''|*[!a-zA-Z0-9_-]*) echo 'Security: unsafe temporary output path' >&2; exit 1 ;; esac
+    ;;
+  *) echo 'Security: unexpected deployment output path' >&2; exit 1 ;;
+esac
+if [ -L "$out" ]; then
+  echo 'Security: deployment output cannot be a symlink' >&2
+  exit 1
+fi
+node tools/check/deploy-surface.cjs --source
+if [ "$out" = "dist" ]; then
+  rm -rf -- "$out"
+elif [ -d "$out" ] && [ -n "$(ls -A "$out")" ]; then
+  echo 'Security: refusing to overwrite a non-empty temporary output directory' >&2
+  exit 1
+fi
 mkdir -p "$out"
 cp -r index.html styles src "$out"/
 if [ -d assets/npc ]; then
@@ -31,6 +51,12 @@ NODE
 
 printf '{"revision":"%s"}\n' "$rev" > "$out/build.json"
 cat > "$out/_headers" <<'HEADERS'
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; media-src 'self'; worker-src 'self'
 /
   Cache-Control: no-store
 /index.html
@@ -43,3 +69,4 @@ cat > "$out/_headers" <<'HEADERS'
   Cache-Control: no-store
 HEADERS
 touch "$out/.nojekyll"
+node tools/check/deploy-surface.cjs --dist "$out"
