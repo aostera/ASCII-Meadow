@@ -134,8 +134,19 @@ try{
   });
   // Explicit QA/preview access; normal gameplay uses the existing castle
   // gate's E interaction and its contextual touch button.
-  if(new URLSearchParams(location.search).get('castleInterior')==='1')
-    castleInterior.enter();
+  if(new URLSearchParams(location.search).get('castleInterior')==='1'){
+    // The query is ONLY a reviewer shortcut: wait for the original source
+    // world and its gate interactions to initialize before suspending it.
+    // An early enter could leave props unbuilt and the real exit unusable.
+    const enterAfterSourceBuild=()=>{
+      if(disposed||!castleInterior||!GL.ok)return;
+      const gateReady=cathedral.cv&&props.some(p=>
+        (p.spots||[]).some(s=>s._nativeInterior));
+      if(gateReady&&W>0&&H>0)castleInterior.enter();
+      else requestAnimationFrame(enterAfterSourceBuild);
+    };
+    requestAnimationFrame(enterAfterSourceBuild);
+  }
   if(EDIT)editorModels=new NativeGreyMapEditor(
     backend.renderer,
     ()=>({solids,ruinSites,ruinDetail,ruinRotateMesh,cathedral,
