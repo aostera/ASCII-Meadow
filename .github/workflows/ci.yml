@@ -347,6 +347,10 @@ jobs:
           node --check experiments/three/native.js
           node --check tools/check/three-native-game.cjs
           node --check tools/check/three-native-recovery.cjs
+          node --check experiments/three/gltf-clip-knight.mjs
+          node --check experiments/three/native-ashen-blender.mjs
+          node --check tools/check/ashen-blender-native.cjs
+          node tools/check/ashen-blender-glb.cjs
           node --check experiments/three/native-mobile.js
           node --check experiments/three/native-mobile-lifecycle.mjs
           node --check tools/check/three-native-mobile.mjs
@@ -418,6 +422,7 @@ jobs:
           for i in $(seq 1 20); do curl -sf http://127.0.0.1:8181/experiments/three/parity.html > /dev/null && break; sleep 1; done
           node tools/check/three-native-game.cjs http://127.0.0.1:8181
           node tools/check/three-native-recovery.cjs http://127.0.0.1:8181
+          node tools/check/ashen-blender-native.cjs http://127.0.0.1:8181
           node tools/check/three-native-android.cjs http://127.0.0.1:8181
           node tools/check/three-native-bush.cjs http://127.0.0.1:8181
           node tools/check/three-native-bush-depth.cjs http://127.0.0.1:8181

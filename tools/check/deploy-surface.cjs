@@ -20,6 +20,9 @@ if (mode === '--dist' && outputAbs !== path.join(root, 'dist') && outputAbs !== 
 }
 const assetExtensions = new Set(['.png', '.webp']);
 const textExtensions = new Set(['.js', '.css', '.html', '.json', '.mjs']);
+// The native game's player model: the only binary model allowed on the public site, by exact name.
+const approvedModels = new Set(['ashen_vow_v01q.glb', 'ashen_vow_v01q_mobile.glb']);
+const modelDir = 'experiments/three/assets/ashen-vow';
 const blockers = [
   ['private-key', /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----/i],
   ['github-token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{35,})\b/],
@@ -103,6 +106,8 @@ if (mode === '--source') {
         visit('experiments/three/'+name,
           new Set(['.html','.js','.mjs','.css']),false);
     }
+    for (const name of approvedModels)
+      if (fs.existsSync(path.join(root, modelDir, name))) visit(modelDir + '/' + name, new Set(['.glb']), false);
   }
 } else {
   // The published directory must include only assets explicitly approved below.
@@ -128,11 +133,21 @@ if (mode === '--source') {
         if(sub!=='three')report('unapproved-experiment-directory','dist/experiments/'+sub);
       if(fs.existsSync(path.join(dist,'experiments/three'))){
         for(const name of fs.readdirSync(path.join(dist,'experiments/three'))){
+          if(name==='assets')continue;
           if(name!=='native.html'&&!/\.(?:js|mjs|css)$/.test(name))
             report('unapproved-experiment-file','dist/experiments/three/'+name);
+          else visit(path.join(output,'experiments/three',name),new Set(['.html','.js','.mjs','.css']),false);
         }
-        visit(path.join(output,'experiments/three'),
-          new Set(['.html','.js','.mjs','.css']));
+        const models=path.join(dist,'experiments/three/assets');
+        if(fs.existsSync(models)){
+          for(const sub of fs.readdirSync(models))
+            if(sub!=='ashen-vow')report('unapproved-experiment-asset-dir','dist/experiments/three/assets/'+sub);
+          const vow=path.join(models,'ashen-vow');
+          if(fs.existsSync(vow))for(const name of fs.readdirSync(vow)){
+            if(!approvedModels.has(name))report('unapproved-experiment-model','dist/'+modelDir+'/'+name);
+            else visit(path.join(output,modelDir,name),new Set(['.glb']),false);
+          }
+        }
       }
     }
     // These are intentionally the only extensionless/hidden deployment metadata.

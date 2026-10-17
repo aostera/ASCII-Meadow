@@ -10,8 +10,13 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Rubik:wght@400;500&display=swap">
 <link rel="stylesheet" href="styles/main.css">
 <link rel="stylesheet" href="experiments/three/native.css">
+<!-- the player's 3D knight starts downloading with the page, not after the Three.js scene is up -->
+<link rel="preload" as="fetch" crossorigin="anonymous" href="experiments/three/assets/ashen-vow/ashen_vow_v01q_mobile.glb" media="(pointer: coarse)">
+<link rel="preload" as="fetch" crossorigin="anonymous" href="experiments/three/assets/ashen-vow/ashen_vow_v01q.glb" media="(pointer: fine)">
+<link rel="modulepreload" href="experiments/three/native-ashen-blender.mjs">
+<link rel="modulepreload" href="experiments/three/gltf-clip-knight.mjs">
 <script type="importmap">
-{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js"}}
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}
 </script>
 </head>
 <body>
