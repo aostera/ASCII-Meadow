@@ -1,0 +1,12 @@
+#!/bin/sh
+# Fail closed: scan reachable local Git history before uploading any commits.
+# Unlike GitHub CI, this prevents an accidental push from reaching the public repo.
+set -eu
+if command -v python3 >/dev/null 2>&1; then
+  exec python3 tools/check/secret-history.py
+elif command -v python >/dev/null 2>&1; then
+  exec python tools/check/secret-history.py
+else
+  echo 'BLOCKED PUSH: Python is required for Git history secret scanning.' >&2
+  exit 2
+fi
