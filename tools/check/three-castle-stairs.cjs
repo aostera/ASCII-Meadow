@@ -61,5 +61,36 @@ const base=(process.argv[2]||'http://127.0.0.1:8181').replace(/\/$/,'');
   assert.equal(errors.length,0,'Browser script errors: '+errors.join(' | '));
   console.log('PASS castle actual input: nave -> west tower -> helix -> upper landing -> descent -> unchanged exterior');
   await context.close();
+
+  // Mobile action must work with an ACTUAL touch event, not only keyboard E.
+  const mobileCtx=await browser.newContext({
+   viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true
+  });
+  const phone=await mobileCtx.newPage();
+  await phone.goto(base+'/experiments/three/native.html?edit=0&castleInterior=1',
+    {waitUntil:'domcontentloaded'});
+  await phone.waitForFunction(()=>window.__ASCII_NATIVE__?.castleInterior?.active&&
+    window.__ASCII_NATIVE__.castleInterior.frames>3,undefined,{timeout:120000});
+  const phoneWalk=async(key,predicate)=>{
+   await phone.keyboard.down('Shift');await phone.keyboard.down(key);
+   try{await phone.waitForFunction(predicate,undefined,{timeout:28000})}
+   finally{await phone.keyboard.up(key);await phone.keyboard.up('Shift')}
+  };
+  await phoneWalk('w',()=>window.__ASCII_NATIVE__?.castleInterior?.z<2.3);
+  await phoneWalk('a',()=>window.__ASCII_NATIVE__?.castleInterior?.x< -23.5);
+  await phoneWalk('w',()=>window.__ASCII_NATIVE__?.castleInterior?.stairNearby==='west');
+  const action=phone.locator('.castle-interior-action');
+  await action.waitFor({state:'visible'});
+  await action.tap();
+  await phone.waitForFunction(()=>window.__ASCII_NATIVE__?.castleInterior?.level===1&&
+    !window.__ASCII_NATIVE__.castleInterior.transitioning,undefined,{timeout:15000});
+  await action.tap();
+  await phone.waitForFunction(()=>window.__ASCII_NATIVE__?.castleInterior?.level===0&&
+    !window.__ASCII_NATIVE__.castleInterior.transitioning,undefined,{timeout:15000});
+  await phone.keyboard.press('Escape');
+  await phone.waitForFunction(()=>window.__ASCII_NATIVE__?.castleInterior?.active===false);
+  console.log('PASS castle phone TOUCH: actual stair button climbs/descends both real tower storeys');
+  await mobileCtx.close();
+
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
