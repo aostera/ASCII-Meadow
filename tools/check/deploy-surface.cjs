@@ -6,11 +6,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const mode = process.argv[2] ?? '--source';
+const output = process.argv[3] ?? 'dist';
 if (mode !== '--source' && mode !== '--dist') {
   console.error('Usage: node tools/check/deploy-surface.cjs [--source|--dist]');
   process.exit(2);
 }
 const root = path.resolve(__dirname, '../..');
+const outputAbs = path.resolve(root, output);
+if (mode === '--dist' && outputAbs !== path.join(root, 'dist') && outputAbs !== '/tmp/site/ASCII-Meadow') {
+  console.error('BLOCKED DEPLOY: unexpected output directory');
+  process.exit(2);
+}
 const assetExtensions = new Set(['.png', '.webp']);
 const textExtensions = new Set(['.js', '.css', '.html', '.json', '.mjs']);
 const blockers = [
@@ -41,7 +47,8 @@ function report(type, rel) {
 }
 function visit(rel, allowedExt, mayHaveChildren = true) {
   const abs = path.resolve(root, rel);
-  if (abs !== root && !abs.startsWith(root + path.sep)) {
+  if (abs !== root && !abs.startsWith(root + path.sep) &&
+      !(mode === '--dist' && (abs === outputAbs || abs.startsWith(outputAbs + path.sep)))) {
     report('path-escape', '[redacted]');
     return;
   }
@@ -90,7 +97,7 @@ if (mode === '--source') {
     visit('assets/npc', assetExtensions);
 } else {
   // The published directory must include only assets explicitly approved below.
-  const dist = path.join(root, 'dist');
+  const dist = outputAbs;
   if (!fs.existsSync(dist) || fs.lstatSync(dist).isSymbolicLink()) {
     report('missing-or-symlink-dist', 'dist');
   } else {
@@ -98,14 +105,14 @@ if (mode === '--source') {
     for (const filename of fs.readdirSync(dist)) {
       if (!allowed.has(filename)) report('unexpected-published-file', 'dist/' + filename);
     }
-    visit('dist/index.html', new Set(['.html']), false);
-    visit('dist/build.json', new Set(['.json']), false);
-    visit('dist/src', new Set(['.js']));
-    visit('dist/styles', new Set(['.css']));
+    visit(path.join(output, 'index.html'), new Set(['.html']), false);
+    visit(path.join(output, 'build.json'), new Set(['.json']), false);
+    visit(path.join(output, 'src'), new Set(['.js']));
+    visit(path.join(output, 'styles'), new Set(['.css']));
     if (fs.existsSync(path.join(dist, 'assets'))) {
       const dirs = fs.readdirSync(path.join(dist, 'assets'));
       for (const d of dirs) if (d !== 'npc') report('unexpected-published-asset-dir', 'dist/assets/' + d);
-      if (fs.existsSync(path.join(dist, 'assets/npc'))) visit('dist/assets/npc', assetExtensions);
+      if (fs.existsSync(path.join(dist, 'assets/npc'))) visit(path.join(output, 'assets/npc'), assetExtensions);
     }
     // These are intentionally the only extensionless/hidden deployment metadata.
     for (const name of ['_headers', '.nojekyll']) {
