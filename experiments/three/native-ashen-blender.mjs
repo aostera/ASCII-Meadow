@@ -7,11 +7,17 @@
 import * as THREE from 'three';
 import {createClipKnight} from './gltf-clip-knight.mjs';
 import {headingForSourceD8} from './source-motion.mjs';
+import {chooseNativeRasterHz} from './ashen-glyph-emitter.mjs';
 
 const COLS = 104, ROWS = 54, FX = 52, FY = 51.6, ART = 44.4;   // the source knight grid (KG)
 const SPRITE_ELEV = .35;
 export const ASHEN_BLENDER_GLB = new URL('./assets/ashen-vow/ashen_tripo_blender_repaired_v01.glb', import.meta.url).href;
-const CLIP_SPEED = {Walk: .529, Run: 1.571};      // model heights per second the baked clips cover
+const CLIP_SPEED = {Walk: .529, Run: 1.571};
+// Share of cells per ramp level (0 = dark plate, 1..9 = ". : - = + * # % @") in the original baked
+// knight frames, measured in the game over idle, walk and run (2026-10-17); cumulative.
+const LEVEL_SHARE = [.004, 0, .019, .046, .111, .179, .259, .198, .107, .077];
+const LEVEL_CDF = LEVEL_SHARE.reduce((acc, v, i) => (acc.push((acc[i - 1] || 0) + v), acc), [])
+  .map((v, i, a) => v / a[a.length - 1]);      // model heights per second the baked clips cover
 const JUMP_FRAMES = {takeoff: 22, land: 48, end: 72, fps: 60};   // anim_ashen.py JUMP                            // camera elevation of the sprite view, rad
 const MODEL_TOP = 1.0;                              // top of the hood (the GLB is height-normalised)
 const SS = 4;                                       // render pixels per cell side
@@ -106,6 +112,15 @@ export class NativeKnightGlyphs {
     });
     this.scene.add(this.knight);
     this.clock = null; this.prev = null; this.disposed = false;
+    // The pose is evaluated every frame; the GPU raster + read-back + glyph build runs at an
+    // adaptive rate (as the V2 adapter does), the cached glyphs are re-emitted in between with
+    // live firelight and occlusion.
+    this.touchDevice = Boolean(globalThis.matchMedia?.('(pointer:coarse)')?.matches);
+    this.rasterClock = null;
+    this.rasterInterval = 1 / (this.touchDevice ? 12 : 20);
+    this.rasterCostAvg = null;
+    this.glyphDirty = true;
+    Object.assign(this.stats, {rasterHz: 1 / this.rasterInterval, rasterFrames: 0, glyphBuilds: 0});
   }
   get ready() { return !this.disposed && this.stats.loaded; }
 
@@ -138,8 +153,19 @@ export class NativeKnightGlyphs {
       jumpClipTime: NativeKnightGlyphs.jumpClipTime(e, src.JUMP_T, src.AIR0, src.AIR1)
     }, now);
     this.stats.clip = this.knight.userData.gltf.clip;
-    this.render(G, fcw, fch);
-    this.convert();
+    if (this.rasterClock === null || now - this.rasterClock >= this.rasterInterval || now < this.rasterClock) {
+      this.render(G, fcw, fch);
+      this.convert();
+      this.glyphDirty = true;
+      const cost = this.stats.readMs + this.stats.convertMs;
+      if (Number.isFinite(cost) && cost >= 0)
+        this.rasterCostAvg = this.rasterCostAvg === null ? cost : this.rasterCostAvg * .85 + cost * .15;
+      const hz = chooseNativeRasterHz({gpuReadMs: this.rasterCostAvg ?? 25, glyphConvertMs: 0, touch: this.touchDevice});
+      this.rasterInterval = 1 / hz;
+      this.stats.rasterHz = hz;
+      this.rasterClock = now;
+      this.stats.rasterFrames++;
+    }
     this.emit(e, G, fcw, fch, src);
     this.stats.frames++;
   }
@@ -217,6 +243,13 @@ export class NativeKnightGlyphs {
   }
 
   emit(e, G, fcw, fch, src) {
+    const {K} = this;
+    if (this.glyphDirty) { this.buildGlyphs(src); this.glyphDirty = false; this.stats.glyphBuilds++; }
+    this.paint(e, G, fcw, fch, src);
+  }
+
+  // tone -> ramp levels for the latest raster (only when a new one exists)
+  buildGlyphs(src) {
     const {S, A, K} = this;
     const vals = [];
     for (let c = 0; c < COLS * ROWS; c++) if (A[c] >= .3) vals.push(S[c]);
@@ -231,24 +264,50 @@ export class NativeKnightGlyphs {
     this.tone = [lo, hi];
     const span = Math.max(1e-3, hi - lo);
     let glyphs = 0, cloak = 0;
+    // to_ascii's tone per cell, then matched to the ORIGINAL knight's glyph statistics: cells are
+    // ranked by tone and given ramp levels in the same proportions as the baked ASCII frames
+    // (LEVEL_CDF), so steel, legs and blade sit on the original's levels instead of a brighter
+    // spread. Bayer dither and the fixed grain still break up the bands.
+    const order = this.order || (this.order = new Int32Array(COLS * ROWS));
+    const tone = this.toneV || (this.toneV = new Float32Array(COLS * ROWS));
+    let m = 0;
     for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
       const c = cy * COLS + cx;
       if (A[c] < .3) continue;
       const V = Math.pow(Math.min(1, Math.max(0, (S[c] - lo) / span)), .9);
-      let v = (.37 + .63 * V) * Math.min(1, A[c] * 1.25) + BAYER[(cy & 3) * 4 + (cx & 3)] * .14 + GRAIN[c];
+      tone[c] = (.37 + .63 * V) * Math.min(1, A[c] * 1.25);
+      order[m++] = c;
+    }
+    const sorted = Array.from(order.subarray(0, m)).sort((a, b) => tone[a] - tone[b]);
+    const rank = this.rank || (this.rank = new Float32Array(COLS * ROWS));
+    sorted.forEach((c, i) => { rank[c] = (i + .5) / m; });
+    for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
+      const c = cy * COLS + cx;
+      if (A[c] < .3) continue;
+      const q = Math.min(.9999, Math.max(0, rank[c] + BAYER[(cy & 3) * 4 + (cx & 3)] * .07 + GRAIN[c] * .8));
+      let level = 0;
+      while (level < 9 && q >= LEVEL_CDF[level]) level++;
       const j = K.n++;
       K.cx[j] = cx; K.cy[j] = cy;
       K.cl[j] = this.cloakFrac[c] > .5 ? 1 : 0;
       cloak += K.cl[j];
-      if (v < .14) { K.code[j] = -1; continue; }
-      v = Math.min(.999, v);
-      K.code[j] = src.rampCode(Math.min(9, 1 + Math.floor(v * 9)));
+      if (level === 0) { K.code[j] = -1; continue; }
+      K.code[j] = src.rampCode(level);
       glyphs++;
     }
     this.stats.glyphs = glyphs; this.stats.cloakCells = cloak;
+    // how many cells sit on each ramp level (0 = dark plate only, 1..9 = " .:-=+*#%@" minus space)
+    const levels = new Array(10).fill(0);
+    for (let j = 0; j < K.n; j++) levels[K.code[j] < 0 ? 0 : K.code[j] >> 3]++;
+    this.stats.levels = levels;
     let y0 = ROWS, y1 = 0, x0 = COLS, x1 = 0;
     for (let j = 0; j < K.n; j++) { y0 = Math.min(y0, K.cy[j]); y1 = Math.max(y1, K.cy[j]); x0 = Math.min(x0, K.cx[j]); x1 = Math.max(x1, K.cx[j]); }
     this.stats.bounds = [x0, y0, x1, y1];
+  }
+
+  // dark plates and glyphs into the source batch, every frame (firelight is live)
+  paint(e, G, fcw, fch, src) {
+    const {K} = this;
     const left = G.left, top = G.top;
     // dark plate first, in runs along each row (as drawKnight does), then the glyphs
     let ry = -1, rs = 0, re = 0;
