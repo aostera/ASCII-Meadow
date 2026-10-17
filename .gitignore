@@ -18,3 +18,19 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Local credentials and machine-specific deployment state
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
+*.pem
+*.p12
+*.pfx
+*.key
+id_rsa
+id_ed25519
+*.tfstate
+*.tfstate.*
+credentials.json
+service-account*.json
