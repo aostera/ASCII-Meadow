@@ -63,8 +63,12 @@ function nativeBushBodyClear(f,x,h,shift,pad){
   if(Math.abs(d)>=reach+Math.abs(shift))return shift;
   const base=nativeClamp(h/.28,0,1),anchor=base*base*(3-2*base);
   const ragged=.86+.14*Math.sin(h*9.7+(f.ph||0)*3.1);
-  const clear=w*part*anchor*ragged;
-  if(!(clear>.05))return shift;
+  // The opening scales with contact; a clump's radius is added in full on
+  // top of it (ramped in over the first quarter of contact, so it does not
+  // pop), so its edge, not only its centre, leaves the opening.
+  const open=width*part*anchor*ragged;
+  if(!(open>.05))return shift;
+  const clear=open+(pad||0)*Math.min(1,part*4)*anchor;
   const side=d<-1e-4?-1:d>1e-4?1:(shift<0?-1:1),a=Math.abs(d);
   const pushed=a<reach?a+clear*(1-a/reach):a;
   const p=Math.max(side*(d+shift),pushed,clear);
