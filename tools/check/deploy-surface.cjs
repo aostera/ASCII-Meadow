@@ -99,7 +99,7 @@ if (mode === '--source') {
   const three=path.join(root,'experiments/three');
   if(fs.existsSync(path.join(three,'native.html'))){
     for(const name of fs.readdirSync(three)){
-      if(name==='native.html'||/\\.(?:js|mjs|css)$/.test(name))
+      if(name==='native.html'||/\.(?:js|mjs|css)$/.test(name))
         visit('experiments/three/'+name,
           new Set(['.html','.js','.mjs','.css']),false);
     }
@@ -128,7 +128,7 @@ if (mode === '--source') {
         if(sub!=='three')report('unapproved-experiment-directory','dist/experiments/'+sub);
       if(fs.existsSync(path.join(dist,'experiments/three'))){
         for(const name of fs.readdirSync(path.join(dist,'experiments/three'))){
-          if(name!=='native.html'&&!/\\.(?:js|mjs|css)$/.test(name))
+          if(name!=='native.html'&&!/\.(?:js|mjs|css)$/.test(name))
             report('unapproved-experiment-file','dist/experiments/three/'+name);
         }
         visit(path.join(output,'experiments/three'),
