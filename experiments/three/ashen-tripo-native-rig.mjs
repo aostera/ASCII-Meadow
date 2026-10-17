@@ -134,6 +134,35 @@ function animateRig(model,source,root,weapon){
   const {sets,rest,legCalibration}=source,axisQ=new THREE.Quaternion();
   const wristWorldQ=new THREE.Quaternion(),rootWorldQ=new THREE.Quaternion();
   const swordCantQ=new THREE.Quaternion();
+  const parentQ=new THREE.Quaternion(),modelQ=new THREE.Quaternion();
+  const shoulderAxis=new THREE.Vector3(),shoulderTarget=new THREE.Vector3();
+  const shoulderDelta=new THREE.Quaternion();
+  // Calibrate from ACTUAL source bone offsets, not guessed opposite +/- X
+  // Euler angles. T-pose arm bone transforms may have their own local twists.
+  const shoulders=[sets.leftArm,sets.rightArm].map(chain=>{
+    const upper=chain[0],elbow=chain[1],r=rest.get(upper);
+    const restDirection=elbow.position.clone().applyQuaternion(r.q).normalize();
+    const p=new THREE.Vector3(),e=new THREE.Vector3();
+    upper.getWorldPosition(p);elbow.getWorldPosition(e);
+    const modelWorld=new THREE.Quaternion();model.getWorldQuaternion(modelWorld);
+    const dir=e.sub(p).applyQuaternion(modelWorld.invert()).normalize();
+    const side=Math.sign(dir.z)||1;
+    return {upper,restDirection,side};
+  });
+  function poseShoulder(arm,swing){
+    const {upper,restDirection,side}=arm;
+    // A relaxed arm descends below the real sculpted pauldron while
+    // preserving a lateral gap. Run swings occur primarily in source X,
+    // never as an axial shoulder twist that collapses the sleeve.
+    model.updateMatrixWorld(true);
+    model.getWorldQuaternion(modelQ);
+    shoulderTarget.set(swing*.65,-.89,side*.46).normalize()
+      .applyQuaternion(modelQ);
+    upper.parent.getWorldQuaternion(parentQ);
+    shoulderTarget.applyQuaternion(parentQ.invert()).normalize();
+    shoulderDelta.setFromUnitVectors(restDirection,shoulderTarget);
+    upper.quaternion.copy(shoulderDelta).multiply(rest.get(upper).q);
+  }
   function twist(b,axes){
     const r=rest.get(b);
     b.quaternion.copy(r.q);
@@ -418,39 +447,29 @@ function animateRig(model,source,root,weapon){
       pin.forEach(p=>p.contact=false);
     const swing=Math.sin(phase);
     const armAmplitude=(.19+runMix*.20)*stride*(1-.78*airMix);
-    // The source Tripo shoulder bones rest in a near T-pose along +/-Z.
-    // Old 0.69 rad X rotations left them spread ~45 degrees from the
-    // torso; additionally, rolling around Z while the arm extends on Z
-    // cannot produce a proper forward walking swing. Correct 3D hinges:
-    //   shoulder: X lowers arm / Y swings it in the sagittal plane;
-    //   elbow:    Y bends forearm forward after the shoulder is lowered.
-    // The right (weapon) arm swings less, to avoid blade/torso clipping.
-    // 1.28 folded both gloves onto the belt and moved the sword into the
-    // groin. 0.98 keeps natural clearance between forearms and tassets.
-    const shoulderDown=.98;
-    // Delayed, phase-continuous hand arcs rather than one stiff swinging
-    // shoulder. The sword arm deliberately has a shorter travel than the
-    // free arm, while the elbows bend noticeably during the running phase.
-    // In flight both hands move slightly forward to balance the landing.
-    // Contralateral arm swing: sword hand counters the free hand rather
-    // than both marching in synchrony. Limit the armed side to keep the
-    // blade outside the hip while the left elbow supplies momentum.
-    const leftSwing=-swing*armAmplitude+arc*.15;
-    const rightSwing=+swing*armAmplitude*.35-arc*.075;
-    twist(sets.leftArm[0],[['ix',-shoulderDown],['iy',leftSwing]]);
-    twist(sets.rightArm[0],[['ix',shoulderDown],['iy',rightSwing]]);
-    const leftElbow=-.20-.10*stride*Math.max(0,-swing)-
-      .13*runMix-.20*arc;
-    const rightElbow=.24+.08*stride*Math.max(0,-swing)+
-      .12*runMix+.10*arc;
-    twist(sets.leftArm[1],[['iy',leftElbow]]);
-    twist(sets.rightArm[1],[['iy',rightElbow]]);
-    twist(sets.leftArm[2],[['iy',-.018+Math.sin(bodyClock*1.4)*.015]]);
-    twist(sets.rightArm[2],[['iy',.025]]);
+    // V21 anatomical arm repair. Former +/-0.98 rad X on guessed
+    // shoulder axes twisted shoulder plates, while Y at the elbow
+    // mostly rotated the forearm around its own length. Instead align
+    // the real shoulder-to-elbow bone toward a calibrated local DOWN
+    // direction with safe lateral clearance and natural X-direction
+    // contralateral swing. Both elbows flex about model Z (bend hinge).
+    const shoulderDown=Math.atan2(.89,.46);
+    const leftSwing=-swing*armAmplitude+arc*.09;
+    const rightSwing=+swing*armAmplitude*.38-arc*.045;
+    poseShoulder(shoulders[0],leftSwing);
+    poseShoulder(shoulders[1],rightSwing);
+    const leftElbow=.10+.10*stride*Math.max(0,-swing)+
+      .055*runMix+.04*arc;
+    const rightElbow=.13+.07*stride*Math.max(0,swing)+
+      .04*runMix+.03*arc;
+    // Z in the source character is the arm's true elbow bend hinge
+    // after the humerus is lowered, unlike the earlier axial Y twist.
+    twist(sets.leftArm[1],[['iz',leftElbow]]);
+    twist(sets.rightArm[1],[['iz',rightElbow]]);
+    twist(sets.leftArm[2],[['iz',.015+stride*.018]]);
+    twist(sets.rightArm[2],[['iz',.012]]);
     twist(sets.leftArm[3],[]);
-    // Small anatomical wrist turn makes the OPEN Tripo glove follow the
-    // hilt. Fingers are not independently rigged: never imply a true grasp.
-    const wristTurn=-.10-.04*runMix+Math.sin(phase)*stride*.025;
+    const wristTurn=-.035-.012*runMix;
     twist(sets.rightArm[3],[['iy',wristTurn]]);
     // Controlled weight loading and spring-like rise at alternating
     // strides. The real Tripo pelvis bone is the common parent of both
@@ -595,7 +614,7 @@ function animateRig(model,source,root,weapon){
         leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
       palmAnchorValid:weapon?.userData.palmAnchorValid===true,
       palmVertexCount:weapon?.userData.palmVertexCount||0,
-      animationVersion:'Tripo-IK-v20-art-review-gait'
+      animationVersion:'Tripo-IK-v21-anatomical-arm-calibration'
     };
     return clip.toLowerCase();
   }
