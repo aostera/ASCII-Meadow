@@ -62,6 +62,7 @@ python3 tools/check/diff.py /tmp/shots/b /tmp/shots/a --out /tmp/shots/diff   # 
 | `three-native-game.cjs`, `three-parity.cjs` | Настоящий native runtime, одно WebGL2-окно, source-сцена, fallback, frozen parity |
 | `three-native-shadow-layer.cjs`, `three-native-shadow-coverage.cjs`, `three-native-body-shadows.cjs` | Слой архитектурных теней; тень замка за пределами исходного окна и края 3×3; контактная тень рыцаря/NPC/коров без изменения directional casts |
 | `three-native-tree-depth.cjs`, `three-native-bush-depth.cjs`, `three-native-stone-depth.cjs` | Объекты и GPU depth/occlusion на desktop и phone viewport |
+| `three-native-bush-readability.cjs` | T05: видимость NPC в самых густых зарослях против того же места без кустов, отсутствие листьев в колонне тела, восстановление веток без рывка до исходного рисунка |
 | `three-native-grey-editor.cjs`, `three-native-editor-touch.cjs` | Серые модели и поворот руин; pan двумя пальцами и pinch-zoom редактора (CDP touch, phone + tablet), undo восстанавливает карту побайтно |
 | `three-native-recovery.cjs`, `three-native-android.cjs`, `three-native-mobile.mjs` | Потеря/восстановление WebGL, Android portrait/landscape, смена плотности, pointercancel, fallback без WebGL2 |
 | `three-performance.cjs`, `three-device-profiler.cjs` | Лабораторная нагрузка; **не** аппаратные FPS |
