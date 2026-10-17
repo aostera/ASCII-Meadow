@@ -185,3 +185,9 @@ Native game only (`/experiments/three/native.html`):
 - CI run `38578424190`, job `115901568487`, head `ae94d38c`: native game desktop/phone PASS; physical bush desktop/phone PASS; native NPC depth desktop/phone PASS; parity 10/10 source/Three static images 100% exact (includes lightning) plus prior animation/source-rig/depth tests. CI software GPU timing is not real hardware FPS. Only source-parity lab frames are guaranteed pixel exact; new native-world bush displacement and NPC compositing necessarily change the picture intentionally.
 - Keep actual Safari/iPad hardware acceptance, full source geometry depth compositing, shadows, 3D character art fidelity and memory/performance work open. Do not call full Three migration complete. Preserve independent draft PR #37 and main production.
 
+## 2026-10-17 — рыцарь Tripo (The Ashen Vow) в Blender
+- Скрипты `blender/ashen/repair_ashen_rig.py` (импорт → `fix_weights` → `pose_arms_down` → `measure` / `render_review`), листы сравнения `blender/ashen/review/compare_*.png`. Исходную GLB только читать.
+- Не делай пластины брони жёсткими по кускам — наплечник собран из наложенных кусков и расходится щелями. Правь веса плавно по вершинам.
+- Имена Tripo не анатомические: +Y рука — `0_Left_Limb_*`, -Y рука — `bone_16..25`, плащ — `0_Right_Limb_*`. В V22 (экспорт из Three.js) имена без `::` (`tripo0_Left_Limb_2`).
+- Рыцарь Tripo v01: `blender/ashen/README.md` (пересборка и таблица изменений). После экспорта ОБЯЗАТЕЛЬНО `node blender/ashen/fix_joint_order.cjs` — Blender меняет порядок суставов. Экспорт — через прореженную копию тела (`web_body`), не модификатором (иначе ~30 минут).
+- В `native.html` модель по умолчанию — `native-ashen-blender.mjs` (клипы из GLB). Старые: `?tripoV2=1` (V2), `?ashenModel=v12`.
