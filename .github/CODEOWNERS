@@ -1,0 +1,14 @@
+# Security-critical paths. GitHub requests @aostera review for these changes.
+# Enforce approvals via Settings > Rules > Rulesets (requires admin access).
+/.github/workflows/ @aostera
+/.github/dependabot.yml @aostera
+/.github/CODEOWNERS @aostera
+/.githooks/ @aostera
+/tools/security/ @aostera
+/tools/check/secret-history.py @aostera
+/tools/check/staged-secrets.py @aostera
+/tools/check/security-regression.cjs @aostera
+/tools/check/deploy-surface.cjs @aostera
+/tools/build_site.sh @aostera
+/wrangler.jsonc @aostera
+/SECURITY.md @aostera
