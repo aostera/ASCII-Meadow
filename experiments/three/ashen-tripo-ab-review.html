@@ -154,7 +154,7 @@ function animate(now){
   if(mode==='Jump')jumpClipTime=(clock%1.35);
   animRoot.userData.animate(Math.min(dt,1/30),{
     speed:mode==='Walk'?8:mode==='Run'?15:0,
-    run:mode==='Run',heading:0,jumpClipTime,
+    run:mode==='Run',heading,jumpClipTime,
     inspectSoles:false
   },clock);
   simulated++;
