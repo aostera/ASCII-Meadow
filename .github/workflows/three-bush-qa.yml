@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - 'feat/three-native-bush-*'
+  pull_request:
+    branches:
+      - experiment/threejs-ascii-prototype
   workflow_dispatch:
 
 permissions:
@@ -15,9 +18,9 @@ concurrency:
 
 jobs:
   articulated-bush-depth:
-    name: Physical bush occlusion and spring movement (desktop/mobile)
+    name: Physical bush occlusion, NPC readability and spring recovery (desktop/mobile)
     runs-on: ubuntu-latest
-    timeout-minutes: 22
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,6 +35,9 @@ jobs:
           node --check experiments/three/native-architecture-depth.mjs
           node --check experiments/three/native.js
           node --check tools/check/three-native-bush-depth.cjs
+          node --check experiments/three/native-bushes.js
+          node --check tools/check/three-native-bush.cjs
+          node --check tools/check/three-native-bush-readability.cjs
       - name: Physically verify source bush Z and independent twig deflection
         run: |
           python3 -m http.server 8181 > /tmp/native-bush-http.log 2>&1 &
@@ -43,6 +49,8 @@ jobs:
           done
           node tools/check/three-native-bush-depth.cjs http://127.0.0.1:8181
           node tools/check/three-native-tree-depth.cjs http://127.0.0.1:8181
+          node tools/check/three-native-bush.cjs http://127.0.0.1:8181
+          node tools/check/three-native-bush-readability.cjs http://127.0.0.1:8181
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -50,4 +58,6 @@ jobs:
           path: |
             shots/three-native-bushes
             shots/three-native-trees
+            shots/three-native-bush
+            shots/three-native-bush-readability
           if-no-files-found: warn
