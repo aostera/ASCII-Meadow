@@ -5,8 +5,8 @@
 set -eu
 out=${1:?usage: sh tools/build_site.sh dist}
 # Fail closed: never clean arbitrary paths, follow symlinks or publish unapproved sources.
-if [ "$out" != "dist" ] || [ -L "$out" ]; then
-  echo 'Security: deploy output must be a non-symlink dist directory' >&2
+if { [ "$out" != "dist" ] && [ "$out" != "/tmp/site/ASCII-Meadow" ]; } || [ -L "$out" ]; then
+  echo 'Security: output must be dist or the CI-only /tmp/site/ASCII-Meadow path, and not a symlink' >&2
   exit 1
 fi
 node tools/check/deploy-surface.cjs --source
@@ -50,4 +50,4 @@ cat > "$out/_headers" <<'HEADERS'
   Cache-Control: no-store
 HEADERS
 touch "$out/.nojekyll"
-node tools/check/deploy-surface.cjs --dist
+node tools/check/deploy-surface.cjs --dist "$out"
