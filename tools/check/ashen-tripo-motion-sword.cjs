@@ -103,7 +103,7 @@ fs.mkdirSync(output,{recursive:true});
      throw Error('Sword is NOT a separate real mesh attached to Tripo right wrist: '+JSON.stringify({weapon:idle.weapon,bone:idle.weaponSocketBone}));
    if(idle.cloakCells<5)
      throw Error('No cloak shading regions read from model surface: '+idle.cloakCells);
-   if(idle.pose?.animationVersion!=='Tripo-IK-v20-art-review-gait')
+   if(idle.pose?.animationVersion!=='Tripo-IK-v21-anatomical-arm-calibration')
      throw Error('New planted-feet IK gait controller did not load');
 
    const shot=async(name)=>{
@@ -178,7 +178,7 @@ fs.mkdirSync(output,{recursive:true});
      throw Error('Live native knight still wasting skin reads per tick: '+
        JSON.stringify({surface:fin.pose.soleSurface,
          reads:fin.pose.soleVertexReads}));
-   if(fin.pose?.animationVersion!=='Tripo-IK-v20-art-review-gait'||!fin.pose.weaponAttached)
+   if(fin.pose?.animationVersion!=='Tripo-IK-v21-anatomical-arm-calibration'||!fin.pose.weaponAttached)
      throw Error('New animated sword and IK state lost during play');
    if(!mobile&&fin.pose?.speed<0&&fin.pose?.heading===undefined)
      throw Error('Bad gameplay pose state');
