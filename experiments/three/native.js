@@ -9,6 +9,30 @@ import {NativeGreyMapEditor} from './native-editor-models.mjs';
 const fallbackCanvas=document.getElementById('g');
 let backend=null,depthPass=null,editorModels=null,disposed=false,fallbackReason=null,frames=0;
 let testDepthDisabled=false;
+// The player is the Ashen Vow knight repaired in Blender (blender/ashen/): a skinned GLB with baked
+// clips, rendered offscreen and printed as the game's own knight glyphs (native-ashen-blender.mjs).
+// ?ashenVow=0 keeps the original baked ASCII knight; so does any failure, editing, and the time
+// until the GLB has loaded.
+const ashenVowOn=new URLSearchParams(location.search).get('ashenVow')!=='0';
+let ashenVow=null,ashenVowError=null;
+if(ashenVowOn){
+  const originalDrawKnight=drawKnight;
+  drawKnight=function nativeAshenDrawKnight(e,G,fcw,fch){
+    if(e===player&&!editing&&GL.ok&&!GL.lost&&ashenVow?.ready){
+      try{
+        ashenVow.draw(e,G,fcw,fch,{t,CW,CH,PITCH,KG,JUMP_T,AIR0,AIR1,
+          rampCode,grect,gput,KN0,KNS,fireLightAt,knightFireBlock});
+        drawTag(e,G.gx,G.gy);
+        return;
+      }catch(error){
+        ashenVowError=String(error?.message||error);
+        console.error('The Ashen Vow knight failed; original knight restored:',error);
+        ashenVow?.dispose();ashenVow=null;
+      }
+    }
+    return originalDrawKnight(e,G,fcw,fch);
+  };
+}
 let contextLostCount=0,contextRestoredCount=0,nativeFallbackFrames=0;
 // The source game remains the authoritative painter: collect only NPC spans.
 const originalNativeRender=render;
@@ -182,6 +206,15 @@ try{
   });
 }catch(err){enableFallback(err)}
 
+if(ashenVowOn&&backend){
+  import('./native-ashen-blender.mjs').then(({NativeKnightGlyphs})=>{
+    if(!disposed&&backend)ashenVow=new NativeKnightGlyphs(backend.renderer);
+  }).catch(error=>{
+    ashenVowError=String(error?.message||error);
+    console.error('The Ashen Vow 3D knight is unavailable; original player retained:',error);
+  });
+}
+
 window.__ASCII_NATIVE__={
   get ready(){return Boolean(GB.atlasCv&&W&&H&&GB.n>1000)},
   get mode(){return GL.ok&&!GL.lost?'three':'canvas2d'},
@@ -218,10 +251,13 @@ window.__ASCII_NATIVE__={
     return true;
   },
   get error(){return fallbackReason},
+  get ashenVow(){return ashenVowOn?{active:!!ashenVow,ready:!!ashenVow?.ready,
+    error:ashenVowError||ashenVow?.stats.error||null,...(ashenVow?.stats||{})}:null},
   // Explicitly off the production route; visual art review comes at the end.
   dispose(){
     if(disposed)return;
     disposed=true;
+    ashenVow?.dispose();ashenVow=null;
     enableFallback('Native GPU bridge disposed');
     backend?.dispose();backend=null;
   }

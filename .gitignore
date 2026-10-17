@@ -34,3 +34,18 @@ id_ed25519
 *.tfstate.*
 credentials.json
 service-account*.json
+
+# Blender work (blender/): only scripts are tracked. Sources, .blend files, renders and handoff
+# archives are large or third-party; rebuild them with the scripts.
+blender/**/*.blend
+blender/**/*.blend1
+blender/ASCII-Meadow-Claude-Blender-TRIPO-Handoff/
+blender/Masked_Knight_src/
+blender/SF_Knight_v1.0/
+blender/anim/
+blender/previews/
+blender/previews_masked/
+blender/refs/
+blender/ashen/review/
+/SF_medival_knight_no_supports/
+/SF_medival_knight_with_supports/
