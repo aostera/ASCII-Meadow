@@ -47,7 +47,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Validate real production game, authored map, grass and screenshots
         run: node tools/check/production-runtime-browser.cjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: production-scenes
@@ -112,7 +112,7 @@ jobs:
           if grep -q '<script src=' dist/ascii-meadow.html; then echo 'bundle still loads external scripts'; exit 1; fi
           if grep -q 'href="styles/' dist/ascii-meadow.html; then echo 'bundle still links styles/'; exit 1; fi
           test "$(grep -c '^<script>$' dist/ascii-meadow.html)" = "$(grep -c '<script src=' index.html)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: standalone-html
           path: dist/ascii-meadow*.html
@@ -150,7 +150,7 @@ jobs:
         run: node tools/check/ruin-context-browser.cjs
       - name: Upload gothic ruins reference screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gothic-ruins-gallery
           path: shots/ruins/
@@ -159,7 +159,7 @@ jobs:
         run: node tools/check/npc-atlas-browser.cjs
       - name: NPC editor visual gallery (both renderers)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: npc-preview-gallery
           path: shots/npc-preview/
@@ -186,7 +186,7 @@ jobs:
           node tools/check/smoke.cjs "file://$GITHUB_WORKSPACE/dist/ascii-meadow.html" --out shots/bundle --quick
       - name: Upload screenshots and logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-failure
           path: |
@@ -252,14 +252,14 @@ jobs:
         working-directory: head
         run: |
           { echo "### Visual diff vs base: ${{ matrix.name }}"; echo '```'; cat shots/diff.txt 2>/dev/null || echo 'no result'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: visual-diff-${{ matrix.name }}
           path: |
             head/shots/diff/
             head/shots/diff.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure() || steps.diff.outputs.code != '0'
         with:
           name: visual-shots-${{ matrix.name }}
