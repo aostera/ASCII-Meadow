@@ -328,7 +328,7 @@ jobs:
     name: Exact-world Three.js renderer migration (original game + experimental backend)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -352,6 +352,9 @@ jobs:
           node --check tools/check/three-native-android.cjs
           node --check experiments/three/native-bushes.js
           node --check tools/check/three-native-bush.cjs
+          node --check experiments/three/native-bush-depth.mjs
+          node --check tools/check/three-native-bush-depth.cjs
+          node --check tools/check/three-native-bush-readability.cjs
           node --check experiments/three/native-npcs.js
           node --check experiments/three/native-gothic-details.js
           node --check experiments/three/native-gothic-complete.js
@@ -413,6 +416,8 @@ jobs:
           node tools/check/three-native-recovery.cjs http://127.0.0.1:8181
           node tools/check/three-native-android.cjs http://127.0.0.1:8181
           node tools/check/three-native-bush.cjs http://127.0.0.1:8181
+          node tools/check/three-native-bush-depth.cjs http://127.0.0.1:8181
+          node tools/check/three-native-bush-readability.cjs http://127.0.0.1:8181
           node tools/check/three-native-npcs.cjs http://127.0.0.1:8181
           node tools/check/three-native-depth.cjs http://127.0.0.1:8181
           node tools/check/three-native-tree-depth.cjs http://127.0.0.1:8181
@@ -455,6 +460,8 @@ jobs:
             shots/three-native-recovery/
             shots/three-native-android/
             shots/three-native-bush/
+            shots/three-native-bushes/
+            shots/three-native-bush-readability/
             shots/three-native-npcs/
             shots/three-native-depth/
             shots/three-native-trees/
