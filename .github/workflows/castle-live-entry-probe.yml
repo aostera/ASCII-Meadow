@@ -13,6 +13,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate built CSP: strict exterior and independent Three policy
+        run: |
+          sh tools/build_site.sh dist
+          node - <<'NODE'
+          const fs=require('node:fs'),assert=require('node:assert/strict');
+          const blocks=fs.readFileSync('dist/_headers','utf8').split(/(?=^\/\S)/m);
+          const wild=blocks.find(x=>x.startsWith('/*\n'));
+          const native=blocks.find(x=>x.startsWith('/experiments/three/*\n'));
+          const home=blocks.find(x=>x.startsWith('/\n'));
+          assert(wild&&!/Content-Security-Policy:/i.test(wild),'Wildcard must NOT apply additional CSP to native');
+          assert(native?.includes('https://cdn.jsdelivr.net')&&native.includes('sha256-'));
+          assert(home?.includes("script-src 'self'"));
+          console.log('PASS CSP isolation: exterior remains strict, native gets only pinned-CDN policy');
+          NODE
       - name: Check production-like published experiment URL
         run: |
           set -eu
@@ -26,3 +46,17 @@ jobs:
               *) echo "PUBLISHED_ASSET_UNAVAILABLE: $p" ;;
             esac
           done
+      - run: npx playwright install --with-deps chromium
+      - name: Browser-test actual updated Cloudflare feature preview
+        run: |
+          base='https://fix-three-castle-entry-20261017-ascii-meadow.aloster36.workers.dev'
+          # Build deployment is asynchronous; verify that the new CSP was
+          # published before testing the browser.
+          for i in $(seq 1 40); do
+            curl -fsSL --max-time 15 "$base/experiments/three/native.html" -o /tmp/native-page || true
+            if [ -s /tmp/native-page ] && curl -sSLI --max-time 15 "$base/experiments/three/native.html" | grep -iq 'cdn.jsdelivr.net'; then
+              break
+            fi
+            sleep 5
+          done
+          node tools/check/three-castle-live.cjs "$base"
