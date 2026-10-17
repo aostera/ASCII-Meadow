@@ -102,14 +102,15 @@ def main():
                 raise RuntimeError("Truncated Git object")
             if kind == "tree":
                 continue
-            if b"\x00" in payload[:8192]:
-                binary += 1
-                continue
             sample = payload[:8192]
-            if sample and sum(c < 9 or 13 < c < 32 for c in sample) > len(sample) * .04:
+            binary_content = b"\x00" in sample or (
+                bool(sample) and sum(c < 9 or 13 < c < 32 for c in sample) > len(sample) * .04
+            )
+            if binary_content:
                 binary += 1
-                continue
-            text = payload.decode("utf-8", "replace")
+            # Scan printable/UTF-8 strings inside media/binary assets too.
+            # Keys can leak through PNG metadata, GLB extras and compressed bundles.
+            text = payload.decode("utf-8", "ignore" if binary_content else "replace")
             checked += 1
             filename = safe_path(name) if name else f"[{kind} object]"
             for title, rx in RX:
@@ -129,7 +130,7 @@ def main():
         proc.stdout.close()
         proc.wait(timeout=10)
 
-    print(f"Reachable objects: {len(objs)}; inspected text/commits/tags: {checked}; "
+    print(f"Reachable objects: {len(objs)}; inspected blobs/commits/tags: {checked}; "
           f"commits: {commits}; binary: {binary}; oversized: {oversized}.")
     if not findings:
         print("No detections using configured patterns. Not a guarantee against all leaks.")
