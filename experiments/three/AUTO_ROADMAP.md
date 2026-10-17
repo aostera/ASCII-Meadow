@@ -16,7 +16,7 @@
 | T01 | DONE (аудит) | Desktop + mobile viewport, 4 здания; это не финальный art sign-off |
 | T04 | IN_REVIEW | [#59](https://github.com/aostera/ASCII-Meadow/pull/59) + [#60](https://github.com/aostera/ASCII-Meadow/pull/60) merged. Проверить тени всех объектов с проёмами, поворотами и undo/redo без прямоугольников/ghost-shadows |
 | T05 | IN_REVIEW | Растительность/глубина/пружины. Куст при контакте не раздвигается (решение владельца 17.10), а качается от шагов — [PR #65](https://github.com/aostera/ASCII-Meadow/pull/65); реальный телефон остаётся gate |
-| T06 | IN_PROGRESS | Tents/fences/fires/road/stone/Gothic props, collision и grounding без плоских подмен |
+| T06 | IN_PROGRESS | Tents/fences/fires/road/stone/Gothic props, collision и grounding без плоских подмен. Camp QA на experiment PR: tent/fence Z + fire order/collision (desktop+phone). Следующее: конкретные замечания владельца по лагерю, дороги/декор |
 | T07 | IN_PROGRESS | Touch pan/pinch [#62](https://github.com/aostera/ASCII-Meadow/pull/62) merged (`73cf6c8`); editor scroll, HUD, lifecycle, контекст и настоящий Safari |
 | T08 | IN_PROGRESS (baseline draft) | [#61](https://github.com/aostera/ASCII-Meadow/pull/61) — baseline native perf, никаких недоказанных FPS |
 | T02 | PARKED | Замок: [#54](https://github.com/aostera/ASCII-Meadow/pull/54) draft, невидимый рельеф не принимать как готовую геометрию |
