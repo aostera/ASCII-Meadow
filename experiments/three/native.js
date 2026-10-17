@@ -258,13 +258,19 @@ if(new URLSearchParams(location.search).get('knightDiag')==='1'){
   diag.style.cssText='position:fixed;left:6px;top:6px;z-index:99;margin:0;padding:4px 6px;'+
     'font:11px/1.3 monospace;color:#ddd;background:rgba(0,0,0,.75);pointer-events:none;white-space:pre-wrap;max-width:94vw';
   document.body.append(diag);
+  const pageErrors=[];
+  addEventListener('error',e=>pageErrors.push(String(e.message||e.error||e.type)));
+  addEventListener('unhandledrejection',e=>pageErrors.push('promise: '+String(e.reason?.message||e.reason)));
   setInterval(()=>{
+    const g=ashenVow?.knight?.userData?.gltf;
+    const load=g?`\nglb: ${(g.bytes/1048576).toFixed(2)}${g.total?'/'+(g.total/1048576).toFixed(2):''} MB, ${((performance.now()-g.started)/1000).toFixed(0)} s${g.loaded?' loaded':''}`:'';
     const s=ashenVow?.stats,err=ashenVowError||s?.error||s?.asyncError||null;
     const knight=!ashenVowOn?'original (ashenVow=0)':!backend?'original (no Three backend)':
       !(GL.ok&&!GL.lost)?'original (WebGL off/lost)':editing?'original (editor)':
       ashenVow?.ready?'Ashen Vow':ashenVow?'original (model loading)':err?'original (failed)':'original (module loading)';
     diag.textContent=`knight: ${knight}\nmode: ${GL.ok&&!GL.lost?'three':'canvas2d'}${fallbackReason?' ('+fallbackReason+')':''}`+
-      `\nlod: ${s?.lod||'-'} frames: ${s?.frames||0} read: ${s?.asyncRead?'async':'sync'}`+(err?`\nerror: ${err}`:'');
+      `\nlod: ${s?.lod||'-'} frames: ${s?.frames||0} read: ${s?.asyncRead?'async':'sync'}`+load+(err?`\nerror: ${err}`:'')+
+      (pageErrors.length?`\npage: ${pageErrors.slice(-2).join(' | ')}`:'');
   },500);
 }
 

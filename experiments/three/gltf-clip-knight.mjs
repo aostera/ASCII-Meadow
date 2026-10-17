@@ -15,7 +15,7 @@ export function createClipKnight(THREE, {
   root.name = 'glTF clip knight';
   const holder = new THREE.Group();
   root.add(holder);
-  const st = {loaded: false, error: null, mixer: null, actions: {}, current: null, model: null,
+  const st = {loaded: false, error: null, started: performance.now(), bytes: 0, total: null, mixer: null, actions: {}, current: null, model: null,
     motion: 'idle', clip: null, timeScale: 1};
   root.userData.gltf = st;
   root.userData.pxPerUnit = null;            // source sprite pixels per model unit, set by the caller
@@ -48,7 +48,7 @@ export function createClipKnight(THREE, {
     st.loaded = true;
     play('Idle', 0);
     onLoad?.(root);
-  }, undefined, err => {
+  }, ev => { st.bytes = ev.loaded; st.total = ev.total || null; }, err => {
     st.error = String(err?.message || err);
     onError?.(err);
   });
