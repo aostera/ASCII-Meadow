@@ -114,8 +114,8 @@ export class CastleInterior{
     this.box(cx,CASTLE_UPPER_HEIGHT+.004,z,
      room.x1-room.x0,.02,.06,'black',this.upperGroup);
    const railY=CASTLE_UPPER_HEIGHT+.52;
-   this.box(cx,railY,room.z0,.19,1.05,.2,'rib',this.upperGroup);
-   this.box(cx,railY,room.z1,.19,1.05,.2,'rib',this.upperGroup);
+   this.box(cx,railY,room.z0,room.x1-room.x0,1.05,.2,'rib',this.upperGroup);
+   this.box(cx,railY,room.z1,room.x1-room.x0,1.05,.2,'rib',this.upperGroup);
   }
   for(const side of [-1,1]){
    const x=side*28.5;
