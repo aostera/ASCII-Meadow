@@ -1,0 +1,4 @@
+#!/bin/sh
+# Enabled on each developer clone by tools/security/install-hooks.sh.
+set -eu
+exec python3 tools/check/staged-secrets.py
