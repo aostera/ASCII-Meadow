@@ -36,6 +36,22 @@ Concrete issues found in `ashen-tripo-native-rig.mjs`:
 
 Claude/Blender acceptance: export matched whole-body Idle and at least 60 frames each of Walk, Run, Jump; add named foot targets/heel/toe controls or provide consistent original-bone mapping. Capture **full-resolution** source-vs-edited feet/knees/front robe at front, side and back plus at least one 60-frame contact sheet and native ASCII map screenshots (links to full files, not small chat thumbnails). For every planted 60 Hz sample report actual boot-sole ground penetration, lateral pin-slip distance, left/right knee angles, toe-off and foot rocker envelope; do not claim "perfect" just from the movement clip.
 
+## 2026-10-17 — New actual modular technical GLB (LOCAL USER HANDOFF)
+
+The user now has an additional **downloadable ChatGPT conversation ZIP**:
+`ASCII-Meadow-Tripo-Modular-Legs-Claude-Blender.zip` (13 files, 15,975,644 bytes), containing:
+
+- `ashen_tripo_MODULAR_SEGMENTS_REVIEW_ONLY.glb`: 21 separate skinned mesh nodes from the **same original 40-joint GLB**, each individually selectable in Blender, with **no source geometry invented**;
+- the byte-for-byte unchanged `ashen_tripo_original_UNMODIFIED.glb`, and separate V22 `REVIEW_ONLY` motion reference;
+- `modularize_tripo_source.py` — skin-influence-weighted face partition, with provisional front tabard/waist split;
+- `validate_modular_tripo.py` and machine-readable validation: **399,027 original faces = 399,027 modular faces**, original 247,713 source vertices, each oriented triangle's complete position/normal/skin joint/weight records preserved byte-for-byte after reconstruction, same inverse bind matrices, same grey source PBR parameters and all 40 skeleton joints;
+- `blender_setup_modular_legs.py` — imports the 21 meshes, organizes semantic mesh collections, adds foot/toe/knee-pole **guides with IK constraints deliberately disabled** pending art calibration. This script has been syntax-checked but **has not been run in Blender** in the current environment;
+- real-data orthographic front/back/side mesh partition comparison PNGs. Diagnostic part colors are **not PBR materials**; export keeps original grey.
+
+**Important limitation:** original source mesh is a fused sculpt with only one material, so weighted-joint partitioning DOES NOT mean clean artist-authored armor seams and detached cloth. `ARM_*_ArmorAndSleeve`, `LEG_*_ThighAndTasset`, `BODY_*_Mixed` contain mixed source shapes. `CLOTH_*_CANDIDATE_*` is exploratory geometry, not a finished deformable tabard. Claude must inspect/repair seam geometry, cloth materials, arm weighting, knee anatomy and actual IK in Blender. New modular GLB is a **DCC staging source**, not a game-optimized replacement (21 draw calls). The source GLB remains unchanged and no art approval is claimed.
+
+**Recipient note:** archive is attached to the current ChatGPT conversation; hand it to Claude locally. GitHub PR currently stores documentation, NOT the new 8.56 MB modular binary (do not assume it is checked in).
+
 ## Scope for Claude / Blender
 
 - Import the unmodified Tripo source into a NEW Blender file and save untouched baseline. Import the V22 reference GLB into a **separate** Blender file. Never replace original with the broken animation reference.
