@@ -35,9 +35,10 @@ fs.mkdirSync(dir,{recursive:true});
      const gl=n.renderer.getContext(),canvas=n.renderer.domElement;
      const spans=[];
      function region(f){
-       // Fire base and pot: a few cells around the authored fire foot.
+       // Fire, pot and both knight stances (behind: feet just above the
+       // fire; in front: body over the fire base).
        const scale=VZ*DPR,x0=(f.x-3-camX)*CW*scale,x1=(f.x+3-camX)*CW*scale;
-       const top=(f.y-2-camY)*CH*scale,bottom=(f.y+2-camY)*CH*scale;
+       const top=(f.y-6-camY)*CH*scale,bottom=(f.y+4-camY)*CH*scale;
        const x=Math.max(0,Math.floor(x0)),w=Math.min(canvas.width,Math.ceil(x1))-x;
        const y=Math.max(0,Math.floor(canvas.height-bottom));
        const h=Math.min(canvas.height,Math.ceil(canvas.height-top))-y;
@@ -47,8 +48,9 @@ fs.mkdirSync(dir,{recursive:true});
        return out;
      }
      function place(f,dy){
-       player.x=f.x;player.y=f.y+dy;player.tx=player.x;player.ty=player.y;
-       updateCamera(0,true);
+       // One camera per fire, so both stances compare the same screen pixels.
+       player.x=f.x;player.y=f.y;updateCamera(0,true);
+       player.y=f.y+dy;player.tx=player.x;player.ty=player.y;
        spans.length=0;render();
        const fire=spans.find(s=>s.kind==='fire'&&s.src===f);
        const knight=spans.find(s=>s.kind==='knight');
@@ -91,8 +93,9 @@ fs.mkdirSync(dir,{recursive:true});
        Object.assign(player,oldPlayer);updateCamera(0,true);render();
      }
      const bad=results.filter(r=>!r.behindPaintsFirst||!r.frontPaintsLast||
-       !r.solidCentre||!r.openBehind||!r.openFront||r.fireGlyphs<4);
-     if(results.length<2||bad.length||!results.some(r=>r.pixelDelta>=20))
+       !r.solidCentre||!r.openBehind||!r.openFront||r.fireGlyphs<4||r.pixelDelta<20);
+     if(results.length!==fires.length||bad.length||
+        results.some(r=>r.pixelDelta<20))
        throw Error('Camp fire order/collision not confirmed '+
          JSON.stringify(results));
      if(JSON.stringify(MEADOW_MAP)!==oldMap)
