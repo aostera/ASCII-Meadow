@@ -117,3 +117,20 @@ html,body { overscroll-behavior: none; }
  .castle-interior-head strong{font-size:14px}
  .castle-interior-head span{font-size:10px}
 }
+
+/* One clear contextual action at stairs or gate, also usable on touch.
+   Never cover the movement arrows or the exterior's editor. */
+.castle-interior-action{position:absolute;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));
+ transform:translateX(-50%);z-index:10;max-width:min(360px,calc(100vw - 35px));
+ border:1px solid #819095;background:#1a2226ee;color:#dce7e9;
+ font:500 12px/1.45 var(--mono,monospace);padding:11px 14px;
+ text-align:center;box-shadow:0 4px 22px #000b;pointer-events:auto;
+ cursor:pointer;touch-action:manipulation}
+.castle-interior-action[hidden]{display:none!important}
+.castle-interior-action:focus-visible{outline:2px solid #b2c6d0;outline-offset:3px}
+.castle-interior-floor{font-size:10px;font-weight:600;color:#b8c7c8}
+@media(pointer:coarse),(max-width:700px){
+ .castle-interior-action{left:14px;bottom:calc(34px + env(safe-area-inset-bottom));
+   transform:none;max-width:min(160px,calc(100vw - 210px));padding:11px 10px}
+ .castle-interior-leave{bottom:calc(83px + env(safe-area-inset-bottom))}
+}
