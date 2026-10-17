@@ -1,7 +1,7 @@
 // Native-only contact interaction for the ORIGINAL authored Gothic bush.
 // Branch groups bend with delayed springs around passing animals/people.
-// The former implementation opened a single rigid rectangular slit; now
-// backing and leaves travel together and follow a nonuniform crown profile.
+// Backing and leaves travel together and follow a nonuniform crown profile;
+// a body in the crown shakes it, it never cuts it open.
 // No change to authored glyph IDs, luminance, alpha, map or source assets.
 const nativeOriginalUpdateFlora=updateFlora;
 const nativeOriginalDrawFlora=drawFlora;
@@ -44,49 +44,27 @@ function nativeBushTwigIndex(localX,radius){
 function nativeBushSpring(position,velocity,target,dt){
   const step=Math.min(.05,Math.max(0,dt));
   const k=target===0?42:85;
-  const damping=target===0?9:13;
+  const damping=target===0?9:6;
   const v=(velocity+(target-position)*k*step)*Math.exp(-damping*step);
   return [nativeClamp(position+v*step,-1.6,1.6),v];
 }
-// The body of the actor inside the crown is a volume foliage cannot occupy.
-// Leaves and clumps in the body column are pushed sideways, compressing the
-// crown beside it rather than piling into a straight-edged slit. The woody
-// base stays anchored, and the clearance follows nativePart, so the crown
-// closes again smoothly after the actor has left. `pad` widens the column
-// for 3D depth clumps by their own radius; `clearH` is their true height
-// above the ground (the screen height of a clump in front of the body is
-// lower than its real height, and would leave it anchored like the stems).
-function nativeBushBodyClear(f,x,h,shift,pad){
-  const part=f.nativePart||0,width=f.nativePartWidth||0;
-  if(!(part>.003)||!(width>0))return shift;
-  const w=width+(pad||0),d=x-(f.nativePartCenter||0),reach=w*2;
-  if(Math.abs(d)>=reach+Math.abs(shift))return shift;
-  const base=nativeClamp(h/.28,0,1),anchor=base*base*(3-2*base);
-  const ragged=.86+.14*Math.sin(h*9.7+(f.ph||0)*3.1);
-  // The opening scales with contact; a clump's radius is added in full on
-  // top of it (ramped in over the first quarter of contact, so it does not
-  // pop), so its edge, not only its centre, leaves the opening.
-  const open=width*part*anchor*ragged;
-  if(!(open>.05))return shift;
-  const clear=open+(pad||0)*Math.min(1,part*4)*anchor;
-  const side=d<-1e-4?-1:d>1e-4?1:(shift<0?-1:1),a=Math.abs(d);
-  const pushed=a<reach?a+clear*(1-a/reach):a;
-  const p=Math.max(side*(d+shift),pushed,clear);
-  return side*p-d;
-}
-function nativeBushBranchShift(f,x,yFactor,pad,clearH){
+// The crown is never cut open: an actor in the bush shakes it. Each stride
+// kicks a few nearby boughs (an impulse into their springs), the crown
+// trembles while the actor keeps moving, leans a little away from the body,
+// and rings down with damped oscillation once it has passed.
+const NATIVE_BUSH_KICK=6.5,NATIVE_BUSH_STRIDE=.24;
+function nativeBushBranchShift(f,x,yFactor){
   const R=Math.max(4,f.v.R),branches=f.nativeTwigs;
   if(!branches)return 0;
   const normalized=nativeClamp((x/R+1)*.5,0,1)*(NATIVE_BUSH_TWIGS-1);
   const lo=Math.floor(normalized),hi=Math.min(NATIVE_BUSH_TWIGS-1,lo+1);
   const blend=normalized-lo,smooth=blend*blend*(3-2*blend);
   const bend=branches[lo]*(1-smooth)+branches[hi]*smooth;
-  // The woody lower stalk stays anchored. The mid-crown displaces visibly
-  // and the soft upper tips have lighter movement, not a circular empty hole.
+  // The woody lower stalk stays anchored, the mid-crown and soft upper tips
+  // swing.
   const h=nativeClamp(yFactor,0,1);
   const flex=Math.pow(Math.sin(Math.PI*(h*.83+.07)),.75);
-  return nativeBushBodyClear(f,x,clearH===undefined?h:nativeClamp(clearH,0,1),
-    bend*R*.46*flex,pad);
+  return bend*R*.36*flex;
 }
 updateFlora=function(dt){
   nativeOriginalUpdateFlora(dt);
@@ -104,36 +82,49 @@ updateFlora=function(dt){
       if(c>target){target=c;source=a}
     }
     f.nativePart=nativeBushApproach(f.nativePart||0,target,dt);
+    // How fast the actor in the crown is actually moving (cells/s, 0..1).
+    let stride=0;
     if(source){
       f.nativePartCenter=(source.x-f.x)*CW;
-      // Half of the drawn body box: the column the boughs must clear.
-      const body=geomOf(source);
-      f.nativePartWidth=nativeClamp(body.w*.3,CW*1.2,R*.75);
-    }
+      const last=f.nativeSource===source?f.nativeSourceAt:null;
+      if(last)stride=nativeClamp(Math.hypot(source.x-last[0],
+        (source.y-last[1])*CH/CW)/dt/9,0,1);
+      f.nativeSource=source;f.nativeSourceAt=[source.x,source.y];
+      // The source rustle (single leaves twitching) for every actor, not
+      // only the knight.
+      f.rust=Math.max(f.rust||0,target*stride);
+    }else{f.nativeSource=null;f.nativeSourceAt=null}
     const twigs=f.nativeTwigs||(f.nativeTwigs=new Float32Array(NATIVE_BUSH_TWIGS));
     const velocity=f.nativeTwigVel||(f.nativeTwigVel=new Float32Array(NATIVE_BUSH_TWIGS));
+    // A stride lands every NATIVE_BUSH_STRIDE seconds of movement.
+    let kick=false;
+    if(source&&stride>.05){
+      f.nativeStride=(f.nativeStride||0)+dt*stride;
+      if(f.nativeStride>=NATIVE_BUSH_STRIDE){f.nativeStride-=NATIVE_BUSH_STRIDE;kick=true}
+    }
+    const step=Math.floor((f.nativeKicks=(f.nativeKicks||0)+(kick?1:0)));
     for(let j=0;j<NATIVE_BUSH_TWIGS;j++){
       const branchX=(j/(NATIVE_BUSH_TWIGS-1)*2-1)*R*.88;
       let force=0;
       if(source){
         const gap=branchX-f.nativePartCenter;
-        const dist=Math.abs(gap)/(R*.88);
-        const falloff=Math.max(0,1-dist);
-        // Contact moves only reachable boughs. The alternate asymmetric
-        // offsets avoid nine branches splitting into a uniform symmetric V.
-        const spread=gap<-R*.025?-1:gap>R*.025?1:
-          (j<NATIVE_BUSH_TWIGS/2?-1:1);
+        const falloff=Math.max(0,1-Math.abs(gap)/(R*.88));
+        const spread=gap<-R*.025?-1:gap>R*.025?1:(j<NATIVE_BUSH_TWIGS/2?-1:1);
         const shoulder=.65+.35*Math.cos((j*2.3+f.ph)*.9);
-        force=spread*target*falloff*shoulder;
+        // A slight lean away from the body; the motion comes from kicks.
+        force=spread*target*falloff*shoulder*.2;
+        if(kick){
+          const r=hash(j+step*17,Math.floor(f.ph*1000));
+          velocity[j]+=(r-.5)*2*NATIVE_BUSH_KICK*target*(.35+.65*falloff)*
+            (.6+.4*stride);
+        }
       }
       const spring=nativeBushSpring(twigs[j],velocity[j],force,dt);
       twigs[j]=spring[0];velocity[j]=spring[1];
     }
-    // Keep the last contact column until the boughs have settled, so a
-    // closing crown never jumps to the bush centre halfway through.
     if(!source&&f.nativePart<.003){
       f.nativePart=0;
-      if(!twigs.some(x=>Math.abs(x)>.012)){f.nativePartCenter=0;f.nativePartWidth=0}
+      if(!twigs.some(x=>Math.abs(x)>.012)){f.nativePartCenter=0;f.nativeStride=0}
     }
   }
 };
@@ -179,7 +170,7 @@ drawFlora=function(f){
 window.__ASCII_NATIVE_BUSHES__={
   approach:nativeBushApproach,shift:nativeBushLeafShift,
   contact:nativeBushContact,spring:nativeBushSpring,
-  branchShift:nativeBushBranchShift,bodyClear:nativeBushBodyClear,sourceDraw:nativeOriginalDrawFlora,
+  branchShift:nativeBushBranchShift,sourceDraw:nativeOriginalDrawFlora,
   get counts(){return {
     active:flora.filter(f=>f.v.type==='bush'&&
       (f.nativePart>.05||f.nativeTwigs?.some(x=>Math.abs(x)>.05))).length,

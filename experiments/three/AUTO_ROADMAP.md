@@ -15,13 +15,14 @@
 | T00 | DONE | Первоначальный full CI экспериментального native |
 | T01 | DONE (аудит) | Desktop + mobile viewport, 4 здания; это не финальный art sign-off |
 | T04 | IN_REVIEW | [#59](https://github.com/aostera/ASCII-Meadow/pull/59) + [#60](https://github.com/aostera/ASCII-Meadow/pull/60) merged. Проверить тени всех объектов с проёмами, поворотами и undo/redo без прямоугольников/ghost-shadows |
-| T05 | IN_REVIEW | Растительность/глубина/пружины; читаемость NPC в кустах и восстановление веток — [PR #64](https://github.com/aostera/ASCII-Meadow/pull/64); реальный телефон остаётся gate |
+| T05 | IN_REVIEW | Растительность/глубина/пружины. Куст при контакте не раздвигается (решение владельца 17.10), а качается от шагов — [PR #65](https://github.com/aostera/ASCII-Meadow/pull/65); реальный телефон остаётся gate |
 | T06 | IN_PROGRESS | Tents/fences/fires/road/stone/Gothic props, collision и grounding без плоских подмен |
 | T07 | IN_PROGRESS | Touch pan/pinch [#62](https://github.com/aostera/ASCII-Meadow/pull/62) merged (`73cf6c8`); editor scroll, HUD, lifecycle, контекст и настоящий Safari |
 | T08 | IN_PROGRESS (baseline draft) | [#61](https://github.com/aostera/ASCII-Meadow/pull/61) — baseline native perf, никаких недоказанных FPS |
 | T02 | PARKED | Замок: [#54](https://github.com/aostera/ASCII-Meadow/pull/54) draft, невидимый рельеф не принимать как готовую геометрию |
 | T03 | PARKED | Три разные руины: [#58](https://github.com/aostera/ASCII-Meadow/pull/58) draft/stacked |
-| T09 | TODO | Full-game parity, QA реальных устройств, возврат GPU/fallback, контроль карты, художественное решение владельца |
+| T10 | TODO | **Управление на телефоне и планшете** (владелец 17.10: «супер корявое»). Сейчас в `src/core/input.js` ходьба = удержание и протяжка к точке пальца относительно рыцаря, бег только при протяжке дальше 28 клеток, прыжок = короткий тап рядом с рыцарем, тап в стороне = порыв ветра, «использовать» только тапом по рамке; нет видимого джойстика/кнопок и мультитача. Сделать native-слой: плавающий стик + кнопки прыжка/действия/бега, мёртвая зона, без конфликта с редактором и pinch, phone portrait/landscape и планшет; тест Chromium touch + отметка о непроверенном реальном iOS/Android |
+| T09 | TODO | Full-game parity (после T10), QA реальных устройств, возврат GPU/fallback, контроль карты, художественное решение владельца |
 
 **Технически подтверждено:** head `c1f12b6496` после #60 имеет [CI success](https://github.com/aostera/ASCII-Meadow/actions/runs/38944223018) и [editor/character success](https://github.com/aostera/ASCII-Meadow/actions/runs/38944215332). Обновлённые PR проверять по их собственному CI, а не по зелёному предыдущей базы.
 
