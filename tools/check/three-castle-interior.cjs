@@ -65,6 +65,23 @@ fs.mkdirSync(out,{recursive:true});
    await page.waitForFunction(()=>window.__ASCII_NATIVE__?.castleInterior?.active===false);
    assert.equal(await page.evaluate(()=>JSON.stringify(MEADOW_MAP)),first.map,
     label+' returning outdoors mutated map');
+   // The production-like flow is the *actual E interaction at the exterior
+   // castle gate*, not the QA query string. Teleport the TEST knight only to
+   // the authored gate (never change the map), then use normal input.
+   await page.evaluate(()=>{
+     const spot=props.flatMap(p=>p.spots||[]).find(s=>s._nativeInterior);
+     if(!spot)throw Error('No live castle gate interaction in world props');
+     player.x=spot.x;player.y=spot.y;player.hT=140;
+   });
+   await page.waitForFunction(()=>activeSpot?.label==='войти в замок',
+      undefined,{timeout:15000});
+   await page.keyboard.press('e');
+   await page.waitForFunction(()=>window.__ASCII_NATIVE__?.castleInterior?.active===true,
+      undefined,{timeout:10000});
+   await page.keyboard.press('Escape');
+   await page.waitForFunction(()=>window.__ASCII_NATIVE__?.castleInterior?.active===false);
+   assert.equal(await page.evaluate(()=>JSON.stringify(MEADOW_MAP)),first.map,
+     label+' exterior gate roundtrip changed authored map');
    assert.equal(errors.length,0,label+' script errors: '+errors.join(' | '));
    console.log('PASS castle interior '+label+': nine rooms, one native renderer, movement, no map mutation, return');
    await context.close();
