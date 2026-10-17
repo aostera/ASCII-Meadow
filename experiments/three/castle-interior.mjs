@@ -185,7 +185,8 @@ export class CastleInterior{
  syncGate(spot){
   if(!spot||spot._nativeInterior)return;
   spot._nativeInterior=true;spot.label='войти в замок';
-  spot.action='use';spot.need=()=>true;spot.use=()=>this.enter();
+  spot.action='use';spot.need=()=>this.canEnter();
+  spot.use=()=>{if(this.canEnter())this.enter()};
  }
  updateGateUi(near){this.gateButton.hidden=this.active||!near||!this.canEnter()}
  enter(){
