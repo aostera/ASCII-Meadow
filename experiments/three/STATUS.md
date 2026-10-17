@@ -35,6 +35,7 @@
 | T07 | IN_PROGRESS | Сенсорный pan/pinch редактора — [PR #62](https://github.com/aostera/ASCII-Meadow/pull/62) **merged** (`73cf6c8`, CI зелёный, только эмуляция Chromium); mobile lifecycle, HUD, WebGL recovery и реальный Safari остаются gate |
 | T08 | IN_PROGRESS — baseline | [PR #61](https://github.com/aostera/ASCII-Meadow/pull/61) **draft**; нельзя объявлять доказанными аппаратные FPS |
 | T02 / T03 | PARKED | Детализация замка [#54](https://github.com/aostera/ASCII-Meadow/pull/54) и трёх руин [#58](https://github.com/aostera/ASCII-Meadow/pull/58) — draft, не мержить до снятия приоритета системного переноса; у #54 был визуально невидимый relief |
+| T10 | IN_REVIEW | Управление пальцем в `native.html`: плавающий стик, кнопки прыжка/действия, мультитач — PR в experiment (см. AUTO_ROADMAP). Только Chromium-эмуляция; реальные Android/iOS не проверены |
 | T09 | TODO | Сквозная parity, реальные Android/iOS, art sign-off и только потом **явное** разрешение владельца на `main` |
 
 Персонажи/Ashen Vow/Tripo — отдельные draft PR #38, #41–45, #52, #55, #56 (#54 — это T02 замок, не персонаж). **Не смешивать** с экологической очередью T04–T09 и не списывать платные кредиты без разрешения. Наличие GLB в feature-ветке не означает интеграцию в базу.
