@@ -1,17 +1,24 @@
-name: Published Castle Entry Probe
+name: Published Castle Entry QA
 
 on:
   push:
-    branches: ['fix/three-castle-entry-*']
+    branches:
+      - experiment/threejs-ascii-prototype
+      - 'fix/three-castle-entry-*'
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: published-castle-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  probe:
+  published-castle:
+    name: Verify real Cloudflare castle entrance (desktop / phone)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,7 +26,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Validate separate security headers for exterior and Three
+      - name: Check non-inherited CSP in generated Cloudflare assets
         run: |
           sh tools/build_site.sh dist
           node - <<'NODE'
@@ -28,35 +35,32 @@ jobs:
           const wild=blocks.find(x=>x.startsWith('/*\n'));
           const native=blocks.find(x=>x.startsWith('/experiments/three/*\n'));
           const home=blocks.find(x=>x.startsWith('/\n'));
-          assert(wild&&!/Content-Security-Policy:/i.test(wild),'Wildcard must NOT apply additional CSP to native');
+          assert(wild&&!/Content-Security-Policy:/i.test(wild),
+            'Wildcard policy would block Three.js even with a narrower CDN policy');
           assert(native?.includes('https://cdn.jsdelivr.net')&&native.includes('sha256-'));
           assert(home?.includes("script-src 'self'"));
-          console.log('PASS CSP isolation: exterior remains strict, native gets only pinned-CDN policy');
+          console.log('PASS Cloudflare CSP isolation (exterior strict; native pinned CDN + importmap)');
           NODE
-      - name: Check production-like published experiment URL
+      - run: npx playwright install --with-deps chromium
+      - name: Open REAL published preview and enter/exit the castle in Chromium
         run: |
           set -eu
-          site='https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev'
-          for p in /experiments/three/native.html /experiments/three/native.js /experiments/three/castle-interior.mjs /experiments/three/castle-interior-layout.mjs /src/world/castle.js; do
-            status=$(curl -L -sS --max-time 25 -D /tmp/entry-headers -o /tmp/entry-body -w '%{http_code}' "$site$p" || true)
-            echo "$p status=$status bytes=$(wc -c </tmp/entry-body 2>/dev/null || echo 0)"
-            grep -i -E '^(content-type|content-security-policy|location):' /tmp/entry-headers | cut -c 1-300 || true
-            case "$status" in
-              200) ;;
-              *) echo "PUBLISHED_ASSET_UNAVAILABLE: $p" ;;
-            esac
-          done
-      - run: npx playwright install --with-deps chromium
-      - name: Browser-test actual updated Cloudflare feature preview
-        run: |
-          base='https://fix-three-castle-entry-20261017-ascii-meadow.aloster36.workers.dev'
-          # Build deployment is asynchronous; verify that the new CSP was
-          # published before testing the browser.
-          for i in $(seq 1 40); do
-            curl -fsSL --max-time 15 "$base/experiments/three/native.html" -o /tmp/native-page || true
-            if [ -s /tmp/native-page ] && curl -sSLI --max-time 15 "$base/experiments/three/native.html" | grep -iq 'cdn.jsdelivr.net'; then
-              break
+          case "$GITHUB_REF_NAME" in
+            experiment/threejs-ascii-prototype)
+              base='https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev' ;;
+            fix/three-castle-entry-*)
+              base='https://fix-three-castle-entry-20261017-ascii-meadow.aloster36.workers.dev' ;;
+            *) echo 'Unsupported Cloudflare preview branch' >&2; exit 2 ;;
+          esac
+          revision=$(git rev-parse --short=12 HEAD)
+          ready=0
+          # Do not accidentally accept a green test against a prior build.
+          for i in $(seq 1 48); do
+            if curl -fsSL --max-time 12 "$base/build.json" -o /tmp/castle-build.json &&
+               grep -Fq "\"revision\":\"$revision\"" /tmp/castle-build.json; then
+              ready=1; break
             fi
             sleep 5
           done
+          test "$ready" -eq 1 || { echo 'Updated Cloudflare preview not published'; exit 1; }
           node tools/check/three-castle-live.cjs "$base"
