@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createAshenGothicLongsword} from './ashen-gothic-longsword.mjs';
+import {locateBootSoleVertices,groundedSoleTarget,advanceSoleCorrection} from './ashen-sole-contact.mjs';
 
 export const TRIPO_V2_GLB = new URL('./assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb',import.meta.url).href;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -24,6 +25,7 @@ function setupBones(model){
   // skin.joints INDEX order, weights and inverse-bind matrices. Use exact
   // original Tripo skin indices as stable animation bindings.
   const sets={
+    pelvis:find('tripo::Root',0),
     spine:find('tripo::Spine_0',1),
     chest:find('tripo::Spine_1',2),
     head:find('tripo::Head_0',4),
@@ -46,23 +48,133 @@ function setupBones(model){
           find('tripo::0_Right_Limb_2',38)]
   };
   model.updateMatrixWorld(true);
-  // Record rest transforms once. World -> each bone's LOCAL space, so
-  // Tripo's unusual initial quaternions never get overwritten by Euler zero.
+  // Record rest transforms once. Animate around ANATOMICAL model axes,
+  // not fixed scene axes. The model is permanently reoriented +X -> +Z
+  // by its parent; using uncorrected world Z to flex the knees twists
+  // them sideways when the parent rotation is -90 degrees.
+  // Convert source model axes -> world -> bone-local rest coordinates.
+  const modelWorldQ=new THREE.Quaternion();
+  model.getWorldQuaternion(modelWorldQ);
+  const modelAxes=[X,Y,Z].map(axis=>axis.clone().applyQuaternion(modelWorldQ));
   const rest=new Map();
   for(const b of skin.bones){
     const q=new THREE.Quaternion();
     b.getWorldQuaternion(q);
+    const inverseWorld=q.clone().invert();
     rest.set(b,{q:b.quaternion.clone(),p:b.position.clone(),
-      ix:X.clone().applyQuaternion(q.clone().invert()).normalize(),
-      iy:Y.clone().applyQuaternion(q.clone().invert()).normalize(),
-      iz:Z.clone().applyQuaternion(q.clone().invert()).normalize()});
+      ix:modelAxes[0].clone().applyQuaternion(inverseWorld).normalize(),
+      iy:modelAxes[1].clone().applyQuaternion(inverseWorld).normalize(),
+      iz:modelAxes[2].clone().applyQuaternion(inverseWorld).normalize()});
   }
-  return {meshes,skin,sets,rest};
+  // Never assume straight source legs. Actual Tripo knee pivots (bones 32,
+  // 27) are already in FRONT of hip pivots, while ankles (33,28) turn
+  // slightly backwards: solving an absolute 2D leg IK on top of these
+  // curved rest bones double-bends knees.
+  const sc=model.getWorldScale(new THREE.Vector3()).x;
+  const sourceLeg=(bones)=>{
+    const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();
+    bones[0].getWorldPosition(a);bones[1].getWorldPosition(b);
+    bones[2].getWorldPosition(c);
+    const first=b.clone().sub(a),second=c.clone().sub(b);
+    const toXY=v=>[v.dot(modelAxes[0])/sc,v.dot(modelAxes[1])/sc];
+    const [ax,ay]=toXY(first),[bx,by]=toXY(second);
+    return {
+      thigh: bones[1].position.length(),
+      shin: bones[2].position.length(),
+      restHip: Math.atan2(ax,-ay),
+      restShin: Math.atan2(bx,-by),
+      restX:ax+bx,restY:ay+by
+    };
+  };
+  const legCalibration={
+    left:sourceLeg(sets.leftLeg),right:sourceLeg(sets.rightLeg)
+  };
+  return {meshes,skin,sets,rest,legCalibration};
 }
+// The sword needs to pass through the ACTUAL weighted glove/palm surface,
+// not through the centre of a skeleton joint which can sit outside the mesh.
+// Sample only vertices whose strongest influence is the existing right-wrist
+// bone. Every sampled point is transformed into wrist-local coordinates.
+// No new character geometry, fake fingers, textures or expensive API calls.
+function locateRightPalm(meshes,wrist){
+  const sum=new THREE.Vector3(),p=new THREE.Vector3(),ws=new THREE.Vector3();
+  let total=0,vertices=0;
+  wrist.updateWorldMatrix(true,false);
+  for(const mesh of meshes){
+    const boneIndex=mesh.skeleton?.bones.indexOf(wrist)??-1;
+    const geo=mesh.geometry;
+    const joints=geo.attributes?.skinIndex,weights=geo.attributes?.skinWeight;
+    if(boneIndex<0||!joints||!weights)continue;
+    mesh.updateWorldMatrix(true,false);
+    const count=geo.attributes.position?.count||0;
+    for(let i=0;i<count;i++){
+      let weight=0;
+      for(let j=0;j<4;j++){
+        const influence=weights.getComponent(i,j);
+        if(joints.getComponent(i,j)===boneIndex)weight+=influence;
+      }
+      if(weight<.52)continue;
+      mesh.getVertexPosition(i,p);
+      ws.copy(p).applyMatrix4(mesh.matrixWorld);
+      wrist.worldToLocal(ws);
+      if(!Number.isFinite(ws.x+ws.y+ws.z))continue;
+      sum.addScaledVector(ws,weight);total+=weight;vertices++;
+    }
+  }
+  if(vertices<12||total<8)return {point:new THREE.Vector3(),vertices,valid:false};
+  const point=sum.divideScalar(total);
+  // Guard against a mislabeled skin: never fling the sword far from wrist.
+  if(point.length()>.21)return {point:new THREE.Vector3(),vertices,valid:false};
+  return {point,vertices,valid:true};
+}
+
 // Anatomical, phase-continuous walk/run with stance/swing foot targets.
 // Every joint below deforms the authentic Tripo SKIN rather than a fake puppet.
 function animateRig(model,source,root,weapon){
-  const {sets,rest}=source,axisQ=new THREE.Quaternion();
+  const {sets,rest,legCalibration}=source,axisQ=new THREE.Quaternion();
+  const wristWorldQ=new THREE.Quaternion(),rootWorldQ=new THREE.Quaternion();
+  const swordCantQ=new THREE.Quaternion();
+  const parentQ=new THREE.Quaternion(),modelQ=new THREE.Quaternion();
+  const shoulderAxis=new THREE.Vector3(),shoulderTarget=new THREE.Vector3();
+  const shoulderDelta=new THREE.Quaternion();
+  // Calibrate from ACTUAL source bone offsets, not guessed opposite +/- X
+  // Euler angles. T-pose arm bone transforms may have their own local twists.
+  const arms=[sets.leftArm,sets.rightArm].map(chain=>{
+    const upper=chain[0],elbow=chain[1],wrist=chain[2];
+    const sourceDir=(parent,child)=>child.position.clone()
+      .applyQuaternion(rest.get(parent).q).normalize();
+    const p=new THREE.Vector3(),e=new THREE.Vector3();
+    upper.getWorldPosition(p);elbow.getWorldPosition(e);
+    const modelWorld=new THREE.Quaternion();model.getWorldQuaternion(modelWorld);
+    const dir=e.sub(p).applyQuaternion(modelWorld.invert()).normalize();
+    const side=Math.sign(dir.z)||1;
+    return {
+      upper,elbow,side,
+      shoulderRest:sourceDir(upper,elbow),
+      elbowRest:sourceDir(elbow,wrist)
+    };
+  });
+  function aimJoint(joint,restDirection,targetForward,targetDown,targetLateral){
+    // Transform a *real source bone segment* into anatomical down/front/
+    // lateral space. Original bind and skin remain untouched.
+    model.updateMatrixWorld(true);
+    model.getWorldQuaternion(modelQ);
+    shoulderTarget.set(targetForward,-targetDown,targetLateral).normalize()
+      .applyQuaternion(modelQ);
+    joint.parent.getWorldQuaternion(parentQ);
+    shoulderTarget.applyQuaternion(parentQ.invert()).normalize();
+    shoulderDelta.setFromUnitVectors(restDirection,shoulderTarget);
+    joint.quaternion.copy(shoulderDelta).multiply(rest.get(joint).q);
+  }
+  function poseArm(arm,swing,elbowFlex){
+    // Downward and close to the hip, NOT the wide A-pose visible in V21.
+    // Calibrate the FOREARM separately: prior rig lowered the humerus but
+    // left the elbow->wrist segment pointing sideways.
+    aimJoint(arm.upper,arm.shoulderRest,
+      swing*.52,.962,arm.side*.272);
+    aimJoint(arm.elbow,arm.elbowRest,
+      .095+elbowFlex*.25+swing*.35,.979,arm.side*.155);
+  }
   function twist(b,axes){
     const r=rest.get(b);
     b.quaternion.copy(r.q);
@@ -74,38 +186,233 @@ function animateRig(model,source,root,weapon){
   }
   const smooth=t=>{const a=clamp(t,0,1);return a*a*(3-2*a)};
   let phase=0,stride=0,runMix=0,airMix=0,bodyClock=0,heading=0,clip='Idle';
+  const capeRoll=[0,0,0],capeYaw=[0,0,0];
   let lastFrameData={speed:0,heading:0,run:false,airborne:false,phase:0,
     leftFootLift:0,rightFootLift:0,leftFootX:0,rightFootX:0,
     weaponAttached:true,footContact:[true,true],kneeBend:[0,0]};
   const pos=sets.spine.position.clone();
-  const L1=.209, L2=.169; // actual Tripo knee/ankle REST lengths in mesh units
-  function legPose(bones,offset,weight,jumpWeight,run){
+  const pelvisRest=sets.pelvis.position.clone();
+  // Tripo's side axis is authored in source model Z. Infer which way
+  // "left" points from actual hip joints, rather than assuming a sign.
+  const leftHipInPelvis=new THREE.Vector3(),rightHipInPelvis=new THREE.Vector3();
+  sets.leftLeg[0].getWorldPosition(leftHipInPelvis);
+  sets.rightLeg[0].getWorldPosition(rightHipInPelvis);
+  sets.pelvis.worldToLocal(leftHipInPelvis);
+  sets.pelvis.worldToLocal(rightHipInPelvis);
+  const leftSideSign=Math.sign(leftHipInPelvis.z-rightHipInPelvis.z)||1;
+  const shoePivot=[sets.leftLeg[3],sets.rightLeg[3]];
+  const soles=locateBootSoleVertices(source.meshes,sets);
+  const soleVertex=new THREE.Vector3(),soleWorld=new THREE.Vector3();
+  let soleVertexReads=0;
+  function soleSurfacePose(contacts=null){
+    return soles.map((foot,side)=>{
+      if(!foot||contacts&&!contacts[side])return null;
+      foot.mesh.updateWorldMatrix(true,false);
+      let low=Infinity,high=-Infinity,heelSum=0,toeSum=0;
+      const levels=new Map();
+      for(const index of foot.indices){
+        soleVertexReads++;
+        // SkinnedMesh.getVertexPosition returns the current bone-weighted
+        // point on the genuine Tripo surface, not its rest/bind position.
+        foot.mesh.getVertexPosition(index,soleVertex);
+        soleWorld.copy(soleVertex).applyMatrix4(foot.mesh.matrixWorld);
+        root.worldToLocal(soleWorld);
+        levels.set(index,soleWorld.y);
+        low=Math.min(low,soleWorld.y);
+        high=Math.max(high,soleWorld.y);
+      }
+      for(const i of foot.heel)heelSum+=levels.get(i)??0;
+      for(const i of foot.toe)toeSum+=levels.get(i)??0;
+      return {sampleCount:foot.indices.length,
+        candidateCount:foot.candidateCount,
+        minY:low,maxY:high,
+        heelY:foot.heel.length?heelSum/foot.heel.length:null,
+        toeY:foot.toe.length?toeSum/foot.toe.length:null};
+    });
+  }
+  const pin=[{contact:false,travel:0,x:0},{contact:false,travel:0,x:0}];
+  const bootWorld=new THREE.Vector3();
+  let lastTravel=null, contactCorrection=0;
+  const sourcePerMetre=1/model.getWorldScale(new THREE.Vector3()).y;
+  // Each sole's own original pivot level in normalized character metres.
+  model.updateMatrixWorld(true);
+  const restBootY=shoePivot.map(b=>{
+    b.getWorldPosition(bootWorld);
+    return root.worldToLocal(bootWorld.clone()).y;
+  });
+  // Ground reference is the real original skinned sole in the neutral
+  // GLB rest pose. This is the same character-local metric used each
+  // frame, not a guessed foot-joint center or authored terrain height.
+  const restSoleY=soleSurfacePose().map(s=>s?.minY??null);
+  // With original-map X/Z available, pin each true boot joint to a
+  // measured planar world coordinate. The source actor moves independently
+  // while this real skinned mesh stays at the offscreen sprite origin.
+  // Legacy scalar travel retains the earlier longitudinal-only fallback;
+  // the stationary workshop remains explicitly a treadmill preview.
+  function legPose(bones,cal,offset,weight,jumpWeight,run,pelvisBob,footId,travelSource,hasTravel,ground){
     const p=((phase/(2*Math.PI)+offset)%1+1)%1;
-    const stance=run>.5?.50:.61;
-    const inStance=p<stance;
+    const stance=.63-run*.21,inStance=p<stance;
     const u=inStance?p/stance:(p-stance)/(1-stance);
-    const step=.115+run*.048,back=step*(inStance?1-2*u:2*smooth(u)-1);
-    const lift=inStance?0:(.062+run*.055)*Math.sin(Math.PI*u);
-    // Foot pose (X is natural model forward): foot planted during stance,
-    // lifted and carried forward during swing. Jump tucks both legs.
-    const x=weight*back*(1-.76*jumpWeight)+(offset?.028:-.028)*jumpWeight;
-    const y=-.370+weight*lift*(1-.6*jumpWeight)+.098*jumpWeight;
-    const rawLen=Math.hypot(x,y),len=clamp(rawLen,.10,L1+L2-.002);
-    const theta=Math.atan2(x,-y);
-    const alpha=Math.acos(clamp((L1*L1+len*len-L2*L2)/(2*L1*len),-1,1));
-    const knee=Math.PI-Math.acos(clamp((L1*L1+L2*L2-len*len)/(2*L1*L2),-1,1));
-    const hip=theta-alpha;
-    // Both legs are vertical in source GLB. Rotating about model Z
-    // produces sagittal (forward/backward) motion; rotating X would splay!
-    twist(bones[0],[['iz',hip]]);
-    twist(bones[1],[['iz',knee]]);
-    twist(bones[2],[['iz',-hip-knee*.76]]);
-    twist(bones[3],[]);
-    return {lift:weight*lift,x,knee,contact:inStance&&jumpWeight<.15};
+    const groundBlend=clamp(1-4*jumpWeight,0,1);
+    // Slightly longer SWING reach only. Source XZ stance anchors below
+    // remain authoritative; planted feet never get an artificial push.
+    const step=.079+run*.065;
+    const travel=inStance?1-2*u:2*smooth(u)-1;
+    let x=cal.restX+weight*step*travel*(1-.78*jumpWeight);
+    const anchored=hasTravel&&weight>.2&&jumpWeight<.15&&inStance;
+    const planar=anchored&&ground!==null;
+    let newContact=false;
+    if(anchored){
+      if(!pin[footId].contact || pin[footId].planar!==planar){
+        pin[footId].contact=true;
+        pin[footId].planar=planar;
+        pin[footId].travel=travelSource;
+        pin[footId].x=x;
+        newContact=true;
+      }
+      if(!planar)x=pin[footId].x-(travelSource-pin[footId].travel);
+    }else pin[footId].contact=false;
+    // The heavy front tabard obscured the moving boot in the old gait.
+    // Boost only the airborne swing arc, keeping true stance soles at zero.
+    // This is constrained below by the existing original-bone IK limits.
+    const lift=inStance?0:(.050+run*.035)*Math.sin(Math.PI*u);
+    const y=cal.restY-pelvisBob+weight*lift*(1-.57*jumpWeight)+
+      .067*jumpWeight;
+    const L1=cal.thigh,L2=cal.shin;
+    const kneeLimit=.82+run*.22+Math.min(1,jumpWeight)*.20;
+    const minReach=Math.sqrt(Math.max(0,
+      L1*L1+L2*L2+2*L1*L2*Math.cos(kneeLimit)));
+    // Three physically interpretable stance intervals: initial heel
+    // rocker, nearly level midfoot support, then toe rocker at push-off.
+    // Curves overlap slightly but never kick both hinges at once.
+    // The original Tripo boot/toe joints deform; no mesh replacements.
+    // Both rocker envelopes MUST return to zero at stance boundaries.
+    // Previously heel jumped directly to 1 at heel strike, while toe
+    // jumped from 1 to 0 at liftoff (a 0.052 rad one-frame toe snap).
+    // Zero-at-boundary C1 curves keep the true toe bone continuous.
+    const heelLoad=inStance?
+      smooth(u/.12)*(1-smooth((u-.21)/.22))*groundBlend:0;
+    const toeLoad=inStance?
+      smooth((u-.55)/.23)*(1-smooth((u-.88)/.12))*groundBlend:0;
+    const midLoad=inStance?
+      smooth(u/.19)*(1-smooth((u-.68)/.30))*groundBlend:0;
+    const flightPitch=inStance?0:-.028*Math.sin(Math.PI*u);
+    const heelPitch=-.047*heelLoad;
+    const toeRocker=.115*toeLoad;
+    const footPitch=(heelPitch+toeRocker+flightPitch)*weight*
+      (1-.7*jumpWeight);
+    const toePitch=-.052*toeLoad*weight*(1-.7*jumpWeight);
+    const supportLoad=inStance?weight*groundBlend*clamp(
+      smooth(u/.16)*(1-smooth((u-.80)/.20)),0,1):0;
+    const contact=jumpWeight<.15&&(weight<.08||inStance);
+    // IK targets are on the REAL original bent Tripo leg, never a
+    // geometrically straight mannequin. Clamp knee bend for injury-safe
+    // sagittal flexion while preserving the original rest transforms.
+    function applyPose(targetX,hipRoll=0){
+      const len=clamp(Math.hypot(targetX,y),minReach,L1+L2-.0008);
+      const theta=Math.atan2(targetX,-y);
+      const alpha=Math.acos(clamp((L1*L1+len*len-L2*L2)/(2*L1*len),-1,1));
+      const knee=Math.PI-Math.acos(clamp(
+        (L1*L1+L2*L2-len*len)/(2*L1*L2),-1,1));
+      const absoluteThigh=theta+alpha,absoluteShin=absoluteThigh-knee;
+      const hipDelta=absoluteThigh-cal.restHip;
+      const kneeDelta=(absoluteShin-absoluteThigh)-
+        (cal.restShin-cal.restHip);
+      if(weight<.02&&jumpWeight<.02){
+        for(const bone of bones)twist(bone,[]);
+      }else{
+        // Source X is the anatomical forward axis: a small abduction
+        // controls lateral boot travel independently of knee flex.
+        twist(bones[0],[['ix',hipRoll],['iz',hipDelta]]);
+        twist(bones[1],[['iz',kneeDelta]]);
+        twist(bones[2],[['iz',-hipDelta-kneeDelta+footPitch]]);
+        twist(bones[3],[['iz',toePitch]]);
+      }
+      return {hipDelta,knee};
+    }
+    let hipRoll=0,solved=applyPose(x),trueBootWorldX=null,bootError=0;
+    let anchorXZ=null,trueBootXZ=null,planarError=null;
+    if(planar){
+      const c=Math.cos(heading),s=Math.sin(heading);
+      const readBoot=()=>{
+        shoePivot[footId].getWorldPosition(bootWorld);
+        root.worldToLocal(bootWorld);
+        const bx=bootWorld.x*sourcePerMetre,bz=bootWorld.z*sourcePerMetre;
+        return [ground[0]+c*bx+s*bz,ground[1]-s*bx+c*bz];
+      };
+      trueBootXZ=readBoot();
+      if(newContact){
+        pin[footId].anchorXZ=trueBootXZ.slice();
+        pin[footId].contactHeading=heading;
+      }else{
+        // A huge turn is a deliberate replant, not a reason to twist the
+        // knee across the torso. The support foot may safely step again.
+        const turned=Math.abs(Math.atan2(
+          Math.sin(heading-pin[footId].contactHeading),
+          Math.cos(heading-pin[footId].contactHeading)));
+        const far=Math.hypot(
+          ground[0]-pin[footId].anchorXZ[0],
+          ground[1]-pin[footId].anchorXZ[1])>.44;
+        if(turned>.55||far){
+          pin[footId].anchorXZ=trueBootXZ.slice();
+          pin[footId].contactHeading=heading;
+        }else for(let iter=0;iter<3;iter++){
+          const ex=trueBootXZ[0]-pin[footId].anchorXZ[0];
+          const ez=trueBootXZ[1]-pin[footId].anchorXZ[1];
+          const lateral=c*ex-s*ez;
+          const forward=s*ex+c*ez;
+          if(Math.hypot(lateral,forward)<.0007)break;
+          // Bounded two-axis solve on the actual Tripo boot joint:
+          // hip abduction handles lateral error, sagittal two-bone IK
+          // handles forward slip. Avoid elbow/knee-like sideways collapse.
+          x=clamp(x-forward*.78,cal.restX-step*1.30,
+            cal.restX+step*1.30);
+          hipRoll=clamp(hipRoll-lateral*.75/Math.max(.25,
+            cal.thigh+cal.shin),-.23,.23);
+          solved=applyPose(x,hipRoll);
+          trueBootXZ=readBoot();
+        }
+      }
+      anchorXZ=pin[footId].anchorXZ.slice();
+      planarError=Math.hypot(trueBootXZ[0]-anchorXZ[0],
+                            trueBootXZ[1]-anchorXZ[1]);
+      bootError=planarError;
+    }else if(anchored){
+      // Preserve the earlier longitudinal-only fallback for deterministic
+      // laboratory tests and callers that lack source-map X/Z coordinates.
+      const getBoot=()=>{
+        shoePivot[footId].getWorldPosition(bootWorld);
+        root.worldToLocal(bootWorld);
+        return bootWorld.z*sourcePerMetre+travelSource;
+      };
+      trueBootWorldX=getBoot();
+      if(newContact)pin[footId].bootWorldX=trueBootWorldX;
+      else for(let iter=0;iter<2;iter++){
+        bootError=trueBootWorldX-pin[footId].bootWorldX;
+        if(Math.abs(bootError)<.0005)break;
+        const corrected=clamp(x-bootError*.88,
+          cal.restX-step*1.30,cal.restX+step*1.30);
+        if(Math.abs(corrected-x)<.00003)break;
+        x=corrected;
+        solved=applyPose(x);
+        trueBootWorldX=getBoot();
+      }
+      bootError=trueBootWorldX-pin[footId].bootWorldX;
+    }
+    return {lift:weight*lift,x:x-cal.restX,y,knee:solved.knee,hip:solved.hipDelta,
+      hipRoll,anklePitch:footPitch,toePitch,
+      supportLoad,footRocker:[heelLoad,midLoad,toeLoad],
+      contact,stance:inStance,phase:p,
+      pinned:anchored,planar,anchorXZ,trueBootXZ,planarError,
+      anchorWorldX:anchored&&!planar?pin[footId].bootWorldX:null,
+      trueBootWorldX,bootError};
   }
   function update(dt,motion,now){
     const d=clamp(Number(dt)||1/60,0,1/15);
     bodyClock+=d;
+    // Count genuine CPU skin reads; the character must not regress into
+    // sampling all 399k mesh triangles on every 60 Hz animation tick.
+    soleVertexReads=0;
     const speed=clamp((Number(motion?.speed)||0)/8,0,4.5);
     const moving=speed>.12;
     const running=moving&&Boolean(motion?.run);
@@ -116,47 +423,203 @@ function animateRig(model,source,root,weapon){
     const jumpTime=airborne?motion.jumpClipTime:0;
     const arc=airborne?Math.max(0,Math.sin(Math.PI*clamp(jumpTime/1.49,0,1))):0;
     const jumpWeight=Math.max(arc*.94,airMix*.32);
-    // phase must NEVER reset when moving between Idle/Walk/Run.
-    const hz=(1.45+1.20*runMix)*Math.min(1.45,Math.max(.7,speed));
-    phase+=d*2*Math.PI*hz*(stride>.03?1:.02);
-    const swing=Math.sin(phase),other=-swing;
-    const armAmplitude=(.22+runMix*.29)*stride*(1-.74*airMix);
-    // Shoulder rests extend horizontally along +/-Z. Tilt them DOWN
-    // about X, then swing in the anatomical X/Y walking plane about Z.
-    twist(sets.leftArm[0],[['ix',-.69],['iz',-swing*armAmplitude]]);
-    twist(sets.rightArm[0],[['ix',+.69],['iz',-other*armAmplitude*.68]]);
-    twist(sets.leftArm[1],[['iz',-.06-Math.max(0,swing)*(.20+.16*runMix)*stride]]);
-    twist(sets.rightArm[1],[['iz',-.12-Math.max(0,other)*(.22+.13*runMix)*stride]]);
-    twist(sets.leftArm[2],[['iz',.035*Math.sin(bodyClock*1.4)]]);
-    twist(sets.rightArm[2],[['iz',.02*Math.sin(bodyClock*1.8)]]);
+    // The native map provides monotonic distance in ORIGINAL Tripo bone
+    // units (not render pixels). Match gait phase to actual ground travel;
+    // when the studio supplies no such field, retain 60 Hz preview timing.
+    const travelSource=Number(motion?.travelSource);
+    const hasTravel=Number.isFinite(travelSource)&&travelSource>=0;
+    let travelDelta=0;
+    if(hasTravel){
+      if(lastTravel!==null&&travelSource>=lastTravel)
+        travelDelta=clamp(travelSource-lastTravel,0,.13);
+      else pin.forEach(p=>p.contact=false); // teleport/reset
+      lastTravel=travelSource;
+    }else{lastTravel=null;pin.forEach(p=>p.contact=false);}
+    const hz=(.86+.56*runMix)*clamp(Math.sqrt(Math.max(.35,speed)),.8,1.25);
+    const stanceRatio=.63-runMix*.21;
+    const stepLength=.076+runMix*.052;
+    const cycleDistance=2*stepLength/stanceRatio;
+    // If the player presses Run against a wall but doesn't move, do
+    // NOT moonwalk: only actual map displacement advances native footsteps.
+    phase+=hasTravel?
+      2*Math.PI*travelDelta/cycleDistance:
+      d*2*Math.PI*hz*(stride>.03?1:.02);
+    const gx=motion?.groundX,gz=motion?.groundZ;
+    const ground=hasTravel&&Number.isFinite(gx)&&Number.isFinite(gz)?
+      [gx,gz]:null;
+    // Apply facing BEFORE evaluating the actual world-space shoe joints.
+    // Previous pose evaluated boot contact at last tick's heading.
+    const targetHeading=Number.isFinite(motion?.heading)?motion.heading:heading;
+    const turnDelta=Math.atan2(Math.sin(targetHeading-heading),Math.cos(targetHeading-heading));
+    const headingStep=turnDelta*(1-Math.exp(-12*d));
+    heading+=headingStep;
+    root.rotation.y=heading;
+    // The legacy 1D solver has no lateral rotation correction: replant it.
+    if(!ground&&hasTravel&&Math.abs(turnDelta)>.24)
+      pin.forEach(p=>p.contact=false);
+    const swing=Math.sin(phase);
+    const armAmplitude=(.19+runMix*.20)*stride*(1-.78*airMix);
+    // V22: the real upper-arm AND lower-arm segment are aimed.
+    // V21 solved only shoulder->elbow, leaving elbow->wrist in a wide
+    // A-pose. Solving both segments keeps hands beside outer thighs.
+    const shoulderDown=Math.atan2(.962,.272);
+    const leftSwing=-swing*armAmplitude+arc*.07;
+    const rightSwing=+swing*armAmplitude*.32-arc*.03;
+    const leftElbow=.095+.075*stride*Math.max(0,-swing)+
+      .04*runMix+.025*arc;
+    const rightElbow=.11+.06*stride*Math.max(0,swing)+
+      .04*runMix+.025*arc;
+    poseArm(arms[0],leftSwing,leftElbow);
+    poseArm(arms[1],rightSwing,rightElbow);
+    twist(sets.leftArm[2],[['iz',.012+stride*.012]]);
+    twist(sets.rightArm[2],[['iz',.008]]);
     twist(sets.leftArm[3],[]);
-    twist(sets.rightArm[3],[]);
-    const left=legPose(sets.leftLeg,0,stride,jumpWeight,runMix);
-    const right=legPose(sets.rightLeg,.5,stride,jumpWeight,runMix);
-    twist(sets.spine,[['iz',.028*runMix+.022*arc],['ix',.012*Math.sin(phase)*stride]]);
+    const wristTurn=-.025-.007*runMix;
+    twist(sets.rightArm[3],[['iy',wristTurn]]);
+    // Controlled weight loading and spring-like rise at alternating
+    // strides. The real Tripo pelvis bone is the common parent of both
+    // legs and torso; compensating ankle Y preserves the stance ground.
+    // Leg-reach geometry: at ±.10m source forward travel, the pelvis
+    // must settle ~.01m lower during support. Otherwise hip-to-ankle
+    // exceeds L1+L2 and the old solver hard-clamps to a straight knee.
+    // Two soft upward peaks follow the left/right push-off.
+    const supportDrop=stride*(.006+.015*runMix);
+    const bounce=stride*(.004+.013*runMix)*(1-Math.cos(2*phase))*.5;
+    const pelvisBob=bounce-supportDrop;
+    // Load the real planted hip rather than bobbing the skeleton exactly
+    // over the center line. The half-cycle support envelope corresponds
+    // to the left/right leg phases, not the arm animation phases.
+    const loadAt=(offset)=>{
+      const p=((phase/(2*Math.PI)+offset)%1+1)%1;
+      const stance=.63-runMix*.21;
+      if(p>=stance)return 0;
+      const u=p/stance;
+      return smooth(u/.17)*(1-smooth((u-.80)/.20));
+    };
+    // The planted-load indicator and torso compensation must agree:
+    // neither a stationary Idle nor an airborne Jump may claim a
+    // weight-bearing boot. Fade through takeoff/landing instead of
+    // teleporting the pelvis back onto the centre line.
+    const groundLoad=stride*clamp(1-4*jumpWeight,0,1);
+    const leftSupport=loadAt(0)*groundLoad;
+    const rightSupport=loadAt(.5)*groundLoad;
+    const balance=(leftSupport-rightSupport)/
+      Math.max(.5,leftSupport+rightSupport);
+    const pelvisLateral=leftSideSign*.006*stride*balance;
+    sets.pelvis.position.copy(pelvisRest);
+    sets.pelvis.position.y+=pelvisBob;
+    sets.pelvis.position.z+=pelvisLateral;
+    const left=legPose(sets.leftLeg,legCalibration.left,0,
+      stride,jumpWeight,runMix,pelvisBob,0,travelSource,hasTravel,ground);
+    const right=legPose(sets.rightLeg,legCalibration.right,.5,
+      stride,jumpWeight,runMix,pelvisBob,1,travelSource,hasTravel,ground);
+    // v16: use actual skinned lower-boot surface minima for ground
+    // correction, not the usually elevated Tripo toe-joint pivots.
+    // Correct the shared pelvis by at most 4.5 cm in source rig units.
+    // This is a flat original-source-game ground proxy, NOT terrain IK.
+    const planted=[left.contact,right.contact];
+    let soleGround=null,groundCorrection='off';
+    if(jumpWeight<.12&&stride>.12){
+      // Sample only load-bearing boots for gameplay ground correction.
+      // The workshop can still request the full diagnostic scan below.
+      const skinBefore=soleSurfacePose(planted);
+      soleGround=groundedSoleTarget(skinBefore,restSoleY,planted,sourcePerMetre);
+      let target=soleGround.target;
+      if(soleGround.count===0){
+        // No reliable weighted boot mesh: keep v14 pivot-based behaviour.
+        let sumY=0,num=0;
+        for(let i=0;i<2;i++){
+          if(!planted[i])continue;
+          shoePivot[i].getWorldPosition(bootWorld);
+          root.worldToLocal(bootWorld);
+          sumY+=bootWorld.y-restBootY[i];num++;
+        }
+        target=num?clamp(-(sumY/num)*sourcePerMetre,-.045,.045):0;
+        groundCorrection=num?'pivot-fallback':'off';
+      }else groundCorrection='skinned-sole';
+      contactCorrection=advanceSoleCorrection(contactCorrection,target,d);
+    }else contactCorrection=advanceSoleCorrection(contactCorrection,0,d);
+    sets.pelvis.position.y+=contactCorrection;
+    // Delayed upper-body counterweight prevents a rigid same-side lean.
+    // Subtle only: heavy plate armor + long sword should retain inertia.
+    const spineCounter=-leftSideSign*.013*balance*stride;
+    twist(sets.spine,[['iz',-.016*stride-.078*runMix-.012*arc],
+      ['ix',.019*Math.sin(phase)*stride+spineCounter]]);
     twist(sets.chest,[['iz',-.012*runMix],['ix',.012*Math.sin(bodyClock*1.75)]]);
-    twist(sets.head,[['ix',.012*Math.sin(bodyClock*1.1)],['iy',.015*Math.cos(bodyClock*.7)]]);
+    twist(sets.head,[['ix',.012*Math.sin(bodyClock*1.1)],
+      ['iy',.015*Math.cos(bodyClock*.7)],['iz',.022*runMix]]);
     sets.spine.position.copy(pos);
     sets.spine.position.y+=.004*Math.sin(bodyClock*1.8)*(1-stride)+
       Math.abs(Math.cos(phase))*stride*.012;
-    // Three actual GLB lower-garment chain bones. These weights affect
-    // cloth, but this is a small authored sway, not a cloth simulation.
-    const drag=stride*(.018+.018*runMix);
-    twist(sets.cape[0],[['iz',.012*Math.sin(bodyClock*1.1)-drag]]);
-    twist(sets.cape[1],[['iz',.020*Math.sin(bodyClock*1.5+.6)-drag*.80]]);
-    twist(sets.cape[2],[['iz',.024*Math.sin(bodyClock*1.25+1.1)-drag*.65]]);
-    const targetHeading=Number.isFinite(motion?.heading)?motion.heading:heading;
-    heading+=Math.atan2(Math.sin(targetHeading-heading),Math.cos(targetHeading-heading))*(1-Math.exp(-12*d));
-    root.rotation.y=heading;
+    // Preserve turning inertia through the three REAL Tripo cape joints.
+    // Small damped delays create secondary follow-through without faking
+    // cloth physics or changing the character's torso/body dimensions.
+    // The Gothic sword is parented to the Tripo RIGHT wrist for position.
+    // Counter-rotate only the independent sword mesh so the blade still
+    // points DOWN next to the boot as the wrist bends; previously the
+    // inherited T-pose orientation sent it across the belt/left leg.
+    root.getWorldQuaternion(rootWorldQ);
+    sets.rightArm[3].getWorldQuaternion(wristWorldQ);
+    swordCantQ.setFromAxisAngle(Z,-.12-.025*stride);
+    weapon.quaternion.copy(wristWorldQ.invert()).multiply(rootWorldQ).multiply(swordCantQ);
+    const turning=clamp(headingStep/d,-3.5,3.5);
+    const drag=stride*(.016+.038*runMix);
+    for(let i=0;i<sets.cape.length;i++){
+      const lag=i/2,slow=8/(1+.7*i);
+      const sway=(.011+.009*lag)*Math.sin(bodyClock*(1.2+.15*i)+i*.45);
+      const dragTarget=-drag*(1-.24*lag)+sway;
+      const turnTarget=clamp(-turning*(.006+.004*i),-.050,.050);
+      capeRoll[i]=damp(capeRoll[i],dragTarget,slow,d);
+      capeYaw[i]=damp(capeYaw[i],turnTarget,slow*.7,d);
+      twist(sets.cape[i],[['iz',capeRoll[i]],['iy',capeYaw[i]]]);
+    }
     clip=airborne?'Jump':runMix>.5&&stride>.4?'Run':stride>.2?'Walk':'Idle';
+    // Diagnostic mesh readback is useful in the studio, but duplicating it
+    // every game tick wastes CPU skinning on a 400k-triangle character.
+    // Gameplay still samples weighted plantar vertices for real grounding.
+    const currentSoleSurface=motion?.inspectSoles===false?
+      null:soleSurfacePose();
     lastFrameData={
       speed,run:running,airborne,heading,phase,
       footContact:[left.contact,right.contact],
       leftFootLift:left.lift,rightFootLift:right.lift,
       leftFootX:left.x,rightFootX:right.x,
       kneeBend:[left.knee,right.knee],
+      legCalibration,stepFrequencyHz:hz,pelvisBob,
+      pelvisLateral,balance,spineCounter,
+      supportWeights:[leftSupport,rightSupport],
+      footRocker:[left.footRocker,right.footRocker],
+      toePitch:[left.toePitch,right.toePitch],
+      travelSource:hasTravel?travelSource:null,travelDelta,
+      footPinned:[left.pinned,right.pinned],
+      footAnchorWorldX:[left.anchorWorldX,right.anchorWorldX],
+      trueBootWorldX:[left.trueBootWorldX,right.trueBootWorldX],
+      bootSlipError:[left.bootError,right.bootError],
+      planarFootPinned:[left.planar,right.planar],
+      footPinWorldXZ:[left.anchorXZ,right.anchorXZ],
+      trueBootWorldXZ:[left.trueBootXZ,right.trueBootXZ],
+      planarBootSlipXZ:[left.planarError,right.planarError],
+      hipAbduction:[left.hipRoll,right.hipRoll],
+      actorGroundXZ:ground?ground.slice():null,
+      contactCorrection,groundCorrection,
+      maxContactCorrectionSpeed:.18,
+      soleCorrectionTarget:soleGround?.target??null,
+      soleSurfaceFloorError:soleGround?.meanHeightError??null,
+      soleRestY:restSoleY.slice(),
+      // Real CPU-skinned boot surface diagnostics in character-local Y.
+      // Used for geometry-level stance QA, NOT to override source physics.
+      soleSurface:currentSoleSurface,
+      soleVertexReads,
+      anklePitch:[left.anklePitch,right.anklePitch],
+      stancePhase:[left.stance,right.stance],
+      footY:[left.y,right.y],
+      capeDeflection:capeRoll.map((roll,i)=>[roll,capeYaw[i]]),
       weaponAttached:!!weapon?.parent,
-      animationVersion:'Tripo-IK-v2'
+      armPose:{shoulderDown,shoulderSwing:leftSwing,rightShoulderSwing:rightSwing,
+        leftElbow,rightElbow,wristTurn,swordCant:-.12-.025*stride},
+      palmAnchorValid:weapon?.userData.palmAnchorValid===true,
+      palmVertexCount:weapon?.userData.palmVertexCount||0,
+      animationVersion:'Tripo-IK-v22-segment-aligned-arms'
     };
     return clip.toLowerCase();
   }
@@ -194,10 +657,24 @@ export function createGltfKnight(_THREE=THREE,{url=TRIPO_V2_GLB,onLoad,onError}=
       model.updateMatrixWorld(true);
       const restWorld=new THREE.Quaternion();
       wrist.getWorldQuaternion(restWorld);
+      const grip=locateRightPalm(source.meshes,wrist);
       wrist.add(weapon);
-      weapon.position.set(0,0,0);
+      // A wrist-weighted palm centroid is HIGHER than the actual open glove
+      // finger cradle on this 40-joint GLB. The old handle visibly floated
+      // above the glove while the crossguard intersected the fingertips.
+      // Shift the sword downward in WORLD vertical after converting the
+      // palm's wrist-local anchor, not along the arbitrary wrist Y axis.
+      const palmWorld=wrist.localToWorld(grip.point.clone());
+      const hiltDropWorld=.05;
+      palmWorld.y-=hiltDropWorld;
+      weapon.position.copy(wrist.worldToLocal(palmWorld));
       weapon.quaternion.copy(restWorld.invert());
+      weapon.userData.hiltDropWorld=hiltDropWorld;
       weapon.userData.socketBoneIndex=source.skin.bones.indexOf(wrist);
+      weapon.userData.palmAnchorValid=grip.valid;
+      weapon.userData.palmVertexCount=grip.vertices;
+      weapon.userData.palmLocal=grip.point.toArray();
+      root.userData.sourceUnitsPerMetre=1/sc;
       const anim=animateRig(model,source,root,weapon);
       root.userData.gltf={
         loaded:true,
@@ -206,6 +683,8 @@ export function createGltfKnight(_THREE=THREE,{url=TRIPO_V2_GLB,onLoad,onError}=
         skinnedMeshes:source.meshes.length,
         weapon:'detached Gothic longsword',
         weaponSocketBone:weapon.userData.socketBoneIndex,
+        palmAnchorValid:weapon.userData.palmAnchorValid,
+        palmVertexCount:weapon.userData.palmVertexCount,
         type:'Tripo_V2_40_Bone_Native_Runtime',
         get clip(){return anim.clip}
       };

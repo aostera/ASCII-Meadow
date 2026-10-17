@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121015">
+<title>The Ashen Vow · 3D-мастерская анимации</title>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#111015;color:#ece8e6}
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;overflow:hidden}
+button,select,input{font:inherit}button{cursor:pointer}
+#viewport{position:absolute;inset:0;touch-action:none}#viewport canvas{display:block;width:100%;height:100%}
+.header{position:absolute;top:20px;left:22px;pointer-events:none;text-shadow:0 2px 10px #050406}
+h1{font:normal clamp(20px,3vw,32px)/1.15 Georgia,serif;letter-spacing:.09em;margin:0}
+.header p{color:#baafb0;font-size:12px;margin:6px 0 0}
+.panel{position:absolute;top:20px;right:20px;width:min(350px,calc(100vw - 40px));background:#1b1921ed;border:1px solid #4a3c44;border-radius:14px;padding:16px;box-shadow:0 15px 40px #08050777;backdrop-filter:blur(12px)}
+.panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#d8b6af;margin:0 0 10px}
+.group{margin-top:13px}.group>label{display:block;font-size:12px;color:#cbbfc0;margin-bottom:6px}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.tiles.views{grid-template-columns:repeat(3,minmax(0,1fr))}
+button,select{background:#302b34;color:#f0e9e9;border:1px solid #574c57;border-radius:7px;padding:9px 6px;font-size:12px;min-width:0}
+button[aria-pressed=true]{background:#62434f;border-color:#d5a5aa}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #ddb9aa;outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+select{width:100%}input[type=range]{width:100%;accent-color:#a86b77}
+.inline{display:flex;gap:8px;align-items:center}.inline>span{font-size:12px;min-width:44px;text-align:right}
+.pills{display:flex;flex-wrap:wrap;gap:6px}.pills button{flex:1}
+.meta{font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:#c8bcba;background:#111017;border:1px solid #393039;border-radius:8px;padding:9px;margin-top:13px;white-space:pre-wrap}
+.status{font-size:12px;color:#ddd0cc;margin:10px 0 0;line-height:1.5}
+.footer{position:absolute;left:22px;bottom:18px;font-size:12px;color:#c7baba;text-shadow:0 1px 4px #050507;max-width:35vw}
+a{color:#e8b8ae}a:focus-visible{outline:2px solid #e8b8ae}
+@media(max-width:760px){
+ .header{top:11px;left:14px}.header h1{font-size:19px}.header p{font-size:10px}
+ #viewport{bottom:46dvh}.panel{left:0;right:0;top:auto;bottom:0;width:100%;max-height:48dvh;overflow:auto;border-radius:14px 14px 0 0;padding:12px 14px max(12px,env(safe-area-inset-bottom))}
+ .group{margin-top:9px}button,select{padding:8px 4px}.meta{font-size:10px}.footer{bottom:calc(49dvh + 5px);left:14px;max-width:calc(100vw - 28px);font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){.panel{backdrop-filter:none}}
+</style>
+</head>
+<body>
+<div id="viewport" role="img" aria-label="Настоящая 3D-модель Tripo V2 с анимируемым скелетом. Вращение пальцем или мышью."></div>
+<header class="header"><h1>THE ASHEN VOW</h1><p>ASCII MEADOW · Tripo V2 · 40 костей · анимация в Three.js</p></header>
+<section class="panel" aria-label="Управление персонажем">
+ <h2>Мастерская движений · 60 Гц</h2>
+ <div class="tiles" id="motions" role="group" aria-label="Анимация">
+   <button type="button" data-motion="Idle" aria-pressed="true">Idle</button>
+   <button type="button" data-motion="Walk" aria-pressed="false">Walk</button>
+   <button type="button" data-motion="Run" aria-pressed="false">Run</button>
+   <button type="button" data-motion="Jump" aria-pressed="false">Jump</button>
+ </div>
+ <div class="group"><label for="direction">Быстрые направления (8)</label>
+ <select id="direction"><option value="0">Вперёд · 0°</option><option value="45">45°</option><option value="90">Вправо · 90°</option><option value="135">135°</option><option value="180">Назад · 180°</option><option value="225">225°</option><option value="270">Влево · 270°</option><option value="315">315°</option></select></div>
+ <div class="group"><label for="yaw">Точный поворот · <span id="yaw-value">0°</span></label>
+ <input id="yaw" type="range" min="0" max="359" step="1" value="0" aria-label="Угол поворота персонажа от 0 до 359 градусов"></div>
+ <div class="group"><label for="tempo">Темп анимации</label><div class="inline"><input id="tempo" type="range" min="0.5" max="1.5" step="0.05" value="1"><span id="tempo-value">1.00×</span></div></div>
+ <div class="group"><div class="pills"><button id="pause" aria-pressed="false">Пауза</button><button id="frame" type="button">+1 кадр</button><button id="skeleton" aria-pressed="false">Кости</button><button id="wire" aria-pressed="false">Сетка</button></div></div>
+ <div class="group"><div class="pills">
+  <button id="turn" aria-pressed="false" type="button">Авто 360°</button>
+  <button id="palette" aria-pressed="false" type="button">Экспериментальная перекраска · выкл</button>
+ </div></div>
+ <div class="group"><label>Осмотр модели</label><div class="tiles views"><button data-view="front">Спереди</button><button data-view="side">Сбоку</button><button data-view="back">Сзади</button></div></div>
+ <div class="meta" id="metrics" aria-live="off">Загрузка GLB…</div>
+ <p class="status" id="status" role="status">Ожидание модели со скелетом. Дополнительные кредиты Tripo не расходуются.</p>
+</section>
+<footer class="footer">Вращай модель и проверяй позы с любого ракурса. <a href="./native.html?ashenInspect=1">Открыть рыцаря в игре</a> · <a href="./ashen-tripo-v2-viewer.html">Исходная модель</a></footer>
+<script type="module">
+// Interactive, 60 Hz animation inspector for the EXISTING real Tripo V2 skin.
+// No new Tripo generation, no fake mesh, no modifications to the source game.
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {createGltfKnight} from './ashen-tripo-native-rig.mjs';
+import {createGothicPalettePreview} from './ashen-vow-gothic-palette.mjs';
+
+const $=id=>document.getElementById(id);
+const ui={viewport:$('viewport'),status:$('status'),metrics:$('metrics'),
+  tempo:$('tempo'),tempoValue:$('tempo-value'),direction:$('direction'),
+  yaw:$('yaw'),yawValue:$('yaw-value'),
+  pause:$('pause'),frame:$('frame'),skeleton:$('skeleton'),wire:$('wire'),
+  palette:$('palette'),turn:$('turn')};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const mobile=matchMedia('(max-width:760px)').matches;
+const renderer=new THREE.WebGLRenderer({antialias:!mobile,alpha:false,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,mobile?1.35:1.8));
+renderer.setClearColor(0x111015,1);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.23;
+ui.viewport.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x111015);
+scene.add(new THREE.HemisphereLight(0xd6d1d9,0x36323b,2.65));
+for(const [color,power,position] of [
+  [0xffded4,3.3,[-3,6,4]],[0xc7c3e4,1.7,[3,3,2]],
+  [0xb87b6f,1.6,[1.5,5,-3]]]){
+  const light=new THREE.DirectionalLight(color,power);light.position.set(...position);scene.add(light);
+}
+const platform=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.17,.08,80),
+  new THREE.MeshStandardMaterial({color:0x252029,metalness:.33,roughness:.82}));
+platform.position.y=-.08;platform.receiveShadow=true;scene.add(platform);
+const edge=new THREE.Mesh(new THREE.TorusGeometry(1.1,.009,8,100),
+  new THREE.MeshStandardMaterial({color:0x8f6462,metalness:.7,roughness:.38}));
+edge.rotation.x=-Math.PI/2;edge.position.y=-.036;scene.add(edge);
+// Studio-only visual ground contact indicator: never part of the native game.
+// Its size and opacity track the jump parabola and are NOT collision evidence.
+const contactShadow=new THREE.Mesh(new THREE.CircleGeometry(.33,48),
+  new THREE.MeshBasicMaterial({color:0x0a080c,transparent:true,opacity:.29,
+    depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1}));
+contactShadow.rotation.x=-Math.PI/2;
+contactShadow.position.y=-.034;
+scene.add(contactShadow);
+
+const camera=new THREE.PerspectiveCamera(36,1,.03,80);
+const viewPositions={front:[0,1.65,4.4],side:[4.4,1.65,0],back:[0,1.65,-4.4]};
+camera.position.set(...viewPositions.front);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=.08;
+controls.target.set(0,1.04,0);
+controls.minDistance=.85;controls.maxDistance=12;
+controls.maxPolarAngle=Math.PI*.94;
+controls.update();
+
+let mode='Idle',heading=0,tempo=1,paused=false,autoTurn=false;
+let simulatedFrames=0,jumpClock=0,last=0,displayClock=0,stepTime=0;
+let boneHelper=null,wire=false,showSkeleton=false,rig=null,error=null,palette=null;
+let smoothFps=0,alive=true,accumulator=0;
+const SIM_STEP=1/60;
+const status=message=>ui.status.textContent=message;
+function setMotion(next){
+  if(!['Idle','Walk','Run','Jump'].includes(next))return;
+  mode=next;jumpClock=0;
+  // This offset is solely for studio previews. The native game already
+  // moves its player with its own jump physics: do not lift the shared rig.
+  if(rig)rig.position.y=0;
+  document.querySelectorAll('[data-motion]').forEach(el=>
+    el.setAttribute('aria-pressed',String(el.dataset.motion===mode)));
+  if(!paused)status('Режим '+mode+' · живые движения 40 костей, без готовых клипов Tripo.');
+}
+function setPaused(next){
+  paused=next;
+  // Never replay an accumulated sub-frame when single-stepping.
+  if(paused)accumulator=0;
+  ui.pause.textContent=paused?'Продолжить':'Пауза';
+  ui.pause.setAttribute('aria-pressed',String(paused));
+}
+$('motions').addEventListener('click',ev=>{
+  const button=ev.target.closest('button[data-motion]');if(button)setMotion(button.dataset.motion);
+});
+function setHeading(degrees){
+  const value=clamp(Number(degrees)||0,0,359);
+  heading=value*Math.PI/180;
+  ui.yaw.value=String(value);
+  ui.yawValue.textContent=value+'°';
+}
+function setAutoTurn(value){
+  autoTurn=Boolean(value);
+  ui.turn.setAttribute('aria-pressed',String(autoTurn));
+}
+ui.direction.addEventListener('change',()=>{
+  setAutoTurn(false);setHeading(ui.direction.value);
+});
+ui.yaw.addEventListener('input',()=>{
+  setAutoTurn(false);setHeading(ui.yaw.value);
+});
+ui.turn.addEventListener('click',()=>{
+  setAutoTurn(!autoTurn);
+  if(autoTurn&&paused)setPaused(false);
+});
+ui.tempo.addEventListener('input',()=>{
+  tempo=Number(ui.tempo.value);ui.tempoValue.textContent=tempo.toFixed(2)+'×';
+});
+ui.pause.addEventListener('click',()=>setPaused(!paused));
+ui.frame.addEventListener('click',()=>{
+  // Advance *synchronously* on click. On a slow GPU, relying on the next
+  // requestAnimationFrame made the button appear to do nothing until the
+  // page rendered, breaking frame accuracy and keyboard workflows.
+  setPaused(true);
+  advanceSimulation();
+});
+ui.palette.addEventListener('click',()=>{
+  if(!palette)return;
+  const enabled=palette.setEnabled(!palette.enabled);
+  // Preserve wireframe inspector state after switching material instances.
+  rig?.traverse(o=>{if(o.isSkinnedMesh){
+    for(const m of (Array.isArray(o.material)?o.material:[o.material]))
+      m.wireframe=wire;
+  }});
+  ui.palette.setAttribute('aria-pressed',String(enabled));
+  ui.palette.textContent=enabled?
+    'Экспериментальная перекраска · вкл':'Экспериментальная перекраска · выкл';
+  status(enabled?'ВНИМАНИЕ: непроверенная перекраска. Исходный GLB только для сравнения.':
+    'Оригинальные материалы и текстуры Tripo восстановлены.');
+});
+ui.skeleton.addEventListener('click',()=>{
+  showSkeleton=!showSkeleton;if(boneHelper)boneHelper.visible=showSkeleton;
+  ui.skeleton.setAttribute('aria-pressed',String(showSkeleton));
+});
+ui.wire.addEventListener('click',()=>{
+  wire=!wire;ui.wire.setAttribute('aria-pressed',String(wire));
+  rig?.traverse(o=>{if(o.isMesh&&o!==platform&&o!==edge){
+    for(const m of (Array.isArray(o.material)?o.material:[o.material]))if(m)m.wireframe=wire;
+  }});
+});
+document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>{
+  const p=viewPositions[el.dataset.view];if(!p)return;
+  camera.position.set(...p);controls.target.set(0,1.04,0);controls.update();
+}));
+const diagnostics={
+  get ready(){return Boolean(rig?.userData.gltf.loaded)},
+  get model(){return rig},
+  get mode(){return mode},
+  get headingTarget(){return heading},
+  get autoTurn(){return autoTurn},
+  get frame(){return simulatedFrames},
+  get state(){return rig?.userData.pose?.()||null},
+  get bones(){return rig?.userData.gltf.bones||0},
+  get weaponAttached(){return Boolean(rig?.userData.weapon?.parent)},
+  get jumpHeight(){return rig?.position.y||0},
+  get paletteActive(){return palette?.enabled??false},
+  get error(){return error},
+};
+window.__ASHEN_ANIMATION_LAB__=diagnostics;
+try{
+  rig=createGltfKnight(THREE,{
+    onLoad:root=>{
+      const data=root.userData.gltf;
+      // Never modify source GLB textures or visible materials by default.
+      // Previous screenshots showed an UNAPPROVED vertex-color study,
+      // not the authentic original character. Opt-in only for comparison.
+      palette=createGothicPalettePreview(root,{enabled:false});
+      ui.palette.setAttribute('aria-pressed',String(palette.enabled));
+      boneHelper=new THREE.SkeletonHelper(root);
+      boneHelper.material.depthTest=false;
+      boneHelper.material.transparent=true;
+      boneHelper.material.opacity=.78;
+      boneHelper.visible=showSkeleton;
+      scene.add(boneHelper);
+      status('Модель загружена · '+data.bones+' костей, '+data.skinnedMeshes+
+        ' SkinnedMesh. Рукоять выровнена по геометрии ладони; пальцы пока не сжимаются.');
+      ui.metrics.textContent='Подготовлено: '+data.bones+' костей · Idle / Walk / Run / Jump';
+    },
+    onError:e=>{error=String(e?.message||e);status('Ошибка загрузки модели: '+error);}
+  });
+  scene.add(rig);
+}catch(e){error=String(e?.message||e);status('Ошибка движка: '+error)}
+function fit(){
+  const w=ui.viewport.clientWidth,h=ui.viewport.clientHeight;
+  if(!w||!h)return;
+  camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);
+}
+window.addEventListener('resize',fit);
+new ResizeObserver(fit).observe(ui.viewport);fit();
+document.addEventListener('visibilitychange',()=>{last=0});
+// The fixed-step simulation is independent of the browser's render cadence.
+// It is also used by the +1 frame button, even if WebGL stalls or the tab
+// is throttled. This does not make every device physically render at 60fps.
+function advanceSimulation(){
+  if(!rig?.userData.gltf.loaded)return false;
+  stepTime+=SIM_STEP;simulatedFrames++;
+  if(autoTurn){
+    // 45 degrees per simulated second: full orbit every 8 seconds.
+    // This rotates the model, not the camera, for full skin QA.
+    heading=(heading+SIM_STEP*Math.PI/4)%(2*Math.PI);
+    const degrees=Math.round(heading*180/Math.PI)%360;
+    ui.yaw.value=String(degrees);
+    ui.yawValue.textContent=degrees+'°';
+  }
+  if(mode==='Jump')jumpClock=(jumpClock+SIM_STEP)%2.04;
+  const jumpClipTime=mode==='Jump'&&jumpClock<1.49?jumpClock:undefined;
+  // Real 40-joint Tripo skin and the native game's actual pose function.
+  rig.userData.animate(SIM_STEP,{
+    speed:mode==='Walk'?8:mode==='Run'?15:0,
+    run:mode==='Run',heading,jumpClipTime
+  },stepTime);
+  // Studio-only ballistic display and projected blob shadow.
+  const liftPhase=mode==='Jump'&&jumpClock<1.49?
+    Math.max(0,Math.sin(Math.PI*jumpClock/1.49)):0;
+  rig.position.y=.36*liftPhase;
+  contactShadow.scale.setScalar(1+.30*liftPhase);
+  contactShadow.material.opacity=.29-.18*liftPhase;
+  return true;
+}
+function animateFrame(now){
+  if(!alive)return;
+  requestAnimationFrame(animateFrame);
+  const dt=last?clamp((now-last)/1000,0,.05):1/60;last=now;
+  if(dt>0)smoothFps=smoothFps?(.94*smoothFps+.06/dt):1/dt;
+  // Deterministic 60-pose-per-second playback on 60/90/120 Hz displays;
+  // at slower refresh rates the small catch-up budget preserves cadence.
+  accumulator=paused?0:Math.min(.075,accumulator+dt*tempo);
+  let stepBudget=4;
+  while(accumulator>=SIM_STEP-1e-8&&stepBudget-->0){
+    if(!advanceSimulation())break;
+    accumulator-=SIM_STEP;
+  }
+  controls.update();
+  renderer.render(scene,camera);
+  if(now-displayClock>170){
+    displayClock=now;
+    const pose=rig?.userData.pose?.();
+    ui.metrics.textContent=rig?.userData.gltf.loaded?
+      'Клип: '+rig.userData.gltf.clip+'   ·   FPS: '+Math.round(smoothFps)+
+      '\nОбновлений скелета: '+simulatedFrames+' · Костей: '+rig.userData.gltf.bones+
+      '\nОпора (расчёт): '+(pose?.footContact||[]).map(v=>v?'●':'○').join(' / ')+
+      ' · Колени: '+(pose?.kneeBend||[]).map(v=>v.toFixed(2)).join(' / ')+
+      '\nФиксация стоп: '+(pose?.travelSource===null?'тест на месте':
+        (pose?.footPinned||[]).map(v=>v?'зафиксирована':'свободна').join(' / '))+
+      ' · Коррекция таза: '+((pose?.contactCorrection||0)*100).toFixed(1)+' см'+
+      '\nМеч на запястье: '+(pose?.weaponAttached?'да':'нет')+
+      ' · Ладонь: '+(pose?.palmAnchorValid?'точка по '+pose.palmVertexCount+' вершинам':'резервная привязка')+
+      '\nПальцы: без отдельного рига · Прыжок: '+(rig.position.y).toFixed(2)+' м'+
+      ' · Режим: '+mode:'Ожидание модели Tripo V2…';
+  }
+}
+requestAnimationFrame(animateFrame);
+window.addEventListener('pagehide',()=>{
+  alive=false;palette?.dispose();rig?.userData.dispose?.();boneHelper?.geometry?.dispose();
+  controls.dispose();renderer.dispose();
+},{once:true});
+
+</script>
+</body>
+</html>

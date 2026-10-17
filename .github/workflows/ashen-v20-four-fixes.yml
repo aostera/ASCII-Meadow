@@ -1,0 +1,53 @@
+name: Ashen Vow - Four Visual Fix Screenshots
+on:
+  pull_request:
+    branches: [feat/ashen-tripo-v2-motion-sword]
+    paths:
+      - experiments/three/ashen-tripo-native-rig.mjs
+      - experiments/three/ashen-vow-gothic-palette.mjs
+      - experiments/three/ashen-gothic-longsword.mjs
+      - experiments/three/ashen-tripo-ab-review.html
+      - experiments/three/ashen-glyph-emitter.mjs
+      - experiments/three/native-tripo-v2.mjs
+      - tools/check/ashen-tripo-four-fixes.cjs
+      - .github/workflows/ashen-v20-four-fixes.yml
+  workflow_dispatch:
+concurrency:
+  group: ashen-four-visual-screens-${{ github.ref }}
+  cancel-in-progress: true
+permissions: {contents: read}
+jobs:
+  visual:
+    name: Four actual Tripo GLB and native ASCII captures
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22',cache: npm}
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Confirm real source math and visual review scripts
+        run: |
+          node --check experiments/three/ashen-tripo-native-rig.mjs
+          node --check experiments/three/ashen-gothic-longsword.mjs
+          node --check experiments/three/ashen-vow-gothic-palette.mjs
+          node --check experiments/three/native-tripo-v2.mjs
+          node --check experiments/three/ashen-glyph-emitter.mjs
+          node --check tools/check/ashen-tripo-four-fixes.cjs
+      - name: Four real browser screenshots - original GLB unchanged
+        run: |
+          python3 -m http.server 8181 >/tmp/ashen-v20-art.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8181/experiments/three/ashen-tripo-ab-review.html >/dev/null && break
+            sleep 1
+          done
+          node tools/check/ashen-tripo-four-fixes.cjs http://127.0.0.1:8181
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ashen-v20-four-visual-fix-screenshots
+          path: shots/ashen-four-fixes/
+          if-no-files-found: warn

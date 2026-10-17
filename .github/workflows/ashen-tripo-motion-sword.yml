@@ -4,11 +4,37 @@ on:
     branches: [feat/ashen-tripo-v2-motion-sword]
     paths:
       - experiments/three/ashen-tripo-native-rig.mjs
+      - experiments/three/source-motion.mjs
+      - experiments/three/ashen-sole-contact.mjs
+      - experiments/three/ashen-blade-envelope.mjs
+      - tools/check/ashen-blade-envelope.cjs
+      - tools/check/ashen-tripo-sole-contact.cjs
+      - tools/check/ashen-tripo-source-motion.cjs
+      - experiments/three/ashen-tripo-animation-workshop.html
+      - experiments/three/ashen-vow-gothic-palette.mjs
       - experiments/three/ashen-gothic-longsword.mjs
       - experiments/three/native-tripo-v2.mjs
+      - experiments/three/ashen-glyph-emitter.mjs
+      - tools/check/ashen-native-glyph-cache.cjs
+      - tools/check/ashen-tripo-motion-sword.cjs
+      - tools/check/ashen-tripo-animation-workshop.cjs
+      - .github/workflows/ashen-tripo-motion-sword.yml
+  pull_request:
+    branches: [feat/ashen-tripo-v2-motion-sword]
+    paths:
+      - experiments/three/ashen-tripo-native-rig.mjs
+      - experiments/three/ashen-glyph-emitter.mjs
+      - experiments/three/native-tripo-v2.mjs
+      - experiments/three/ashen-sole-contact.mjs
+      - experiments/three/ashen-blade-envelope.mjs
+      - tools/check/ashen-native-glyph-cache.cjs
       - tools/check/ashen-tripo-motion-sword.cjs
       - .github/workflows/ashen-tripo-motion-sword.yml
   workflow_dispatch:
+# Repeated animation revisions should not consume four simultaneous GPU runners.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions: {contents: read}
 jobs:
   gameplay:
@@ -24,9 +50,25 @@ jobs:
       - name: Static syntax
         run: |
           node --check experiments/three/ashen-tripo-native-rig.mjs
+          node --check experiments/three/source-motion.mjs
+          node --check tools/check/ashen-tripo-source-motion.cjs
+          node tools/check/ashen-tripo-source-motion.cjs
+          node --check experiments/three/ashen-sole-contact.mjs
+          node --check tools/check/ashen-tripo-sole-contact.cjs
+          node tools/check/ashen-tripo-sole-contact.cjs
+          node --check experiments/three/ashen-blade-envelope.mjs
+          node --check tools/check/ashen-blade-envelope.cjs
+          node tools/check/ashen-blade-envelope.cjs
+          node --check experiments/three/ashen-vow-gothic-palette.mjs
           node --check experiments/three/ashen-gothic-longsword.mjs
           node --check experiments/three/native-tripo-v2.mjs
           node --check tools/check/ashen-tripo-motion-sword.cjs
+          node --check experiments/three/ashen-glyph-emitter.mjs
+          node --check tools/check/ashen-native-glyph-cache.cjs
+          node tools/check/ashen-native-glyph-cache.cjs
+          node --check tools/check/ashen-tripo-animation-workshop.cjs
+          node -e "const fs=require('fs');const html=fs.readFileSync('experiments/three/ashen-tripo-animation-workshop.html','utf8');const m=html.match(/<script type=\"module\">([\s\S]*?)<\/script>/);if(!m)throw Error('Workshop module missing');fs.writeFileSync('/tmp/ashen-workshop.mjs',m[1])"
+          node --check /tmp/ashen-workshop.mjs
       - name: Real skinned player, attached separate Gothic longsword, planted walk and jump
         run: |
           python3 -m http.server 8181 >/tmp/ashen-motion-http.log 2>&1 &
@@ -37,9 +79,12 @@ jobs:
             sleep 1
           done
           node tools/check/ashen-tripo-motion-sword.cjs http://127.0.0.1:8181
+          node tools/check/ashen-tripo-animation-workshop.cjs http://127.0.0.1:8181
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ashen-tripo-gait-gothic-sword-real-game
-          path: shots/ashen-tripo-v2-motion-sword/
+          path: |
+            shots/ashen-tripo-v2-motion-sword/
+            shots/ashen-tripo-animation-workshop/
           if-no-files-found: warn

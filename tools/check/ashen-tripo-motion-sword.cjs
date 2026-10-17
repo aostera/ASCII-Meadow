@@ -48,6 +48,45 @@ fs.mkdirSync(output,{recursive:true});
        gameFrames:state.frameCount,sourceGlyphs:state.stats?.visibleGlyphs};
    });
    const idle=await read();
+   if(!mobile){
+     // Probe true actor displacement, rather than trusting the Run key.
+     const runIntoWall=await page.evaluate(async()=>{
+       const {NativeKnightGlyphs}=await import('/experiments/three/native-tripo-v2.mjs');
+       const samples=[];
+       const stub={clock:null,prev:null,travelSource:0,groundX:0,groundZ:0,
+         stats:{frames:0},rasterClock:0,rasterInterval:Infinity,
+         knight:{userData:{sourceUnitsPerMetre:.5,gltf:{clip:'Idle'},
+           animate:(_dt,m)=>{samples.push([m.speed,m.travelSource,m.groundX,m.groundZ]);return 'idle';},
+           pose:()=>({})}},
+         render(){},convert(){},emit(){}};
+       const positions=[[100,40,0],[102,41,0],[102,41,0],[500,500,0],
+         [501,500,1],[502,500,0],[503,500,0]];
+       for(const [i,[x,y,jump]] of positions.entries())
+         NativeKnightGlyphs.prototype.draw.call(stub,
+           {x,y,walk:1,run:1,d8:0,jump},null,1,1,
+           {t:(i+1)/30,CW:1,CH:1,KG:{art:44.4},JUMP_T:1,AIR0:.2,AIR1:.8});
+       return samples;
+     });
+     if(runIntoWall.length!==7||runIntoWall[0][0]!==0||runIntoWall[1][0]<=0||
+        runIntoWall[2][0]!==0||runIntoWall[1][1]<=0||
+        runIntoWall[2][1]!==runIntoWall[1][1]||
+        !Number.isFinite(runIntoWall[1][2])||
+        !(runIntoWall[1][2]<runIntoWall[0][2])||
+        !(runIntoWall[1][3]<runIntoWall[0][3])||
+        runIntoWall[2][2]!==runIntoWall[1][2]||
+        runIntoWall[2][3]!==runIntoWall[1][3]||
+        runIntoWall[3][0]!==0||
+        runIntoWall[3][1]!==runIntoWall[2][1]||
+        runIntoWall[3][2]!==runIntoWall[2][2]||
+        runIntoWall[3][3]!==runIntoWall[2][3]||
+        runIntoWall[4][0]!==0||runIntoWall[5][0]!==0||
+        runIntoWall[4][1]!==runIntoWall[3][1]||
+        runIntoWall[5][1]!==runIntoWall[3][1]||
+        runIntoWall[6][0]<=0||
+        runIntoWall[6][1]<=runIntoWall[5][1])
+       throw Error('Player moonwalks while blocked: '+JSON.stringify(runIntoWall));
+     console.log('Run displacement / wall stop pass',runIntoWall);
+   }
    if(idle.error)throw Error('GLB/skin/ASCII player failed '+idle.error);
    if(!idle.ready||idle.glyphs<300||idle.cells<idle.glyphs||
       (idle.bounds?.[3]-idle.bounds?.[1])<28)
@@ -64,7 +103,7 @@ fs.mkdirSync(output,{recursive:true});
      throw Error('Sword is NOT a separate real mesh attached to Tripo right wrist: '+JSON.stringify({weapon:idle.weapon,bone:idle.weaponSocketBone}));
    if(idle.cloakCells<5)
      throw Error('No cloak shading regions read from model surface: '+idle.cloakCells);
-   if(idle.pose?.animationVersion!=='Tripo-IK-v2')
+   if(idle.pose?.animationVersion!=='Tripo-IK-v22-segment-aligned-arms')
      throw Error('New planted-feet IK gait controller did not load');
 
    const shot=async(name)=>{
@@ -105,6 +144,14 @@ fs.mkdirSync(output,{recursive:true});
      const sprint=await shot('run');
      if(sprint.pose?.phase<=walk.pose?.phase)
        throw Error('Walking->running phase restarted instead of being continuous');
+     if(!(sprint.pose.travelSource>walk.pose.travelSource)||
+        sprint.pose.footPinned?.length!==2)
+       throw Error('Original MAP travel not transmitted to Tripo IK foot planner: '+
+         JSON.stringify({walk:walk.pose.travelSource,sprint:sprint.pose.travelSource,
+           pins:sprint.pose.footPinned}));
+     // Running has an aerial interval; both pins can be released at a
+     // sampled frame. Their stationary invariants are tested over full
+     // cycles by the separate real GLB pose-sweep workflow.
      await page.keyboard.up('Shift');await page.keyboard.up('d');
      await page.keyboard.press('Space');
      await page.waitForFunction(()=>window.__ASCII_NATIVE__.ashenVow?.clip==='Jump',
@@ -122,11 +169,44 @@ fs.mkdirSync(output,{recursive:true});
    const fin=await read();
    if(fin.map!==idle.map)throw Error('Original authored map changed');
    if(!fin.pose||!(fin.pose.phase>=0))throw Error('No live bone-animation controller state');
-   if(fin.pose?.animationVersion!=='Tripo-IK-v2'||!fin.pose.weaponAttached)
+   // Production never does the studio's second CPU-skinned boot scan:
+   // grounded surface correction remains active, but 60Hz diagnostics
+   // should be explicitly disabled in the native game fast path.
+   if(fin.pose.soleSurface!==null||
+      !Number.isInteger(fin.pose.soleVertexReads)||
+      fin.pose.soleVertexReads>24)
+     throw Error('Live native knight still wasting skin reads per tick: '+
+       JSON.stringify({surface:fin.pose.soleSurface,
+         reads:fin.pose.soleVertexReads}));
+   if(fin.pose?.animationVersion!=='Tripo-IK-v22-segment-aligned-arms'||!fin.pose.weaponAttached)
      throw Error('New animated sword and IK state lost during play');
    if(!mobile&&fin.pose?.speed<0&&fin.pose?.heading===undefined)
      throw Error('Bad gameplay pose state');
    if(fin.gameFrames<=idle.gameFrames)throw Error('Original game loop stalled');
+   // The genuine Three rig advances on each simulation frame while
+   // expensive 3D-to-ASCII GPU readback is currently deliberately slower.
+   // Verify that the user-visible GLYPH image actually refreshes; do not
+   // mislabel the 60 Hz bone-pose rate as 60 visible rendered FPS.
+   if(!(fin.rasterFrames>idle.rasterFrames&&
+        Number.isFinite(fin.rasterHz)&&fin.rasterHz>=10))
+     throw Error('Animated ASCII knight stopped updating visible raster frames: '+
+       JSON.stringify({initial:idle.rasterFrames,final:fin.rasterFrames,
+         configuredHz:fin.rasterHz}));
+   console.log('Native visible ASCII raster frames:',JSON.stringify({
+     mode:label,initial:idle.rasterFrames,final:fin.rasterFrames,
+     configuredHz:fin.rasterHz,
+     simulationFrames:fin.gameFrames-idle.gameFrames
+   }));
+   if(!(fin.glyphBuilds>idle.glyphBuilds&&
+        fin.glyphCacheHits>idle.glyphCacheHits&&
+        fin.glyphBuilds<=fin.rasterFrames+1))
+     throw Error('Game kept rebuilding unchanged ASCII geometry: '+
+       JSON.stringify({builds:fin.glyphBuilds,hits:fin.glyphCacheHits,
+         rasterFrames:fin.rasterFrames}));
+   console.log('Native ASCII glyph cache:',JSON.stringify({
+     builds:fin.glyphBuilds,hits:fin.glyphCacheHits,
+     rasterFrames:fin.rasterFrames
+   }));
    await page.screenshot({path:path.join(output,label+'-whole-game.png'),timeout:60000});
    await page.evaluate(()=>window.__ASCII_NATIVE__.dispose());
    const after=await page.evaluate(()=>window.__ASCII_NATIVE__.ashenVow?.active);

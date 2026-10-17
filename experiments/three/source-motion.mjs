@@ -21,13 +21,21 @@ export function headingForSourceD8(d8){
 export function sourceKnightMotion(e,previous,dt,CW,CH){
  if(!e||!(dt>0)||!Number.isFinite(dt))throw Error('Invalid native rig clock');
  const [sx,sy]=sourceActorFoot(e,CW,CH);
- let speed=0;
- if(previous){
-  const moved=Math.hypot(sx-previous.sx,sy-previous.sy);
-  speed=moved/dt>0.5?Math.min(30,moved/dt/10):0;
- }
- if(e.moving||e.walk>.5)speed=Math.max(speed,e.run>.5?15:8);
  const jumping=(e.jump||0)>0;
+ // Exactly as in the production-map adapter: input intent cannot be
+ // substituted for distance. Held Walk/Run against collision, airborne
+ // movement and map teleports must NOT animate phantom ground steps.
+ const moved=previous?Math.hypot(sx-previous.sx,sy-previous.sy):0;
+ const pxPerMetre=Number.isFinite(e.pxPerMetre)&&e.pxPerMetre>0?
+   e.pxPerMetre:24;
+ const movedMetres=moved/pxPerMetre;
+ // The first grounded frame may still carry jump-arc map displacement.
+ // Do not convert it into a phantom walk/run stride on touchdown.
+ const validStep=Boolean(previous)&&!jumping&&!previous?.jumping&&
+   Boolean(e.moving||(e.walk||0)>.5)&&
+   movedMetres<.20&&movedMetres/dt<12;
+ const speed=validStep&&moved>.001?
+   Math.min(36,moved/dt/10):0;
  return {movement:{
    speed,run:(e.run||0)>.5,
    jump:jumping&&!previous?.jumping,

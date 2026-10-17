@@ -1,0 +1,89 @@
+// Pure CPU-side source-foot surface selection. Does not require WebGL or Three.
+// Uses the owner's genuine GLB skin joint weights; NEVER creates replacement geometry.
+// Select small, actual weighted lower-boot mesh regions once at load.
+// Sample REAL CPU-skinned GLB triangles thereafter, not joint positions.
+// The sole proxy remains a vertex-point diagnostic, NOT collision physics.
+export function locateBootSoleVertices(meshes,legSets){
+  const pairs=[legSets.leftLeg,legSets.rightLeg];
+  return pairs.map((leg,side)=>{
+    let best=null;
+    for(const mesh of meshes){
+      if(!mesh.isSkinnedMesh||!mesh.skeleton)continue;
+      const geo=mesh.geometry,p=geo?.attributes?.position;
+      const si=geo?.attributes?.skinIndex,sw=geo?.attributes?.skinWeight;
+      if(!p||!si||!sw)continue;
+      const footJointIndices=new Set([leg[2],leg[3]].map(b=>mesh.skeleton.bones.indexOf(b))
+        .filter(i=>i>=0));
+      if(!footJointIndices.size)continue;
+      const candidates=[];let lowY=Infinity;
+      for(let i=0;i<p.count;i++){
+        let weight=0;
+        for(let j=0;j<4;j++)if(footJointIndices.has(si.getComponent(i,j)))
+          weight+=sw.getComponent(i,j);
+        if(weight<.42)continue;
+        const x=p.getX(i),y=p.getY(i);
+        if(!Number.isFinite(x+y))continue;
+        candidates.push({i,x,y});
+        lowY=Math.min(lowY,y);
+      }
+      if(!candidates.length)continue;
+      // The bottom ~7cm of the source GLB boots. A rigid mesh component
+      // outside this band is never mistaken for the ground-contact sole.
+      const lower=candidates.filter(v=>v.y<=lowY+.07);
+      if(lower.length<12)continue;
+      lower.sort((a,b)=>a.x-b.x);
+      const choose=(a,start,end,count)=>Array.from({length:count},(_,k)=>
+        a[Math.round(start+(end-start)*(k+.5)/count)]?.i).filter(Number.isInteger);
+      const n=lower.length;
+      const heel=choose(lower,0,Math.max(0,n*.24),4);
+      const toe=choose(lower,Math.max(0,n*.76),n-1,4);
+      const middle=choose(lower,Math.max(0,n*.30),Math.max(0,n*.70),4);
+      const indices=[...new Set([...heel,...middle,...toe])];
+      if(!best||lower.length>best.candidateCount)
+        best={mesh,side,candidateCount:lower.length,indices,
+          heel:heel.filter(i=>indices.includes(i)),
+          toe:toe.filter(i=>indices.includes(i))};
+    }
+    return best;
+  });
+}
+
+// Compute a bounded *pelvis-local* adjustment from real skinned boot
+// surface heights, not the joint pivot. Input heights are in normalized
+// root world metres. The target is returned in original Tripo bone units.
+// Pure math enables a deterministic test before a WebGL rig is available.
+export function groundedSoleTarget(surfaces,restHeights,contacts,sourcePerMetre,
+  maxCorrection=.045){
+  if(!Number.isFinite(sourcePerMetre)||sourcePerMetre<=0||
+     !Number.isFinite(maxCorrection)||maxCorrection<=0)
+    throw Error('Invalid original Tripo sole correction scale');
+  let error=0,count=0;
+  for(let i=0;i<2;i++){
+    if(!contacts?.[i])continue;
+    const current=surfaces?.[i],baseline=restHeights?.[i];
+    if(!current||!(current.sampleCount>=6)||
+       !Number.isFinite(current.minY)||!Number.isFinite(baseline))continue;
+    error+=current.minY-baseline;
+    count++;
+  }
+  const raw=count?-error/count*sourcePerMetre:0;
+  const bounded=Math.max(-maxCorrection,Math.min(maxCorrection,raw));
+  // A physically neutral sole height is +0, not IEEE -0. The latter
+  // breaks strict regression checks and creates needless state changes.
+  const target=bounded===0?0:bounded;
+  return {target,raw,count,meanHeightError:count?error/count:null};
+}
+
+// Rate-limited contact correction prevents pelvis "popping" on landing,
+// toe-off or near an obstacle. Distances are ORIGINAL Tripo source units
+// and speed is source units/s; independent of 60 Hz render cadence.
+export function advanceSoleCorrection(current,target,dt,rate=.18,lambda=28){
+  if(![current,target,dt,rate,lambda].every(Number.isFinite)||
+     dt<0||rate<=0||lambda<=0)
+    throw Error('Invalid skinned-ground correction transition');
+  if(dt===0)return current;
+  const damping=1-Math.exp(-lambda*dt);
+  const next=current+(target-current)*damping;
+  const maxStep=rate*dt;
+  return Math.max(current-maxStep,Math.min(current+maxStep,next));
+}

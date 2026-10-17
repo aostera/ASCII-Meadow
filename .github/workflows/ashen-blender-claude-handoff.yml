@@ -1,0 +1,55 @@
+name: Ashen Vow - Original Tripo GLB for Claude Blender
+on:
+  pull_request:
+    branches: [feat/ashen-tripo-v2-motion-sword]
+    paths:
+      - tools/check/ashen-export-blender-handoff.cjs
+      - tools/check/ashen-validate-blender-handoff.cjs
+      - .github/workflows/ashen-blender-claude-handoff.yml
+  workflow_dispatch:
+concurrency:
+  group: ashen-blender-handoff-${{ github.ref }}
+  cancel-in-progress: true
+permissions: {contents: read}
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22',cache: npm}
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Verify original source GLB is present
+        run: |
+          test -s experiments/three/assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb
+          file experiments/three/assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb
+          node --check tools/check/ashen-export-blender-handoff.cjs
+          node --check tools/check/ashen-validate-blender-handoff.cjs
+      - name: Bake four REVIEW ONLY Tripo motion clips for Blender import
+        run: |
+          python3 -m http.server 8181 >/tmp/ashen-blender-handoff.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8181/experiments/three/ashen-tripo-animation-workshop.html >/dev/null && break
+            sleep 1
+          done
+          node tools/check/ashen-export-blender-handoff.cjs http://127.0.0.1:8181
+      - name: Validate glTF source bones and authored action tracks
+        run: |
+          node tools/check/ashen-validate-blender-handoff.cjs
+          cp experiments/three/assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb \
+            artifacts/ashen-blender-handoff/ashen_tripo_original_UNMODIFIED.glb
+          sha256sum \
+            artifacts/ashen-blender-handoff/ashen_tripo_original_UNMODIFIED.glb \
+            artifacts/ashen-blender-handoff/ashen_tripo_v22_REVIEW_ONLY_motion_bake.glb \
+            > artifacts/ashen-blender-handoff/SHA256SUMS.txt
+          git diff --exit-code -- experiments/three/assets/ashen-vow/ashen_tripo_v2_skeleton_lod.glb
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Ashen-Tripo-Original-And-Claude-Blender-Bake
+          path: artifacts/ashen-blender-handoff/
+          if-no-files-found: warn

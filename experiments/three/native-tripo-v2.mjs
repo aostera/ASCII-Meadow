@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import {createGltfKnight} from './ashen-tripo-native-rig.mjs';
 import {headingForSourceD8} from './source-motion.mjs';
+import {emitCachedTripoGlyphs,chooseNativeRasterHz} from './ashen-glyph-emitter.mjs';
 
 const COLS = 104, ROWS = 54, FX = 52, FY = 51.6, ART = 44.4;   // the source knight grid (KG)
 const SPRITE_ELEV = .35;                            // camera elevation of the sprite view, rad
@@ -125,7 +126,8 @@ export class NativeKnightGlyphs {
       cy: new Int16Array(COLS * ROWS), cl: new Uint8Array(COLS * ROWS)};
     this.tone = null;
     this.stats = {frames: 0, loaded: false, error: null, clip: null, motion: 'idle',
-      cells: 0, glyphs: 0, cloakCells: 0, readMs: 0, convertMs: 0};
+      cells: 0, glyphs: 0, cloakCells: 0, readMs: 0, convertMs: 0,
+      glyphBuilds:0, glyphCacheHits:0};
     this.knight = createGltfKnight(THREE, {
       arc: false,
       onLoad: rig => {
@@ -148,12 +150,25 @@ export class NativeKnightGlyphs {
     });
     this.scene.add(this.knight);
     this.clock = null; this.prev = null; this.disposed = false;
+    this.wasJumping = false;
+    // Persistent travelled path length in the source GLB's bone units.
+    // Independent from the knight's camera-centred ASCII sprite position.
+    this.travelSource = 0;
+    // Accumulated original-map X/Z travel in Tripo source-bone units.
+    // This is not the stationary offscreen sprite root's position.
+    this.groundX = 0; this.groundZ = 0;
     this.rasterClock = null;
+    // Visible glyph geometry is stable until the next 3D raster sample.
+    // Fire lighting and ground-map occlusion are STILL painted each tick.
+    this.glyphDirty = true;
     // Mobile gets lower GPU readback frequency; 60+ distinct animation
     // poses are still evaluated from the simulation's live time.
     const slowDevice=window.matchMedia?.('(pointer:coarse)')?.matches;
+    this.touchDevice=Boolean(slowDevice);
     this.rasterInterval=1/(slowDevice?12:20);
     this.stats.rasterHz=slowDevice?12:20;
+    this.stats.rasterTargetHz=this.stats.rasterHz;
+    this.rasterCostAvg=null;
     this.stats.rasterFrames=0;
   }
   get ready() { return !this.disposed && this.stats.loaded; }
@@ -174,14 +189,43 @@ export class NativeKnightGlyphs {
     this.clock = now;
     // ground speed in source pixels per second, for the clip cadence
     const fx = e.x * src.CW, fy = (e.y + .7) * src.CH;
-    let speed = 0;
-    if (this.prev && dt > 0) speed = Math.hypot(fx - this.prev[0], fy - this.prev[1]) / dt / 10;
+    const dx=this.prev?fx-this.prev[0]:0;
+    const dy=this.prev?fy-this.prev[1]:0;
+    const travelPixels=Math.hypot(dx,dy);
     this.prev = [fx, fy];
-    const walking = !(e.jump > 0) && (e.walk || 0) > .5;
-    if (walking) speed = Math.max(speed, (e.run || 0) > .5 ? 15 : 8); else speed = 0;
-    this.knight.userData.pxPerMeter = src.KG.art * fch / 1.9;
+    const jumping=(e.jump||0)>0;
+    const firstLandingFrame=this.wasJumping&&!jumping;
+    this.wasJumping=jumping;
+    const walking = !jumping && (e.walk || 0) > .5;
+    const pxPerMetre=src.KG.art*fch/1.9;
+    this.knight.userData.pxPerMeter=pxPerMetre;
+    // Source displacement drives BOTH animation speed and planted feet.
+    // Ignore teleports, airborne movement and held input at a solid wall;
+    // never feed a bogus sprint to the real skinned legs for those events.
+    const sourceUnitsPerMetre=this.knight.userData.sourceUnitsPerMetre;
+    const movedMetres=travelPixels/Math.max(1,pxPerMetre);
+    const validStep=walking&&!firstLandingFrame&&
+      Number.isFinite(sourceUnitsPerMetre)&&
+      dt>0&&movedMetres/dt<12&&movedMetres<.20;
+    const speed=validStep&&travelPixels>.001?
+      Math.min(36,travelPixels/dt/10):0;
+    if(validStep){
+      const factor=sourceUnitsPerMetre/Math.max(1,pxPerMetre);
+      this.travelSource+=movedMetres*sourceUnitsPerMetre;
+      // In the original screen projection, right/down is negative world X/Z.
+      // Integrate from actual actor coordinates, never camera pan or input intent.
+      this.groundX-=dx*factor;
+      this.groundZ-=dy*factor;
+    }
+    this.stats.sourceTravel=this.travelSource;
+    this.stats.groundXZ=[this.groundX,this.groundZ];
     this.stats.motion = this.knight.userData.animate(dt, {
       speed, run: (e.run || 0) > .5, heading: headingForSourceD8(e.d8 || 0),
+      travelSource:this.travelSource,
+      groundX:this.groundX,groundZ:this.groundZ,
+      // Gameplay keeps authentic sole-ground support but skips the SECOND
+      // CPU-skinned mesh diagnostic scan; studio previews keep full QA.
+      inspectSoles:false,
       jumpClipTime: NativeKnightGlyphs.jumpClipTime(e, src.JUMP_T, src.AIR0, src.AIR1)
     }, now);
     this.stats.clip = this.knight.userData.gltf.clip;
@@ -192,6 +236,20 @@ export class NativeKnightGlyphs {
     if(this.rasterClock===null||now-this.rasterClock>=this.rasterInterval){
       this.render(G, fcw, fch);
       this.convert();
+      this.glyphDirty=true;
+      // Let fast GPUs display up to 30 (desktop) / 20 (touch) DISTINCT
+      // mesh-based glyph images; under load fall back to safe 20/12 Hz.
+      // No assertion that a 399k-triangle model can visibly run 60fps.
+      const cost=this.stats.readMs+this.stats.convertMs;
+      if(Number.isFinite(cost)&&cost>=0)
+        this.rasterCostAvg=this.rasterCostAvg===null?
+          cost:this.rasterCostAvg*.85+cost*.15;
+      const targetHz=chooseNativeRasterHz({
+        gpuReadMs:this.rasterCostAvg??25,
+        glyphConvertMs:0,touch:this.touchDevice
+      });
+      this.rasterInterval=1/targetHz;
+      this.stats.rasterTargetHz=targetHz;
       this.rasterClock=now;
       this.stats.rasterFrames++;
     }
@@ -272,55 +330,8 @@ export class NativeKnightGlyphs {
   }
 
   emit(e, G, fcw, fch, src) {
-    const {S, A, K} = this;
-    const vals = [];
-    for (let c = 0; c < COLS * ROWS; c++) if (A[c] >= .3) vals.push(S[c]);
-    K.n = 0;
-    this.stats.cells = vals.length;
-    if (vals.length < 10) { this.stats.glyphs = 0; return; }
-    vals.sort((a, b) => a - b);
-    const pct = q => vals[Math.min(vals.length - 1, Math.max(0, Math.round(q / 100 * (vals.length - 1))))];
-    let lo = pct(3), hi = pct(98);
-    // the tone stretch follows the pose, but not frame by frame (no flicker)
-    if (this.tone) { lo = this.tone[0] + (lo - this.tone[0]) * .25; hi = this.tone[1] + (hi - this.tone[1]) * .25; }
-    this.tone = [lo, hi];
-    const span = Math.max(1e-3, hi - lo);
-    let glyphs = 0, cloak = 0;
-    for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
-      const c = cy * COLS + cx;
-      if (A[c] < .3) continue;
-      const V = Math.pow(Math.min(1, Math.max(0, (S[c] - lo) / span)), .9);
-      let v = (.37 + .63 * V) * Math.min(1, A[c] * 1.25) + BAYER[(cy & 3) * 4 + (cx & 3)] * .14 + GRAIN[c];
-      const j = K.n++;
-      K.cx[j] = cx; K.cy[j] = cy;
-      K.cl[j] = this.cloakFrac[c] > .5 ? 1 : 0;
-      cloak += K.cl[j];
-      if (v < .14) { K.code[j] = -1; continue; }
-      v = Math.min(.999, v);
-      K.code[j] = src.rampCode(Math.min(9, 1 + Math.floor(v * 9)));
-      glyphs++;
-    }
-    this.stats.glyphs = glyphs; this.stats.cloakCells = cloak;
-    let y0 = ROWS, y1 = 0, x0 = COLS, x1 = 0;
-    for (let j = 0; j < K.n; j++) { y0 = Math.min(y0, K.cy[j]); y1 = Math.max(y1, K.cy[j]); x0 = Math.min(x0, K.cx[j]); x1 = Math.max(x1, K.cx[j]); }
-    this.stats.bounds = [x0, y0, x1, y1];
-    const left = G.left, top = G.top;
-    // dark plate first, in runs along each row (as drawKnight does), then the glyphs
-    let ry = -1, rs = 0, re = 0;
-    const flushRun = () => { if (ry >= 0) src.grect(left + rs * fcw - .4, top + ry * fch - .4, (re - rs) * fcw + .8, fch + .8, .94); };
-    for (let j = 0; j < K.n; j++) {
-      const cx = K.cx[j], cy = K.cy[j];
-      if (cy === ry && cx === re) { re = cx + 1; continue; }
-      flushRun(); ry = cy; rs = cx; re = cx + 1;
-    }
-    flushRun();
-    const [fI, fdx] = src.fireLightAt(e);
-    for (let j = 0; j < K.n; j++) {
-      const code = K.code[j];
-      if (code < 0) continue;
-      src.gput(src.KN0 + src.knightFireBlock(K, j, fI, fdx) * src.KNS + code,
-        left + K.cx[j] * fcw, top + K.cy[j] * fch, 1);
-    }
+    return emitCachedTripoGlyphs.call(this,e,G,fcw,fch,src,
+      {COLS,ROWS,BAYER,GRAIN});
   }
 
   dispose() {
