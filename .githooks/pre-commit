@@ -1,4 +1,11 @@
 #!/bin/sh
-# Enabled on each developer clone by tools/security/install-hooks.sh.
+# Fail closed: check exactly the staged versions before a commit is recorded.
 set -eu
-exec python3 tools/check/staged-secrets.py
+if command -v python3 >/dev/null 2>&1; then
+  exec python3 tools/check/staged-secrets.py
+elif command -v python >/dev/null 2>&1; then
+  exec python tools/check/staged-secrets.py
+else
+  echo 'BLOCKED COMMIT: Python is required for secret scanning.' >&2
+  exit 2
+fi
