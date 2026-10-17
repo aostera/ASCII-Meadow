@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 
-LIMIT = 6 * 1024 * 1024
+LIMIT = 32 * 1024 * 1024
 RX = [
     ("private-key", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP |ENCRYPTED )?PRIVATE KEY-----")),
     ("github-token", re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{35,})\b")),
