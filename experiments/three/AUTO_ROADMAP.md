@@ -21,8 +21,8 @@
 | T08 | IN_PROGRESS (baseline draft) | [#61](https://github.com/aostera/ASCII-Meadow/pull/61) — baseline native perf, никаких недоказанных FPS |
 | T02 | PARKED | Замок: [#54](https://github.com/aostera/ASCII-Meadow/pull/54) draft, невидимый рельеф не принимать как готовую геометрию |
 | T03 | PARKED | Три разные руины: [#58](https://github.com/aostera/ASCII-Meadow/pull/58) draft/stacked |
-| T10 | TODO | **Управление на телефоне и планшете** (владелец 17.10: «супер корявое»). Сейчас в `src/core/input.js` ходьба = удержание и протяжка к точке пальца относительно рыцаря, бег только при протяжке дальше 28 клеток, прыжок = короткий тап рядом с рыцарем, тап в стороне = порыв ветра, «использовать» только тапом по рамке; нет видимого джойстика/кнопок и мультитача. Сделать native-слой: плавающий стик + кнопки прыжка/действия/бега, мёртвая зона, без конфликта с редактором и pinch, phone portrait/landscape и планшет; тест Chromium touch + отметка о непроверенном реальном iOS/Android |
-| T09 | TODO | Full-game parity (после T10), QA реальных устройств, возврат GPU/fallback, контроль карты, художественное решение владельца |
+| T10 | IN_REVIEW (merged [#81](https://github.com/aostera/ASCII-Meadow/pull/81)) | **Управление на телефоне и планшете** (владелец 17.10: «очень плохо отрабатывает»). Слой `native-touch-controls.js`: плавающий стик от места касания (шаг/бег по отклонению, мгновенный разворот), второй палец и кнопка ⤒ — прыжок, кнопка «E» при подсказке, отмена касания не тап, без long-press меню и зума. `src/` не тронут. Тест `tools/check/three-native-touch-controls.cjs` (Chromium phone+tablet). Остались реальные Android/iOS/Safari и управление пальцем внутри замка (там своя крестовина) |
+| T09 | TODO | Full-game parity, QA реальных устройств, возврат GPU/fallback, контроль карты, художественное решение владельца |
 
 **Технически подтверждено:** head `c1f12b6496` после #60 имеет [CI success](https://github.com/aostera/ASCII-Meadow/actions/runs/38944223018) и [editor/character success](https://github.com/aostera/ASCII-Meadow/actions/runs/38944215332). Обновлённые PR проверять по их собственному CI, а не по зелёному предыдущей базы.
 
