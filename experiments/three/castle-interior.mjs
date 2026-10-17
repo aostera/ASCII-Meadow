@@ -35,24 +35,31 @@ export class CastleInterior{
  }
  xWall(x,z0,z1,h=7){this.box(x,h/2,(z0+z1)/2,.85,h,z1-z0)}
  zWall(z,x0,x1,h=7){this.box((x0+x1)/2,h/2,z,x1-x0,h,.85)}
- arch(x,z,alongX,half){
-  // Above-door pointed lintels. Openings below are real and traversable.
-  for(const sign of [-1,1]){
-   const a=this.box(x+(alongX?sign*half*.5:0),5.75,
-     z+(alongX?0:sign*half*.5),alongX?half+.6:.7,.7,alongX?.7:half+.6,'rib');
-   if(alongX)a.rotation.z=sign*.41;else a.rotation.x=sign*.41;
+ arch(x,z,alongX,half,h=7){
+  // Two true, connected pointed voussoir beams, each springing from the
+  // wall jamb and meeting at one apex. No floating zigzag ornament.
+  if(h<4)return; // near-camera cutaway walls intentionally have no crown
+  const peak=new THREE.Vector3(x,h-.05,z);
+  for(const side of [-1,1]){
+   const spring=new THREE.Vector3(
+     alongX?x+side*half:x,h-2.5,alongX?z:z+side*half);
+   const delta=new THREE.Vector3().subVectors(peak,spring);
+   const b=new THREE.Mesh(new THREE.BoxGeometry(.6,delta.length(),.68),this.mat.rib);
+   b.position.copy(peak).add(spring).multiplyScalar(.5);
+   b.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());
+   this.group.add(b);
   }
  }
  xOpen(x,z0,z1,holes,h=7){
   let last=z0;for(const [a,b]of holes){
    if(a>last)this.xWall(x,last,a,h);
-   this.arch(x,(a+b)/2,false,(b-a)/2);last=b;
+   this.arch(x,(a+b)/2,false,(b-a)/2,h);last=b;
   }if(last<z1)this.xWall(x,last,z1,h);
  }
  zOpen(z,x0,x1,holes,h=7){
   let last=x0;for(const [a,b]of holes){
    if(a>last)this.zWall(z,last,a,h);
-   this.arch((a+b)/2,z,true,(b-a)/2);last=b;
+   this.arch((a+b)/2,z,true,(b-a)/2,h);last=b;
   }if(last<x1)this.zWall(z,last,x1,h);
  }
  pillar(x,z){
@@ -238,8 +245,11 @@ export class CastleInterior{
   const span=w<650?29:37;
   this.camera.left=-span*aspect/2;this.camera.right=span*aspect/2;
   this.camera.top=span/2;this.camera.bottom=-span/2;this.camera.updateProjectionMatrix();
-  this.camera.position.set(this.pos.x+20,33,this.pos.z+24);
-  this.camera.lookAt(this.pos.x,0,this.pos.z);
+  // Look slightly into the hall so the player stays in the lower third
+  // instead of staring at the empty field outside the castle gate.
+  const focusZ=this.pos.z-6.5;
+  this.camera.position.set(this.pos.x+20,33,focusZ+24);
+  this.camera.lookAt(this.pos.x,0,focusZ);
   this.renderer.setRenderTarget(null);
   this.renderer.setViewport(0,0,w,h);this.renderer.setScissorTest(false);
   this.renderer.clear(true,true,true);
