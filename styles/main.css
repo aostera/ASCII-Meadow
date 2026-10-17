@@ -10,12 +10,14 @@
   color-scheme: dark;
 }
 html, body { height: 100%; }
-body { background: var(--bg); color: var(--ink); font-family: var(--mono); overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+body { background: var(--bg); color: var(--ink); font-family: var(--mono); overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .hud { position: fixed; left: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); max-width: calc(100% - 32px); padding: 10px 12px; background: var(--hud); border: 1px solid var(--line); display: grid; gap: 4px; pointer-events: none; }
 .hud h1 { margin: 0; font: 500 14px/1.2 var(--ui); letter-spacing: .01em; }
 .hud p { margin: 0; font: 400 12px/1.4 var(--ui); color: var(--dim); }
 .hud kbd { font-family: inherit; color: var(--ink); }
+.hud .hint-touch { display: none; }
+@media (hover: none) and (pointer: coarse) { .hud .hint-keys { display: none; } .hud .hint-touch { display: block; } }
 .stats { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; text-align: right; pointer-events: none; line-height: 1.5; white-space: pre; }
 
 /* Navigation only: the experimental engine runs on a separate branch.

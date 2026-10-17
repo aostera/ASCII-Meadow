@@ -11,10 +11,11 @@
 <body>
 
 <canvas id="g" aria-hidden="true"></canvas>
-<canvas id="c" aria-label="ASCII grass field. Move with WASD or arrow keys, or drag; hold Shift or drag far to run. Tap to send a gust."></canvas>
+<canvas id="c" aria-label="ASCII grass field. Move with WASD or arrow keys, or drag; hold Shift or drag far to run. Tap to send a gust; tap the knight, or tap with a second finger while walking, to jump."></canvas>
 <div class="hud">
   <h1>ASCII MMORPG</h1>
-  <p><kbd>WASD</kbd> or drag to walk · <kbd>Shift</kbd> to run · <kbd>E</kbd> or tap a prompt to use · <kbd>Space</kbd> to jump</p>
+  <p class="hint-keys"><kbd>WASD</kbd> or drag to walk · <kbd>Shift</kbd> to run · <kbd>E</kbd> or tap a prompt to use · <kbd>Space</kbd> to jump</p>
+  <p class="hint-touch">Drag anywhere to walk, further to run · tap the knight or a second finger to jump · tap a prompt to use</p>
 </div>
 <div class="stats" id="stats"></div>
 <a class="engine-preview-link"
