@@ -13,7 +13,8 @@ if (mode !== '--source' && mode !== '--dist') {
 }
 const root = path.resolve(__dirname, '../..');
 const outputAbs = path.resolve(root, output);
-if (mode === '--dist' && outputAbs !== path.join(root, 'dist') && outputAbs !== '/tmp/site/ASCII-Meadow') {
+if (mode === '--dist' && outputAbs !== path.join(root, 'dist') && outputAbs !== '/tmp/site/ASCII-Meadow' &&
+    !/^\/tmp\/ascii-meadow-assets-[a-zA-Z0-9_-]+$/.test(outputAbs)) {
   console.error('BLOCKED DEPLOY: unexpected output directory');
   process.exit(2);
 }
