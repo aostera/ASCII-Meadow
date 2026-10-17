@@ -92,8 +92,13 @@ function nativeBushBranchShift(f,x,yFactor,pad,clearH){
   // and the soft upper tips have lighter movement, not a circular empty hole.
   const h=nativeClamp(yFactor,0,1);
   const flex=Math.pow(Math.sin(Math.PI*(h*.83+.07)),.75);
-  return bend*R*.46*flex+nativeBushWake(f,x,
-    clearH===undefined?h:nativeClamp(clearH,0,1),pad);
+  const spring=bend*R*.46*flex;
+  const wake=nativeBushWake(f,x,clearH===undefined?h:nativeClamp(clearH,0,1),pad);
+  if(!wake)return spring;
+  // Spring inertia (an actor reversing or crossing the centre) may add to
+  // the wake but never pull a bough back towards the body.
+  const side=wake<0?-1:1;
+  return side*Math.max(side*(spring+wake),side*wake);
 }
 // Downward sag (screen pixels) of the same pushed bough.
 nativeBushBranchShift.drop=function(f,x,yFactor,pad,clearH){
