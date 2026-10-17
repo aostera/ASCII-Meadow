@@ -19,7 +19,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Validate built CSP: strict exterior and independent Three policy
+      - name: Validate separate security headers for exterior and Three
         run: |
           sh tools/build_site.sh dist
           node - <<'NODE'
