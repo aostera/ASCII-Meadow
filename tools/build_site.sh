@@ -87,7 +87,7 @@ if [ -f "$out/experiments/three/native.html" ]; then
   map_hash=$(node - <<'NODE'
 const fs=require('node:fs'),crypto=require('node:crypto');
 const html=fs.readFileSync('experiments/three/native.html','utf8');
-const m=html.match(/<script type="importmap">([\\s\\S]*?)<\\/script>/);
+const m=html.match(/<script type="importmap">([\s\S]*?)<\/script>/);
 if(!m)throw Error('Missing approved Three.js import map');
 process.stdout.write(crypto.createHash('sha256').update(m[1]).digest('base64'));
 NODE
