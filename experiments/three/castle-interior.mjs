@@ -9,16 +9,24 @@ export class CastleInterior{
   this.renderer=renderer;this.canEnter=canEnter;this.onLeave=onLeave;
   this.active=false;this.frame=0;this.pos={...CASTLE_SPAWN};
   this.keys=new Set();
-  this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x0b0e10);
-  this.scene.fog=new THREE.Fog(0x0b0e10,43,95);
-  this.scene.add(new THREE.HemisphereLight(0xaab6bb,0x101416,1.7));
-  const sun=new THREE.DirectionalLight(0xc5ccd0,1.25);sun.position.set(-18,36,25);this.scene.add(sun);
+  // Native glyph backend explicitly outputs LINEAR RGB to preserve its
+  // authored source pixels. Material hex colours would be converted from
+  // sRGB a second time and become nearly black, so specify linear channels.
+  const linear=hex=>new THREE.Color().setRGB(
+    ((hex>>16)&255)/255,((hex>>8)&255)/255,(hex&255)/255,
+    THREE.LinearSRGBColorSpace);
+  this.scene=new THREE.Scene();this.scene.background=linear(0x0b0e10);
+  this.scene.fog=new THREE.Fog(linear(0x0b0e10),43,95);
+  this.scene.add(new THREE.HemisphereLight(linear(0xaab6bb),linear(0x303639),1.55));
+  const sun=new THREE.DirectionalLight(linear(0xc5ccd0),1.15);
+  sun.position.set(-18,36,25);this.scene.add(sun);
   this.camera=new THREE.OrthographicCamera(-18,18,18,-18,.1,180);
   this.group=new THREE.Group();this.scene.add(this.group);
   const palette={floor:0x292c2e,wall:0x4c4e4e,rib:0x63686a,iron:0x293033,
    stone:0x737a7c,black:0x14181b};
   this.mat={};for(const [name,color]of Object.entries(palette))
-   this.mat[name]=new THREE.MeshLambertMaterial({color,flatShading:true});
+   this.mat[name]=new THREE.MeshLambertMaterial({
+    color:linear(color),flatShading:true});
   this.build();this.initUi();this.installInput();
  }
  box(x,y,z,w,h,d,mat='wall',parent=this.group){
