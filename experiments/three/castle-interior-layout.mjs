@@ -10,7 +10,7 @@ export const CASTLE_ROOMS=Object.freeze([
 {id:'crypt',name:'Погребальная часовня',x0:-25,x1:-11,z0:10,z1:22},
 {id:'armory',name:'Оружейная',x0:11,x1:25,z0:10,z1:22}
 ]);
-export const CASTLE_SPAWN=Object.freeze({x:0,z:21.5});
+export const CASTLE_SPAWN=Object.freeze({x:0,z:16.6});
 export const CASTLE_EXIT=Object.freeze({x:0,z:24.1,r:1.75});
 export const CASTLE_DOORS=Object.freeze([
 {x:0,z:18,r:3.3},{x:0,z:-18,r:3.3},
