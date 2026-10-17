@@ -5,9 +5,10 @@
 import {ThreeGlyphBackend} from './three-glyphs.js';
 import {NativeArchitectureDepth} from './native-architecture-depth.mjs';
 import {NativeGreyMapEditor} from './native-editor-models.mjs';
+import {CastleInterior} from './castle-interior.mjs';
 
 const fallbackCanvas=document.getElementById('g');
-let backend=null,depthPass=null,editorModels=null,disposed=false,fallbackReason=null,frames=0;
+let backend=null,depthPass=null,editorModels=null,castleInterior=null,disposed=false,fallbackReason=null,frames=0;
 let testDepthDisabled=false;
 // The player is the Ashen Vow knight repaired in Blender (blender/ashen/): a skinned GLB with baked
 // clips, rendered offscreen and printed as the game's own knight glyphs (native-ashen-blender.mjs).
@@ -38,14 +39,29 @@ let contextLostCount=0,contextRestoredCount=0,nativeFallbackFrames=0;
 const originalNativeRender=render;
 render=function(){
   GB.nativeActorRanges=[];
+  if(castleInterior?.active){castleInterior.render();return;}
   const result=originalNativeRender();
   if(!GL.ok&&!GL.lost&&GL.ctx2)nativeFallbackFrames++;
   return result;
+};
+// Suspend the exterior simulation only while exploring the interior. The
+// original actor positions, map, collision and editor remain intact outside.
+const originalNativeSimulate=simulate;
+simulate=function(dt){
+  if(castleInterior?.active){castleInterior.update(dt);return;}
+  originalNativeSimulate(dt);
+  if(castleInterior){
+    const gate=props.flatMap(p=>p.spots||[]).find(s=>
+      s._nativeInterior||s.label==='push the great gate');
+    castleInterior.syncGate(gate);
+    castleInterior.updateGateUi(Boolean(gate&&!editing&&interactionInRange(gate)));
+  }
 };
 const nativeBridge=GL;
 const resizeFallback=GL.resize.bind(GL);
 
 function enableFallback(error){
+  castleInterior?.leave();
   fallbackReason=String(error?.message||error||'WebGL2 unavailable');
   console.error('Native Three runtime fell back to Canvas2D:',error);
   GL.ok=false;GL.lost=false;GL.gl=null;
@@ -136,6 +152,25 @@ try{
   };
   GL.flush=flushNative;
   GL.ok=true;
+  castleInterior=new CastleInterior(backend.renderer,{
+    canEnter:()=>!editing&&!disposed&&GL.ok&&!GL.lost,
+    onLeave:()=>{if(typeof keys!=='undefined')keys.clear();}
+  });
+  // Explicit QA/preview access; normal gameplay uses the existing castle
+  // gate's E interaction and its contextual touch button.
+  if(new URLSearchParams(location.search).get('castleInterior')==='1'){
+    // The query is ONLY a reviewer shortcut: wait for the original source
+    // world and its gate interactions to initialize before suspending it.
+    // An early enter could leave props unbuilt and the real exit unusable.
+    const enterAfterSourceBuild=()=>{
+      if(disposed||!castleInterior||!GL.ok)return;
+      const gateReady=cathedral.cv&&props.some(p=>
+        (p.spots||[]).some(s=>s._nativeInterior));
+      if(gateReady&&W>0&&H>0)castleInterior.enter();
+      else requestAnimationFrame(enterAfterSourceBuild);
+    };
+    requestAnimationFrame(enterAfterSourceBuild);
+  }
   if(EDIT)editorModels=new NativeGreyMapEditor(
     backend.renderer,
     ()=>({solids,ruinSites,ruinDetail,ruinRotateMesh,cathedral,
@@ -162,6 +197,7 @@ try{
   backend.renderer.domElement.addEventListener('webglcontextlost',e=>{
     e.preventDefault();
     contextLostCount++;
+    castleInterior?.leave();
     // Source main.js intentionally stops animation while GL.lost is true
     // because its original #g framebuffer *is* the lost WebGL canvas.
     // Unlike production, native.html has an INDEPENDENT 2D #g backing;
@@ -243,6 +279,7 @@ window.__ASCII_NATIVE__={
     return {width,height,pixels};
   },
   get greyEditor(){return editorModels?.stats||{enabled:false,frames:0,sites:[]}},
+  get castleInterior(){return castleInterior?.stats||{active:false,rooms:0}},
   // Strictly test-scoped: prove an actual GPU occlusion difference without
   // needing any user-facing renderer toggle or laboratory overlay.
   setDepthMaskForTest(disabled){
@@ -258,6 +295,7 @@ window.__ASCII_NATIVE__={
     if(disposed)return;
     disposed=true;
     ashenVow?.dispose();ashenVow=null;
+    castleInterior?.dispose();castleInterior=null;
     enableFallback('Native GPU bridge disposed');
     backend?.dispose();backend=null;
   }

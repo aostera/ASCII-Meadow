@@ -21,6 +21,6 @@ const nativeMobile=installNativeMobileLifecycle({
 if(nativeMobile.enabled){
   const hint=document.querySelector('.hud p');
   if(hint)hint.textContent=
-    'Удерживайте и тяните для движения · дальше — бег · касание — взаимодействие';
+    'Тяните в любом месте — идти, дальше — бег · ⤒ или второй палец — прыжок · касание подсказки — действие';
 }
 window.__ASCII_MOBILE__=nativeMobile;

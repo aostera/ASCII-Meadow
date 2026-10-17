@@ -80,3 +80,65 @@ html,body { overscroll-behavior: none; }
     left:calc(9px + env(safe-area-inset-left,0px));
   }
 }
+
+/* Castle rooms are rendered in the existing native Three canvas, not a second
+   WebGL context. UI alone overlays the exterior simulation while inside. */
+.castle-enter{position:fixed;z-index:8;left:50%;bottom:max(28px,env(safe-area-inset-bottom));
+ transform:translateX(-50%);border:1px solid #707879;background:#191d20;color:#d0d2d2;
+ padding:11px 18px;box-shadow:0 6px 22px #0009;cursor:pointer;touch-action:manipulation;
+ font:500 13px var(--mono,monospace)}
+.castle-enter[hidden],.castle-interior-ui[hidden],.castle-interior-leave[hidden]{display:none!important}
+.castle-interior-hidden{display:none!important}
+.castle-interior-ui{position:fixed;inset:0;z-index:9;pointer-events:none;
+ color:#d7d8d6;font-family:var(--mono,monospace);user-select:none}
+.castle-interior-head{position:absolute;left:max(14px,env(safe-area-inset-left));
+ top:max(12px,env(safe-area-inset-top));max-width:min(350px,calc(100vw - 28px));
+ display:grid;gap:6px;background:linear-gradient(100deg,#0c1012f5,#0c1012bb);
+ border-left:2px solid #777f80;padding:13px 16px;box-sizing:border-box;
+ box-shadow:0 4px 20px #0008}
+.castle-interior-head small{font-size:10px;letter-spacing:.17em;color:#88969a}
+.castle-interior-head strong{font-size:16px;font-weight:600;letter-spacing:.01em}
+.castle-interior-head span{font-size:11px;line-height:1.5;color:#a5aba9}
+.castle-interior-pad{display:none;position:absolute;right:max(14px,env(safe-area-inset-right));
+ bottom:calc(42px + env(safe-area-inset-bottom));pointer-events:auto;
+ flex-direction:column;gap:3px;align-items:center}
+.castle-interior-pad>div{display:flex;gap:3px}
+.castle-interior-pad button,.castle-interior-leave{border:1px solid #687273;
+ background:#171d20ed;color:#d5dcdd;cursor:pointer;touch-action:none;
+ font:500 17px var(--mono,monospace);box-shadow:0 2px 10px #000a}
+.castle-interior-pad button{width:54px;height:48px;border-radius:3px}
+.castle-interior-pad button:active{background:#556267}
+.castle-interior-leave{position:absolute;left:max(14px,env(safe-area-inset-left));
+ bottom:calc(25px + env(safe-area-inset-bottom));pointer-events:auto;
+ padding:12px 16px;font-size:12px;touch-action:manipulation}
+@media(pointer:coarse),(max-width:700px){
+ .castle-interior-pad{display:flex}
+ .castle-interior-head{max-width:min(320px,calc(100vw - 25px))}
+ .castle-interior-head strong{font-size:14px}
+ .castle-interior-head span{font-size:10px}
+}
+
+/* T10 touch controls (native-touch-controls.js): a floating stick drawn where
+   the thumb lands, and press-to-act buttons. Monochrome HUD look; only shown on
+   touch screens, never in the editor or the castle interior. */
+.native-stick{position:fixed;z-index:5;left:0;top:0;width:0;height:0;pointer-events:none}
+.native-stick[hidden]{display:none!important}
+.native-stick::before,.native-stick i{content:"";position:absolute;border-radius:50%;
+ border:1px solid rgba(250,250,250,.2);transform:translate(-50%,-50%)}
+.native-stick::before{width:144px;height:144px}
+.native-stick i{width:92px;height:92px;border-color:rgba(250,250,250,.09)}
+.native-stick b{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;
+ background:rgba(250,250,250,.32)}
+.native-stick.running::before{border-color:rgba(250,250,250,.36)}
+.native-stick.running b{background:rgba(250,250,250,.52)}
+.native-touch-pad{display:none;position:fixed;z-index:5;
+ right:max(14px,env(safe-area-inset-right,0px));bottom:calc(58px + env(safe-area-inset-bottom,0px));
+ gap:10px;align-items:flex-end}
+.native-touch-pad button{min-width:58px;height:58px;padding:0 14px;border:1px solid #5a5a5a;
+ background:rgba(14,14,14,.82);color:#dedede;font:500 13px/1 var(--mono,monospace);
+ touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;cursor:pointer}
+.native-touch-pad .native-touch-jump{width:58px;padding:0;font-size:22px;border-radius:50%}
+.native-touch-pad button:active{background:#3a3a3a;border-color:#b0b0b0}
+.native-touch-pad [hidden]{display:none!important}
+@media (pointer:coarse){.native-touch-pad{display:flex}.native-touch-pad[hidden]{display:none}}
+#c{-webkit-touch-callout:none}

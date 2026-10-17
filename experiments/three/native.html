@@ -75,6 +75,8 @@
 <script src="experiments/three/native-npcs.js"></script>
 <script src="src/renderer/render.js"></script>
 <script src="src/core/input.js"></script>
+<!-- After input.js (wraps moveIntent), before the editor scripts: its capture listeners see touch first. -->
+<script src="experiments/three/native-touch-controls.js"></script>
 <script src="src/core/game.js"></script>
 <!-- Before editor.js: its capture listeners must see touch pointers first. -->
 <script src="experiments/three/native-editor-touch.js"></script>

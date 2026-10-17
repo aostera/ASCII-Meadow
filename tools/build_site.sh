@@ -31,6 +31,25 @@ if [ -d assets/npc ]; then
   cp -r assets/npc "$out/assets/"
 fi
 
+# Preview branches contain a full playable native Three.js game. Publish
+# ONLY its runtime modules and native.html, never markdown, concepts, keys,
+# GLB drafts or unrelated experiments.
+if [ -f experiments/three/native.html ]; then
+  mkdir -p "$out/experiments/three"
+  cp experiments/three/native.html "$out/experiments/three/"
+  for file in experiments/three/*.js experiments/three/*.mjs experiments/three/*.css; do
+    [ -f "$file" ] || continue
+    cp "$file" "$out/experiments/three/"
+  done
+  # The approved player model of the native game (PR #77), by exact name only.
+  for glb in ashen_tripo_blender_repaired_v01.glb ashen_tripo_blender_repaired_v01_mobile.glb; do
+    src="experiments/three/assets/ashen-vow/$glb"
+    [ -f "$src" ] || continue
+    mkdir -p "$out/experiments/three/assets/ashen-vow"
+    cp "$src" "$out/experiments/three/assets/ashen-vow/"
+  done
+fi
+
 # The checkout commit is the single source of truth for the release revision.
 rev=$(git rev-parse --verify --short=12 HEAD 2>/dev/null || printf 'local')
 node - "$out/index.html" "$rev" <<'NODE'
@@ -56,11 +75,18 @@ cat > "$out/_headers" <<'HEADERS'
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; media-src 'self'; worker-src 'self'
+# Browsers enforce ALL CSP headers, including inherited wildcard headers.
+# Never put script-src on /*: it would block the pinned Three.js CDN and
+# hashed import map despite a more specific CSP for the native game.
 /
   Cache-Control: no-store
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; media-src 'self'; worker-src 'self'
 /index.html
   Cache-Control: no-store
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; media-src 'self'; worker-src 'self'
+/index
+  Cache-Control: no-store
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; media-src 'self'; worker-src 'self'
 /build.json
   Cache-Control: no-store
 /src/*
@@ -68,5 +94,23 @@ cat > "$out/_headers" <<'HEADERS'
 /styles/*
   Cache-Control: no-store
 HEADERS
+# Scoped CSP for the standalone Three.js game. Importmaps require an inline
+# hash but NEVER global unsafe-inline. Production game's default CSP stays
+# self-only. The single approved external runtime dependency is pinned Three.
+if [ -f "$out/experiments/three/native.html" ]; then
+  map_hash=$(node - <<'NODE'
+const fs=require('node:fs'),crypto=require('node:crypto');
+const html=fs.readFileSync('experiments/three/native.html','utf8');
+const m=html.match(/<script type="importmap">([\s\S]*?)<\/script>/);
+if(!m)throw Error('Missing approved Three.js import map');
+process.stdout.write(crypto.createHash('sha256').update(m[1]).digest('base64'));
+NODE
+)
+  cat >> "$out/_headers" <<HEADERS
+/experiments/three/*
+  Cache-Control: no-store
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self' https://cdn.jsdelivr.net 'sha256-$map_hash'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://cdn.jsdelivr.net; media-src 'self'; worker-src 'self'
+HEADERS
+fi
 touch "$out/.nojekyll"
 node tools/check/deploy-surface.cjs --dist "$out"

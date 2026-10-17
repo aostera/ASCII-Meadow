@@ -20,6 +20,9 @@ if (mode === '--dist' && outputAbs !== path.join(root, 'dist') && outputAbs !== 
 }
 const assetExtensions = new Set(['.png', '.webp']);
 const textExtensions = new Set(['.js', '.css', '.html', '.json', '.mjs']);
+// The native game's player model: the only binary model allowed on the public site, by exact name.
+const approvedModels = new Set(['ashen_tripo_blender_repaired_v01.glb', 'ashen_tripo_blender_repaired_v01_mobile.glb']);
+const modelDir = 'experiments/three/assets/ashen-vow';
 const blockers = [
   ['private-key', /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----/i],
   ['github-token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{35,})\b/],
@@ -96,13 +99,23 @@ if (mode === '--source') {
   visit('styles', new Set(['.css']));
   if (fs.existsSync(path.join(root, 'assets/npc')))
     visit('assets/npc', assetExtensions);
+  const three=path.join(root,'experiments/three');
+  if(fs.existsSync(path.join(three,'native.html'))){
+    for(const name of fs.readdirSync(three)){
+      if(name==='native.html'||/\.(?:js|mjs|css)$/.test(name))
+        visit('experiments/three/'+name,
+          new Set(['.html','.js','.mjs','.css']),false);
+    }
+    for (const name of approvedModels)
+      if (fs.existsSync(path.join(root, modelDir, name))) visit(modelDir + '/' + name, new Set(['.glb']), false);
+  }
 } else {
   // The published directory must include only assets explicitly approved below.
   const dist = outputAbs;
   if (!fs.existsSync(dist) || fs.lstatSync(dist).isSymbolicLink()) {
     report('missing-or-symlink-dist', 'dist');
   } else {
-    const allowed = new Set(['src', 'styles', 'assets', 'index.html', 'build.json', '_headers', '.nojekyll']);
+    const allowed = new Set(['src', 'styles', 'assets', 'experiments', 'index.html', 'build.json', '_headers', '.nojekyll']);
     for (const filename of fs.readdirSync(dist)) {
       if (!allowed.has(filename)) report('unexpected-published-file', 'dist/' + filename);
     }
@@ -114,6 +127,28 @@ if (mode === '--source') {
       const dirs = fs.readdirSync(path.join(dist, 'assets'));
       for (const d of dirs) if (d !== 'npc') report('unexpected-published-asset-dir', 'dist/assets/' + d);
       if (fs.existsSync(path.join(dist, 'assets/npc'))) visit(path.join(output, 'assets/npc'), assetExtensions);
+    }
+    if(fs.existsSync(path.join(dist,'experiments'))){
+      for(const sub of fs.readdirSync(path.join(dist,'experiments')))
+        if(sub!=='three')report('unapproved-experiment-directory','dist/experiments/'+sub);
+      if(fs.existsSync(path.join(dist,'experiments/three'))){
+        for(const name of fs.readdirSync(path.join(dist,'experiments/three'))){
+          if(name==='assets')continue;
+          if(name!=='native.html'&&!/\.(?:js|mjs|css)$/.test(name))
+            report('unapproved-experiment-file','dist/experiments/three/'+name);
+          else visit(path.join(output,'experiments/three',name),new Set(['.html','.js','.mjs','.css']),false);
+        }
+        const models=path.join(dist,'experiments/three/assets');
+        if(fs.existsSync(models)){
+          for(const sub of fs.readdirSync(models))
+            if(sub!=='ashen-vow')report('unapproved-experiment-asset-dir','dist/experiments/three/assets/'+sub);
+          const vow=path.join(models,'ashen-vow');
+          if(fs.existsSync(vow))for(const name of fs.readdirSync(vow)){
+            if(!approvedModels.has(name))report('unapproved-experiment-model','dist/'+modelDir+'/'+name);
+            else visit(path.join(output,modelDir,name),new Set(['.glb']),false);
+          }
+        }
+      }
     }
     // These are intentionally the only extensionless/hidden deployment metadata.
     for (const name of ['_headers', '.nojekyll']) {

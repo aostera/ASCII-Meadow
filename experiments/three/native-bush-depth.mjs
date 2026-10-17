@@ -83,10 +83,8 @@ export class NativeBushDepth{
         // EXACT same independent nine-twig spring interpolation used when
         // the source ASCII backing and leaves move in native-bushes.js.
         const radius=r*(kind===0?.73:1);
-        // The clump clears the actor's body column by its own radius, so
-        // its edge, not only its centre, leaves the opening the leaves show.
-        const shift=source.nativeBushBranchShift(f,x+sway,h,radius,
-          y/shape.nativeTop);
+        // Bent by its true height above the ground, not its screen height.
+        const shift=source.nativeBushBranchShift(f,x+sway,y/shape.nativeTop);
         this.matrix.makeScale(radius,radius,radius);
         this.matrix.setPosition(originX-x-sway-shift,
           originY+y,originZ+z);

@@ -360,7 +360,7 @@ jobs:
           node --check tools/check/three-native-bush.cjs
           node --check experiments/three/native-bush-depth.mjs
           node --check tools/check/three-native-bush-depth.cjs
-          node --check tools/check/three-native-bush-readability.cjs
+          node --check tools/check/three-native-bush-contact.cjs
           node --check experiments/three/native-npcs.js
           node --check experiments/three/native-gothic-details.js
           node --check experiments/three/native-gothic-complete.js
@@ -368,6 +368,8 @@ jobs:
           node --check tools/check/three-native-grey-editor.cjs
           node --check experiments/three/native-editor-touch.js
           node --check tools/check/three-native-editor-touch.cjs
+          node --check tools/check/three-native-touch-controls.cjs
+          node --check experiments/three/native-touch-controls.js
           node --check experiments/three/native-shadow-soften.js
           node --check experiments/three/native-shadow-coverage.js
           node --check tools/check/three-native-shadow-coverage.cjs
@@ -424,7 +426,7 @@ jobs:
           node tools/check/three-native-android.cjs http://127.0.0.1:8181
           node tools/check/three-native-bush.cjs http://127.0.0.1:8181
           node tools/check/three-native-bush-depth.cjs http://127.0.0.1:8181
-          node tools/check/three-native-bush-readability.cjs http://127.0.0.1:8181
+          node tools/check/three-native-bush-contact.cjs http://127.0.0.1:8181
           node tools/check/three-native-npcs.cjs http://127.0.0.1:8181
           node tools/check/three-native-depth.cjs http://127.0.0.1:8181
           node tools/check/three-native-tree-depth.cjs http://127.0.0.1:8181
@@ -432,6 +434,7 @@ jobs:
           node tools/check/three-native-art.cjs http://127.0.0.1:8181
           node tools/check/three-native-grey-editor.cjs http://127.0.0.1:8181
           node tools/check/three-native-editor-touch.cjs http://127.0.0.1:8181
+          node tools/check/three-native-touch-controls.cjs http://127.0.0.1:8181
           node tools/check/three-native-body-shadows.cjs http://127.0.0.1:8181
           node tools/check/three-parity.cjs http://127.0.0.1:8181
           node tools/check/three-motion-parity.cjs http://127.0.0.1:8181
@@ -468,7 +471,7 @@ jobs:
             shots/three-native-android/
             shots/three-native-bush/
             shots/three-native-bushes/
-            shots/three-native-bush-readability/
+            shots/three-native-bush-contact/
             shots/three-native-npcs/
             shots/three-native-depth/
             shots/three-native-trees/
@@ -476,5 +479,6 @@ jobs:
             shots/three-native-art/
             shots/three-native-grey-editor/
             shots/three-native-editor-touch/
+            shots/three-native-touch-controls/
             shots/three-native-body-shadows/
           if-no-files-found: warn
