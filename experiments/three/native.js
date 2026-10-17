@@ -6,10 +6,14 @@ import {ThreeGlyphBackend} from './three-glyphs.js';
 import {NativeArchitectureDepth} from './native-architecture-depth.mjs';
 import {NativeGreyMapEditor} from './native-editor-models.mjs';
 import {CastleInterior} from './castle-interior.mjs';
+import {installJumpOcclusion} from './native-jump-occlusion.mjs';
 
 const fallbackCanvas=document.getElementById('g');
 let backend=null,depthPass=null,editorModels=null,castleInterior=null,disposed=false,fallbackReason=null,frames=0;
 let testDepthDisabled=false;
+// A jumping knight keeps his ground-foot occlusion: masonry in front covers
+// the whole raised sprite, never a straight slice of it (native-jump-occlusion.mjs).
+const jumpOcclusion=installJumpOcclusion();
 // The player is the Ashen Vow knight repaired in Blender (blender/ashen/): a skinned GLB with baked
 // clips, rendered offscreen and printed as the game's own knight glyphs (native-ashen-blender.mjs).
 // ?ashenVow=0 keeps the original baked ASCII knight; so do the editor and a 3D knight that cannot
@@ -311,6 +315,7 @@ window.__ASCII_NATIVE__={
   },
   get greyEditor(){return editorModels?.stats||{enabled:false,frames:0,sites:[]}},
   get castleInterior(){return castleInterior?.stats||{active:false,rooms:0}},
+  get jumpOcclusion(){return jumpOcclusion?{...jumpOcclusion.stats}:null},
   // Strictly test-scoped: prove an actual GPU occlusion difference without
   // needing any user-facing renderer toggle or laboratory overlay.
   setDepthMaskForTest(disabled){
