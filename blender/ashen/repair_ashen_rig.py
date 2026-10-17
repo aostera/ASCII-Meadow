@@ -259,3 +259,28 @@ def render_review(out_dir, prefix, views=None, size=(640, 760)):
         bpy.ops.render.render(write_still=True)
         paths.append(sc.render.filepath)
     return paths
+
+
+def apply_rest_pose():
+    """The current pose (arms down) becomes the bind: the deformation is baked into the mesh,
+    the pose applied as the armature's rest, and the mesh skinned again with the same groups.
+    Animations then stay close to the bind, where linear blend skinning (Three.js) is clean."""
+    arm, me = rig(), body()
+    hidden = arm.hide_get()
+    arm.hide_set(False)
+    for o in bpy.context.selected_objects:
+        o.select_set(False)
+    mod = next(m for m in me.modifiers if m.type == "ARMATURE")
+    with bpy.context.temp_override(object=me, active_object=me, selected_objects=[me]):
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+    bpy.context.view_layer.objects.active = arm
+    arm.select_set(True)
+    bpy.ops.object.mode_set(mode="POSE")
+    bpy.ops.pose.select_all(action="SELECT")
+    bpy.ops.pose.armature_apply(selected=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    m = me.modifiers.new("Armature", "ARMATURE")
+    m.object = arm
+    m.use_vertex_groups = True
+    arm.hide_set(hidden)
+    assert len(arm.data.bones) == 40 and len(me.vertex_groups) == 40
