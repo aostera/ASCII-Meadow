@@ -5,12 +5,25 @@
 set -eu
 out=${1:?usage: sh tools/build_site.sh dist}
 # Fail closed: never clean arbitrary paths, follow symlinks or publish unapproved sources.
-if { [ "$out" != "dist" ] && [ "$out" != "/tmp/site/ASCII-Meadow" ]; } || [ -L "$out" ]; then
-  echo 'Security: output must be dist or the CI-only /tmp/site/ASCII-Meadow path, and not a symlink' >&2
+case "$out" in
+  dist|/tmp/site/ASCII-Meadow) ;;
+  /tmp/ascii-meadow-assets-*)
+    suffix=${out#/tmp/ascii-meadow-assets-}
+    case "$suffix" in ''|*[!a-zA-Z0-9_-]*) echo 'Security: unsafe temporary output path' >&2; exit 1 ;; esac
+    ;;
+  *) echo 'Security: unexpected deployment output path' >&2; exit 1 ;;
+esac
+if [ -L "$out" ]; then
+  echo 'Security: deployment output cannot be a symlink' >&2
   exit 1
 fi
 node tools/check/deploy-surface.cjs --source
-rm -rf -- "$out"
+if [ "$out" = "dist" ]; then
+  rm -rf -- "$out"
+elif [ -d "$out" ] && [ -n "$(ls -A "$out")" ]; then
+  echo 'Security: refusing to overwrite a non-empty temporary output directory' >&2
+  exit 1
+fi
 mkdir -p "$out"
 cp -r index.html styles src "$out"/
 if [ -d assets/npc ]; then
