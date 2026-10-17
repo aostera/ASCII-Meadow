@@ -23,6 +23,8 @@ const base=(process.argv[2]||'http://127.0.0.1:8181').replace(/\/$/,'');
     const lab=window.__ASHEN_ANIMATION_LAB__;
     return lab&&(lab.ready||lab.error);
   },undefined,{timeout:110000});
+  // Register the download event BEFORE clicking the browser Blob link.
+  const downloadPromise=page.waitForEvent('download',{timeout:180000});
   const preparing=await page.evaluate(async()=>{
     const THREE=await import('three');
     const {GLTFExporter}=await import('three/addons/exporters/GLTFExporter.js');
@@ -103,7 +105,7 @@ const base=(process.argv[2]||'http://127.0.0.1:8181').replace(/\/$/,'');
     meta.exportedAt=new Date().toISOString();
     return meta;
   });
-  const download=await page.waitForEvent('download',{timeout:120000});
+  const download=await downloadPromise;
   if(!download.suggestedFilename().endsWith('.glb'))
     throw Error('Browser did not export .glb: '+download.suggestedFilename());
   const file=path.join(out,'ashen_tripo_v22_REVIEW_ONLY_motion_bake.glb');
