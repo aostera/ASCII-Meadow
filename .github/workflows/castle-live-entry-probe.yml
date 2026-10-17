@@ -1,0 +1,28 @@
+name: Published Castle Entry Probe
+
+on:
+  push:
+    branches: ['fix/three-castle-entry-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check production-like published experiment URL
+        run: |
+          set -eu
+          site='https://experiment-threejs-ascii-prototype-ascii-meadow.aloster36.workers.dev'
+          for p in /experiments/three/native.html /experiments/three/native.js /experiments/three/castle-interior.mjs /experiments/three/castle-interior-layout.mjs /src/world/castle.js; do
+            status=$(curl -L -sS --max-time 25 -D /tmp/entry-headers -o /tmp/entry-body -w '%{http_code}' "$site$p" || true)
+            echo "$p status=$status bytes=$(wc -c </tmp/entry-body 2>/dev/null || echo 0)"
+            grep -i -E '^(content-type|content-security-policy|location):' /tmp/entry-headers | cut -c 1-300 || true
+            case "$status" in
+              200) ;;
+              *) echo "PUBLISHED_ASSET_UNAVAILABLE: $p" ;;
+            esac
+          done
