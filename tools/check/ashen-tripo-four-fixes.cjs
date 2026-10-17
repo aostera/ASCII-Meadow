@@ -50,7 +50,7 @@ const raf=page=>page.evaluate(()=>new Promise(resolve=>
   await page.locator('[data-mode="Run"]').click();
   await page.waitForFunction(()=>{
    const p=window.__ASHEN_AB_COMPARE__?.visualPose;
-   return p?.animationVersion==='Tripo-IK-v20-art-review-gait' &&
+   return p?.animationVersion==='Tripo-IK-v21-anatomical-arm-calibration' &&
      (p.leftFootLift>.074||p.rightFootLift>.074)&&
      p.footContact.includes(false);
   },undefined,{timeout:60000});
