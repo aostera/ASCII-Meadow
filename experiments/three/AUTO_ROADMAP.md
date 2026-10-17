@@ -15,13 +15,13 @@
 | T00 | DONE | Первоначальный full CI экспериментального native |
 | T01 | DONE (аудит) | Desktop + mobile viewport, 4 здания; это не финальный art sign-off |
 | T04 | IN_REVIEW | [#59](https://github.com/aostera/ASCII-Meadow/pull/59) + [#60](https://github.com/aostera/ASCII-Meadow/pull/60) merged. Проверить тени всех объектов с проёмами, поворотами и undo/redo без прямоугольников/ghost-shadows |
-| T05 | IN_REVIEW | Растительность/глубина/пружины; читаемость NPC в кустах и восстановление веток — [PR #64](https://github.com/aostera/ASCII-Meadow/pull/64); реальный телефон остаётся gate |
-| T06 | IN_PROGRESS | Tents/fences/fires/road/stone/Gothic props, collision и grounding без плоских подмен |
+| T05 | IN_REVIEW | Растительность/глубина/пружины. Куст при контакте не раздвигается (решение владельца 17.10), а качается от шагов — [PR #65](https://github.com/aostera/ASCII-Meadow/pull/65); реальный телефон остаётся gate |
+| T06 | IN_PROGRESS | Tents/fences/fires/road/stone/Gothic props, collision и grounding без плоских подмен. Camp QA на experiment PR: tent/fence Z + fire order/collision (desktop+phone). Следующее: конкретные замечания владельца по лагерю, дороги/декор |
 | T07 | IN_PROGRESS | Touch pan/pinch [#62](https://github.com/aostera/ASCII-Meadow/pull/62) merged (`73cf6c8`); editor scroll, HUD, lifecycle, контекст и настоящий Safari |
 | T08 | IN_PROGRESS (baseline draft) | [#61](https://github.com/aostera/ASCII-Meadow/pull/61) — baseline native perf, никаких недоказанных FPS |
 | T02 | PARKED | Замок: [#54](https://github.com/aostera/ASCII-Meadow/pull/54) draft, невидимый рельеф не принимать как готовую геометрию |
 | T03 | PARKED | Три разные руины: [#58](https://github.com/aostera/ASCII-Meadow/pull/58) draft/stacked |
-| T10 | IN_REVIEW | **Управление на телефоне и планшете** (владелец 17.10: «очень плохо отрабатывает»). Слой `native-touch-controls.js`: плавающий стик от места касания (шаг/бег по отклонению, мгновенный разворот), второй палец и кнопка ⤒ — прыжок, кнопка «E» при подсказке, отмена касания не тап, без long-press меню и зума. `src/` не тронут. Тест `tools/check/three-native-touch-controls.cjs` (Chromium phone+tablet). Остались реальные Android/iOS/Safari и управление пальцем внутри замка (там своя крестовина) |
+| T10 | IN_REVIEW (merged [#81](https://github.com/aostera/ASCII-Meadow/pull/81)) | **Управление на телефоне и планшете** (владелец 17.10: «очень плохо отрабатывает»). Слой `native-touch-controls.js`: плавающий стик от места касания (шаг/бег по отклонению, мгновенный разворот), второй палец и кнопка ⤒ — прыжок, кнопка «E» при подсказке, отмена касания не тап, без long-press меню и зума. `src/` не тронут. Тест `tools/check/three-native-touch-controls.cjs` (Chromium phone+tablet). Остались реальные Android/iOS/Safari и управление пальцем внутри замка (там своя крестовина) |
 | T09 | TODO | Full-game parity, QA реальных устройств, возврат GPU/fallback, контроль карты, художественное решение владельца |
 
 **Технически подтверждено:** head `c1f12b6496` после #60 имеет [CI success](https://github.com/aostera/ASCII-Meadow/actions/runs/38944223018) и [editor/character success](https://github.com/aostera/ASCII-Meadow/actions/runs/38944215332). Обновлённые PR проверять по их собственному CI, а не по зелёному предыдущей базы.

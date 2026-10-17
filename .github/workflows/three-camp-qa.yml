@@ -1,0 +1,55 @@
+name: Three Native Camp QA
+
+on:
+  push:
+    branches:
+      - 'feat/three-t06-*'
+  pull_request:
+    branches:
+      - experiment/threejs-ascii-prototype
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-camp-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  camp-depth-fire:
+    name: Tent/fence Z, camp fire order and fire collision (desktop/mobile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Syntax-check camp modules and tests
+        run: |
+          node --check experiments/three/native-props-depth.mjs
+          node --check tools/check/three-native-props-depth.cjs
+          node --check tools/check/three-native-camp-fire.cjs
+      - name: Physically verify authored camp props and fires
+        run: |
+          python3 -m http.server 8181 > /tmp/native-camp-http.log 2>&1 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8181/experiments/three/native.html >/dev/null && break
+            sleep 1
+          done
+          node tools/check/three-native-props-depth.cjs http://127.0.0.1:8181
+          node tools/check/three-native-camp-fire.cjs http://127.0.0.1:8181
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: three-native-camp
+          path: |
+            shots/three-native-props
+            shots/three-native-camp-fire
+          if-no-files-found: warn
