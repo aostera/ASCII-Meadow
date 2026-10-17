@@ -251,6 +251,23 @@ if(ashenVowOn&&backend){
   });
 }
 
+// ?knightDiag=1: a one-line on-screen report of which knight is drawn and why, for checking a
+// real phone where the console is out of reach.
+if(new URLSearchParams(location.search).get('knightDiag')==='1'){
+  const diag=document.createElement('pre');
+  diag.style.cssText='position:fixed;left:6px;top:6px;z-index:99;margin:0;padding:4px 6px;'+
+    'font:11px/1.3 monospace;color:#ddd;background:rgba(0,0,0,.75);pointer-events:none;white-space:pre-wrap;max-width:94vw';
+  document.body.append(diag);
+  setInterval(()=>{
+    const s=ashenVow?.stats,err=ashenVowError||s?.error||s?.asyncError||null;
+    const knight=!ashenVowOn?'original (ashenVow=0)':!backend?'original (no Three backend)':
+      !(GL.ok&&!GL.lost)?'original (WebGL off/lost)':editing?'original (editor)':
+      ashenVow?.ready?'Ashen Vow':ashenVow?'original (model loading)':err?'original (failed)':'original (module loading)';
+    diag.textContent=`knight: ${knight}\nmode: ${GL.ok&&!GL.lost?'three':'canvas2d'}${fallbackReason?' ('+fallbackReason+')':''}`+
+      `\nlod: ${s?.lod||'-'} frames: ${s?.frames||0} read: ${s?.asyncRead?'async':'sync'}`+(err?`\nerror: ${err}`:'');
+  },500);
+}
+
 window.__ASCII_NATIVE__={
   get ready(){return Boolean(GB.atlasCv&&W&&H&&GB.n>1000)},
   get mode(){return GL.ok&&!GL.lost?'three':'canvas2d'},
