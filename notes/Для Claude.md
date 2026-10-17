@@ -189,3 +189,5 @@ Native game only (`/experiments/three/native.html`):
 - Скрипты `blender/ashen/repair_ashen_rig.py` (импорт → `fix_weights` → `pose_arms_down` → `measure` / `render_review`), листы сравнения `blender/ashen/review/compare_*.png`. Исходную GLB только читать.
 - Не делай пластины брони жёсткими по кускам — наплечник собран из наложенных кусков и расходится щелями. Правь веса плавно по вершинам.
 - Имена Tripo не анатомические: +Y рука — `0_Left_Limb_*`, -Y рука — `bone_16..25`, плащ — `0_Right_Limb_*`. В V22 (экспорт из Three.js) имена без `::` (`tripo0_Left_Limb_2`).
+- Рыцарь Tripo v01: `blender/ashen/README.md` (пересборка и таблица изменений). После экспорта ОБЯЗАТЕЛЬНО `node blender/ashen/fix_joint_order.cjs` — Blender меняет порядок суставов. Экспорт — через прореженную копию тела (`web_body`), не модификатором (иначе ~30 минут).
+- В `native.html` модель по умолчанию — `native-ashen-blender.mjs` (клипы из GLB). Старые: `?tripoV2=1` (V2), `?ashenModel=v12`.

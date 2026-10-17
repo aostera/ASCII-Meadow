@@ -31,7 +31,7 @@ fs.mkdirSync(output,{recursive:true});
    if(requests.some(url=>url.includes('ashen-vow-game-model.mjs')||url.includes('ashen_vow_v12.glb')))
      throw Error('Opt-out still downloaded GLB');
 
-   await page.goto(base+'/experiments/three/native.html?edit=0&ashenVow=1',
+   await page.goto(base+'/experiments/three/native.html?edit=0&ashenVow=1&ashenModel=v12',
      {waitUntil:'domcontentloaded'});
    await page.waitForFunction(()=>{
      const n=window.__ASCII_NATIVE__;
@@ -116,7 +116,7 @@ fs.mkdirSync(output,{recursive:true});
    if(after)throw Error('3D player survived renderer dispose');
    if(!mobile){
      // User-facing optional close inspection is STILL the full real game.
-     await page.goto(base+'/experiments/three/native.html?edit=0&ashenVow=1&ashenInspect=1',
+     await page.goto(base+'/experiments/three/native.html?edit=0&ashenVow=1&ashenModel=v12&ashenInspect=1',
        {waitUntil:'domcontentloaded'});
      await page.waitForFunction(()=>{
        const n=window.__ASCII_NATIVE__;

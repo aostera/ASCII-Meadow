@@ -56,3 +56,10 @@ Third-party Blender MCP: https://github.com/ahujasid/mcp-for-blender
 Install UV, then `uvx mcp-for-blender setup` to select Claude and Blender, or `claude mcp add blender uvx mcp-for-blender` (Claude Code). Blender's N panel exposes the MCP connection; make sure the intended single MCP server is running. See upstream for precise version instructions.
 
 **Handoff state:** authentic GLB and four reference clips exported successfully and independently validated by workflow 39014001772. Blender structural editing of this original file has **not** been performed yet; do not claim all visual bugs fixed.
+
+## Claude result v01 (2026-10-17, branch `feat/ashen-blender-rig-repair-20261017`)
+
+- Repaired GLB: `experiments/three/assets/ashen-vow/ashen_tripo_blender_repaired_v01.glb` (4.1 MB, 70k triangles, the source's 40 joints in the source order, Idle 121 / Walk 69 / Run 85 / Jump 73 frames at 60 fps, separate longsword under `bone_19`, vertex colours). Source GLB byte-identical.
+- Scripts, change table and review sheets: `blender/ashen/` (README, `review/compare_*.png`).
+- Root cause of the V22 arms: Tripo's own weights hold the pauldrons together when posed correctly; what stretched was the cape and armpit plates carrying upper-arm weight. Fixed in the weights, then the arms-down pose became the bind.
+- Native game: `native-ashen-blender.mjs` plays the baked clips and prints them as glyphs; default in `native.html` (`?tripoV2=1` keeps V2). Checks: `tools/check/ashen-blender-glb.cjs`, `tools/check/ashen-blender-native.cjs`.

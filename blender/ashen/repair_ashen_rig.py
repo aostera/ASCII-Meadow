@@ -284,3 +284,120 @@ def apply_rest_pose():
     m.use_vertex_groups = True
     arm.hide_set(hidden)
     assert len(arm.data.bones) == 40 and len(me.vertex_groups) == 40
+
+
+# ---------------------------------------------------------------- materials (vertex colours)
+# The source has one flat grey material and no UVs, so the look comes from a colour per mesh
+# piece (COLOR_0 in the GLB): dark warm steel, the burgundy cape and hood, a darker wine tabard,
+# aged leather straps. Shades vary a little per piece so plates read apart. The final ASCII
+# styling happens in the engine; these are the base values it starts from.
+PALETTE = {
+    "steel": (0.150, 0.146, 0.150),
+    "cloak": (0.300, 0.040, 0.050),
+    "tabard": (0.165, 0.060, 0.060),
+    "leather": (0.135, 0.085, 0.055),
+}
+
+
+def classify_pieces():
+    """Label each mesh piece steel / cloak / tabard / leather from where it sits on the bind
+    (arms down) and which bones carry it."""
+    me = body()
+    G = me.vertex_groups
+    co = world_co(me)
+    lab = islands(me)
+    cloak_ids = {G[b].index for b in CLOAK}
+    root_id = G["tripo::Root"].index
+    n = len(co)
+    wc = np.zeros(n)
+    wr = np.zeros(n)
+    for v in me.data.vertices:
+        for g in v.groups:
+            if g.group in cloak_ids:
+                wc[v.index] += g.weight
+            elif g.group == root_id:
+                wr[v.index] = g.weight
+    head_ids = {G[b].index for b in ("tripo::Head_0", "tripo::Head_1")}
+    neck_id = G["tripo::0_Left_Limb_0"].index
+    clav_ids = {G[a["clav"]].index for a in ARM.values()}
+    upper_ids = {G[a["upper"]].index for a in ARM.values()}
+    arm_ids = {G[n].index for a in ARM.values()
+               for n in [a["upper"], a["fore"], a["hand"], *a["fingers"], *a["thumb"]]}
+    labels = np.empty(lab.max() + 1, dtype=object)
+    for i in range(lab.max() + 1):
+        idx = np.where(lab == i)[0]
+        p = co[idx]
+        c = p.mean(0)
+        ext = p.max(0) - p.min(0)
+        acc = {}
+        for j in idx[:: max(1, len(idx) // 200)]:
+            for g in me.data.vertices[j].groups:
+                acc[g.group] = acc.get(g.group, 0.0) + g.weight
+        dom = max(acc, key=acc.get) if acc else -1
+        if (dom in head_ids and c[0] < 0.095) or (dom == neck_id and c[2] > 0.80) or                 (dom in clav_ids and c[0] < 0.02 and c[2] > 0.70) or                 (dom in upper_ids and c[0] < 0.0 and c[2] > 0.70) or                 (c[2] > 0.79 and 0.10 < abs(c[1]) < 0.19 and c[0] < 0.075):
+            k = "cloak"                     # hood rim around the helmet, the scarf wound round the
+                                            # neck, the cloth over the upper back and the mantle over
+                                            # both shoulders (marked by the author, 2026-10-17)
+        elif wc[idx].mean() > 0.15 or (c[0] < -0.03 and c[2] < 0.86) or (c[2] > 0.80 and c[0] < -0.015):
+            k = "cloak"                     # cape, its tatters, and the hood behind the helmet
+        elif c[2] > 0.78 and p[:, 0].min() < -0.015 and (abs(c[1]) < 0.16 or len(idx) > 1000):
+            k = "cloak"                     # hood halves and the mantle over the shoulders: they wrap
+                                            # from behind the head forward (the helmet sits fully in front)
+        elif abs(c[1]) > 0.13 and c[2] < 0.55 and c[0] < 0.03 and wr[idx].mean() > 0.3:
+            k = "cloak"                     # the cape's side panels by the hips
+        elif 0.40 < c[2] < 0.56 and ext[2] < 0.06 and len(idx) < 1500 and dom not in arm_ids:
+            k = "leather"                   # belts, buckles' straps, pouches at the waist (not the
+                                            # gauntlets' fingers, which hang at the same height)
+        elif 0.08 < c[2] < 0.54 and wr[idx].mean() > 0.4 and abs(c[1]) < 0.16:
+            k = "tabard"                    # the skirt hanging from the belt
+        else:
+            k = "steel"
+        labels[i] = k
+    return lab, labels
+
+
+def paint_vertex_colours(seed=7):
+    me = body()
+    lab, labels = classify_pieces()
+    rng = np.random.default_rng(seed)
+    jitter = 1 + 0.12 * (rng.random(len(labels)) - 0.5)
+    cols = np.zeros((len(lab), 4))
+    for i, k in enumerate(labels):
+        base = np.array(PALETTE[k]) * jitter[i]
+        cols[lab == i, :3] = base
+    cols[:, 3] = 1
+    ca = me.data.color_attributes.get("Col") or me.data.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
+    ca.data.foreach_set("color", cols.ravel())
+    me.data.color_attributes.active_color = ca
+    me.data.color_attributes.render_color_index = me.data.color_attributes.find("Col")
+    for name in ("Stretch", "W"):
+        a = me.data.color_attributes.get(name)
+        if a:
+            me.data.color_attributes.remove(a)
+    mat = bpy.data.materials.get("Ashen_Knight") or bpy.data.materials.new("Ashen_Knight")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    attr = next((n for n in nt.nodes if n.type == "ATTRIBUTE"), None) or nt.nodes.new("ShaderNodeAttribute")
+    attr.attribute_name = "Col"
+    attr.attribute_type = "GEOMETRY"
+    nt.links.new(attr.outputs["Color"], bsdf.inputs["Base Color"])
+    bsdf.inputs["Metallic"].default_value = 0.35
+    bsdf.inputs["Roughness"].default_value = 0.62
+    me.data.materials.clear()
+    me.data.materials.append(mat)
+    return {k: int(sum((lab == i).sum() for i, kk in enumerate(labels) if kk == k)) for k in PALETTE}
+
+
+def sword_material():
+    sword = bpy.data.objects.get("Ashen_Sword")
+    if not sword:
+        return
+    mat = bpy.data.materials.get("Ashen_Sword") or bpy.data.materials.new("Ashen_Sword")
+    mat.use_nodes = True
+    bsdf = next(n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    bsdf.inputs["Base Color"].default_value = (0.42, 0.42, 0.44, 1)
+    bsdf.inputs["Metallic"].default_value = 0.85
+    bsdf.inputs["Roughness"].default_value = 0.38
+    sword.data.materials.clear()
+    sword.data.materials.append(mat)
