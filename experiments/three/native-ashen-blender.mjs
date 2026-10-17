@@ -13,6 +13,7 @@ const COLS = 104, ROWS = 54, FX = 52, FY = 51.6, ART = 44.4;   // the source kni
 const SPRITE_ELEV = .35;
 export const ASHEN_BLENDER_GLB = new URL('./assets/ashen-vow/ashen_tripo_blender_repaired_v01.glb', import.meta.url).href;
 const CLIP_SPEED = {Walk: .529, Run: 1.571};
+const NO_ASYNC = new URLSearchParams(globalThis.location?.search || '').get('ashenAsync') === '0';   // A/B switch
 // Share of cells per ramp level (0 = dark plate, 1..9 = ". : - = + * # % @") in the original baked
 // knight frames, measured in the game over idle, walk and run (2026-10-17); cumulative.
 const LEVEL_SHARE = [.004, 0, .019, .046, .111, .179, .259, .198, .107, .077];
@@ -72,6 +73,39 @@ function glyphMaterial(material) {
   return m;
 }
 
+// ?ashenPerf=1: a small live readout for checking the knight on a real phone or tablet.
+function perfOverlay() {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:50;padding:6px 8px;background:rgba(0,0,0,.72);' +
+    'color:#d8d2c8;font:11px/1.35 ui-monospace,monospace;white-space:pre;pointer-events:none;border-radius:4px';
+  document.body.appendChild(el);
+  let last = performance.now(), frames = 0, rasters = 0, prevRasters = 0;
+  return {
+    el,
+    tick(st) {
+      frames++;
+      const now = performance.now();
+      if (now - last < 500) return;
+      rasters = st.rasterFrames - prevRasters;
+      prevRasters = st.rasterFrames;
+      const sec = (now - last) / 1000;
+      el.textContent = `knight ${st.model}
+` +
+        `game fps     ${(frames / sec).toFixed(1)}
+` +
+        `3D raster/s  ${(rasters / sec).toFixed(1)} (target ${st.rasterHz})
+` +
+        `read ${st.asyncRead ? 'async' : 'sync '}   ${((st.asyncRead ? st.readLatencyMs : st.readMs) ?? 0).toFixed(1)} ms
+` +
+        `issue        ${(st.readMs ?? 0).toFixed(1)} ms   glyphs ${(st.convertMs ?? 0).toFixed(1)} ms
+` +
+        `clip ${st.clip}   cells ${st.cells}`;
+      frames = 0; last = now;
+    },
+    dispose() { el.remove(); },
+  };
+}
+
 export class NativeKnightGlyphs {
   constructor(renderer) {
     this.renderer = renderer;
@@ -116,6 +150,8 @@ export class NativeKnightGlyphs {
     // adaptive rate (as the V2 adapter does), the cached glyphs are re-emitted in between with
     // live firelight and occlusion.
     this.touchDevice = Boolean(globalThis.matchMedia?.('(pointer:coarse)')?.matches);
+    this.asyncRead = false; this.readPending = false; this.freshPixels = false;
+    if (new URLSearchParams(globalThis.location?.search || '').get('ashenPerf') === '1') this.perf = perfOverlay();
     this.rasterClock = null;
     this.rasterInterval = 1 / (this.touchDevice ? 12 : 20);
     this.rasterCostAvg = null;
@@ -153,10 +189,35 @@ export class NativeKnightGlyphs {
       jumpClipTime: NativeKnightGlyphs.jumpClipTime(e, src.JUMP_T, src.AIR0, src.AIR1)
     }, now);
     this.stats.clip = this.knight.userData.gltf.clip;
-    if (this.rasterClock === null || now - this.rasterClock >= this.rasterInterval || now < this.rasterClock) {
-      this.render(G, fcw, fch);
+    if (this.freshPixels) {                 // an asynchronous read-back has landed
+      this.freshPixels = false;
       this.convert();
       this.glyphDirty = true;
+    }
+    const due = this.rasterClock === null || now - this.rasterClock >= this.rasterInterval || now < this.rasterClock;
+    if (due && !this.readPending) {
+      const pending = this.render(G, fcw, fch);
+      if (pending) {
+        this.readPending = true;
+        const issued = performance.now();
+        pending.then(() => {
+          this.readPending = false;
+          this.freshPixels = true;
+          const latency = this.stats.readLatencyMs = performance.now() - issued;
+          // A fence that keeps landing late means a frozen pose: a short stall is better.
+          this.slowReads = latency > 250 ? (this.slowReads || 0) + 1 : 0;
+          if (this.slowReads >= 3 || latency > 1000) { this.asyncRead = false; this.stats.asyncError = `slow fence (${Math.round(latency)} ms)`; }
+        }, err => {
+          this.readPending = false;
+          this.asyncRead = false;               // fall back to synchronous reads
+          this.stats.asyncError = String(err?.message || err);
+        });
+      } else {
+        this.convert();
+        this.glyphDirty = true;
+        this.asyncRead = !this.stats.asyncError && !NO_ASYNC;   // async from the second raster on
+      }
+      this.stats.asyncRead = Boolean(pending);
       const cost = this.stats.readMs + this.stats.convertMs;
       if (Number.isFinite(cost) && cost >= 0)
         this.rasterCostAvg = this.rasterCostAvg === null ? cost : this.rasterCostAvg * .85 + cost * .15;
@@ -166,6 +227,7 @@ export class NativeKnightGlyphs {
       this.rasterClock = now;
       this.stats.rasterFrames++;
     }
+    this.perf?.tick(this.stats);
     this.emit(e, G, fcw, fch, src);
     this.stats.frames++;
   }
@@ -197,18 +259,24 @@ export class NativeKnightGlyphs {
     const prevTarget = r.getRenderTarget(), auto = r.autoClear;
     const color = r.getClearColor(new THREE.Color()).clone(), alpha = r.getClearAlpha();
     const t0 = performance.now();
+    let pending = null;
     try {
       r.setRenderTarget(this.target);
       r.setClearColor(0x000000, 0);
       r.autoClear = true;
       r.render(this.scene, cam);
-      r.readRenderTargetPixels(this.target, 0, 0, PW, PH, this.pixels);
+      // Asynchronous read-back (WebGL2 PBO + fence) once the first raster exists: the frame does
+      // not wait for the GPU; the glyphs follow one or two frames later.
+      if (this.asyncRead && r.readRenderTargetPixelsAsync)
+        pending = r.readRenderTargetPixelsAsync(this.target, 0, 0, PW, PH, this.pixels);
+      else r.readRenderTargetPixels(this.target, 0, 0, PW, PH, this.pixels);
     } finally {
       r.setRenderTarget(prevTarget);
       r.setClearColor(color, alpha);
       r.autoClear = auto;
     }
     this.stats.readMs = performance.now() - t0;
+    return pending;
   }
 
   // tools/to_ascii.py frame_to_ascii(), on the live render
@@ -330,6 +398,7 @@ export class NativeKnightGlyphs {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.perf?.dispose();
     this.scene.remove(this.knight);
     this.knight.userData.dispose?.();
     this.target.dispose();
