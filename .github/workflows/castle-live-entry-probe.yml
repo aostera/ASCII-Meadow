@@ -24,7 +24,7 @@ jobs:
           sh tools/build_site.sh dist
           node - <<'NODE'
           const fs=require('node:fs'),assert=require('node:assert/strict');
-          const blocks=fs.readFileSync('dist/_headers','utf8').split(/(?=^\/\S)/m);
+          const blocks=fs.readFileSync('dist/_headers','utf8').split(/(?=^\/[^\r\n]*$)/m);
           const wild=blocks.find(x=>x.startsWith('/*\n'));
           const native=blocks.find(x=>x.startsWith('/experiments/three/*\n'));
           const home=blocks.find(x=>x.startsWith('/\n'));
